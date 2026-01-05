@@ -1,0 +1,4 @@
+*.gpkg filter=lfs diff=lfs merge=lfs -text
+*.kmz filter=lfs diff=lfs merge=lfs -text
+Geopackage/** filter=lfs diff=lfs merge=lfs -text
+KMZ/** filter=lfs diff=lfs merge=lfs -text

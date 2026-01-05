@@ -1,0 +1,470 @@
+Rally Point App Specification
+Overview
+The Rally Point app is a comprehensive mobile and web application designed to support field operations, community engagement, administration, Bible worker coordination, and a Literature Evangelist Program (Light Squads, Angel Squads, Evangelism Cycles). The app will be built using modern web technologies (React with Tailwind CSS) to ensure cross- platform compatibility and scalability.
+Functional Requirements In the Field
+1. Geotracking:
+o Real-time GPS tracking of field workers.
+o Record and display paths taken during fieldwork.
+2. DeliveryTracking:
+o Option to mark book deliveries as "to door" or "to person." o Log delivery locations with geocoordinates.
+3. Surveys:
+o Create, distribute, and collect surveys at the door.
+o Admin interface to modify or create new surveys dynamically.
+4. WalkieTalkie:
+o Real-time voice communication between team members within the app.
+5. Donations/Payments:
+o Secure in-app payment processing for donations (e.g., Stripe integration).
+o Support for multiple payment methods (credit card, digital wallets).
+o Support offline donations with later syncing, including manual entry for cash donations and digital receipt generation.
+o Developer Note: Use IndexedDB for queued transactions, with encryption for stored payment data; sync with Stripe when online.
+6. TerritoryManagement:
+
+o Interactive map interface for selecting/assigning work areas.
+o Prevent overlapping assignments with real-time territory locking. o Request/assign new territories via team leader/admin approval.
+7. DistanceCovered:
+o Track and report distance traveled by field workers (calculated via GPS).
+8. MapAccess:
+o Embedded maps (e.g., Google Maps or OpenStreetMap) for navigation within
+the app.
+9. OfflineFunctionality:
+o Support offline mode for geotracking, delivery tracking, surveys, and payments, with data syncing when internet is restored.
+o Developer Note: Use service workers and IndexedDB for local storage to ensure seamless operation in low-connectivity areas.
+10. Augmented Reality (AR) Navigation:
+o Implement AR to visualize assigned territories or delivery points via phone
+camera, starting with marker-based AR (e.g., QR codes).
+o Developer Note: Integrate AR.js or a similar lightweight AR library for cross- platform compatibility.
+11. Real-Time Weather Integration:
+o Display weather conditions for assigned territories to aid fieldwork planning.
+o Developer Note: Use a weather API (e.g., OpenWeatherMap) to fetch real- time data based on geolocation.
+12. Safety Alerts:
+o Include a panic button for field workers to send an SOS with their location to
+team leaders or admins.
+o Developer Note: Implement push notifications and SMS alerts using Firebase Cloud Messaging or Twilio.
+13. Real-Time Collaboration Tools:
+
+o Add a shared digital whiteboard or note-taking feature for field teams to collaborate on territory plans or share real-time observations.
+o Developer Note: Use a real-time collaboration library like Yjs with WebRTC for low-latency syncing, integrated into the app’s map interface.
+14. Task Checklists:
+o Provide customizable checklists for field workers to track daily objectives
+(e.g., number of doors to visit, surveys to complete).
+o Developer Note: Store checklists in the database with a drag-and-drop UI using React-Beautiful-DnD; allow pre-populated task templates based on territory type.
+15. Voice-to-Text Notes:
+o Enable field workers to record quick voice notes that are transcribed and
+saved for later review or sharing.
+o Developer Note: Integrate a speech-to-text API (e.g., Google Cloud Speech- to-Text) for real-time transcription; test accuracy for various accents and noisy environments.
+16. Dynamic Territory Feedback Loop:
+o Allow field workers to submit real-time feedback on territories (e.g.,
+accessibility, receptiveness) to inform future assignments.
+o Developer Note: Add a feedback form to the Territory Management interface, with responses stored in Firestore/MongoDB and viewable in the Admin Dashboard’s Master Map; use anonymized feedback for privacy.
+17. Field Worker Training Hub:
+o Provide a dedicated section for in-field training resources (e.g., videos, PDFs
+on door-to-door techniques, survey delivery).
+o Developer Note: Host content in the Resource Vault with a “Field Training” tab, using existing video hosting infrastructure; include progress tracking and offline access.
+18. Digital Receipts for Donations:
+o Auto-generate PDF receipts for online and offline (cash) donations for donor trust and tax compliance.
+
+o Developer Note: Use jsPDF to generate branded receipts, integrated with Donations/Payments; store receipts in Firestore/MongoDB and allow offline generation with sync.
+19. Barcode Scanning for Inventory:
+o Enable barcode scanning for book sales/distribution to streamline inventory
+tracking.
+o Developer Note: Use Firebase ML Kit or a barcode scanning library (e.g., QuaggaJS) with device camera; support ISBNs with manual entry fallback; integrate with Inventory Management.
+20. Safe Check-In Timer:
+o Alert team leaders/admins if a field worker hasn’t checked in after a set
+period (e.g., 2–4 hours) for safety.
+o Developer Note: Integrate with GPS and Safety Alerts, using Firebase Cloud Messaging/Twilio for alerts to multiple recipients; allow customizable intervals.
+21. Local Language Translation:
+o Provide real-time translation for surveys and Bible study content, beyond UI
+multilingual support.
+o Developer Note: Integrate Google Translate API or offline libraries (e.g., i18next); cache translations offline and ensure theological accuracy.
+22. Voice-Activated Commands:
+o Enable hands-free commands (e.g., “Log delivery to door”) for field workers.
+o Developer Note: Use SpeechRecognition API or native voice assistants (Siri/Google); limit to key actions (e.g., logging deliveries, starting walkie- talkie); provide training via Field Worker Training Hub.
+23. Augmented Reality Great Controversy Distribution Map:
+o Visualize The Great Controversy book distribution on a map via AR, with
+areas lighting up based on the number of books distributed.
+o Developer Note: Extend AR.js from AR Navigation, using geolocation data from Delivery Tracking; implement dynamic lighting (e.g., color intensity) based on distribution metrics stored in Firestore/MongoDB.
+
+In the Community 1. Podcast:
+o Host and stream podcasts within the app.
+o Push notifications and sharing options to external platforms (e.g., Spotify,
+Apple Podcasts). 2. LiveEvents:
+o Live streaming for Bible studies, training, prayer, meetings, and readings.
+o Support for Zoom or WebRTC integration. 3. Archives:
+o Store and access past events, podcasts, and recordings.
+o Searchable archive with categorization (e.g., date, type). 4. CommunityCommunication:
+o In-app messaging system for community members.
+o Group chat and private messaging options. 5. NewsFeed:
+o Dynamic feed for community updates, stories, and posts. 6. Announcements:
+o Push notifications to app, email, and SMS for announcements.
+o Admin interface to create and schedule announcements. 7. Donations:
+o In-house donation system with recurring payment options and offline support.
+8. Journaling:
+o Support for video, audio, and written journals.
+o Private/public toggle with admin approval for public sharing.
+o Export public journals to newsletters, newsfeeds, magazines, or YouTube.
+9. CommunityProfiles:
+
+o User profiles with customizable fields (bio, photo, contact info). 10. Ministry Allies:
+o Display banners for allied churches and ministries with links. 11. Leadership Info:
+o Section for leadership bios and contact details. 12. Prayer Requests:
+o Submission form for prayer requests.
+o Admin moderation and display in community section. 13. Daily Devotional:
+o Daily readings from the Mission Book with progress tracking. 14. Courses:
+o Sequential course system where lessons unlock upon completion.
+o Progress tracking and completion certificates. 15. Resource Store:
+o E-commerce section for hats, shirts, bags, pens, and books.
+o Inventory management and checkout process. 16. Resource Vault:
+o Repository for downloadable resources (letters, PDF books, etc.).
+o Access control based on user permissions. 17. Gamification:
+o Introduce badges, leaderboards, or points for community participation (e.g., attending events, completing courses, posting journals).
+o Developer Note: Create a rewards system in the backend with a points database and UI components for badges.
+18. Event RSVP and Calendar Integration:
+o Allow users to RSVP for live events and sync to personal calendars (Google Calendar, iCal).
+
+o Developer Note: Use Google Calendar API or iCal export for seamless integration.
+19. Multilingual Support:
+o Offer content (devotionals, courses, news feed) in multiple languages for
+diverse communities.
+o Developer Note: Implement i18n libraries (e.g., react-i18next) with translations in JSON files.
+20. Social Media Sharing:
+o Enable direct sharing of news feed posts, journal entries, or devotionals to
+platforms like X, Instagram, or Facebook.
+o Developer Note: Integrate platform-specific SDKs or use Web Share API for native sharing.
+21. Community Polls:
+o Allow admins to create quick polls for community feedback on events,
+resources, or initiatives, displayed in the news feed.
+o Developer Note: Build a poll creation interface in the admin dashboard, storing responses in Firestore/MongoDB with real-time result updates; track participation rates for analytics.
+22. Virtual Event Gamification:
+o Add interactive quizzes or live Q&A during live Bible studies or training
+sessions to boost engagement.
+o Developer Note: Use WebSocket or Firebase Realtime Database for live interactions, with a scoring system tied to the gamification module; make elements optional for user flexibility.
+23. Community Mentorship Program:
+o Create a feature for pairing experienced members with newcomers for
+mentorship, with in-app messaging and progress tracking.
+o Developer Note: Add a mentorship matching algorithm based on user profiles and preferences, with a dedicated chat channel; include a feedback loop for mentors/mentees.
+
+24. Event Feedback System:
+o Collect post-event feedback via forms or ratings to improve future Bible
+studies, meetings, or trainings.
+o Developer Note: Integrate a feedback form with star ratings and comments, linked to each event in the archives; allow anonymous submissions with optional follow-up.
+25. Crowdsourced Content Suggestions:
+o Allow community members to suggest topics for devotionals, podcasts, or
+courses, with admin approval.
+o Developer Note: Create a suggestion submission form with a moderation queue in the admin dashboard; add a voting system for popular suggestions.
+26. Mission Trip and Event Sign-Up:
+o Provide a dedicated section for users to view and sign up for upcoming mission trips and events, with details like dates, locations, requirements, and skills/experience fields for role matching.
+o Support payment integration for trip fees using existing Stripe setup.
+o Developer Note: Build a sign-up form with fields for user details and preferences, integrated with the events calendar and admin dashboard for tracking registrations.
+27. Onboarding Tutorial:
+o Add an interactive tutorial for new users to learn key features (e.g., mission
+trip sign-ups, journaling).
+o Developer Note: Use a guided walkthrough with React Joyride, tailored to different user roles (e.g., field workers, Bible workers).
+28. Community Event Leaderboards:
+o Extend gamification to rank top event attendees or mission trip participants,
+encouraging participation with friendly competition.
+o Developer Note: Integrate with the gamification system, pulling data from event RSVPs and mission trip sign-ups for leaderboard rankings.
+29. Community-Driven Mission Planning:
+
+o Enable community members to propose mission trip ideas (e.g., target locations for book distribution), with admin approval.
+o Developer Note: Create a proposal submission form with a moderation queue, linked to the mission trip sign-up section.
+30. Mission Trip Feedback Loop:
+o Allow mission trip participants to submit post-trip feedback to improve future
+events.
+o Developer Note: Integrate a feedback form with star ratings and comments, similar to the event feedback system, linked to mission trip records in the admin dashboard.
+31. Community Prayer Wall:
+o Create a digital prayer wall for real-time posting and responding to prayer requests, with options for anonymous submissions and community reactions (e.g., “Prayed” button).
+o Developer Note: Use Firebase Realtime Database for real-time updates, integrated with the existing Prayer Requests moderation system; allow subscription to updates via Push Notification Customization.
+32. Volunteer Recognition System:
+o Automate recognition for volunteer milestones (e.g., books distributed,
+mission trips completed) with digital certificates or badges.
+o Developer Note: Link to the Gamification system, using jsPDF for certificate generation, stored in the Resource Vault; allow admins to customize criteria.
+33. Mission Trip Hub:
+o Enhance mission trip sign-ups with a discussion forum, pre-trip training
+modules, and a packing checklist generator based on trip details.
+o Developer Note: Use the existing messaging framework for the forum, link training to the Resource Vault, and create a checklist generator with admin- editable templates; integrate with the Events Calendar.
+34. Volunteer Skill Database:
+o Add skill fields to user profiles to match volunteers to tasks (e.g., medical skills for health events).
+
+o Developer Note: Extend Community Profiles with skill fields; add a filtering tool in the Admin Dashboard, integrated with Mission Trip and Volunteer Scheduling features.
+35. Child Check-In for Events:
+o Implement a QR code-based check-in system for children at events/mission
+trips, with guardian alerts.
+o Developer Note: Use qrcode.react for badge generation, integrated with Event RSVP; store child data securely (GDPR/CCPA compliance) and provide printed badge fallback.
+36. Testimony Sharing Hub:
+o Create a dedicated hub for crowdsourcing video/text success stories to
+motivate the community.
+o Developer Note: Build on Journaling framework with a separate hub; include admin approval and sharing options via Social Media Sharing; highlight in Community Spotlight.
+37. Augmented Reality Prayer Maps:
+o Visualize prayer requests on a map via AR, with custom pins for geolocated
+requests.
+o Developer Note: Extend AR.js from AR Navigation, using geolocation data from Prayer Requests; ensure optional use to avoid battery drain.
+Administration 1. Reports:
+o Generate daily, weekly, and monthly reports (filterable by national, regional, state, town):
+▪ Booksdistributed
+▪ Timespentinthefield
+▪ Donationsreceived
+▪ Salesmade
+▪ Peopleattendingmeetings
+
+▪ Biblestudiesgiven
+▪ Biblestudyinterestsassigned ▪ Lessonscompleted
+▪ Streetscompleted
+▪ Prayerlist
+▪ Interestlist
+▪ Interestsvisited
+o Export reports as PDF/CSV. 2. Admin Dashboard:
+o Visual goal charts (e.g., progress bars, pie charts).
+o Master map showing all assigned territories and worker locations. o Team and team leader management interface.
+o Upcoming events calendar.
+o Urgent task alerts with push notifications.
+o Task assignment and communication tools for leaders.
+3. AI-PoweredInsights:
+o Add predictive analytics for field performance (e.g., predicting high-impact
+territories based on historical data).
+o Developer Note: Integrate a lightweight machine learning model (e.g., TensorFlow.js) or use an external API like Google Cloud AI; start with rule- based analytics (e.g., ranking territories by activity) before full AI implementation.
+4. CustomizableReportTemplates:
+o Allow admins to create custom report formats beyond predefined metrics
+(e.g., combining specific data points).
+o Developer Note: Build a drag-and-drop interface for report customization using a library like React-Grid-Layout.
+5. VolunteerScheduling:
+
+o Add a scheduling tool for admins to assign shifts or tasks based on volunteer availability.
+o Developer Note: Use a calendar library (e.g., FullCalendar) with drag-and- drop functionality.
+6. AutomatedTaskPrioritization:
+o Implement an algorithm to prioritize tasks based on urgency, location, or
+team availability, displayed in the admin dashboard.
+o Developer Note: Use a priority scoring system (e.g., based on deadlines and impact) with Firebase Cloud Functions for automation; allow admin overrides for flexibility.
+7. TeamPerformanceHeatmaps:
+o Add a heatmap visualization on the master map to show high-activity areas
+or successful territories.
+o Developer Note: Use Google Maps API with heatmap overlay, pulling data from field activity logs; ensure colorblind-friendly design with a toggle for simplified views.
+8. ResourceUsageAnalytics:
+o Track which resources (e.g., PDFs, store items) are most accessed to inform
+inventory and content decisions.
+o Developer Note: Implement analytics tracking with Firebase Analytics or a custom MongoDB query; provide exportable reports for leadership.
+9. Mission Trip Dashboard:
+o Add a dedicated admin view for mission trip registrations, showing
+participant details, skills, and payment status.
+o Developer Note: Integrate with the existing admin dashboard, pulling data from the mission trip sign-up section.
+10. Volunteer Performance Analytics:
+o Add detailed analytics on individual volunteer performance (e.g., hours worked, tasks completed, mission trip participation) with exportable reports.
+
+o Developer Note: Extend Reports and Analytics Dashboard for Users with admin-level insights, using Firebase Analytics/MongoDB; ensure anonymized data for privacy.
+11. Event Impact Metrics:
+o Track and report metrics for community events and mission trips (e.g.,
+attendance, conversions, follow-up interests).
+o Developer Note: Add to Reports, pulling data from Mission Trip Dashboard, Event RSVP, and Event Feedback System; use visualizations like bar charts.
+12. Team Budget Tools:
+o Add a lightweight budget tracker for team leaders to manage expenses (e.g.,
+travel, inventory).
+o Developer Note: Create a module in the Admin Dashboard with fields for expense categories and totals, integrating with the Financial Breakdown feature for sales-related expenses; provide exportable budget reports.
+13. API Usage Dashboard:
+o Add an internal dashboard to track API costs and usage (e.g., Google Maps,
+Twilio, Stripe).
+o Developer Note: Aggregate usage data from API providers, displaying real- time metrics in the Admin Dashboard; set cost alerts for budget limits.
+14. Leader Training Modules:
+o Provide structured training for admins and team leaders (e.g., dashboard
+usage, territory assignment).
+o Developer Note: Host in the Resource Vault with a “Leader Training” tab, using existing video hosting infrastructure; include progress tracking, offline access, and role-specific modules.
+15. Conflict Resolution Logs:
+o Document disputes over territories/assignments for transparency and
+auditability.
+o Developer Note: Add a log database in Firestore/MongoDB, accessible via the Admin Dashboard; include templates for common disputes and restrict access to admins.
+
+16. Equipment Tracking:
+o Manage loaned devices (e.g., tablets, audio gear) for field teams with check-
+in/out and condition reports.
+o Developer Note: Create a check-in/out system in the Admin Dashboard, similar to Inventory Management; integrate with Team Budget Tools for cost tracking.
+17. Customizable Permission Tiers:
+o Implement fine-grained access (e.g., “view-only reports” for junior leaders)
+beyond basic roles.
+o Developer Note: Extend Firebase Auth with granular permissions; provide a simple UI for admins to manage tiers; test for security.
+Bible Worker Coordination 1. StudyTitles:
+o Dropdown menu for predefined Bible study titles.
+o Option to add custom titles. 2. RoutePlanning:
+o Map-based route planning for Bible workers.
+o Optimize routes based on contact locations. 3. Interest/ContactsManagement:
+o Database for storing contact details and interaction history.
+o Link contacts to other database entries for relationship tracking. 4. Lesson Completion:
+o Track progress of Bible study lessons for each contact. 5. MeetingAttendance:
+o Log attendance for seminars, stop smoking programs, health events, and consultations.
+6. Notes:
+o Free-text field for notes on each contact.
+
+7. AutomatedFollow-UpReminders:
+o Send automated reminders to Bible workers for follow-ups with contacts
+based on interaction history.
+o Developer Note: Use a cron job or Firebase Cloud Functions to schedule reminders.
+8. ContactSegmentation:
+o Allow workers to tag and filter contacts (e.g., by interest level, study progress)
+for targeted outreach.
+o Developer Note: Add tagging functionality to the contact database with a filterable UI.
+9. SmartSchedulingforContacts:
+o Allow Bible workers to propose and confirm meeting times with contacts via
+in-app scheduling tools.
+o Developer Note: Integrate a scheduling API (e.g., Calendly API) or build a custom scheduler with time slot selection, synced with Google Calendar API.
+10. Contact Interaction Timeline:
+o Display a visual timeline of all interactions with a contact (e.g., visits,
+studies, notes) for better tracking.
+o Developer Note: Create a timeline component using a library like Vis.js, linked to the contact database; ensure mobile optimization.
+11. Group Study Coordination:
+o Enable coordination of group Bible studies, allowing workers to invite
+multiple contacts to a single session.
+o Developer Note: Add a group invitation feature with RSVP tracking, integrated with the events system.
+Literature Evangelist Program (Angel Squads) 1. PerformanceTracking:
+o Excel-like interface for tracking team performance:
+
+▪ Inventory(booksavailable,quantities).
+▪ Listingofpersons(contacts/customers).
+▪ Teamleaderassignments.
+▪ Datesofactivities.
+▪ Territoryassignments.
+▪ Bookcostandsaleprice.
+▪ Dailyandweeklytotalsforsalesandactivities.
+▪ Leadership board (ranking teams by performance).
+▪ Goaltrackingpagewithprogressindicators.
+2. InventoryManagement:
+o Automatically adjust inventory when a sale is recorded.
+3. FinancialBreakdown:
+o Allocate sales revenue:
+▪ 50%tostudent
+▪ 15%toleadership
+▪ 3%toloss
+▪ 32%tocostofgoods
+4. FieldFeatures:
+o Include all "In the Field" functionalities (geotracking, surveys, etc.).
+5. SalesForecasting:
+o Provide predictive sales goals based on historical team performance and
+territory data.
+o Developer Note: Implement a simple forecasting algorithm or integrate with an analytics API.
+6. In-AppTrainingModules:
+o Include short video or text-based training for sales techniques, tailored to new evangelists.
+
+o Developer Note: Host training content in the Resource Vault with progress tracking.
+7. CustomerFeedbackCollection:
+o Allow evangelists to collect feedback from customers post-sale to improve
+service and track satisfaction.
+o Developer Note: Add a feedback form linked to each sale record, with results viewable in the admin dashboard.
+8. DynamicGoalSetting:
+o Allow team leaders to set personalized sales or outreach goals for each
+member, with progress tracked in real time.
+o Developer Note: Add a goal-setting interface in the performance tracking module, with notifications for milestones; allow mid-cycle adjustments.
+9. CustomerReferralSystem:
+o Enable evangelists to log referrals from customers for new leads, with
+rewards tied to the gamification system.
+o Developer Note: Create a referral form linked to the contact database, with automated tracking of referral outcomes.
+10. Inventory Reorder Alerts:
+o Notify team leaders when inventory (e.g., books, shirts) falls below a
+threshold, with reorder suggestions.
+o Developer Note: Implement inventory threshold checks using Firebase Cloud Functions, triggering alerts via push notifications.
+General Enhancements
+1. AccessibilityFeatures:
+o Ensure WCAG 2.1 compliance (e.g., screen reader support, high-contrast mode) for inclusivity.
+o Developer Note: Use ARIA attributes and test with tools like Lighthouse; ensure new components (e.g., timelines, polls, sign-up forms, AR maps) comply.
+2. AnalyticsDashboardforUsers:
+
+o Provide individual users (field workers, evangelists) with a personal dashboard showing their stats (e.g., books delivered, distance covered, sales).
+o Developer Note: Build a simplified version of the admin dashboard with user-specific data.
+3. Integration with Wearables:
+o Sync with smartwatches for geotracking, notifications, or walkie-talkie
+functionality.
+o Developer Note: Use APIs like Google Fit or Apple HealthKit for device integration; prioritize for Phase 3.
+4. CustomizableUIThemes:
+o Allow users to choose light/dark modes or custom themes to enhance user
+experience.
+o Developer Note: Implement theme switching with Tailwind CSS and local storage for user preferences.
+5. AIChatbotforSupport:
+o Add an in-app AI chatbot to answer common user questions (e.g., how to use
+features, troubleshoot issues).
+o Developer Note: Integrate a lightweight chatbot framework (e.g., Dialogflow or Botpress) with predefined responses tailored to ministry context.
+6. Push Notification Customization:
+o Allow users to customize notification preferences (e.g., only receive urgent
+task alerts or event reminders).
+o Developer Note: Add a notification settings page with granular controls, stored in user profiles, with default settings for new users.
+7. Cross-PlatformDataSync:
+o Ensure seamless data syncing across web, iOS, Android, and wearables for a consistent user experience.
+
+o Developer Note: Use Firebase Realtime Database or GraphQL subscriptions for real-time data syncing; test performance under varying network conditions.
+8. CommunitySpotlightFeature:
+o Highlight a community member or team weekly in the news feed to foster
+recognition and engagement.
+o Developer Note: Create a spotlight section with admin-curated content, pulling from user profiles or journals; rotate frequently to include diverse members.
+9. DataPrivacyTools:
+o Add user consent prompts for data collection (e.g., location, prayer requests)
+and tools for data export/deletion to comply with GDPR/CCPA.
+o Developer Note: Implement a privacy dashboard for users to manage data, with anonymized analytics for admin reports; ensure child data security for Child Check-In.
+10. Battery-Saving Mode:
+o Add a mode to disable non-essential features (e.g., AR, weather updates) to
+preserve battery life.
+o Developer Note: Implement a one-tap toggle in the app settings, optimizing GPS and AR usage with adaptive polling.
+11. Integration with Existing Systems:
+o Support API integrations with external ministry tools (e.g., CRM for contacts)
+to sync data and reduce manual entry.
+o Developer Note: Create a configurable API connector module for common CRM platforms (e.g., Salesforce, HubSpot).
+12. Multi-tenancy Support:
+o Implement isolated data/workspaces for multiple ministries or regional
+branches, with separate data storage and authentication.
+o Developer Note: Use Firebase’s multi-tenancy features or MongoDB schema design for data partitioning; include a workspace selector for admins and configurable branding; prioritize for Phase 3.
+
+Technical Requirements
+• Frontend: React with JSX, Tailwind CSS for styling.
+• Backend: Node.js with Express or Firebase for real-time database and authentication.
+• Database: Firebase Firestore or MongoDB for scalable data storage, with multi- tenancy partitioning.
+• APIs:
+o Google Maps/OpenStreetMap or MapLibre (as a cost-effective alternative) for
+geotracking and mapping.
+o Stripe for payment processing, with nonprofit discount exploration.
+o WebRTC or third-party service (e.g., Agora) for walkie-talkie and live streaming.
+o OpenWeatherMap for real-time weather data.
+o Google Calendar API or iCal for event syncing.
+o TensorFlow.js or Google Cloud AI for predictive analytics, with rule-based analytics as a starting point.
+o Google Cloud Speech-to-Text for voice-to-text notes and Voice-Activated Commands.
+o Google Translate API or i18next for Local Language Translation. o Calendly API or custom scheduler for contact scheduling.
+o Dialogflow or Botpress for AI chatbot.
+o Yjs for real-time collaboration.
+o Vis.js for contact interaction timelines.
+o React Joyride for onboarding tutorials.
+o jsPDF for certificate and receipt generation.
+o Firebase ML Kit or QuaggaJS for Barcode Scanning. o qrcode.react for Child Check-In badge generation.
+
+o AR.js for AR Navigation, AR Prayer Maps, and AR Great Controversy Distribution Map.
+• Hosting: Deploy on Firebase (using free tier for initial testing) with a plan for AWS/GCP migration for scalability beyond 10k users.
+• Security:
+o User authentication with role-based access (admin, team leader, teammate)
+and customizable permission tiers.
+o Data encryption for sensitive information (donations, contacts, timelines, referrals, offline payments, child data).
+o Two-factor authentication (2FA) for admin and team leader accounts. o User consent prompts and data export/deletion tools for GDPR/CCPA
+compliance.
+• Push Notifications: Firebase Cloud Messaging for announcements, alerts, and reminders.
+• Cross-Platform: Responsive design for web, iOS, Android, and wearables.
+• Offline Support: Service workers and IndexedDB for offline functionality, with timestamp-based conflict resolution (Firestore serverTimestamp) and optimistic UI updates.
+• Caching: Implement Redis or similar for heavy reports and analytics to improve performance.
+• Testing:
+o Unit tests for critical features (e.g., payment processing, territory assignment, scheduling, polls, offline payments, barcode scanning) using Jest or Cypress.
+o End-to-end tests with Playwright for offline sync, territory conflicts, payment edge cases, mission trip sign-up surges, and child check-in security.
+o Stress tests for high registration volumes during mission trip campaigns.
+o Accessibility tests with Lighthouse for WCAG 2.1 compliance.
+o Test offline payment security, sync accuracy, barcode scanning reliability, and AR map performance.
+
+Development Notes
+• Use CDN-hosted React and dependencies (e.g., cdn.jsdelivr.net).
+• Avoid <form> onSubmit due to sandbox restrictions; use button event handlers
+instead.
+• Ensure all components are reusable and modular, with configurable enable/disable options for features.
+• Implement a single-page application (SPA) architecture for seamless navigation.
+• Test geotracking, AR (navigation, prayer maps, distribution map), and map features
+thoroughly for accuracy, ensuring colorblind-friendly heatmap and AR designs.
+• Optimize map rendering, heatmaps, timelines, and real-time features to minimize battery drain using adaptive polling.
+• Ensure admin dashboard, reporting tools, and analytics are optimized for large datasets with caching.
+• Verify scalability for large community events and mission trip sign-ups.
+• Test accessibility with tools like Lighthouse to ensure WCAG 2.1 compliance for all
+components.
+• Implement lazy loading for heavy components (e.g., heatmaps, timelines, archives, AR maps) to reduce load times.
+• Audit APIs for security vulnerabilities, especially for sensitive data like contact timelines, referrals, offline payments, and child data.
+• Monitor API costs (e.g., Google Maps, Stripe, Twilio) with usage quotas and explore nonprofit discounts.
+• Create video tutorials for onboarding, hosted in the Resource Vault, tailored to user roles, including training for barcode scanning and voice commands.
+• Plan for phased rollout:
+o Phase 1: Core field features (geotracking, delivery tracking, surveys, territory management, offline payments, digital receipts, barcode scanning, safe check-in timer), basic community features (messaging, news feed, mission trip sign-ups, volunteer skill database, child check-in), and essential admin reports (including conflict resolution logs).
+
+o Phase 2: Community enhancements (podcasts, live events, gamification, mentorship, polls, prayer wall, mission trip hub, testimony sharing hub), Bible worker tools (scheduling, timelines), and leader training modules, equipment tracking, customizable permission tiers.
+o Phase 3: Advanced features (AR navigation, AR prayer maps, AR Great Controversy distribution map, AI analytics, wearables, multi-tenancy, budget tools, API usage dashboard).

@@ -1,0 +1,208 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Users collection
+    match /users/{userId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+      allow read: if request.auth != null && 
+        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['admin', 'team_leader']);
+    }
+
+    // Ministry Sessions collection
+    match /ministrySessions/{sessionId} {
+      // Workers can read/write their own sessions
+      allow read, write: if request.auth != null && 
+        request.auth.uid == resource.data.userId;
+      
+      // Team leaders can read sessions from their team members
+      allow read: if request.auth != null && 
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'team_leader' &&
+        resource.data.teamId == get(/databases/$(database)/documents/users/$(request.auth.uid)).data.teamId;
+      
+      // Admins can read/write all sessions
+      allow read, write: if request.auth != null && 
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+      
+      // Validate session data structure
+      allow create: if request.auth != null && 
+        request.resource.data.keys().hasAll(['userId', 'userName', 'userRole', 'startTime', 'totalDistance', 'pathPoints', 'isActive', 'sessionName', 'createdAt', 'updatedAt', 'syncStatus']) &&
+        request.resource.data.userId == request.auth.uid &&
+        request.resource.data.totalDistance >= 0 &&
+        request.resource.data.pathPoints is list &&
+        request.resource.data.isActive is bool &&
+        request.resource.data.syncStatus in ['synced', 'pending', 'failed'];
+      
+      // Validate session updates
+      allow update: if request.auth != null && 
+        request.auth.uid == resource.data.userId &&
+        request.resource.data.userId == resource.data.userId &&
+        request.resource.data.createdAt == resource.data.createdAt;
+    }
+
+    // Territories collection
+    match /territories/{territoryId} {
+      // Workers can read territories assigned to them
+      allow read: if request.auth != null &&
+        resource.data.assignedWorker.id == request.auth.uid;
+
+      // Team leaders can read territories assigned to their team members
+      allow read: if request.auth != null &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'team_leader' &&
+        resource.data.assignedWorker.teamId == get(/databases/$(database)/documents/users/$(request.auth.uid)).data.teamId;
+
+      // Admins can read all territories
+      allow read: if request.auth != null &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+
+      // Only admins can create/update/delete territories
+      allow write: if request.auth != null &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+
+    // Surveys collection
+    match /surveys/{surveyId} {
+      // Workers can read surveys assigned to them
+      allow read: if request.auth != null;
+
+      // Team leaders can create/update surveys for their team
+      allow create: if request.auth != null &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'team_leader' &&
+        request.resource.data.createdBy == request.auth.uid &&
+        request.resource.data.teamId == get(/databases/$(database)/documents/users/$(request.auth.uid)).data.teamId;
+
+      allow update: if request.auth != null &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'team_leader' &&
+        resource.data.teamId == get(/databases/$(database)/documents/users/$(request.auth.uid)).data.teamId;
+
+      // Admins can create/update/delete all surveys
+      allow write: if request.auth != null &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+
+    // Survey Assignments collection
+    match /survey_assignments/{assignmentId} {
+      // Workers can read their own assignments
+      allow read: if request.auth != null &&
+        resource.data.workerId == request.auth.uid;
+
+      // Team leaders can read/write assignments for their team members
+      allow read, write: if request.auth != null &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'team_leader' &&
+        get(/databases/$(database)/documents/users/$(resource.data.workerId)).data.teamId ==
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.teamId;
+
+      // Admins can read/write all assignments
+      allow read, write: if request.auth != null &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+
+    // Survey Responses collection
+    match /survey_responses/{responseId} {
+      // Workers can read/write their own responses
+      allow read, write: if request.auth != null &&
+        request.auth.uid == resource.data.workerId;
+
+      // Team leaders can read responses from their team members
+      allow read: if request.auth != null &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'team_leader' &&
+        get(/databases/$(database)/documents/users/$(resource.data.workerId)).data.teamId ==
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.teamId;
+
+      // Admins can read all responses
+      allow read: if request.auth != null &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+
+    // Book Deliveries collection
+    match /bookDeliveries/{deliveryId} {
+      // Workers can read/write their own deliveries
+      allow read, write: if request.auth != null &&
+        request.auth.uid == resource.data.workerId;
+
+      // Team leaders can read deliveries from their team members
+      allow read: if request.auth != null &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'team_leader' &&
+        get(/databases/$(database)/documents/users/$(resource.data.workerId)).data.teamId ==
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.teamId;
+
+      // Admins can read all deliveries
+      allow read: if request.auth != null &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+
+    // Team Messages collection
+    match /teamMessages/{messageId} {
+      // Users can read messages from their team
+      allow read: if request.auth != null && 
+        resource.data.teamId == get(/databases/$(database)/documents/users/$(request.auth.uid)).data.teamId;
+      
+      // Users can create messages for their team
+      allow create: if request.auth != null && 
+        request.resource.data.senderId == request.auth.uid &&
+        request.resource.data.teamId == get(/databases/$(database)/documents/users/$(request.auth.uid)).data.teamId;
+      
+      // Only message sender can update their own messages
+      allow update: if request.auth != null && 
+        request.auth.uid == resource.data.senderId;
+      
+      // Admins can read/write all messages
+      allow read, write: if request.auth != null && 
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+
+    // Push Tokens collection
+    match /push_tokens/{tokenId} {
+      allow read, write: if request.auth != null &&
+        request.auth.uid == resource.data.userId;
+
+      allow read: if request.auth != null &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+
+    // Book Assignments collection
+    match /book_assignments/{assignmentId} {
+      // Workers can read their own assignments
+      allow read: if request.auth != null &&
+        resource.data.workerId == request.auth.uid;
+
+      // Workers can update delivery status on their assignments
+      allow update: if request.auth != null &&
+        resource.data.workerId == request.auth.uid &&
+        request.resource.data.workerId == resource.data.workerId &&
+        request.resource.data.assignedBy == resource.data.assignedBy;
+
+      // Admins can read/write all book assignments
+      allow read, write: if request.auth != null &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+
+    // Walkie-Talkie Sessions collection
+    match /walkie_talkie_sessions/{sessionId} {
+      // Team members can read sessions from their team
+      allow read: if request.auth != null && 
+        resource.data.teamId == get(/databases/$(database)/documents/users/$(request.auth.uid)).data.teamId;
+      
+      // Team members can create sessions for their team
+      allow create: if request.auth != null && 
+        request.resource.data.speakerId == request.auth.uid &&
+        request.resource.data.teamId == get(/databases/$(database)/documents/users/$(request.auth.uid)).data.teamId;
+      
+      // Session creator can update their own sessions
+      allow update: if request.auth != null && 
+        request.auth.uid == resource.data.speakerId;
+      
+      // Session creator can delete their own sessions
+      allow delete: if request.auth != null && 
+        request.auth.uid == resource.data.speakerId;
+      
+      // Admins can read/write all walkie-talkie sessions
+      allow read, write: if request.auth != null && 
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+
+    // Default deny all other documents
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

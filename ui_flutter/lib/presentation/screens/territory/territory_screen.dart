@@ -1,0 +1,1330 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:go_router/go_router.dart';
+import '../../../core/theme/app_colors.dart';
+import '../../../data/models/territory_model.dart';
+import '../../blocs/territory/territory_bloc.dart';
+import '../../widgets/custom_text_field.dart';
+import '../../widgets/custom_button.dart';
+import '../../widgets/territory_map_widget.dart';
+import '../../widgets/walkie_bottom_sheet.dart';
+
+class TerritoryScreen extends StatefulWidget {
+  const TerritoryScreen({super.key});
+
+  @override
+  State<TerritoryScreen> createState() => _TerritoryScreenState();
+}
+
+class _TerritoryScreenState extends State<TerritoryScreen> with TickerProviderStateMixin {
+  late TabController _tabController;
+  final _searchController = TextEditingController();
+  bool _isFabExpanded = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _tabController = TabController(length: 3, vsync: this);
+    // Load data on init
+    context.read<TerritoryBloc>().add(const TerritoryLoadAssignments());
+  }
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Territory'),
+        bottom: TabBar(
+          controller: _tabController,
+          tabs: const [
+            Tab(text: 'My Areas'),
+            Tab(text: 'Available'),
+            Tab(text: 'Map'),
+          ],
+        ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.filter_list),
+            onPressed: () => _showFilterSheet(context),
+          ),
+        ],
+      ),
+      body: Column(
+        children: [
+          // Search Bar
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: CustomSearchField(
+              controller: _searchController,
+              hint: 'Search territories...',
+              onChanged: (value) {
+                if (value.length >= 2) {
+                  context.read<TerritoryBloc>().add(TerritorySearch(query: value));
+                }
+              },
+            ),
+          ),
+          // Tab Content
+          Expanded(
+            child: TabBarView(
+              controller: _tabController,
+              children: [
+                _MyAreasTab(isDark: isDark, tabController: _tabController),
+                _AvailableTab(isDark: isDark, tabController: _tabController),
+                _MapTab(isDark: isDark, tabController: _tabController),
+              ],
+            ),
+          ),
+        ],
+      ),
+      floatingActionButton: _buildCommunicationFab(context, isDark),
+    );
+  }
+
+  Widget _buildCommunicationFab(BuildContext context, bool isDark) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.end,
+      children: [
+        // Mini FABs (shown when expanded)
+        if (_isFabExpanded) ...[
+          // Chat button
+          _MiniActionButton(
+            icon: Icons.chat_bubble,
+            label: 'Chat',
+            color: AppColors.secondary,
+            onTap: () {
+              setState(() => _isFabExpanded = false);
+              context.push('/chat');
+            },
+          ),
+          const SizedBox(height: 12),
+          // Walkie-talkie button
+          _MiniActionButton(
+            icon: Icons.speaker_phone,
+            label: 'Walkie',
+            color: AppColors.primary,
+            onTap: () {
+              setState(() => _isFabExpanded = false);
+              showWalkieBottomSheet(context);
+            },
+          ),
+          const SizedBox(height: 12),
+        ],
+        // Main FAB
+        FloatingActionButton(
+          onPressed: () => setState(() => _isFabExpanded = !_isFabExpanded),
+          backgroundColor: _isFabExpanded ? Colors.grey : AppColors.primary,
+          child: AnimatedRotation(
+            duration: const Duration(milliseconds: 200),
+            turns: _isFabExpanded ? 0.125 : 0,
+            child: Icon(
+              _isFabExpanded ? Icons.close : Icons.forum,
+              color: Colors.white,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  void _showFilterSheet(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) => Container(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Filter Territories',
+              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 24),
+            Text(
+              'Status',
+              style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 8,
+              children: [
+                _FilterChip(label: 'All', selected: true),
+                _FilterChip(label: 'Available', selected: false),
+                _FilterChip(label: 'Assigned', selected: false),
+                _FilterChip(label: 'Completed', selected: false),
+              ],
+            ),
+            const SizedBox(height: 24),
+            SizedBox(
+              width: double.infinity,
+              child: CustomButton(
+                text: 'Apply Filters',
+                onPressed: () => Navigator.pop(context),
+              ),
+            ),
+            const SizedBox(height: 16),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _FilterChip extends StatelessWidget {
+  final String label;
+  final bool selected;
+
+  const _FilterChip({required this.label, required this.selected});
+
+  @override
+  Widget build(BuildContext context) {
+    return FilterChip(
+      label: Text(label),
+      selected: selected,
+      onSelected: (value) {},
+      selectedColor: AppColors.primary.withAlpha(50),
+      checkmarkColor: AppColors.primary,
+    );
+  }
+}
+
+class _MyAreasTab extends StatefulWidget {
+  final bool isDark;
+  final TabController tabController;
+
+  const _MyAreasTab({required this.isDark, required this.tabController});
+
+  @override
+  State<_MyAreasTab> createState() => _MyAreasTabState();
+}
+
+class _MyAreasTabState extends State<_MyAreasTab> {
+  @override
+  void initState() {
+    super.initState();
+    widget.tabController.addListener(_onTabChange);
+  }
+
+  @override
+  void dispose() {
+    widget.tabController.removeListener(_onTabChange);
+    super.dispose();
+  }
+
+  void _onTabChange() {
+    if (!mounted) return; // Prevent using context after dispose
+    // Reload assignments when switching back to this tab (index 0)
+    if (widget.tabController.index == 0) {
+      final currentState = context.read<TerritoryBloc>().state;
+      // Only reload if not already showing assignments
+      if (currentState is! TerritoryAssignmentsLoaded && currentState is! TerritoryLoading) {
+        context.read<TerritoryBloc>().add(const TerritoryLoadAssignments());
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return BlocBuilder<TerritoryBloc, TerritoryState>(
+      builder: (context, state) {
+        if (state is TerritoryLoading) {
+          return const Center(child: CircularProgressIndicator());
+        }
+
+        if (state is TerritoryAssignmentsLoaded) {
+          if (state.assignments.isEmpty) {
+            return _EmptyAssignmentsView(isDark: widget.isDark);
+          }
+
+          return RefreshIndicator(
+            onRefresh: () async {
+              context.read<TerritoryBloc>().add(const TerritoryLoadAssignments());
+            },
+            child: ListView.builder(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              itemCount: state.assignments.length,
+              itemBuilder: (context, index) {
+                final assignment = state.assignments[index];
+                return _AssignmentCard(
+                  name: assignment.entityName ?? 'Territory ${index + 1}',
+                  location: '${assignment.city ?? ''}, ${assignment.state ?? ''}'.trim(),
+                  households: assignment.housingUnits ?? 0,
+                  status: assignment.status,
+                  progress: assignment.completenessPercentage,
+                  isDark: widget.isDark,
+                  onTap: () {},
+                );
+              },
+            ),
+          );
+        }
+
+        if (state is TerritoryError) {
+          return Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.error_outline, size: 48, color: AppColors.error),
+                const SizedBox(height: 16),
+                Text(state.message),
+                const SizedBox(height: 16),
+                CustomButton(
+                  text: 'Retry',
+                  onPressed: () {
+                    context.read<TerritoryBloc>().add(const TerritoryLoadAssignments());
+                  },
+                ),
+              ],
+            ),
+          );
+        }
+
+        return _EmptyAssignmentsView(isDark: widget.isDark);
+      },
+    );
+  }
+}
+
+class _EmptyAssignmentsView extends StatelessWidget {
+  final bool isDark;
+
+  const _EmptyAssignmentsView({required this.isDark});
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              width: 100,
+              height: 100,
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    AppColors.primary.withAlpha(40),
+                    AppColors.secondary.withAlpha(40),
+                  ],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.map_outlined,
+                size: 48,
+                color: AppColors.primary,
+              ),
+            ),
+            const SizedBox(height: 24),
+            Text(
+              'No Assigned Territories',
+              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              'You don\'t have any territories assigned yet.\nBrowse available territories to request one.',
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                height: 1.5,
+              ),
+            ),
+            const SizedBox(height: 32),
+            CustomButton(
+              text: 'Browse Available',
+              icon: Icons.search,
+              onPressed: () {},
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _AssignmentCard extends StatelessWidget {
+  final String name;
+  final String location;
+  final int households;
+  final String status;
+  final double progress;
+  final bool isDark;
+  final VoidCallback? onTap;
+
+  const _AssignmentCard({
+    required this.name,
+    required this.location,
+    required this.households,
+    required this.status,
+    required this.progress,
+    required this.isDark,
+    this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    Color statusColor;
+    switch (status) {
+      case 'active':
+        statusColor = AppColors.success;
+        break;
+      case 'paused':
+        statusColor = AppColors.warning;
+        break;
+      case 'completed':
+        statusColor = AppColors.primary;
+        break;
+      default:
+        statusColor = AppColors.secondary;
+    }
+
+    return Card(
+      margin: const EdgeInsets.only(bottom: 12),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(16),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    width: 48,
+                    height: 48,
+                    decoration: BoxDecoration(
+                      color: statusColor.withAlpha(30),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Icon(Icons.location_on, color: statusColor),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          name,
+                          style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        if (location.isNotEmpty)
+                          Text(
+                            location,
+                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: statusColor.withAlpha(30),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Text(
+                      status.toUpperCase(),
+                      style: TextStyle(
+                        color: statusColor,
+                        fontWeight: FontWeight.w600,
+                        fontSize: 11,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        '$households households',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                        ),
+                      ),
+                      Text(
+                        '${progress.toStringAsFixed(0)}%',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          fontWeight: FontWeight.bold,
+                          color: statusColor,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(4),
+                    child: LinearProgressIndicator(
+                      value: progress / 100,
+                      backgroundColor: isDark ? Colors.white12 : Colors.black12,
+                      valueColor: AlwaysStoppedAnimation<Color>(statusColor),
+                      minHeight: 6,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _AvailableTab extends StatefulWidget {
+  final bool isDark;
+  final TabController tabController;
+
+  const _AvailableTab({required this.isDark, required this.tabController});
+
+  @override
+  State<_AvailableTab> createState() => _AvailableTabState();
+}
+
+class _AvailableTabState extends State<_AvailableTab> {
+  @override
+  void initState() {
+    super.initState();
+    widget.tabController.addListener(_onTabChange);
+  }
+
+  void _onTabChange() {
+    if (!mounted) return; // Prevent using context after dispose
+    if (widget.tabController.index == 1) {
+      context.read<TerritoryBloc>().add(const TerritoryLoadAvailable());
+    }
+  }
+
+  @override
+  void dispose() {
+    widget.tabController.removeListener(_onTabChange);
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return BlocBuilder<TerritoryBloc, TerritoryState>(
+      builder: (context, state) {
+        if (state is TerritoryLoading) {
+          return const Center(child: CircularProgressIndicator());
+        }
+
+        if (state is TerritoryAvailableLoaded) {
+          return RefreshIndicator(
+            onRefresh: () async {
+              context.read<TerritoryBloc>().add(const TerritoryLoadAvailable());
+            },
+            child: ListView.builder(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              itemCount: state.territories.length,
+              itemBuilder: (context, index) {
+                final territory = state.territories[index];
+                return _TerritoryCard(
+                  name: territory.entityName,
+                  union: territory.unionName ?? '',
+                  households: territory.housingUnits ?? 0,
+                  status: 'available',
+                  isDark: widget.isDark,
+                  onRequest: () {
+                    context.read<TerritoryBloc>().add(
+                      TerritoryRequestAssignment(territoryId: territory.id),
+                    );
+                  },
+                );
+              },
+            ),
+          );
+        }
+
+        // Empty state - trigger load if not already loading
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (state is! TerritoryLoading) {
+            context.read<TerritoryBloc>().add(const TerritoryLoadAvailable());
+          }
+        });
+        return const Center(child: CircularProgressIndicator());
+      },
+    );
+  }
+}
+
+class _TerritoryCard extends StatelessWidget {
+  final String name;
+  final String union;
+  final int households;
+  final String status;
+  final bool isDark;
+  final VoidCallback? onRequest;
+
+  const _TerritoryCard({
+    required this.name,
+    required this.union,
+    required this.households,
+    required this.status,
+    required this.isDark,
+    this.onRequest,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    Color statusColor;
+    String statusText;
+
+    switch (status) {
+      case 'pending':
+        statusColor = AppColors.warning;
+        statusText = 'Pending';
+        break;
+      case 'assigned':
+        statusColor = AppColors.success;
+        statusText = 'Assigned';
+        break;
+      default:
+        statusColor = AppColors.primary;
+        statusText = 'Available';
+    }
+
+    return Card(
+      margin: const EdgeInsets.only(bottom: 12),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  width: 48,
+                  height: 48,
+                  decoration: BoxDecoration(
+                    color: AppColors.primary.withAlpha(30),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Icon(Icons.location_on, color: AppColors.primary),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        name,
+                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      Text(
+                        union,
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: statusColor.withAlpha(30),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text(
+                    statusText,
+                    style: TextStyle(
+                      color: statusColor,
+                      fontWeight: FontWeight.w600,
+                      fontSize: 12,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                Icon(Icons.home_outlined, size: 16, color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight),
+                const SizedBox(width: 4),
+                Text(
+                  '$households households',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                  ),
+                ),
+              ],
+            ),
+            if (status == 'available') ...[
+              const SizedBox(height: 16),
+              SizedBox(
+                width: double.infinity,
+                child: CustomButton(
+                  text: 'Request Territory',
+                  type: ButtonType.outline,
+                  size: ButtonSize.small,
+                  onPressed: onRequest ?? () {},
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _MapTab extends StatefulWidget {
+  final bool isDark;
+  final TabController tabController;
+
+  const _MapTab({required this.isDark, required this.tabController});
+
+  @override
+  State<_MapTab> createState() => _MapTabState();
+}
+
+class _MapTabState extends State<_MapTab> {
+  GeoTerritory? _selectedTerritory;
+  final List<VisitMarker> _visitMarkers = [];
+
+  @override
+  void initState() {
+    super.initState();
+    widget.tabController.addListener(_onTabChange);
+  }
+
+  void _onTabChange() {
+    if (!mounted) return; // Prevent using context after dispose
+    // Load territories when Map tab is selected
+    if (widget.tabController.index == 2) {
+      final state = context.read<TerritoryBloc>().state;
+      // Load available territories if not already loaded
+      if (state is! TerritoryAvailableLoaded && state is! TerritoryLoading) {
+        context.read<TerritoryBloc>().add(const TerritoryLoadAvailable(limit: 50));
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    widget.tabController.removeListener(_onTabChange);
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return BlocBuilder<TerritoryBloc, TerritoryState>(
+      builder: (context, state) {
+        // Check if we have territories from assignments
+        if (state is TerritoryAssignmentsLoaded && state.assignments.isNotEmpty) {
+          // Convert assignments to GeoTerritory for the map
+          final territories = state.assignments
+              .where((a) => a.geometry != null)
+              .map((a) => GeoTerritory(
+                    id: a.territoryId,
+                    solid: a.territorySolid,
+                    entityName: a.entityName ?? 'Territory ${a.territorySolid}',
+                    entityId: a.entityId ?? '',
+                    city: a.city,
+                    state: a.state,
+                    unionName: a.unionName,
+                    conference: a.conference,
+                    population: a.population,
+                    housingUnits: a.housingUnits,
+                    geometry: a.geometry,
+                  ))
+              .toList();
+
+          if (territories.isNotEmpty) {
+            return _buildMapView(territories);
+          }
+        }
+
+        // Check if we have available territories
+        if (state is TerritoryAvailableLoaded && state.territories.isNotEmpty) {
+          final territoriesWithGeometry = state.territories
+              .where((t) => t.geometry != null)
+              .toList();
+
+          if (territoriesWithGeometry.isNotEmpty) {
+            return _buildMapView(territoriesWithGeometry);
+          }
+        }
+
+        // Loading state
+        if (state is TerritoryLoading) {
+          return const Center(child: CircularProgressIndicator());
+        }
+
+        // Empty or no geometry - trigger load
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (state is! TerritoryLoading) {
+            context.read<TerritoryBloc>().add(const TerritoryLoadAvailable(limit: 50));
+          }
+        });
+
+        return _buildEmptyState(context);
+      },
+    );
+  }
+
+  Widget _buildMapView(List<GeoTerritory> territories) {
+    return Stack(
+      children: [
+        TerritoryMapWidget(
+          territories: territories,
+          selectedTerritory: _selectedTerritory,
+          onTerritoryTap: (territory) {
+            setState(() => _selectedTerritory = territory);
+            _showTerritoryDetails(context, territory);
+          },
+          showLabels: true,
+          showZoomControls: true,
+          visitMarkers: _visitMarkers,
+          allowAddVisit: true,
+          onAddVisit: (lat, lng) => _showAddVisitDialog(context, lat, lng),
+        ),
+        // Territory count badge
+        Positioned(
+          left: 16,
+          top: 16,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(20),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withAlpha(30),
+                  blurRadius: 4,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.map_outlined, size: 16, color: AppColors.primary),
+                const SizedBox(width: 6),
+                Text(
+                  '${territories.length} territories',
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.textPrimaryLight,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        // Long press hint
+        Positioned(
+          left: 16,
+          bottom: 16,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            decoration: BoxDecoration(
+              color: Colors.black.withAlpha(180),
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: const Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.touch_app, size: 14, color: Colors.white),
+                SizedBox(width: 6),
+                Text(
+                  'Long-press to mark visit',
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: Colors.white,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  void _showAddVisitDialog(BuildContext context, double latitude, double longitude) {
+    final addressController = TextEditingController();
+    final notesController = TextEditingController();
+    String selectedOutcome = 'not_home';
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) => StatefulBuilder(
+        builder: (context, setSheetState) => Padding(
+          padding: EdgeInsets.only(
+            left: 24,
+            right: 24,
+            top: 24,
+            bottom: MediaQuery.of(context).viewInsets.bottom + 24,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    width: 48,
+                    height: 48,
+                    decoration: BoxDecoration(
+                      color: AppColors.primary.withAlpha(30),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Icon(Icons.add_location_alt, color: AppColors.primary),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Log Visit',
+                          style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        Text(
+                          '${latitude.toStringAsFixed(5)}, ${longitude.toStringAsFixed(5)}',
+                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            color: AppColors.textSecondaryLight,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close),
+                    onPressed: () => Navigator.pop(context),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 20),
+              TextField(
+                controller: addressController,
+                decoration: const InputDecoration(
+                  labelText: 'Address (optional)',
+                  hintText: 'Enter address or description',
+                  prefixIcon: Icon(Icons.home_outlined),
+                  border: OutlineInputBorder(),
+                ),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'Visit Outcome',
+                style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  _OutcomeChip(
+                    label: 'Not Home',
+                    value: 'not_home',
+                    icon: Icons.home_outlined,
+                    color: AppColors.warning,
+                    selected: selectedOutcome == 'not_home',
+                    onSelected: () => setSheetState(() => selectedOutcome = 'not_home'),
+                  ),
+                  _OutcomeChip(
+                    label: 'Interested',
+                    value: 'interested',
+                    icon: Icons.check_circle_outline,
+                    color: AppColors.success,
+                    selected: selectedOutcome == 'interested',
+                    onSelected: () => setSheetState(() => selectedOutcome = 'interested'),
+                  ),
+                  _OutcomeChip(
+                    label: 'Not Interested',
+                    value: 'not_interested',
+                    icon: Icons.cancel_outlined,
+                    color: AppColors.error,
+                    selected: selectedOutcome == 'not_interested',
+                    onSelected: () => setSheetState(() => selectedOutcome = 'not_interested'),
+                  ),
+                  _OutcomeChip(
+                    label: 'Callback',
+                    value: 'callback',
+                    icon: Icons.schedule,
+                    color: AppColors.info,
+                    selected: selectedOutcome == 'callback',
+                    onSelected: () => setSheetState(() => selectedOutcome = 'callback'),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: notesController,
+                maxLines: 2,
+                decoration: const InputDecoration(
+                  labelText: 'Notes (optional)',
+                  hintText: 'Add any notes about this visit',
+                  prefixIcon: Icon(Icons.notes),
+                  border: OutlineInputBorder(),
+                ),
+              ),
+              const SizedBox(height: 20),
+              SizedBox(
+                width: double.infinity,
+                child: CustomButton(
+                  text: 'Save Visit',
+                  icon: Icons.save,
+                  onPressed: () {
+                    // Add the visit marker
+                    setState(() {
+                      _visitMarkers.add(VisitMarker(
+                        id: DateTime.now().millisecondsSinceEpoch.toString(),
+                        latitude: latitude,
+                        longitude: longitude,
+                        address: addressController.text.isNotEmpty ? addressController.text : null,
+                        outcome: selectedOutcome,
+                        notes: notesController.text.isNotEmpty ? notesController.text : null,
+                        timestamp: DateTime.now(),
+                      ));
+                    });
+                    Navigator.pop(context);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Visit logged successfully'),
+                        backgroundColor: AppColors.success,
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildEmptyState(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              width: 80,
+              height: 80,
+              decoration: BoxDecoration(
+                color: AppColors.secondary.withAlpha(30),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(Icons.map, size: 40, color: AppColors.secondary),
+            ),
+            const SizedBox(height: 24),
+            Text(
+              'No Territories to Display',
+              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'No territories with map data available.\nTry loading available territories.',
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: widget.isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+              ),
+            ),
+            const SizedBox(height: 24),
+            CustomButton(
+              text: 'Load Territories',
+              icon: Icons.refresh,
+              onPressed: () {
+                context.read<TerritoryBloc>().add(const TerritoryLoadAvailable(limit: 50));
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showTerritoryDetails(BuildContext context, GeoTerritory territory) {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) => Container(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  width: 48,
+                  height: 48,
+                  decoration: BoxDecoration(
+                    color: AppColors.primary.withAlpha(30),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Icon(Icons.location_on, color: AppColors.primary),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        territory.entityName,
+                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      Text(
+                        'ID: ${territory.solid}',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: AppColors.textSecondaryLight,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.close),
+                  onPressed: () => Navigator.pop(context),
+                ),
+              ],
+            ),
+            const SizedBox(height: 20),
+            _DetailRow(
+              icon: Icons.location_city,
+              label: 'Location',
+              value: territory.displayLocation.isNotEmpty
+                  ? territory.displayLocation
+                  : 'Not specified',
+            ),
+            if (territory.unionName != null)
+              _DetailRow(
+                icon: Icons.account_balance,
+                label: 'Union',
+                value: territory.unionName!,
+              ),
+            if (territory.housingUnits != null)
+              _DetailRow(
+                icon: Icons.home,
+                label: 'Housing Units',
+                value: '${territory.housingUnits}',
+              ),
+            if (territory.population != null)
+              _DetailRow(
+                icon: Icons.people,
+                label: 'Population',
+                value: '${territory.population}',
+              ),
+            const SizedBox(height: 20),
+            SizedBox(
+              width: double.infinity,
+              child: CustomButton(
+                text: 'Request Territory',
+                onPressed: () {
+                  Navigator.pop(context);
+                  context.read<TerritoryBloc>().add(
+                    TerritoryRequestAssignment(territoryId: territory.id),
+                  );
+                },
+              ),
+            ),
+            const SizedBox(height: 12),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _DetailRow extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String value;
+
+  const _DetailRow({
+    required this.icon,
+    required this.label,
+    required this.value,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Row(
+        children: [
+          Icon(icon, size: 18, color: AppColors.textSecondaryLight),
+          const SizedBox(width: 12),
+          Text(
+            '$label: ',
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+              color: AppColors.textSecondaryLight,
+            ),
+          ),
+          Text(
+            value,
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _OutcomeChip extends StatelessWidget {
+  final String label;
+  final String value;
+  final IconData icon;
+  final Color color;
+  final bool selected;
+  final VoidCallback onSelected;
+
+  const _OutcomeChip({
+    required this.label,
+    required this.value,
+    required this.icon,
+    required this.color,
+    required this.selected,
+    required this.onSelected,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onSelected,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+          color: selected ? color.withAlpha(30) : Colors.grey.withAlpha(20),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: selected ? color : Colors.grey.withAlpha(60),
+            width: selected ? 2 : 1,
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              icon,
+              size: 16,
+              color: selected ? color : AppColors.textSecondaryLight,
+            ),
+            const SizedBox(width: 6),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: selected ? FontWeight.w600 : FontWeight.normal,
+                color: selected ? color : AppColors.textSecondaryLight,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Mini action button for the expandable FAB
+class _MiniActionButton extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final Color color;
+  final VoidCallback onTap;
+
+  const _MiniActionButton({
+    required this.icon,
+    required this.label,
+    required this.color,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        // Label
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(8),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withAlpha(25),
+                blurRadius: 4,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: Text(
+            label,
+            style: TextStyle(
+              fontWeight: FontWeight.w600,
+              color: color,
+            ),
+          ),
+        ),
+        const SizedBox(width: 12),
+        // Mini FAB
+        FloatingActionButton.small(
+          heroTag: 'fab_$label',
+          onPressed: onTap,
+          backgroundColor: color,
+          child: Icon(icon, color: Colors.white, size: 20),
+        ),
+      ],
+    );
+  }
+}

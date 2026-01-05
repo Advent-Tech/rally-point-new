@@ -1,0 +1,105 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Downtown Ministry District",
+        "territory_code": "DT-001",
+        "priority": "high",
+        "population": 15000,
+        "description": "Central business district with high foot traffic"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[
+          [-74.0059, 40.7128],
+          [-74.0045, 40.7128],
+          [-74.0045, 40.7142],
+          [-74.0059, 40.7142],
+          [-74.0059, 40.7128]
+        ]]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Residential East Zone",
+        "territory_code": "RE-002",
+        "priority": "medium",
+        "population": 8500,
+        "description": "Residential area with family homes"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[
+          [-74.0030, 40.7100],
+          [-74.0010, 40.7100],
+          [-74.0010, 40.7120],
+          [-74.0030, 40.7120],
+          [-74.0030, 40.7100]
+        ]]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "University Campus Area",
+        "territory_code": "UC-003",
+        "priority": "high",
+        "population": 12000,
+        "description": "University campus and surrounding student housing"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[
+          [-74.0080, 40.7080],
+          [-74.0060, 40.7080],
+          [-74.0060, 40.7100],
+          [-74.0080, 40.7100],
+          [-74.0080, 40.7080]
+        ]]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Shopping District West",
+        "territory_code": "SW-004",
+        "priority": "medium",
+        "population": 6000,
+        "description": "Commercial shopping area with retail stores"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[
+          [-74.0100, 40.7150],
+          [-74.0080, 40.7150],
+          [-74.0080, 40.7170],
+          [-74.0100, 40.7170],
+          [-74.0100, 40.7150]
+        ]]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Suburban North Territory",
+        "territory_code": "SN-005",
+        "priority": "low",
+        "population": 4500,
+        "description": "Quiet suburban neighborhood with single-family homes"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[
+          [-74.0040, 40.7180],
+          [-74.0020, 40.7180],
+          [-74.0020, 40.7200],
+          [-74.0040, 40.7200],
+          [-74.0040, 40.7180]
+        ]]
+      }
+    }
+  ]
+}

@@ -1,0 +1,68 @@
+{
+  "expo": {
+    "name": "Rally Point - Ministry Tracker",
+    "slug": "rally-point-ministry-tracker",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "newArchEnabled": true,
+    "description": "A comprehensive mobile app for Bible workers and literature evangelists to manage field operations, track ministry activities, and coordinate community engagement.",
+    "privacy": "public",
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#ffffff"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "Rally Point needs location access to track field operations and territory management.",
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "Rally Point needs location access to track field operations and territory management.",
+        "ITSAppUsesNonExemptEncryption": false
+      },
+      "config": {
+        "googleMapsApiKey": "YOUR_GOOGLE_MAPS_API_KEY"
+      },
+      "bundleIdentifier": "com.soli.rallypoint"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#ffffff"
+      },
+      "edgeToEdgeEnabled": true,
+      "permissions": [
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_BACKGROUND_LOCATION",
+        "CAMERA",
+        "WRITE_EXTERNAL_STORAGE",
+        "READ_EXTERNAL_STORAGE"
+      ],
+      "config": {
+        "googleMaps": {
+          "apiKey": "YOUR_GOOGLE_MAPS_API_KEY"
+        }
+      },
+      "package": "com.soli.rallypoint",
+      "versionCode": 1,
+      "compileSdkVersion": 34,
+      "targetSdkVersion": 34,
+      "minSdkVersion": 21,
+      "playStoreUrl": "https://play.google.com/store/apps/details?id=com.soli.rallypoint"
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "owner": "sumit-dev2005",
+    "plugins": [
+      "expo-dev-client"
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "75694667-400f-4e71-be8b-2fa736b85a75"
+      }
+    }
+  }
+}

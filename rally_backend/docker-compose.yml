@@ -1,0 +1,344 @@
+services:
+  # Infrastructure Services
+  postgres:
+    image: postgis/postgis:15-3.4-alpine
+    container_name: rally_postgres
+    environment:
+      POSTGRES_DB: rally_point
+      POSTGRES_USER: rally_user
+      POSTGRES_PASSWORD: rally_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./shared/database/migrations:/docker-entrypoint-initdb.d
+      - ../Geopackage:/geopackage:ro
+    networks:
+      - rally_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U rally_user -d rally_point"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  redis:
+    image: redis:7-alpine
+    container_name: rally_redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - rally_network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  nats:
+    image: nats:2.10-alpine
+    container_name: rally_nats
+    ports:
+      - "4222:4222"
+      - "8222:8222"  # HTTP monitoring
+    networks:
+      - rally_network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8222/varz"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Ministry Service
+  ministry-service:
+    build:
+      context: .
+      dockerfile: ministry-service/Dockerfile
+    container_name: rally_ministry_service
+    restart: unless-stopped
+    ports:
+      - "8087:8087"
+    environment:
+      - PORT=8087
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_NAME=rally_point
+      - DB_USER=rally_user
+      - DB_PASSWORD=rally_password
+      - REDIS_URL=redis:6379
+      - NATS_URL=nats:4222
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      nats:
+        condition: service_healthy
+    networks:
+      - rally_network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8087/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  # API Gateway
+  api-gateway:
+    build:
+      context: .
+      dockerfile: api-gateway/Dockerfile
+    container_name: rally_api_gateway
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      - PORT=8080
+      - JWT_SECRET=your-super-secret-jwt-key-change-in-production
+      - USER_SERVICE_URL=http://user-service:8081
+      - LOCATION_SERVICE_URL=http://location-service:8082
+      - TERRITORY_SERVICE_URL=http://territory-service:8083
+      - SURVEY_SERVICE_URL=http://survey-service:8084
+      - DELIVERY_SERVICE_URL=http://delivery-service:8085
+      - WALKIE_SERVICE_URL=http://walkie-service:8086
+      - MINISTRY_SERVICE_URL=http://ministry-service:8087
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - NATS_URL=nats:4222
+    depends_on:
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+      nats:
+        condition: service_healthy
+    networks:
+      - rally_network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  # User Service
+  user-service:
+    build:
+      context: .
+      dockerfile: user-service/Dockerfile
+    container_name: rally_user_service
+    restart: unless-stopped
+    ports:
+      - "8081:8081"
+    environment:
+      - PORT=8081
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_NAME=rally_point
+      - DB_USER=rally_user
+      - DB_PASSWORD=rally_password
+      - REDIS_URL=redis:6379
+      - JWT_SECRET=your-super-secret-jwt-key-change-in-production
+      - NATS_URL=nats:4222
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      nats:
+        condition: service_healthy
+    networks:
+      - rally_network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8081/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  # Location Service
+  location-service:
+    build:
+      context: .
+      dockerfile: location-service/Dockerfile
+    container_name: rally_location_service
+    restart: unless-stopped
+    ports:
+      - "8082:8082"
+    environment:
+      - PORT=8082
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_NAME=rally_point
+      - DB_USER=rally_user
+      - DB_PASSWORD=rally_password
+      - REDIS_URL=redis:6379
+      - NATS_URL=nats:4222
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      nats:
+        condition: service_healthy
+    networks:
+      - rally_network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8082/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  # Territory Service
+  territory-service:
+    build:
+      context: .
+      dockerfile: territory-service/Dockerfile
+    container_name: rally_territory_service
+    restart: unless-stopped
+    ports:
+      - "8083:8083"
+    environment:
+      - PORT=8083
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_NAME=rally_point
+      - DB_USER=rally_user
+      - DB_PASSWORD=rally_password
+      - REDIS_URL=redis:6379
+      - NATS_URL=nats:4222
+    volumes:
+      - ../Geopackage:/geopackage:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      nats:
+        condition: service_healthy
+    networks:
+      - rally_network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8083/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  # Survey Service
+  survey-service:
+    build:
+      context: .
+      dockerfile: survey-service/Dockerfile
+    container_name: rally_survey_service
+    restart: unless-stopped
+    ports:
+      - "8084:8084"
+    environment:
+      - PORT=8084
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_NAME=rally_point
+      - DB_USER=rally_user
+      - DB_PASSWORD=rally_password
+      - REDIS_URL=redis:6379
+      - NATS_URL=nats:4222
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      nats:
+        condition: service_healthy
+    networks:
+      - rally_network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8084/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  # Delivery Service
+  delivery-service:
+    build:
+      context: .
+      dockerfile: delivery-service/Dockerfile
+    container_name: rally_delivery_service
+    restart: unless-stopped
+    ports:
+      - "8085:8085"
+    environment:
+      - PORT=8085
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_NAME=rally_point
+      - DB_USER=rally_user
+      - DB_PASSWORD=rally_password
+      - REDIS_URL=redis:6379
+      - NATS_URL=nats:4222
+      - STRIPE_SECRET_KEY=${STRIPE_SECRET_KEY:-sk_test_placeholder}
+      - DEBUG_BYPASS_PAYMENT=true
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      nats:
+        condition: service_healthy
+    networks:
+      - rally_network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8085/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  # Walkie Talkie Service
+  walkie-service:
+    build:
+      context: .
+      dockerfile: walkie-service/Dockerfile
+    container_name: rally_walkie_service
+    restart: unless-stopped
+    ports:
+      - "8086:8086"
+    environment:
+      - PORT=8086
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_NAME=rally_point
+      - DB_USER=rally_user
+      - DB_PASSWORD=rally_password
+      - REDIS_URL=redis:6379
+      - NATS_URL=nats:4222
+      - AUDIO_STORAGE_PATH=/app/audio
+    volumes:
+      - audio_storage:/app/audio
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      nats:
+        condition: service_healthy
+    networks:
+      - rally_network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8086/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+volumes:
+  postgres_data:
+  redis_data:
+  audio_storage:
+
+networks:
+  rally_network:
+    driver: bridge

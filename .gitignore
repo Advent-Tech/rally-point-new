@@ -1,0 +1,54 @@
+# Flutter
+ui_flutter/build/
+ui_flutter/.dart_tool/
+ui_flutter/.packages
+ui_flutter/.pub-cache/
+ui_flutter/.pub/
+ui_flutter/*.iml
+ui_flutter/.idea/
+ui_flutter/android/.gradle/
+ui_flutter/android/app/debug/
+ui_flutter/android/app/profile/
+ui_flutter/android/app/release/
+ui_flutter/ios/Pods/
+ui_flutter/ios/.symlinks/
+
+# React Native / Expo
+ui/node_modules/
+ui/.expo/
+ui/dist/
+ui/web-build/
+
+# Go binaries
+rally_backend/**/bin/
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Env files (keep .env.example)
+.env
+.env.local
+.env.*.local
+
+# Large binary files
+*.apk
+*.aab
+*.ipa
+*.dill
+*.bin
+
+# Screenshots (optional - remove if you want to keep them)
+# *.png

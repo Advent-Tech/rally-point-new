@@ -1,0 +1,748 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Rally Point - Live Worker Locations</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <style>
+        body, html {
+            margin: 0;
+            padding: 0;
+            height: 100%;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+        }
+        
+        #map {
+            height: 100vh;
+            width: 100%;
+        }
+        
+        .worker-popup {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+            min-width: 200px;
+        }
+        
+        .worker-popup h3 {
+            margin: 0 0 8px 0;
+            color: #002b5b;
+            font-size: 16px;
+        }
+        
+        .worker-popup p {
+            margin: 4px 0;
+            font-size: 12px;
+            color: #666;
+        }
+        
+        .worker-popup .status {
+            display: inline-block;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 10px;
+            font-weight: bold;
+            text-transform: uppercase;
+        }
+        
+        .worker-popup .status.active {
+            background-color: #10b981;
+            color: white;
+        }
+        
+        .worker-popup .status.inactive {
+            background-color: #6b7280;
+            color: white;
+        }
+        
+        .worker-marker {
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            border: 3px solid white;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            font-weight: bold;
+            color: white;
+            cursor: pointer;
+            transition: transform 0.2s ease;
+        }
+        
+        .worker-marker:hover {
+            transform: scale(1.1);
+        }
+        
+        .worker-marker.active {
+            background-color: #0066cc;
+            animation: pulse 2s infinite;
+        }
+
+        .worker-marker.recently-active {
+            background-color: #0066cc;
+            animation: none;
+        }
+
+        .worker-marker.offline {
+            background-color: #999999;
+            animation: none;
+        }
+
+        .worker-marker.inactive {
+            background-color: #999999;
+            animation: none;
+        }
+        
+        .worker-marker.selected {
+            border-color: #ff0000;
+            border-width: 4px;
+        }
+        
+        @keyframes pulse {
+            0% {
+                box-shadow: 0 0 0 0 rgba(0, 102, 204, 0.7);
+            }
+            70% {
+                box-shadow: 0 0 0 10px rgba(0, 102, 204, 0);
+            }
+            100% {
+                box-shadow: 0 0 0 0 rgba(0, 102, 204, 0);
+            }
+        }
+        
+        .accuracy-circle {
+            fill: rgba(16, 185, 129, 0.1);
+            stroke: rgba(16, 185, 129, 0.3);
+            stroke-width: 1;
+        }
+
+        .territory-polygon {
+            fill-opacity: 0.1;
+            stroke-width: 2;
+            stroke-opacity: 0.8;
+        }
+
+        .territory-popup {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            min-width: 200px;
+        }
+
+        .territory-popup-name {
+            font-weight: bold;
+            font-size: 14px;
+            color: #002b5b;
+            margin-bottom: 4px;
+        }
+
+        .territory-popup-worker {
+            font-size: 12px;
+            color: #666;
+            margin-bottom: 2px;
+        }
+        
+        .controls {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            z-index: 1000;
+            background: white;
+            padding: 10px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        .controls button {
+            background: #002b5b;
+            color: white;
+            border: none;
+            padding: 8px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 2px;
+            font-size: 12px;
+        }
+        
+        .controls button:hover {
+            background: #003d7a;
+        }
+    </style>
+</head>
+<body>
+    <div id="map"></div>
+    
+    <div class="controls">
+        <button onclick="centerOnAllWorkers()">Show All</button>
+        <button onclick="toggleAccuracyCircles()">Toggle Accuracy</button>
+        <button onclick="refreshWorkers()">Refresh</button>
+    </div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script>
+        let map = null;
+        let workerMarkers = {};
+        let accuracyCircles = {};
+        let territoryPolygons = {};
+        let showAccuracy = false;
+        let showTerritories = true;
+        let selectedWorkerId = null;
+
+        // Initialize map
+        function initMap() {
+            console.log('Initializing live worker location map...');
+            
+            map = L.map('map').setView([40.7128, -74.0060], 10); // Default to NYC
+            
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '© OpenStreetMap contributors'
+            }).addTo(map);
+            
+            console.log('Map initialized successfully');
+            
+            // Expose functions to parent window
+            window.clearMarkers = clearMarkers;
+            window.addWorkerMarker = addWorkerMarker;
+            window.centerOnLocation = centerOnLocation;
+            window.centerOnAllWorkers = centerOnAllWorkers;
+            window.selectWorker = selectWorker;
+            window.updateTerritories = updateTerritories;
+            window.clearTerritories = clearTerritories;
+            window.toggleTerritories = toggleTerritories;
+
+            // Add a test marker to verify map is working
+            setTimeout(() => {
+                console.log('LEAFLET-MAP: Adding test marker to verify map functionality');
+                const testMarker = L.marker([40.7128, -74.0060]).addTo(map);
+                testMarker.bindPopup('Test Marker - Map is working!');
+                console.log('LEAFLET-MAP: Test marker added successfully');
+
+                // Remove test marker after 3 seconds
+                setTimeout(() => {
+                    map.removeLayer(testMarker);
+                    console.log('LEAFLET-MAP: Test marker removed');
+                }, 3000);
+            }, 1000);
+        }
+
+        function clearMarkers() {
+            console.log('Clearing all worker markers...');
+            
+            Object.values(workerMarkers).forEach(marker => {
+                map.removeLayer(marker);
+            });
+            
+            Object.values(accuracyCircles).forEach(circle => {
+                map.removeLayer(circle);
+            });
+            
+            workerMarkers = {};
+            accuracyCircles = {};
+        }
+
+        function addWorkerMarker(workerData) {
+            const addTime = new Date().toLocaleTimeString();
+            console.log('LEAFLET-MAP: Real-time marker add:', workerData.name, 'at', addTime);
+            console.log('LEAFLET-MAP: Coordinates:', workerData.latitude.toFixed(6), workerData.longitude.toFixed(6));
+            
+            const { id, name, latitude, longitude, isActive, lastSeen, accuracy, speed } = workerData;
+            
+            // Remove existing marker if it exists
+            if (workerMarkers[id]) {
+                map.removeLayer(workerMarkers[id]);
+            }
+            if (accuracyCircles[id]) {
+                map.removeLayer(accuracyCircles[id]);
+            }
+            
+            // Create custom marker
+            const markerHtml = `
+                <div class="worker-marker ${isActive ? 'active' : 'inactive'} ${selectedWorkerId === id ? 'selected' : ''}"
+                     title="${name}">
+                    ${name.charAt(0).toUpperCase()}
+                </div>
+            `;
+            
+            const customIcon = L.divIcon({
+                html: markerHtml,
+                className: 'custom-worker-marker',
+                iconSize: [24, 24],
+                iconAnchor: [12, 12],
+                popupAnchor: [0, -12]
+            });
+            
+            // Create marker
+            const marker = L.marker([latitude, longitude], { icon: customIcon });
+            
+            // Create popup content
+            const { locationAge } = workerData;
+            const lastSeenText = lastSeen ? formatLastSeen(lastSeen) : 'Never';
+            const speedText = speed ? `${(speed * 3.6).toFixed(1)} km/h` : 'Unknown';
+            const accuracyText = accuracy ? `±${accuracy.toFixed(0)}m` : 'Unknown';
+
+            // Format location age
+            let locationAgeText = 'Unknown';
+            if (locationAge !== undefined) {
+                if (locationAge < 1) {
+                    locationAgeText = 'Just now';
+                } else if (locationAge < 60) {
+                    locationAgeText = `${locationAge} min ago`;
+                } else if (locationAge < 1440) { // Less than 24 hours
+                    const hours = Math.round(locationAge / 60);
+                    locationAgeText = `${hours} hour${hours > 1 ? 's' : ''} ago`;
+                } else {
+                    const days = Math.round(locationAge / 1440);
+                    locationAgeText = `${days} day${days > 1 ? 's' : ''} ago`;
+                }
+            }
+
+            const statusText = isActive ? 'Active (Live Tracking)' : 'Inactive (Old Data)';
+
+            const popupContent = `
+                <div class="worker-popup">
+                    <h3>${name}</h3>
+                    <p><strong>Status:</strong> <span class="status ${isActive ? 'active' : 'inactive'}">${statusText}</span></p>
+                    <p><strong>Location Age:</strong> ${locationAgeText}</p>
+                    <p><strong>Last Seen:</strong> ${lastSeenText}</p>
+                    <p><strong>Location:</strong> ${latitude.toFixed(6)}, ${longitude.toFixed(6)}</p>
+                    <p><strong>Accuracy:</strong> ${accuracyText}</p>
+                    <p><strong>Speed:</strong> ${speedText}</p>
+                </div>
+            `;
+            
+            marker.bindPopup(popupContent);
+            marker.addTo(map);
+            workerMarkers[id] = marker;
+
+            console.log('LEAFLET-MAP: ✅ Real-time marker added for', name);
+            console.log('LEAFLET-MAP: 📊 Total live markers:', Object.keys(workerMarkers).length);
+
+            // Auto-center map on first marker for better visibility
+            if (Object.keys(workerMarkers).length === 1) {
+                map.setView([latitude, longitude], 15);
+                console.log('LEAFLET-MAP: 🎯 Map centered on first worker:', name);
+            }
+            
+            // Add accuracy circle if available and enabled
+            if (accuracy && showAccuracy) {
+                const circle = L.circle([latitude, longitude], {
+                    radius: accuracy,
+                    className: 'accuracy-circle'
+                });
+                circle.addTo(map);
+                accuracyCircles[id] = circle;
+            }
+            
+            // Add click handler
+            marker.on('click', () => {
+                selectWorker(id);
+                // Notify parent window if available
+                if (window.parent && window.parent.postMessage) {
+                    window.parent.postMessage({
+                        type: 'workerSelected',
+                        workerId: id,
+                        workerName: name
+                    }, '*');
+                }
+            });
+        }
+
+        function centerOnLocation(latitude, longitude, zoom = 15) {
+            console.log('Centering map on location:', latitude, longitude);
+            map.setView([latitude, longitude], zoom);
+        }
+
+        function centerOnAllWorkers() {
+            console.log('Centering map on all workers...');
+            
+            const markerPositions = Object.values(workerMarkers).map(marker => marker.getLatLng());
+            
+            if (markerPositions.length === 0) {
+                console.log('No workers to center on');
+                return;
+            }
+            
+            if (markerPositions.length === 1) {
+                map.setView(markerPositions[0], 15);
+            } else {
+                const group = new L.featureGroup(Object.values(workerMarkers));
+                map.fitBounds(group.getBounds().pad(0.1));
+            }
+        }
+
+        function selectWorker(workerId) {
+            console.log('Selecting worker:', workerId);
+            selectedWorkerId = workerId;
+            
+            // Update marker styles
+            Object.keys(workerMarkers).forEach(id => {
+                const marker = workerMarkers[id];
+                const markerElement = marker.getElement();
+                if (markerElement) {
+                    const workerDiv = markerElement.querySelector('.worker-marker');
+                    if (workerDiv) {
+                        if (id === workerId) {
+                            workerDiv.classList.add('selected');
+                        } else {
+                            workerDiv.classList.remove('selected');
+                        }
+                    }
+                }
+            });
+        }
+
+        function toggleAccuracyCircles() {
+            showAccuracy = !showAccuracy;
+            console.log('Toggling accuracy circles:', showAccuracy);
+            
+            if (showAccuracy) {
+                // Show accuracy circles for all markers
+                Object.keys(workerMarkers).forEach(id => {
+                    const marker = workerMarkers[id];
+                    const position = marker.getLatLng();
+                    // You would need to store accuracy data to recreate circles
+                    // For now, just show a default circle
+                    const circle = L.circle(position, {
+                        radius: 50, // Default 50m accuracy
+                        className: 'accuracy-circle'
+                    });
+                    circle.addTo(map);
+                    accuracyCircles[id] = circle;
+                });
+            } else {
+                // Hide accuracy circles
+                Object.values(accuracyCircles).forEach(circle => {
+                    map.removeLayer(circle);
+                });
+                accuracyCircles = {};
+            }
+        }
+
+        function refreshWorkers() {
+            console.log('Refreshing workers...');
+            // Notify parent window to refresh data
+            if (window.parent && window.parent.postMessage) {
+                window.parent.postMessage({
+                    type: 'refreshRequested'
+                }, '*');
+            }
+        }
+
+        function formatLastSeen(timestamp) {
+            const now = Date.now();
+            const diff = now - timestamp;
+            const minutes = Math.floor(diff / (1000 * 60));
+            
+            if (minutes < 1) return 'Just now';
+            if (minutes < 60) return `${minutes}m ago`;
+            
+            const hours = Math.floor(minutes / 60);
+            if (hours < 24) return `${hours}h ago`;
+            
+            const days = Math.floor(hours / 24);
+            return `${days}d ago`;
+        }
+
+        // Batch update processing for incremental marker updates
+        function processBatchUpdates(data) {
+            const { updates, activeCount } = data;
+            console.log(`LEAFLET-MAP: Processing ${updates.length} incremental updates, ${activeCount} active workers`);
+
+            updates.forEach((update, index) => {
+                if (update.type === 'updateWorkerMarker') {
+                    updateWorkerMarker(update.data);
+                } else if (update.type === 'removeWorkerMarker') {
+                    removeWorkerMarker(update.data.id);
+                }
+            });
+
+            console.log(`LEAFLET-MAP: ✅ Completed ${updates.length} incremental updates`);
+        }
+
+        // Update or create a single worker marker (incremental update)
+        function updateWorkerMarker(workerData) {
+            const { id, name, latitude, longitude, isActive, hasLocation, lastSeen, accuracy, speed, progressiveStatus, locationAge } = workerData;
+
+            console.log(`LEAFLET-MAP: 🔄 Incremental update for ${name}:`, {
+                coordinates: hasLocation ? `${latitude.toFixed(6)}, ${longitude.toFixed(6)}` : 'No location',
+                progressiveStatus: progressiveStatus || (isActive ? 'active' : 'inactive'),
+                locationAge: locationAge || 'unknown',
+                hasLocation: hasLocation
+            });
+
+            // Skip if no location data
+            if (!hasLocation || !latitude || !longitude) {
+                console.log(`LEAFLET-MAP: ⚠️ Skipping ${name} - no location data`);
+                return;
+            }
+
+            // Check if marker already exists
+            const existingMarker = workerMarkers[id];
+
+            if (existingMarker) {
+                // Update existing marker position and status
+                const newLatLng = L.latLng(latitude, longitude);
+                const currentLatLng = existingMarker.getLatLng();
+
+                // Only update position if it changed significantly
+                const distance = newLatLng.distanceTo(currentLatLng);
+                if (distance > 0.1) { // 0.1 meter threshold
+                    console.log(`LEAFLET-MAP: 📍 Moving ${name} marker by ${distance.toFixed(1)}m`);
+                    existingMarker.setLatLng(newLatLng);
+                }
+
+                // Update marker visual status with progressive status
+                updateMarkerProgressiveStatus(id, progressiveStatus || (isActive ? 'active' : 'inactive'), name);
+
+                // Update popup content
+                updateMarkerPopup(existingMarker, workerData);
+
+            } else {
+                // Create new marker
+                console.log(`LEAFLET-MAP: ➕ Creating new marker for ${name}`);
+                addWorkerMarker(workerData);
+            }
+        }
+
+        // Remove a worker marker
+        function removeWorkerMarker(workerId) {
+            if (workerMarkers[workerId]) {
+                console.log(`LEAFLET-MAP: 🗑️ Removing marker for worker ${workerId}`);
+                map.removeLayer(workerMarkers[workerId]);
+                delete workerMarkers[workerId];
+            }
+
+            if (accuracyCircles[workerId]) {
+                map.removeLayer(accuracyCircles[workerId]);
+                delete accuracyCircles[workerId];
+            }
+        }
+
+        // Update marker visual status with progressive status system
+        function updateMarkerProgressiveStatus(workerId, progressiveStatus, workerName) {
+            const marker = workerMarkers[workerId];
+            if (!marker) return;
+
+            const markerElement = marker.getElement();
+            if (!markerElement) return;
+
+            const workerDiv = markerElement.querySelector('.worker-marker');
+            if (!workerDiv) return;
+
+            // Remove all status classes
+            workerDiv.classList.remove('active', 'recently-active', 'offline', 'inactive');
+
+            // Add appropriate class based on progressive status
+            switch (progressiveStatus) {
+                case 'active':
+                    workerDiv.classList.add('active');
+                    console.log(`LEAFLET-MAP: 🟢 ${workerName} marker set to ACTIVE (blue pulsing)`);
+                    break;
+                case 'recently-active':
+                    workerDiv.classList.add('recently-active');
+                    console.log(`LEAFLET-MAP: 🔵 ${workerName} marker set to RECENTLY ACTIVE (blue static)`);
+                    break;
+                case 'offline':
+                    workerDiv.classList.add('offline');
+                    console.log(`LEAFLET-MAP: ⚫ ${workerName} marker set to OFFLINE (grey)`);
+                    break;
+                default:
+                    workerDiv.classList.add('inactive');
+                    console.log(`LEAFLET-MAP: ⚪ ${workerName} marker set to INACTIVE (grey)`);
+                    break;
+            }
+        }
+
+        // Legacy function for backward compatibility
+        function updateMarkerStatus(workerId, isActive, workerName) {
+            updateMarkerProgressiveStatus(workerId, isActive ? 'active' : 'inactive', workerName);
+        }
+
+        // Update marker popup content
+        function updateMarkerPopup(marker, workerData) {
+            const { name, latitude, longitude, isActive, lastSeen, accuracy, speed, locationAge, progressiveStatus } = workerData;
+
+            const lastSeenText = lastSeen ? formatLastSeen(lastSeen) : 'Never';
+            const speedText = speed ? `${(speed * 3.6).toFixed(1)} km/h` : 'Unknown';
+            const accuracyText = accuracy ? `±${accuracy.toFixed(0)}m` : 'Unknown';
+
+            // Format location age
+            let locationAgeText = 'Unknown';
+            if (locationAge !== undefined) {
+                if (locationAge < 1) {
+                    locationAgeText = 'Just now';
+                } else if (locationAge < 60) {
+                    locationAgeText = `${locationAge} min ago`;
+                } else if (locationAge < 1440) { // Less than 24 hours
+                    const hours = Math.round(locationAge / 60);
+                    locationAgeText = `${hours} hour${hours > 1 ? 's' : ''} ago`;
+                } else {
+                    const days = Math.round(locationAge / 1440);
+                    locationAgeText = `${days} day${days > 1 ? 's' : ''} ago`;
+                }
+            }
+
+            // Progressive status display
+            let statusText, statusClass, statusIcon;
+            const status = progressiveStatus || (isActive ? 'active' : 'inactive');
+
+            switch (status) {
+                case 'active':
+                    statusText = 'Live Tracking';
+                    statusClass = 'active';
+                    statusIcon = '🟢';
+                    break;
+                case 'recently-active':
+                    statusText = 'Recently Active (Grace Period)';
+                    statusClass = 'recently-active';
+                    statusIcon = '🔵';
+                    break;
+                case 'offline':
+                    statusText = 'Offline (Visible)';
+                    statusClass = 'offline';
+                    statusIcon = '⚫';
+                    break;
+                default:
+                    statusText = 'Inactive';
+                    statusClass = 'inactive';
+                    statusIcon = '⚪';
+                    break;
+            }
+
+            const popupContent = `
+                <div class="worker-popup">
+                    <h3>${name}</h3>
+                    <p><strong>Status:</strong> <span class="status ${statusClass}">${statusIcon} ${statusText}</span></p>
+                    <p><strong>Location Age:</strong> ${locationAgeText}</p>
+                    <p><strong>Last Seen:</strong> ${lastSeenText}</p>
+                    <p><strong>Location:</strong> ${latitude.toFixed(6)}, ${longitude.toFixed(6)}</p>
+                    <p><strong>Accuracy:</strong> ${accuracyText}</p>
+                    <p><strong>Speed:</strong> ${speedText}</p>
+                </div>
+            `;
+
+            marker.setPopupContent(popupContent);
+        }
+
+        // Territory Management Functions
+        function updateTerritories(territories) {
+            console.log(`LEAFLET-MAP: Updating ${territories.length} territories`);
+
+            // Clear existing territories
+            clearTerritories();
+
+            territories.forEach(territory => {
+                if (territory.visible) {
+                    addTerritoryPolygon(territory);
+                }
+            });
+        }
+
+        function addTerritoryPolygon(territory) {
+            const { id, name, coordinates, color, assignedWorker } = territory;
+
+            if (!coordinates || coordinates.length === 0) {
+                console.log(`LEAFLET-MAP: Skipping territory ${name} - no coordinates`);
+                return;
+            }
+
+            // Convert coordinates to Leaflet format
+            const latLngs = coordinates.map(coord => [coord.lat, coord.lng]);
+
+            // Create polygon with styling
+            const polygon = L.polygon(latLngs, {
+                color: color || '#0066cc',
+                fillColor: color || '#0066cc',
+                fillOpacity: 0.1,
+                weight: 2,
+                opacity: 0.8,
+                className: 'territory-polygon'
+            });
+
+            // Add popup with territory info
+            const workerInfo = assignedWorker ?
+                `👤 Assigned to: ${assignedWorker.name}` :
+                '⚪ Unassigned';
+
+            const popupContent = `
+                <div class="territory-popup">
+                    <div class="territory-popup-name">${name}</div>
+                    <div class="territory-popup-worker">${workerInfo}</div>
+                </div>
+            `;
+
+            polygon.bindPopup(popupContent);
+
+            // Add to map and store reference
+            polygon.addTo(map);
+            territoryPolygons[id] = polygon;
+
+            console.log(`LEAFLET-MAP: Added territory polygon: ${name}`);
+        }
+
+        function clearTerritories() {
+            console.log('LEAFLET-MAP: Clearing all territory polygons');
+
+            Object.keys(territoryPolygons).forEach(territoryId => {
+                map.removeLayer(territoryPolygons[territoryId]);
+                delete territoryPolygons[territoryId];
+            });
+        }
+
+        function toggleTerritories(visible) {
+            showTerritories = visible;
+            Object.values(territoryPolygons).forEach(polygon => {
+                if (visible) {
+                    polygon.addTo(map);
+                } else {
+                    map.removeLayer(polygon);
+                }
+            });
+            console.log(`LEAFLET-MAP: Territories ${visible ? 'shown' : 'hidden'}`);
+        }
+
+        // Initialize map when page loads
+        document.addEventListener('DOMContentLoaded', initMap);
+
+        // Listen for messages from parent window - optimized for real-time updates
+        window.addEventListener('message', (event) => {
+            const messageTime = new Date().toLocaleTimeString();
+
+            if (event.data.type === 'selectWorker') {
+                console.log('LEAFLET-MAP: Selecting worker:', event.data.workerId);
+                selectWorker(event.data.workerId);
+            } else if (event.data.type === 'centerOnWorker') {
+                console.log('LEAFLET-MAP: Centering on worker:', event.data.latitude, event.data.longitude);
+                const { latitude, longitude } = event.data;
+                centerOnLocation(latitude, longitude);
+            } else if (event.data.type === 'addWorkerMarker') {
+                console.log('LEAFLET-MAP: 📡 Real-time marker message received at', messageTime);
+                if (event.data.data) {
+                    addWorkerMarker(event.data.data);
+                } else {
+                    console.error('LEAFLET-MAP: ❌ No worker data in real-time message');
+                }
+            } else if (event.data.type === 'clearMarkers') {
+                console.log('LEAFLET-MAP: 🧹 Clearing markers for real-time update at', messageTime);
+                clearMarkers();
+            } else if (event.data.type === 'batchUpdateMarkers') {
+                console.log('LEAFLET-MAP: 🔄 Processing batch incremental updates at', messageTime);
+                processBatchUpdates(event.data.data);
+            } else if (event.data.type === 'updateWorkerMarker') {
+                console.log('LEAFLET-MAP: 🔄 Processing single incremental update at', messageTime);
+                updateWorkerMarker(event.data.data);
+            } else if (event.data.type === 'removeWorkerMarker') {
+                console.log('LEAFLET-MAP: 🗑️ Removing worker marker at', messageTime);
+                removeWorkerMarker(event.data.data.id);
+            } else if (event.data.type === 'updateTerritories') {
+                console.log('LEAFLET-MAP: 🗺️ Processing territory update at', messageTime);
+                updateTerritories(event.data.territories);
+            } else if (event.data.type === 'toggleTerritories') {
+                console.log('LEAFLET-MAP: 🔄 Toggling territory visibility at', messageTime);
+                toggleTerritories(event.data.visible);
+            } else {
+                console.log('LEAFLET-MAP: ⚠️ Unknown message type:', event.data.type);
+            }
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,339 @@
+part of 'team_map_bloc.dart';
+
+abstract class TeamMapState extends Equatable {
+  const TeamMapState();
+
+  @override
+  List<Object?> get props => [];
+}
+
+class TeamMapInitial extends TeamMapState {}
+
+class TeamMapLoading extends TeamMapState {}
+
+class TeamMapLoaded extends TeamMapState {
+  final List<ActiveWorkerLocation> activeWorkers;
+  final List<MapDeliveryMarker> deliveries;
+  final List<MapReceiptMarker> receipts;
+  final List<MapDonationMarker> donations;
+  final List<TerritoryBoundary> territoryBoundaries;
+  final bool showWorkers;
+  final bool showDeliveries;
+  final bool showReceipts;
+  final bool showDonations;
+  final bool showTerritories;
+  final String teamId;
+
+  const TeamMapLoaded({
+    required this.activeWorkers,
+    required this.deliveries,
+    required this.receipts,
+    required this.donations,
+    this.territoryBoundaries = const [],
+    this.showWorkers = true,
+    this.showDeliveries = true,
+    this.showReceipts = true,
+    this.showDonations = true,
+    this.showTerritories = true,
+    required this.teamId,
+  });
+
+  TeamMapLoaded copyWith({
+    List<ActiveWorkerLocation>? activeWorkers,
+    List<MapDeliveryMarker>? deliveries,
+    List<MapReceiptMarker>? receipts,
+    List<MapDonationMarker>? donations,
+    List<TerritoryBoundary>? territoryBoundaries,
+    bool? showWorkers,
+    bool? showDeliveries,
+    bool? showReceipts,
+    bool? showDonations,
+    bool? showTerritories,
+    String? teamId,
+  }) {
+    return TeamMapLoaded(
+      activeWorkers: activeWorkers ?? this.activeWorkers,
+      deliveries: deliveries ?? this.deliveries,
+      receipts: receipts ?? this.receipts,
+      donations: donations ?? this.donations,
+      territoryBoundaries: territoryBoundaries ?? this.territoryBoundaries,
+      showWorkers: showWorkers ?? this.showWorkers,
+      showDeliveries: showDeliveries ?? this.showDeliveries,
+      showReceipts: showReceipts ?? this.showReceipts,
+      showDonations: showDonations ?? this.showDonations,
+      showTerritories: showTerritories ?? this.showTerritories,
+      teamId: teamId ?? this.teamId,
+    );
+  }
+
+  @override
+  List<Object?> get props => [
+        activeWorkers,
+        deliveries,
+        receipts,
+        donations,
+        territoryBoundaries,
+        showWorkers,
+        showDeliveries,
+        showReceipts,
+        showDonations,
+        showTerritories,
+        teamId,
+      ];
+}
+
+class TeamMapError extends TeamMapState {
+  final String message;
+
+  const TeamMapError({required this.message});
+
+  @override
+  List<Object?> get props => [message];
+}
+
+// Data models for map markers
+class ActiveWorkerLocation {
+  final String id;
+  final String name;
+  final double latitude;
+  final double longitude;
+  final String status;
+  final String territoryName;
+  final DateTime lastUpdate;
+
+  const ActiveWorkerLocation({
+    required this.id,
+    required this.name,
+    required this.latitude,
+    required this.longitude,
+    required this.status,
+    required this.territoryName,
+    required this.lastUpdate,
+  });
+
+  factory ActiveWorkerLocation.fromJson(Map<String, dynamic> json) {
+    return ActiveWorkerLocation(
+      id: json['worker_id']?.toString() ?? json['id']?.toString() ?? '',
+      name: json['worker_name'] ?? json['name'] ?? 'Unknown',
+      latitude: (json['latitude'] ?? json['entry_lat'] ?? 0.0).toDouble(),
+      longitude: (json['longitude'] ?? json['entry_lng'] ?? 0.0).toDouble(),
+      status: json['status'] ?? 'working',
+      territoryName: json['territory_name'] ?? 'Unknown Territory',
+      lastUpdate: json['last_update'] != null
+          ? DateTime.tryParse(json['last_update'].toString()) ?? DateTime.now()
+          : DateTime.now(),
+    );
+  }
+}
+
+class MapDeliveryMarker {
+  final String id;
+  final double latitude;
+  final double longitude;
+  final String status;
+  final String recipientName;
+  final String? workerName;
+
+  const MapDeliveryMarker({
+    required this.id,
+    required this.latitude,
+    required this.longitude,
+    required this.status,
+    required this.recipientName,
+    this.workerName,
+  });
+
+  factory MapDeliveryMarker.fromJson(Map<String, dynamic> json) {
+    return MapDeliveryMarker(
+      id: json['id']?.toString() ?? '',
+      latitude: (json['latitude'] ?? json['recipient_latitude'] ?? 0.0).toDouble(),
+      longitude: (json['longitude'] ?? json['recipient_longitude'] ?? 0.0).toDouble(),
+      status: json['status'] ?? 'pending',
+      recipientName: json['recipient_name'] ?? 'Unknown',
+      workerName: json['assigned_worker_name'] ?? json['worker_name'],
+    );
+  }
+}
+
+class MapReceiptMarker {
+  final String id;
+  final double latitude;
+  final double longitude;
+  final double amount;
+  final String receiptType;
+  final String workerName;
+
+  const MapReceiptMarker({
+    required this.id,
+    required this.latitude,
+    required this.longitude,
+    required this.amount,
+    required this.receiptType,
+    required this.workerName,
+  });
+
+  factory MapReceiptMarker.fromJson(Map<String, dynamic> json) {
+    return MapReceiptMarker(
+      id: json['id']?.toString() ?? '',
+      latitude: (json['latitude'] ?? 0.0).toDouble(),
+      longitude: (json['longitude'] ?? 0.0).toDouble(),
+      amount: (json['amount'] ?? json['total_amount'] ?? 0.0).toDouble(),
+      receiptType: json['receipt_type'] ?? json['type'] ?? 'sale',
+      workerName: json['worker_name'] ?? json['collector_name'] ?? 'Unknown',
+    );
+  }
+}
+
+class MapDonationMarker {
+  final String id;
+  final double latitude;
+  final double longitude;
+  final double amount;
+  final String donorName;
+  final String workerName;
+
+  const MapDonationMarker({
+    required this.id,
+    required this.latitude,
+    required this.longitude,
+    required this.amount,
+    required this.donorName,
+    required this.workerName,
+  });
+
+  factory MapDonationMarker.fromJson(Map<String, dynamic> json) {
+    return MapDonationMarker(
+      id: json['id']?.toString() ?? '',
+      latitude: (json['latitude'] ?? 0.0).toDouble(),
+      longitude: (json['longitude'] ?? 0.0).toDouble(),
+      amount: (json['amount'] ?? 0.0).toDouble(),
+      donorName: json['donor_name'] ?? 'Anonymous',
+      workerName: json['worker_name'] ?? json['collector_name'] ?? 'Unknown',
+    );
+  }
+}
+
+/// Represents a territory boundary polygon for map display
+class TerritoryBoundary {
+  final String id;
+  final String name;
+  final String? solid;
+  final List<List<double>> coordinates; // List of [lng, lat] pairs
+
+  const TerritoryBoundary({
+    required this.id,
+    required this.name,
+    this.solid,
+    required this.coordinates,
+  });
+
+  /// Parse from GeoJSON feature
+  factory TerritoryBoundary.fromGeoJsonFeature(Map<String, dynamic> feature) {
+    debugPrint('TerritoryBoundary.fromGeoJsonFeature: feature keys: ${feature.keys}');
+    final properties = feature['properties'] as Map<String, dynamic>? ?? {};
+    final geometry = feature['geometry'];
+    debugPrint('TerritoryBoundary: geometry type: ${geometry.runtimeType}');
+    debugPrint('TerritoryBoundary: geometry: $geometry');
+
+    final geometryMap = geometry is Map<String, dynamic> ? geometry : <String, dynamic>{};
+
+    // Extract coordinates based on geometry type
+    List<List<double>> coords = [];
+    final geometryType = geometryMap['type'] as String?;
+    final rawCoordinates = geometryMap['coordinates'];
+    debugPrint('TerritoryBoundary: geometryType: $geometryType, hasCoordinates: ${rawCoordinates != null}');
+
+    if (rawCoordinates != null) {
+      if (geometryType == 'Polygon') {
+        // Polygon: [[[lng, lat], [lng, lat], ...]]
+        final outer = rawCoordinates[0] as List;
+        coords = outer.map<List<double>>((point) {
+          final p = point as List;
+          return [
+            (p[0] as num).toDouble(),
+            (p[1] as num).toDouble(),
+          ];
+        }).toList();
+      } else if (geometryType == 'MultiPolygon') {
+        // MultiPolygon: [[[[lng, lat], ...]], [[[lng, lat], ...]]]
+        // Take only the first polygon for simplicity
+        if ((rawCoordinates as List).isNotEmpty) {
+          final firstPolygon = rawCoordinates[0] as List;
+          debugPrint('MultiPolygon firstPolygon length: ${firstPolygon.length}');
+          if (firstPolygon.isNotEmpty) {
+            final outer = firstPolygon[0] as List;
+            debugPrint('MultiPolygon outer ring points: ${outer.length}');
+            coords = outer.map<List<double>>((point) {
+              final p = point as List;
+              return [
+                (p[0] as num).toDouble(),
+                (p[1] as num).toDouble(),
+              ];
+            }).toList();
+            debugPrint('Extracted ${coords.length} coordinates for MultiPolygon');
+          }
+        }
+      }
+    }
+
+    debugPrint('TerritoryBoundary FINAL: ${coords.length} coordinates');
+    return TerritoryBoundary(
+      id: feature['id']?.toString() ?? properties['id']?.toString() ?? '',
+      name: properties['entity_name']?.toString() ??
+          properties['name']?.toString() ??
+          'Territory',
+      solid: properties['solid']?.toString(),
+      coordinates: coords,
+    );
+  }
+
+  /// Parse from assignment response (same format as delivery screen uses)
+  factory TerritoryBoundary.fromAssignment(Map<String, dynamic> json) {
+    List<List<double>> coords = [];
+
+    // The geometry field contains the GeoJSON geometry
+    final geometry = json['geometry'] as Map<String, dynamic>?;
+    if (geometry != null) {
+      final geometryType = geometry['type'] as String?;
+      final rawCoordinates = geometry['coordinates'];
+
+      if (rawCoordinates != null) {
+        if (geometryType == 'Polygon') {
+          // Polygon: [[[lng, lat], [lng, lat], ...]]
+          final outer = rawCoordinates[0] as List;
+          coords = outer.map<List<double>>((point) {
+            final p = point as List;
+            return [
+              (p[0] as num).toDouble(),
+              (p[1] as num).toDouble(),
+            ];
+          }).toList();
+        } else if (geometryType == 'MultiPolygon') {
+          // MultiPolygon: [[[[lng, lat], ...]], [[[lng, lat], ...]]]
+          if ((rawCoordinates as List).isNotEmpty) {
+            final firstPolygon = rawCoordinates[0] as List;
+            if (firstPolygon.isNotEmpty) {
+              final outer = firstPolygon[0] as List;
+              coords = outer.map<List<double>>((point) {
+                final p = point as List;
+                return [
+                  (p[0] as num).toDouble(),
+                  (p[1] as num).toDouble(),
+                ];
+              }).toList();
+            }
+          }
+        }
+      }
+    }
+
+    return TerritoryBoundary(
+      id: json['id']?.toString() ?? json['territory_id']?.toString() ?? '',
+      name: json['territory_name']?.toString() ??
+          json['entity_name']?.toString() ??
+          'Territory',
+      solid: json['solid']?.toString(),
+      coordinates: coords,
+    );
+  }
+}
