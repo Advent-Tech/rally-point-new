@@ -48,6 +48,8 @@ type SendMessageRequest struct {
 	TeamID      uuid.UUID `json:"team_id" binding:"required"`
 	Message     string    `json:"message" binding:"required"`
 	MessageType string    `json:"message_type,omitempty"`
+	SenderName  string    `json:"sender_name,omitempty"`
+	SenderID    string    `json:"sender_id,omitempty"`
 }
 
 // TeamMember represents a team member for walkie-talkie

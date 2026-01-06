@@ -153,8 +153,11 @@ func (s *walkieService) SendMessage(userID uuid.UUID, req *domain.SendMessageReq
 		messageType = domain.MessageTypeText
 	}
 
-	// Get user name (would normally fetch from user service)
-	senderName := "User" // Placeholder - would fetch from user service
+	// Get sender name from request, fallback to "User" if not provided
+	senderName := req.SenderName
+	if senderName == "" {
+		senderName = "User" // Fallback if name not provided
+	}
 
 	// Create message
 	message := &domain.WalkieMessage{
