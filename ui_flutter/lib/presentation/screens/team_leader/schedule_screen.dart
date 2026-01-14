@@ -98,12 +98,12 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
       floatingActionButton: BlocBuilder<ScheduleBloc, ScheduleState>(
         builder: (context, state) {
           if (state is ScheduleLoaded) {
-            return FloatingActionButton.extended(
+            return FloatingActionButton(
               onPressed: () => _showAddScheduleDialog(context),
-              icon: const Icon(Icons.add),
-              label: const Text('Add Schedule'),
               backgroundColor: AppColors.primary,
               foregroundColor: Colors.white,
+              tooltip: 'Add Schedule',
+              child: const Icon(Icons.add),
             );
           }
           return const SizedBox.shrink();

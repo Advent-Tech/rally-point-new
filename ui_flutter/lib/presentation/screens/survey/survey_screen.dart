@@ -7,7 +7,8 @@ import '../../blocs/auth/auth_bloc.dart';
 import '../../blocs/survey/survey_bloc.dart';
 import '../../widgets/custom_button.dart';
 import 'survey_form_screen.dart';
-import 'create_survey_screen.dart';
+// NOTE: Survey creation is now admin-only (via admin panel)
+// Team leaders can only view surveys and see responses, not create them
 import 'survey_detail_screen.dart';
 
 class SurveyScreen extends StatefulWidget {
@@ -134,21 +135,8 @@ class _SurveyScreenState extends State<SurveyScreen> with SingleTickerProviderSt
     super.dispose();
   }
 
-  void _openCreateSurvey() async {
-    final result = await Navigator.push<bool>(
-      context,
-      MaterialPageRoute(
-        builder: (context) => const CreateSurveyScreen(),
-      ),
-    );
-
-    if (result == true) {
-      // Refresh surveys after creating a new one
-      if (mounted) {
-        _loadSurveys();
-      }
-    }
-  }
+  // NOTE: Survey creation removed - now admin-only via admin panel
+  // Team leaders can view surveys and see responses but cannot create
 
   @override
   Widget build(BuildContext context) {
@@ -182,16 +170,7 @@ class _SurveyScreenState extends State<SurveyScreen> with SingleTickerProviderSt
           ),
         ],
       ),
-      // FAB for team leaders to create surveys
-      floatingActionButton: _isTeamLeader
-          ? FloatingActionButton.extended(
-              onPressed: _openCreateSurvey,
-              icon: const Icon(Icons.add),
-              label: const Text('Create Survey'),
-              backgroundColor: AppColors.primary,
-              foregroundColor: Colors.white,
-            )
-          : null,
+      // NOTE: FAB removed - survey creation is now admin-only via admin panel
       body: BlocBuilder<SurveyBloc, SurveyState>(
         builder: (context, state) {
           if (state is SurveyLoading) {
@@ -602,9 +581,7 @@ class _MyResponsesTab extends StatelessWidget {
                 ),
               ),
               trailing: const Icon(Icons.chevron_right),
-              onTap: () {
-                // View response details
-              },
+              onTap: () => _showResponseDetails(context, response),
             ),
           );
         },
@@ -614,5 +591,165 @@ class _MyResponsesTab extends StatelessWidget {
 
   String _formatDate(DateTime date) {
     return '${date.day}/${date.month}/${date.year}';
+  }
+
+  void _showResponseDetails(BuildContext context, SurveyResponse response) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => DraggableScrollableSheet(
+        initialChildSize: 0.6,
+        minChildSize: 0.3,
+        maxChildSize: 0.9,
+        expand: false,
+        builder: (context, scrollController) => Column(
+          children: [
+            // Handle bar
+            Container(
+              margin: const EdgeInsets.only(top: 12, bottom: 8),
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: Colors.grey[400],
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            // Header
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Row(
+                children: [
+                  Container(
+                    width: 48,
+                    height: 48,
+                    decoration: BoxDecoration(
+                      color: AppColors.success.withAlpha(30),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Icon(
+                      Icons.check_circle,
+                      color: AppColors.success,
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Survey Response',
+                          style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        if (response.completedAt != null)
+                          Text(
+                            'Submitted on ${_formatDate(response.completedAt!)}',
+                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const Divider(),
+            // Response details
+            Expanded(
+              child: ListView(
+                controller: scrollController,
+                padding: const EdgeInsets.all(16),
+                children: [
+                  _buildDetailRow(context, 'Response ID', response.id.substring(0, 8), isDark),
+                  _buildDetailRow(context, 'Survey ID', response.surveyId.substring(0, 8), isDark),
+                  if (response.latitude != null && response.longitude != null)
+                    _buildDetailRow(
+                      context,
+                      'Location',
+                      '${response.latitude!.toStringAsFixed(4)}, ${response.longitude!.toStringAsFixed(4)}',
+                      isDark,
+                    ),
+                  if (response.answers != null && response.answers!.isNotEmpty) ...[
+                    const SizedBox(height: 16),
+                    Text(
+                      'Answers',
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    ...response.answers!.map((answer) => Card(
+                      margin: const EdgeInsets.only(bottom: 8),
+                      child: Padding(
+                        padding: const EdgeInsets.all(12),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Question ${response.answers!.indexOf(answer) + 1}',
+                              style: TextStyle(
+                                fontWeight: FontWeight.w600,
+                                color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                                fontSize: 12,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              answer.value ??
+                              answer.selectedOptions?.join(', ') ??
+                              (answer.signatureUrl != null ? '[Signature]' : 'No answer'),
+                              style: Theme.of(context).textTheme.bodyMedium,
+                            ),
+                          ],
+                        ),
+                      ),
+                    )),
+                  ] else
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 24),
+                      child: Center(
+                        child: Text(
+                          'No answer details available',
+                          style: TextStyle(
+                            color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDetailRow(BuildContext context, String label, String value, bool isDark) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(
+            label,
+            style: TextStyle(
+              color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+            ),
+          ),
+          Text(
+            value,
+            style: const TextStyle(fontWeight: FontWeight.w500),
+          ),
+        ],
+      ),
+    );
   }
 }

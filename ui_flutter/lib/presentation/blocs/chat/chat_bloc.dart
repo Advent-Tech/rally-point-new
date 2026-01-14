@@ -49,11 +49,14 @@ class ChatBloc extends Bloc<ChatEvent, ChatState> {
 
   /// Get the chat WebSocket URL based on environment
   String _getChatWsUrl(String conversationId) {
-    final baseUrl = kReleaseMode
-        ? 'wss://api.rallypoint.app'
-        : Platform.isAndroid
-            ? 'ws://10.0.2.2:8086'
-            : 'ws://localhost:8086';
+    String baseUrl;
+    if (kReleaseMode) {
+      baseUrl = 'wss://api.rallypoint.app';
+    } else {
+      // Use production server for real devices
+      final httpBase = ApiConstants.prodBaseUrl;
+      baseUrl = httpBase.replaceFirst('http://', 'ws://').replaceFirst('https://', 'wss://');
+    }
     return '$baseUrl${ApiConstants.wsChat}?user_id=$_currentUserId&conversation_id=$conversationId';
   }
 

@@ -63,6 +63,7 @@ dependencies:
   just_audio: ^0.9.36
   record: ^5.2.0
   audioplayers: ^6.0.0
+  flutter_sound: ^9.2.13
 
   # Permissions
   permission_handler: ^11.3.0
@@ -73,6 +74,9 @@ dependencies:
 
   # Payments
   flutter_stripe: ^11.4.0
+
+  # Supabase (for direct storage uploads)
+  supabase_flutter: ^2.3.0
 
   # Responsive Design
   responsive_framework: ^1.1.1

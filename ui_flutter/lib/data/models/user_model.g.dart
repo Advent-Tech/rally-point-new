@@ -19,6 +19,8 @@ UserModel _$UserModelFromJson(Map<String, dynamic> json) => UserModel(
       teamName: json['team_name'] as String?,
       isActive: json['is_active'] as bool? ?? true,
       isOnline: json['is_online'] as bool? ?? false,
+      verificationStatus: json['verification_status'] as String?,
+      rejectionReason: json['rejection_reason'] as String?,
       createdAt: json['created_at'] == null
           ? null
           : DateTime.parse(json['created_at'] as String),
@@ -40,6 +42,8 @@ Map<String, dynamic> _$UserModelToJson(UserModel instance) => <String, dynamic>{
       'team_name': instance.teamName,
       'is_active': instance.isActive,
       'is_online': instance.isOnline,
+      'verification_status': instance.verificationStatus,
+      'rejection_reason': instance.rejectionReason,
       'created_at': instance.createdAt?.toIso8601String(),
       'updated_at': instance.updatedAt?.toIso8601String(),
     };
@@ -61,6 +65,28 @@ Map<String, dynamic> _$AuthResponseToJson(AuthResponse instance) =>
       'token_type': instance.tokenType,
       'expires_in': instance.expiresIn,
       'user': instance.user,
+    };
+
+RegisterResponse _$RegisterResponseFromJson(Map<String, dynamic> json) =>
+    RegisterResponse(
+      message: json['message'] as String?,
+      user: json['user'] == null
+          ? null
+          : UserModel.fromJson(json['user'] as Map<String, dynamic>),
+      verificationStatus: json['verification_status'] as String?,
+      accessToken: json['access_token'] as String?,
+      refreshToken: json['refresh_token'] as String?,
+      expiresIn: (json['expires_in'] as num?)?.toInt(),
+    );
+
+Map<String, dynamic> _$RegisterResponseToJson(RegisterResponse instance) =>
+    <String, dynamic>{
+      'message': instance.message,
+      'user': instance.user,
+      'verification_status': instance.verificationStatus,
+      'access_token': instance.accessToken,
+      'refresh_token': instance.refreshToken,
+      'expires_in': instance.expiresIn,
     };
 
 LoginRequest _$LoginRequestFromJson(Map<String, dynamic> json) => LoginRequest(

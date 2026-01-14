@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:dio/dio.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:equatable/equatable.dart';
 import '../../../data/models/user_model.dart';
@@ -10,6 +11,33 @@ import '../../../core/constants/api_constants.dart';
 
 part 'auth_event.dart';
 part 'auth_state.dart';
+
+/// Helper function to extract user-friendly error message from exceptions
+String _extractErrorMessage(dynamic error) {
+  if (error is DioException) {
+    // Try to get error message from response data
+    final responseData = error.response?.data;
+    if (responseData is Map<String, dynamic>) {
+      // Backend returns {"error": "message"}
+      final errorMsg = responseData['error'] ?? responseData['message'];
+      if (errorMsg != null) {
+        return errorMsg.toString();
+      }
+    }
+    // Fallback to status message or generic message
+    if (error.response?.statusMessage != null) {
+      return error.response!.statusMessage!;
+    }
+    return 'Network error. Please try again.';
+  }
+  // For other exceptions, return the message directly
+  final msg = error.toString();
+  // Remove common prefixes that make errors ugly
+  if (msg.startsWith('Exception: ')) {
+    return msg.substring(11);
+  }
+  return msg;
+}
 
 class AuthBloc extends Bloc<AuthEvent, AuthState> {
   ApiClient? _apiClient;
@@ -174,7 +202,23 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
         emit(AuthError(message: 'Login failed. Please check your credentials.'));
       }
     } catch (e) {
-      emit(AuthError(message: e.toString()));
+      // Check if this is a pending verification error
+      final errorMessage = _extractErrorMessage(e);
+      final errorLower = errorMessage.toLowerCase();
+      if (errorLower.contains('pending verification') ||
+          errorLower.contains('pending admin approval') ||
+          errorLower.contains('wait for admin approval') ||
+          errorLower.contains('wait for approval')) {
+        // Determine role from error message
+        final isTeamLeader = errorLower.contains('admin approval');
+        emit(AuthPendingVerification(
+          message: 'Your account is pending verification. Please wait for approval before logging in.',
+          role: isTeamLeader ? 'team_leader' : 'worker',
+          email: event.email,
+        ));
+      } else {
+        emit(AuthError(message: errorMessage));
+      }
     }
   }
 
@@ -193,17 +237,42 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
           'role': event.role,
           if (event.firstName != null) 'first_name': event.firstName,
           if (event.lastName != null) 'last_name': event.lastName,
-          // Team leaders create a new team with team_name
-          if (event.role == 'team_leader' && event.teamName != null)
-            'team_name': event.teamName,
-          // Workers can optionally join an existing team
+          // Workers select a team to request joining (team_id)
           if (event.role == 'worker' && event.teamId != null)
             'team_id': event.teamId,
         },
       );
 
       if (response.statusCode == 200 || response.statusCode == 201) {
-        final authResponse = AuthResponse.fromJson(response.data);
+        final data = response.data as Map<String, dynamic>;
+
+        // Check if this is a pending verification response (no tokens)
+        final accessToken = data['access_token']?.toString() ?? '';
+        // verification_status can be at top level or inside user object
+        final verificationStatus = data['verification_status'] ??
+            (data['user'] as Map<String, dynamic>?)?['verification_status'];
+
+        if (accessToken.isEmpty || verificationStatus == 'pending') {
+          // User registered but needs verification before they can login
+          String message;
+          if (event.role == 'team_leader') {
+            message = 'Your account has been created and is pending verification by an admin. '
+                'You will be able to login once your account is approved.';
+          } else {
+            message = 'Your account has been created. '
+                'You will be able to login once a team leader approves your join request.';
+          }
+
+          emit(AuthPendingVerification(
+            message: data['message'] ?? message,
+            role: event.role,
+            email: event.email,
+          ));
+          return;
+        }
+
+        // User can login immediately (has tokens)
+        final authResponse = AuthResponse.fromJson(data);
 
         // Save tokens
         await _secure.saveAccessToken(authResponse.accessToken);
@@ -232,7 +301,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
         emit(AuthError(message: 'Registration failed. Please try again.'));
       }
     } catch (e) {
-      emit(AuthError(message: e.toString()));
+      emit(AuthError(message: _extractErrorMessage(e)));
     }
   }
 

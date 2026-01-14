@@ -34,11 +34,23 @@ class _HomeScreenState extends State<HomeScreen> {
     _scheduleBloc = WorkerScheduleBloc();
     _scheduleBloc.add(WorkerScheduleLoad(date: DateTime.now()));
 
-    // Load assignments for territory selection
+    // Load assignments for territory selection (for workers)
+    // For team leaders, we'll load allocations in build() after checking the role
     context.read<TerritoryBloc>().add(const TerritoryLoadAssignments());
 
     // Load recent deliveries
     context.read<DeliveryBloc>().add(const DeliveryLoadList());
+
+    // Load team leader allocations if user is a team leader
+    // This is done after the first frame to ensure AuthBloc state is available
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final authState = context.read<AuthBloc>().state;
+      if (authState is AuthAuthenticated &&
+          (authState.user.isTeamLeader || authState.user.isAdmin)) {
+        // Load allocated territories for team leaders
+        context.read<TerritoryBloc>().add(const TerritoryLoadMyAllocations());
+      }
+    });
   }
 
   @override
@@ -136,22 +148,22 @@ class _HomeScreenState extends State<HomeScreen> {
         BlocProvider.value(value: _scheduleBloc),
       ],
       child: BlocBuilder<AuthBloc, AuthState>(
-        builder: (context, authState) {
-          // Debug: Log role detection
-          if (authState is AuthAuthenticated) {
-            debugPrint('HomeScreen - User role: "${authState.user.role}"');
-            debugPrint('HomeScreen - isTeamLeader: ${authState.user.isTeamLeader}');
-            debugPrint('HomeScreen - isAdmin: ${authState.user.isAdmin}');
-          } else {
-            debugPrint('HomeScreen - AuthState is NOT AuthAuthenticated: ${authState.runtimeType}');
+        // Only rebuild when auth type changes or user role changes
+        buildWhen: (previous, current) {
+          // Rebuild if state type changed (e.g., from loading to authenticated)
+          if (previous.runtimeType != current.runtimeType) return true;
+          // If both are authenticated, only rebuild if role changed
+          if (previous is AuthAuthenticated && current is AuthAuthenticated) {
+            return previous.user.role != current.user.role ||
+                   previous.user.id != current.user.id;
           }
-
+          return false;
+        },
+        builder: (context, authState) {
           if (authState is AuthAuthenticated &&
               (authState.user.isTeamLeader || authState.user.isAdmin)) {
-            debugPrint('HomeScreen - Showing LEADER dashboard');
             return _buildLeaderDashboard(context, authState, isDark);
           }
-          debugPrint('HomeScreen - Showing WORKER home');
           return _buildWorkerHome(context, authState, isDark);
         },
       ),
@@ -284,24 +296,36 @@ class _HomeScreenState extends State<HomeScreen> {
                         ),
                       ),
                       const SizedBox(height: 16),
-                      Row(
-                        children: [
-                          _LeaderStatItem(
-                            icon: Icons.people,
-                            value: '12',
-                            label: 'Active Workers',
-                          ),
-                          _LeaderStatItem(
-                            icon: Icons.map,
-                            value: '8',
-                            label: 'Territories',
-                          ),
-                          _LeaderStatItem(
-                            icon: Icons.assignment_turned_in,
-                            value: '24',
-                            label: 'Surveys Done',
-                          ),
-                        ],
+                      BlocBuilder<TerritoryBloc, TerritoryState>(
+                        builder: (context, territoryState) {
+                          // Get territory count from allocations (for leaders)
+                          int territoryCount = 0;
+                          if (territoryState is TerritoryAllocationsLoaded) {
+                            territoryCount = territoryState.territories.length;
+                          } else if (territoryState is TerritoryAssignmentsLoaded) {
+                            territoryCount = territoryState.assignments.length;
+                          }
+
+                          return Row(
+                            children: [
+                              _LeaderStatItem(
+                                icon: Icons.people,
+                                value: '-', // TODO: Load from team bloc
+                                label: 'Active Workers',
+                              ),
+                              _LeaderStatItem(
+                                icon: Icons.map,
+                                value: '$territoryCount',
+                                label: 'Territories',
+                              ),
+                              _LeaderStatItem(
+                                icon: Icons.assignment_turned_in,
+                                value: '-', // TODO: Load from survey bloc
+                                label: 'Surveys Done',
+                              ),
+                            ],
+                          );
+                        },
                       ),
                     ],
                   ),
@@ -328,9 +352,16 @@ class _HomeScreenState extends State<HomeScreen> {
                     _ManagementListCard(
                       items: [
                         _ManagementItem(
+                          icon: Icons.verified_user,
+                          label: 'Verify Workers',
+                          description: 'Approve or reject join requests',
+                          color: AppColors.accent,
+                          onTap: () => context.go('/leader/worker-verification'),
+                        ),
+                        _ManagementItem(
                           icon: Icons.assignment,
                           label: 'Manage Surveys',
-                          description: 'Create and view survey responses',
+                          description: 'View surveys and responses',
                           color: AppColors.warning,
                           onTap: () => context.go('/survey'),
                         ),
@@ -417,6 +448,28 @@ class _HomeScreenState extends State<HomeScreen> {
                             label: 'Walkie-Talkie',
                             color: AppColors.accent,
                             onTap: () => showWalkieBottomSheet(context),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: _QuickActionCard(
+                            icon: Icons.volunteer_activism,
+                            label: 'Prayer Requests',
+                            color: AppColors.info,
+                            onTap: () => context.go('/leader/prayer-requests'),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: _QuickActionCard(
+                            icon: Icons.article_outlined,
+                            label: 'News & Updates',
+                            color: AppColors.warning,
+                            onTap: () => context.go('/leader/blogs'),
                           ),
                         ),
                       ],
@@ -635,22 +688,11 @@ class _HomeScreenState extends State<HomeScreen> {
                         ),
                         const SizedBox(width: 12),
                         Expanded(
-                          child: BlocBuilder<WorkSessionBloc, WorkSessionState>(
-                            builder: (context, sessionState) {
-                              final isActive = sessionState is WorkSessionActive;
-                              return _QuickActionCard(
-                                icon: isActive ? Icons.add_location_alt : Icons.qr_code_scanner,
-                                label: isActive ? 'Log Visit' : 'Scan Code',
-                                color: isActive ? AppColors.primary : AppColors.secondary,
-                                onTap: () {
-                                  if (isActive) {
-                                    context.go('/log-visit');
-                                  } else {
-                                    // TODO: Barcode scanner
-                                  }
-                                },
-                              );
-                            },
+                          child: _QuickActionCard(
+                            icon: Icons.local_shipping_outlined,
+                            label: 'New Delivery',
+                            color: AppColors.accent,
+                            onTap: () => context.go('/delivery'),
                           ),
                         ),
                       ],
@@ -660,22 +702,33 @@ class _HomeScreenState extends State<HomeScreen> {
                       children: [
                         Expanded(
                           child: _QuickActionCard(
-                            icon: Icons.local_shipping_outlined,
-                            label: 'New Delivery',
-                            color: AppColors.accent,
-                            onTap: () => context.go('/delivery'),
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: _QuickActionCard(
                             icon: Icons.assignment_outlined,
                             label: 'Quick Survey',
                             color: AppColors.warning,
                             onTap: () => context.go('/survey'),
                           ),
                         ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: _QuickActionCard(
+                            icon: Icons.map_outlined,
+                            label: 'Territory',
+                            color: AppColors.primary,
+                            onTap: () => context.go('/territory'),
+                          ),
+                        ),
                       ],
+                    ),
+                    const SizedBox(height: 12),
+                    // Prayer Request - workers can only create, not view list
+                    SizedBox(
+                      width: double.infinity,
+                      child: _QuickActionCard(
+                        icon: Icons.volunteer_activism,
+                        label: 'New Prayer Request',
+                        color: AppColors.secondary,
+                        onTap: () => context.go('/prayer-requests/new'),
+                      ),
                     ),
                     const SizedBox(height: 12),
                     // Communication row
@@ -685,7 +738,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           child: _QuickActionCard(
                             icon: Icons.chat_bubble_outline,
                             label: 'Chat',
-                            color: AppColors.secondary,
+                            color: AppColors.primary,
                             onTap: () => context.go('/chat'),
                           ),
                         ),
@@ -694,11 +747,22 @@ class _HomeScreenState extends State<HomeScreen> {
                           child: _QuickActionCard(
                             icon: Icons.speaker_phone,
                             label: 'Walkie-Talkie',
-                            color: AppColors.primary,
+                            color: AppColors.accent,
                             onTap: () => showWalkieBottomSheet(context),
                           ),
                         ),
                       ],
+                    ),
+                    const SizedBox(height: 12),
+                    // News row
+                    SizedBox(
+                      width: double.infinity,
+                      child: _QuickActionCard(
+                        icon: Icons.article_outlined,
+                        label: 'News & Updates',
+                        color: AppColors.warning,
+                        onTap: () => context.go('/blogs'),
+                      ),
                     ),
                   ],
                 ),
@@ -1080,8 +1144,7 @@ class _HomeScreenState extends State<HomeScreen> {
                               children: recentDeliveries.asMap().entries.map((entry) {
                                 final index = entry.key;
                                 final delivery = entry.value;
-                                final isBookSale = delivery.deliveryType != 'donation';
-                                final color = isBookSale ? AppColors.primary : AppColors.success;
+                                const color = AppColors.success;
                                 final time = delivery.createdAt ?? delivery.completedAt;
 
                                 return Column(
@@ -1094,8 +1157,8 @@ class _HomeScreenState extends State<HomeScreen> {
                                           color: color.withAlpha(30),
                                           borderRadius: BorderRadius.circular(10),
                                         ),
-                                        child: Icon(
-                                          isBookSale ? Icons.menu_book : Icons.volunteer_activism,
+                                        child: const Icon(
+                                          Icons.volunteer_activism,
                                           color: color,
                                           size: 20,
                                         ),
@@ -1109,7 +1172,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                       subtitle: Text(
                                         time != null
                                             ? DateFormat('MMM d, h:mm a').format(time)
-                                            : isBookSale ? 'Book Sale' : 'Donation',
+                                            : 'Donation',
                                         style: TextStyle(
                                           fontSize: 12,
                                           color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
@@ -1117,7 +1180,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                       ),
                                       trailing: Text(
                                         '\$${(delivery.donationAmount ?? 0).toStringAsFixed(2)}',
-                                        style: TextStyle(
+                                        style: const TextStyle(
                                           fontWeight: FontWeight.bold,
                                           color: color,
                                         ),

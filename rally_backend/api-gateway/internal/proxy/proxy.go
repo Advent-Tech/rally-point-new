@@ -124,9 +124,11 @@ func (sp *ServiceProxy) copyHeaders(src, dst http.Header) {
 	}
 }
 
-// isHopByHopHeader checks if a header is hop-by-hop
+// isHopByHopHeader checks if a header is hop-by-hop or should be skipped
 func (sp *ServiceProxy) isHopByHopHeader(header string) bool {
-	hopByHopHeaders := []string{
+	// Headers that should not be copied from backend responses
+	skipHeaders := []string{
+		// Hop-by-hop headers
 		"Connection",
 		"Keep-Alive",
 		"Proxy-Authenticate",
@@ -135,11 +137,19 @@ func (sp *ServiceProxy) isHopByHopHeader(header string) bool {
 		"Trailers",
 		"Transfer-Encoding",
 		"Upgrade",
+		// CORS headers - these are handled by the gateway's CORS middleware
+		// Copying them from backend would cause duplicate values
+		"Access-Control-Allow-Origin",
+		"Access-Control-Allow-Methods",
+		"Access-Control-Allow-Headers",
+		"Access-Control-Allow-Credentials",
+		"Access-Control-Expose-Headers",
+		"Access-Control-Max-Age",
 	}
 
 	header = strings.ToLower(header)
-	for _, hopHeader := range hopByHopHeaders {
-		if strings.ToLower(hopHeader) == header {
+	for _, skipHeader := range skipHeaders {
+		if strings.ToLower(skipHeader) == header {
 			return true
 		}
 	}

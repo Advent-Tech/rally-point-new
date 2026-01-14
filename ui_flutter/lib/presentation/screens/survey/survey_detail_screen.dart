@@ -624,51 +624,77 @@ class _ResponseCard extends StatelessWidget {
         children: [
           Padding(
             padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                ...(response.answers ?? []).map((answer) {
-                  final question = survey.questions?.firstWhere(
-                    (q) => q.id == answer.questionId,
-                    orElse: () => SurveyQuestion(
-                      id: answer.questionId,
-                      surveyId: survey.id,
-                      text: 'Unknown Question',
-                      questionType: 'text',
-                    ),
-                  );
+            child: Builder(
+              builder: (context) {
+                debugPrint('ResponseCard: Response ID: ${response.id}');
+                debugPrint('ResponseCard: Answers count: ${response.answers?.length ?? 0}');
+                debugPrint('ResponseCard: Survey questions count: ${survey.questions?.length ?? 0}');
+                if (response.answers != null) {
+                  for (final a in response.answers!) {
+                    debugPrint('ResponseCard: Answer - questionId: ${a.questionId}, value: ${a.value}');
+                  }
+                }
 
-                  return Padding(
-                    padding: const EdgeInsets.only(bottom: 12),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          question?.text ?? 'Question',
-                          style: TextStyle(
-                            fontWeight: FontWeight.bold,
-                            color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
-                            fontSize: 12,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Container(
-                          width: double.infinity,
-                          padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(
-                            color: isDark ? Colors.grey[800] : Colors.grey[100],
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Text(
-                            answer.value ?? answer.selectedOptions?.join(', ') ?? 'No answer',
-                            style: const TextStyle(fontSize: 14),
-                          ),
-                        ),
-                      ],
+                final answers = response.answers ?? [];
+                if (answers.isEmpty) {
+                  return const Center(
+                    child: Padding(
+                      padding: EdgeInsets.all(16),
+                      child: Text(
+                        'No answers recorded for this response',
+                        style: TextStyle(fontStyle: FontStyle.italic),
+                      ),
                     ),
                   );
-                }),
-              ],
+                }
+
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    ...answers.map((answer) {
+                      final question = survey.questions?.firstWhere(
+                        (q) => q.id == answer.questionId,
+                        orElse: () => SurveyQuestion(
+                          id: answer.questionId,
+                          surveyId: survey.id,
+                          text: 'Unknown Question',
+                          questionType: 'text',
+                        ),
+                      );
+
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 12),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              question?.text ?? 'Question',
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                                fontSize: 12,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Container(
+                              width: double.infinity,
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: isDark ? Colors.grey[800] : Colors.grey[100],
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Text(
+                                answer.value ?? answer.selectedOptions?.join(', ') ?? 'No answer',
+                                style: const TextStyle(fontSize: 14),
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    }),
+                  ],
+                );
+              },
             ),
           ),
         ],

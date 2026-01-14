@@ -280,21 +280,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   void _handleRegister() {
     if (_formKey.currentState?.validate() ?? false) {
-      // Validate team requirements
+      // Validate team requirements for workers
       if (_selectedRole == 'worker' && _selectedTeam == null) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Please select a team to join as a worker'),
-            backgroundColor: AppColors.error,
-          ),
-        );
-        return;
-      }
-
-      if (_selectedRole == 'team_leader' && _teamNameController.text.trim().isEmpty) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Please enter a team name to create'),
+            content: Text('Please select a team to request joining'),
             backgroundColor: AppColors.error,
           ),
         );
@@ -306,7 +296,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
         password: _passwordController.text,
         displayName: _nameController.text.trim(),
         role: _selectedRole,
-        teamName: _selectedRole == 'team_leader' ? _teamNameController.text.trim() : null,
+        // Workers select a team to request joining
         teamId: _selectedRole == 'worker' && _selectedTeam != null
             ? _selectedTeam!.id
             : null,
@@ -332,6 +322,64 @@ class _RegisterScreenState extends State<RegisterScreen> {
               SnackBar(
                 content: Text(state.message),
                 backgroundColor: AppColors.error,
+              ),
+            );
+          } else if (state is AuthPendingVerification) {
+            // Show pending verification dialog and navigate to login
+            showDialog(
+              context: context,
+              barrierDismissible: false,
+              builder: (context) => AlertDialog(
+                title: Row(
+                  children: [
+                    Icon(
+                      state.role == 'team_leader' ? Icons.hourglass_empty : Icons.send,
+                      color: AppColors.primary,
+                    ),
+                    const SizedBox(width: 12),
+                    Text(state.role == 'team_leader'
+                        ? 'Pending Verification'
+                        : 'Request Sent'),
+                  ],
+                ),
+                content: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(state.message),
+                    const SizedBox(height: 16),
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: AppColors.info.withAlpha(20),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(Icons.info_outline, color: AppColors.info, size: 20),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              state.role == 'team_leader'
+                                  ? 'An admin will review your account.'
+                                  : 'The team leader will review your request.',
+                              style: TextStyle(fontSize: 13, color: AppColors.info),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                actions: [
+                  TextButton(
+                    onPressed: () {
+                      Navigator.of(context).pop();
+                      context.go('/login');
+                    },
+                    child: const Text('Go to Login'),
+                  ),
+                ],
               ),
             );
           }
@@ -431,25 +479,41 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   ),
                   const SizedBox(height: 16),
 
-                  // Team Name (for Team Leaders)
+                  // Team Leader Info Message
                   if (_selectedRole == 'team_leader') ...[
-                    CustomTextField(
-                      controller: _teamNameController,
-                      label: 'Create Your Team *',
-                      hint: 'Enter your team name',
-                      prefixIcon: Icons.groups_outlined,
-                      validator: (value) {
-                        if (_selectedRole == 'team_leader' && (value == null || value.isEmpty)) {
-                          return 'Please enter a team name';
-                        }
-                        return null;
-                      },
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'As a team leader, you\'ll create and manage your own team',
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: AppColors.info.withAlpha(15),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: AppColors.info.withAlpha(40)),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Icon(Icons.info_outline, color: AppColors.info, size: 20),
+                              const SizedBox(width: 8),
+                              Text(
+                                'Verification Required',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w600,
+                                  color: AppColors.info,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            'After registration, your account will be reviewed by an admin. '
+                            'Once verified, you will be assigned to manage a team and receive territory allocations.',
+                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                              height: 1.4,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                     const SizedBox(height: 16),
@@ -458,9 +522,16 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   // Team Search (for Workers)
                   if (_selectedRole == 'worker') ...[
                     Text(
-                      'Select Your Team *',
+                      'Request to Join a Team *',
                       style: Theme.of(context).textTheme.titleSmall?.copyWith(
                         fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Your request will be sent to the team leader for approval',
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
                       ),
                     ),
                     const SizedBox(height: 8),
@@ -622,8 +693,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     builder: (context, state) {
                       return CustomButton(
                         text: _selectedRole == 'team_leader'
-                            ? 'Create Team & Account'
-                            : 'Create Account',
+                            ? 'Register as Team Leader'
+                            : 'Request to Join Team',
                         onPressed: _handleRegister,
                         isLoading: state is AuthLoading,
                       );

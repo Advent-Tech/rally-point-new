@@ -88,17 +88,22 @@ func (r *assignmentRepository) GetByID(id uuid.UUID) (*domain.TerritoryAssignmen
 	`
 
 	var a domain.TerritoryAssignmentWithDetails
+	var geometryJSON sql.NullString
 	err := r.db.QueryRow(query, id).Scan(
 		&a.ID, &a.TerritoryID, &a.TerritorySOLID, &a.TeamID, &a.AssignedWorkerID,
 		&a.AssignedBy, &a.AssignedAt, &a.ExpiresAt, &a.Status, &a.Priority, &a.Notes,
 		&a.LastWorkedAt, &a.VisitsCount, &a.CompletenessPercentage,
 		&a.CreatedAt, &a.UpdatedAt,
 		&a.EntityName, &a.EntityID, &a.City, &a.State, &a.UnionName, &a.Conference,
-		&a.Population, &a.HousingUnits, &a.Geometry,
+		&a.Population, &a.HousingUnits, &geometryJSON,
 	)
 
 	if err != nil {
 		return nil, err
+	}
+
+	if geometryJSON.Valid && geometryJSON.String != "" {
+		a.Geometry = json.RawMessage(geometryJSON.String)
 	}
 
 	return &a, nil
@@ -182,16 +187,20 @@ func (r *assignmentRepository) queryAssignments(query string, args ...interface{
 	var assignments []*domain.TerritoryAssignmentWithDetails
 	for rows.Next() {
 		var a domain.TerritoryAssignmentWithDetails
+		var geometryJSON sql.NullString
 		err := rows.Scan(
 			&a.ID, &a.TerritoryID, &a.TerritorySOLID, &a.TeamID, &a.AssignedWorkerID,
 			&a.AssignedBy, &a.AssignedAt, &a.ExpiresAt, &a.Status, &a.Priority, &a.Notes,
 			&a.LastWorkedAt, &a.VisitsCount, &a.CompletenessPercentage,
 			&a.CreatedAt, &a.UpdatedAt,
 			&a.EntityName, &a.EntityID, &a.City, &a.State, &a.UnionName, &a.Conference,
-			&a.Population, &a.HousingUnits, &a.Geometry,
+			&a.Population, &a.HousingUnits, &geometryJSON,
 		)
 		if err != nil {
 			return nil, err
+		}
+		if geometryJSON.Valid && geometryJSON.String != "" {
+			a.Geometry = json.RawMessage(geometryJSON.String)
 		}
 		assignments = append(assignments, &a)
 	}

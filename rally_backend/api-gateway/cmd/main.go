@@ -158,6 +158,9 @@ func setupRouter(cfg *config.Config, jwtManager *auth.JWTManager, rateLimiter mi
 
 	router := gin.New()
 
+	// Disable trailing slash redirect (causes CORS issues with 307 redirects)
+	router.RedirectTrailingSlash = false
+
 	// Global middleware
 	router.Use(middleware.CORSMiddleware())
 	router.Use(middleware.RequestResponseLogger())
@@ -198,6 +201,10 @@ func setupRouter(cfg *config.Config, jwtManager *auth.JWTManager, rateLimiter mi
 		// Public team routes (for workers to find teams during signup)
 		public.GET("/teams/search", serviceProxy.ProxyRequest("user"))
 		public.GET("/teams/:id", serviceProxy.ProxyRequest("user"))
+
+		// Public blog routes (read-only)
+		public.GET("/blogs", serviceProxy.ProxyRequest("user"))
+		public.GET("/blogs/:id", serviceProxy.ProxyRequest("user"))
 	}
 
 	// Protected routes (authentication required)
@@ -385,16 +392,20 @@ func setupRouter(cfg *config.Config, jwtManager *auth.JWTManager, rateLimiter mi
 			visitsRoutes.GET("/worker/:workerId", serviceProxy.ProxyRequest("territory"))
 		}
 
-		// Survey service routes
+		// Survey service routes - explicit routes for both with and without trailing slash
+		protected.GET("/surveys", serviceProxy.ProxyRequest("survey"))
+		protected.POST("/surveys", serviceProxy.ProxyRequest("survey"))
+		protected.GET("/surveys/", serviceProxy.ProxyRequest("survey"))
+		protected.POST("/surveys/", serviceProxy.ProxyRequest("survey"))
 		surveys := protected.Group("/surveys")
 		{
-			surveys.POST("/", serviceProxy.ProxyRequest("survey"))
 			surveys.GET("/:id", serviceProxy.ProxyRequest("survey"))
 			surveys.PUT("/:id", serviceProxy.ProxyRequest("survey"))
 			surveys.DELETE("/:id", serviceProxy.ProxyRequest("survey"))
 			surveys.GET("/team/:teamId", serviceProxy.ProxyRequest("survey"))
 			surveys.GET("/worker/:workerId", serviceProxy.ProxyRequest("survey"))
 			surveys.PUT("/:id/assign", serviceProxy.ProxyRequest("survey"))
+			surveys.POST("/:id/assignments", serviceProxy.ProxyRequest("survey"))
 			surveys.POST("/:id/responses", serviceProxy.ProxyRequest("survey"))
 			surveys.GET("/:id/responses", serviceProxy.ProxyRequest("survey"))
 			surveys.GET("/:id/analytics", serviceProxy.ProxyRequest("survey"))
@@ -500,6 +511,25 @@ func setupRouter(cfg *config.Config, jwtManager *auth.JWTManager, rateLimiter mi
 			donations.GET("/stats/worker/:workerId", serviceProxy.ProxyRequest("delivery"))
 		}
 
+		// Prayer request routes
+		prayerRequests := protected.Group("/prayer-requests")
+		{
+			prayerRequests.POST("/", serviceProxy.ProxyRequest("delivery"))
+			prayerRequests.GET("/", serviceProxy.ProxyRequest("delivery"))
+			prayerRequests.GET("/me", serviceProxy.ProxyRequest("delivery"))
+			prayerRequests.GET("/map", serviceProxy.ProxyRequest("delivery"))
+			prayerRequests.GET("/stats", serviceProxy.ProxyRequest("delivery"))
+			prayerRequests.GET("/:id", serviceProxy.ProxyRequest("delivery"))
+			prayerRequests.PUT("/:id", serviceProxy.ProxyRequest("delivery"))
+			prayerRequests.DELETE("/:id", serviceProxy.ProxyRequest("delivery"))
+			prayerRequests.PUT("/:id/status", serviceProxy.ProxyRequest("delivery"))
+			prayerRequests.PUT("/:id/assign-preacher", serviceProxy.ProxyRequest("delivery"))
+			prayerRequests.PUT("/:id/complete", serviceProxy.ProxyRequest("delivery"))
+			prayerRequests.GET("/worker/:workerId", serviceProxy.ProxyRequest("delivery"))
+			prayerRequests.GET("/team/:teamId", serviceProxy.ProxyRequest("delivery"))
+			prayerRequests.GET("/territory/:territoryId", serviceProxy.ProxyRequest("delivery"))
+		}
+
 		// Payment routes (Stripe integration)
 		payments := protected.Group("/payments")
 		{
@@ -508,12 +538,40 @@ func setupRouter(cfg *config.Config, jwtManager *auth.JWTManager, rateLimiter mi
 			payments.POST("/send-link", serviceProxy.ProxyRequest("delivery"))
 			payments.GET("/status/:sessionId", serviceProxy.ProxyRequest("delivery"))
 		}
+
+		// Blog routes (create/update/delete requires admin - enforced in user-service)
+		blogs := protected.Group("/blogs")
+		{
+			blogs.POST("/", serviceProxy.ProxyRequest("user"))
+			blogs.PUT("/:id", serviceProxy.ProxyRequest("user"))
+			blogs.DELETE("/:id", serviceProxy.ProxyRequest("user"))
+			blogs.POST("/:id/image", serviceProxy.ProxyRequest("user"))
+			blogs.POST("/upload-image", serviceProxy.ProxyRequest("user"))
+		}
 	}
 
-	// Admin routes (admin role required)
+	// =====================================================
+	// SUPERADMIN ROUTES (superadmin only)
+	// =====================================================
+	superadmin := api.Group("/superadmin")
+	superadmin.Use(middleware.AuthMiddleware(jwtManager))
+	superadmin.Use(middleware.SuperAdminMiddleware())
+	superadmin.Use(middleware.ServiceAuthMiddleware())
+	{
+		// Admin account management
+		superadmin.POST("/admins", serviceProxy.ProxyRequest("user"))
+		superadmin.GET("/admins", serviceProxy.ProxyRequest("user"))
+		superadmin.GET("/admins/:id", serviceProxy.ProxyRequest("user"))
+		superadmin.DELETE("/admins/:id", serviceProxy.ProxyRequest("user"))
+		superadmin.PUT("/admins/:id/reset-password", serviceProxy.ProxyRequest("user"))
+	}
+
+	// =====================================================
+	// ADMIN ROUTES (admin and superadmin)
+	// =====================================================
 	admin := api.Group("/admin")
 	admin.Use(middleware.AuthMiddleware(jwtManager))
-	admin.Use(middleware.RoleMiddleware("admin"))
+	admin.Use(middleware.AdminMiddleware())
 	admin.Use(middleware.ServiceAuthMiddleware())
 	{
 		admin.GET("/stats", func(c *gin.Context) {
@@ -524,14 +582,85 @@ func setupRouter(cfg *config.Config, jwtManager *auth.JWTManager, rateLimiter mi
 			})
 		})
 
+		// Team leader verification and management
+		admin.GET("/team-leaders", serviceProxy.ProxyRequest("user"))
+		admin.GET("/team-leaders/:id", serviceProxy.ProxyRequest("user"))
+		admin.PUT("/team-leaders/:id/verify", serviceProxy.ProxyRequest("user"))
+		admin.PUT("/team-leaders/:id/reject", serviceProxy.ProxyRequest("user"))
+
+		// Admin team management
+		admin.POST("/teams", serviceProxy.ProxyRequest("user"))
+		admin.PUT("/teams/:id/assign-leader", serviceProxy.ProxyRequest("user"))
+		admin.DELETE("/teams/:id/leader", serviceProxy.ProxyRequest("user"))
+
+		// Worker verification
+		admin.GET("/workers/pending", serviceProxy.ProxyRequest("user"))
+		admin.GET("/workers/verified", serviceProxy.ProxyRequest("user"))
+		admin.PUT("/workers/:id/verify", serviceProxy.ProxyRequest("user"))
+		admin.PUT("/workers/:id/reject", serviceProxy.ProxyRequest("user"))
+
+		// Territory allocations (admin → team leader)
+		admin.POST("/territories/allocate", serviceProxy.ProxyRequest("territory"))
+		admin.POST("/territories/allocate-bulk", serviceProxy.ProxyRequest("territory"))
+		admin.GET("/territories/allocations", serviceProxy.ProxyRequest("territory"))
+		admin.GET("/territories/allocations/:id", serviceProxy.ProxyRequest("territory"))
+		admin.DELETE("/territories/allocations/:id", serviceProxy.ProxyRequest("territory"))
+		admin.GET("/territories/allocations/leader/:leaderId", serviceProxy.ProxyRequest("territory"))
+
 		// Proxy admin routes to all services
+		// Note: territories routes handled explicitly above to avoid catch-all conflict
 		admin.Any("/users/*path", serviceProxy.ProxyRequest("user"))
 		admin.Any("/locations/*path", serviceProxy.ProxyRequest("location"))
 		admin.Any("/walkie/*path", serviceProxy.ProxyRequest("walkie"))
-		admin.Any("/territories/*path", serviceProxy.ProxyRequest("territory"))
 		admin.Any("/surveys/*path", serviceProxy.ProxyRequest("survey"))
 		admin.Any("/deliveries/*path", serviceProxy.ProxyRequest("delivery"))
 		admin.Any("/ministry-contacts/*path", serviceProxy.ProxyRequest("ministry"))
+	}
+
+	// =====================================================
+	// TEAM LEADER ROUTES (for managing join requests)
+	// =====================================================
+	// Note: These are added to the teams routes under protected
+	// Team leader can view and approve/reject join requests for their team
+	teamLeaderRoutes := api.Group("/teams")
+	teamLeaderRoutes.Use(middleware.AuthMiddleware(jwtManager))
+	teamLeaderRoutes.Use(middleware.TeamLeaderMiddleware())
+	teamLeaderRoutes.Use(middleware.ServiceAuthMiddleware())
+	{
+		// Join request management
+		teamLeaderRoutes.GET("/:id/join-requests", serviceProxy.ProxyRequest("user"))
+		teamLeaderRoutes.PUT("/join-requests/:id/approve", serviceProxy.ProxyRequest("user"))
+		teamLeaderRoutes.PUT("/join-requests/:id/reject", serviceProxy.ProxyRequest("user"))
+	}
+
+	// =====================================================
+	// WORKER ROUTES (for join requests)
+	// =====================================================
+	// Workers can request to join teams and view their request status
+	workerTeamRoutes := api.Group("/teams")
+	workerTeamRoutes.Use(middleware.AuthMiddleware(jwtManager))
+	workerTeamRoutes.Use(middleware.ServiceAuthMiddleware())
+	{
+		// Join request endpoints for workers
+		workerTeamRoutes.POST("/:id/request-join", serviceProxy.ProxyRequest("user"))
+		workerTeamRoutes.GET("/my-request", serviceProxy.ProxyRequest("user"))
+		workerTeamRoutes.GET("/my-requests", serviceProxy.ProxyRequest("user"))
+		workerTeamRoutes.DELETE("/my-request", serviceProxy.ProxyRequest("user"))
+	}
+
+	// =====================================================
+	// TERRITORY ALLOCATION ROUTES (for team leaders)
+	// =====================================================
+	// Leaders can view their allocated territories
+	leaderTerritoryRoutes := api.Group("/territories")
+	leaderTerritoryRoutes.Use(middleware.AuthMiddleware(jwtManager))
+	leaderTerritoryRoutes.Use(middleware.TeamLeaderMiddleware())
+	leaderTerritoryRoutes.Use(middleware.ServiceAuthMiddleware())
+	{
+		leaderTerritoryRoutes.GET("/my-allocations", serviceProxy.ProxyRequest("territory"))
+		leaderTerritoryRoutes.GET("/my-allocations/geojson", serviceProxy.ProxyRequest("territory"))
+		leaderTerritoryRoutes.GET("/my-allocations/stats", serviceProxy.ProxyRequest("territory"))
+		leaderTerritoryRoutes.GET("/can-assign/:territoryId", serviceProxy.ProxyRequest("territory"))
 	}
 
 	return router

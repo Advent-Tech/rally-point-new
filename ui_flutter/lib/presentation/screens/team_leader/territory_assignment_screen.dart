@@ -35,7 +35,10 @@ class _TerritoryAssignmentScreenState extends State<TerritoryAssignmentScreen>
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
     _teamBloc = TeamBloc();
-    context.read<TerritoryBloc>().add(const TerritoryLoadAvailable());
+
+    // Team leaders should only see territories allocated to them by admin
+    // Use TerritoryLoadMyAllocations instead of TerritoryLoadAvailable
+    context.read<TerritoryBloc>().add(const TerritoryLoadMyAllocations());
 
     // Load team members if user has a team
     final authState = context.read<AuthBloc>().state;
@@ -167,8 +170,8 @@ class _TerritoriesTabState extends State<_TerritoriesTab> {
           offset: 0,
         ));
       } else {
-        // Load all territories when search is cleared
-        context.read<TerritoryBloc>().add(const TerritoryLoadAvailable(offset: 0));
+        // Load allocated territories when search is cleared
+        context.read<TerritoryBloc>().add(const TerritoryLoadMyAllocations());
       }
     });
   }
@@ -179,7 +182,7 @@ class _TerritoriesTabState extends State<_TerritoriesTab> {
       _currentSearchQuery = '';
       _isLoadingMore = false;
     });
-    context.read<TerritoryBloc>().add(const TerritoryLoadAvailable(offset: 0));
+    context.read<TerritoryBloc>().add(const TerritoryLoadMyAllocations());
   }
 
   @override
@@ -274,7 +277,9 @@ class _TerritoriesTabState extends State<_TerritoriesTab> {
         Expanded(
           child: BlocConsumer<TerritoryBloc, TerritoryState>(
             listener: (context, state) {
-              if (state is TerritoryAvailableLoaded || state is TerritorySearchResults) {
+              if (state is TerritoryAvailableLoaded ||
+                  state is TerritorySearchResults ||
+                  state is TerritoryAllocationsLoaded) {
                 setState(() => _isLoadingMore = false);
               }
             },
@@ -288,10 +293,16 @@ class _TerritoriesTabState extends State<_TerritoriesTab> {
               }
 
               // Get territories from either state
+              // TerritoryAllocationsLoaded = territories allocated to leader by admin
+              // TerritoryAvailableLoaded = all territories (fallback)
+              // TerritorySearchResults = search results
               List<GeoTerritory> territories = [];
               bool hasMore = false;
 
-              if (state is TerritorySearchResults) {
+              if (state is TerritoryAllocationsLoaded) {
+                territories = state.territories;
+                hasMore = false; // Allocations are not paginated
+              } else if (state is TerritorySearchResults) {
                 territories = state.territories;
                 hasMore = state.hasMore;
               } else if (state is TerritoryAvailableLoaded) {
@@ -312,8 +323,9 @@ class _TerritoriesTabState extends State<_TerritoriesTab> {
                 return _buildSearchResultsList(state);
               }
 
-              if (state is TerritoryAvailableLoaded) {
-                return _buildTerritoryList(state);
+              // Handle both allocation and available loaded states
+              if (state is TerritoryAllocationsLoaded || state is TerritoryAvailableLoaded) {
+                return _buildAllocatedTerritoryList(territories, hasMore);
               }
 
               return _buildEmptyView();
@@ -353,7 +365,7 @@ class _TerritoriesTabState extends State<_TerritoriesTab> {
                     query: _currentSearchQuery,
                   ));
                 } else {
-                  context.read<TerritoryBloc>().add(const TerritoryLoadAvailable());
+                  context.read<TerritoryBloc>().add(const TerritoryLoadMyAllocations());
                 }
               },
             ),
@@ -378,7 +390,7 @@ class _TerritoriesTabState extends State<_TerritoriesTab> {
             ),
             const SizedBox(height: 24),
             Text(
-              isSearching ? 'No Results Found' : 'No Territories Available',
+              isSearching ? 'No Results Found' : 'No Territories Allocated',
               style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                 fontWeight: FontWeight.bold,
               ),
@@ -387,7 +399,7 @@ class _TerritoriesTabState extends State<_TerritoriesTab> {
             Text(
               isSearching
                   ? 'Try a different search term or clear the search.'
-                  : 'No territories available for assignment at this time.',
+                  : 'No territories have been allocated to you by admin yet.\nContact your administrator to get territories assigned.',
               textAlign: TextAlign.center,
               style: TextStyle(
                 color: widget.isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
@@ -406,25 +418,26 @@ class _TerritoriesTabState extends State<_TerritoriesTab> {
     );
   }
 
-  Widget _buildTerritoryList(TerritoryAvailableLoaded state) {
+  Widget _buildAllocatedTerritoryList(List<GeoTerritory> territories, bool hasMore) {
     return RefreshIndicator(
       onRefresh: () async {
-        context.read<TerritoryBloc>().add(const TerritoryLoadAvailable(offset: 0));
+        // Reload allocated territories for the team leader
+        context.read<TerritoryBloc>().add(const TerritoryLoadMyAllocations());
       },
       child: ListView.builder(
         controller: _scrollController,
         padding: const EdgeInsets.all(16),
-        itemCount: state.territories.length + (state.hasMore ? 1 : 0),
+        itemCount: territories.length + (hasMore ? 1 : 0),
         itemBuilder: (context, index) {
           // Loading indicator at the bottom
-          if (index == state.territories.length) {
+          if (index == territories.length) {
             return const Padding(
               padding: EdgeInsets.symmetric(vertical: 16),
               child: Center(child: CircularProgressIndicator()),
             );
           }
 
-          final territory = state.territories[index];
+          final territory = territories[index];
           return _TerritoryCard(
             territory: territory,
             isDark: widget.isDark,

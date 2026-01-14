@@ -64,13 +64,18 @@ func main() {
 	receiptRepo := postgres.NewReceiptRepository(db.DB)
 	receiptService := service.NewReceiptService(receiptRepo)
 
+	// Initialize prayer request components
+	prayerRepo := postgres.NewPrayerRequestRepository(db.DB)
+	prayerService := service.NewPrayerRequestService(prayerRepo)
+
 	// Initialize handlers
 	deliveryHandler := handler.NewDeliveryHandler(deliveryService, jwtManager)
 	receiptHandler := handler.NewReceiptHandler(receiptService)
 	paymentHandler := handler.NewPaymentHandler()
+	prayerHandler := handler.NewPrayerRequestHandler(prayerService)
 
 	// Setup router
-	router := setupRouter(deliveryHandler, receiptHandler, paymentHandler)
+	router := setupRouter(deliveryHandler, receiptHandler, paymentHandler, prayerHandler)
 
 	// Server configuration
 	port := getEnv("PORT", "8085")
@@ -105,7 +110,7 @@ func main() {
 	log.Println("✅ Server exited")
 }
 
-func setupRouter(deliveryHandler *handler.DeliveryHandler, receiptHandler *handler.ReceiptHandler, paymentHandler *handler.PaymentHandler) *gin.Engine {
+func setupRouter(deliveryHandler *handler.DeliveryHandler, receiptHandler *handler.ReceiptHandler, paymentHandler *handler.PaymentHandler, prayerHandler *handler.PrayerRequestHandler) *gin.Engine {
 	// Set Gin mode
 	if getEnv("GIN_MODE", "debug") == "release" {
 		gin.SetMode(gin.ReleaseMode)
@@ -113,19 +118,8 @@ func setupRouter(deliveryHandler *handler.DeliveryHandler, receiptHandler *handl
 
 	router := gin.Default()
 
-	// CORS middleware
-	router.Use(func(c *gin.Context) {
-		c.Header("Access-Control-Allow-Origin", "*")
-		c.Header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
-		c.Header("Access-Control-Allow-Headers", "Origin, Content-Type, Authorization")
-
-		if c.Request.Method == "OPTIONS" {
-			c.AbortWithStatus(204)
-			return
-		}
-
-		c.Next()
-	})
+	// Note: CORS is handled by the API gateway - do not set CORS headers here
+	// to avoid duplicate header values when proxied through the gateway
 
 	// Health check
 	router.GET("/health", deliveryHandler.HealthCheck)
@@ -213,6 +207,25 @@ func setupRouter(deliveryHandler *handler.DeliveryHandler, receiptHandler *handl
 			payments.GET("/verify/:id", paymentHandler.VerifyPayment)
 			payments.POST("/send-link", paymentHandler.SendPaymentLink)
 			payments.GET("/status/:sessionId", paymentHandler.GetPaymentStatus)
+		}
+
+		// Prayer request management
+		prayerRequests := protected.Group("/prayer-requests")
+		{
+			prayerRequests.POST("/", prayerHandler.CreatePrayerRequest)
+			prayerRequests.GET("/", prayerHandler.ListPrayerRequests)
+			prayerRequests.GET("/me", prayerHandler.GetMyPrayerRequests)
+			prayerRequests.GET("/map", prayerHandler.GetMapMarkers)
+			prayerRequests.GET("/stats", prayerHandler.GetStats)
+			prayerRequests.GET("/:id", prayerHandler.GetPrayerRequest)
+			prayerRequests.PUT("/:id", prayerHandler.UpdatePrayerRequest)
+			prayerRequests.DELETE("/:id", prayerHandler.DeletePrayerRequest)
+			prayerRequests.PUT("/:id/status", prayerHandler.UpdateStatus)
+			prayerRequests.PUT("/:id/assign-preacher", prayerHandler.AssignPreacher)
+			prayerRequests.PUT("/:id/complete", prayerHandler.CompletePrayerRequest)
+			prayerRequests.GET("/worker/:workerId", prayerHandler.GetWorkerPrayerRequests)
+			prayerRequests.GET("/team/:teamId", prayerHandler.GetTeamPrayerRequests)
+			prayerRequests.GET("/territory/:territoryId", prayerHandler.GetTerritoryPrayerRequests)
 		}
 	}
 

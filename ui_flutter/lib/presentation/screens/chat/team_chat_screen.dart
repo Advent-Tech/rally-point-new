@@ -399,7 +399,7 @@ class _TeamChatScreenState extends State<TeamChatScreen> {
                           : null,
                     ),
                     title: Text(participant.userName),
-                    subtitle: Text(participant.role.name),
+                    subtitle: Text(_formatRole(participant.role.name)),
                     trailing: participant.isOnline
                         ? Container(
                             width: 12,
@@ -495,6 +495,11 @@ class _TeamChatScreenState extends State<TeamChatScreen> {
         ],
       ),
     );
+  }
+
+  String _formatRole(String role) {
+    if (role.isEmpty) return '';
+    return role[0].toUpperCase() + role.substring(1);
   }
 }
 

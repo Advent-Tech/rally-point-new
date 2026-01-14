@@ -111,17 +111,28 @@ class _TeamMapScreenState extends State<TeamMapScreen> {
     }
     debugPrint('_fitToAllMarkers: Total points: ${allPoints.length}');
 
+    // Filter out invalid coordinates (0,0 or near it - indicates unset GPS)
+    bool isValidCoord(double lat, double lng) => lat.abs() > 0.1 || lng.abs() > 0.1;
+
     if (state.showWorkers) {
-      allPoints.addAll(state.activeWorkers.map((w) => LatLng(w.latitude, w.longitude)));
+      allPoints.addAll(state.activeWorkers
+          .where((w) => isValidCoord(w.latitude, w.longitude))
+          .map((w) => LatLng(w.latitude, w.longitude)));
     }
     if (state.showDeliveries) {
-      allPoints.addAll(state.deliveries.map((d) => LatLng(d.latitude, d.longitude)));
+      allPoints.addAll(state.deliveries
+          .where((d) => isValidCoord(d.latitude, d.longitude))
+          .map((d) => LatLng(d.latitude, d.longitude)));
     }
     if (state.showReceipts) {
-      allPoints.addAll(state.receipts.map((r) => LatLng(r.latitude, r.longitude)));
+      allPoints.addAll(state.receipts
+          .where((r) => isValidCoord(r.latitude, r.longitude))
+          .map((r) => LatLng(r.latitude, r.longitude)));
     }
     if (state.showDonations) {
-      allPoints.addAll(state.donations.map((d) => LatLng(d.latitude, d.longitude)));
+      allPoints.addAll(state.donations
+          .where((d) => isValidCoord(d.latitude, d.longitude))
+          .map((d) => LatLng(d.latitude, d.longitude)));
     }
 
     if (allPoints.isEmpty) return;
@@ -216,23 +227,23 @@ class _TeamMapScreenState extends State<TeamMapScreen> {
                 state.receipts.isNotEmpty ||
                 state.donations.isNotEmpty;
 
-            // Default center (US - New York area) if no data
-            const defaultCenter = LatLng(40.7128, -74.0060);
+            // Default center (US center) - always start here
+            const defaultCenter = LatLng(39.8283, -98.5795);
 
             return Stack(
               children: [
                 FlutterMap(
                   mapController: _mapController,
                   options: MapOptions(
-                    initialCenter: hasData ? _getCenter(state) : defaultCenter,
-                    initialZoom: hasData ? 4 : 13, // Start zoomed out if we have data spread across regions
+                    initialCenter: defaultCenter,
+                    initialZoom: 4,
                     minZoom: 3,
                     maxZoom: 18,
                     onMapReady: () {
                       setState(() => _isMapReady = true);
-                      // Delay fit to ensure map is fully rendered
+                      // Fit to data if available after a short delay
                       if (hasData) {
-                        Future.delayed(const Duration(milliseconds: 300), () {
+                        Future.delayed(const Duration(milliseconds: 100), () {
                           if (mounted) {
                             _fitToAllMarkers(state);
                           }
@@ -244,6 +255,8 @@ class _TeamMapScreenState extends State<TeamMapScreen> {
                     TileLayer(
                       urlTemplate: MapConstants.getThemedTileUrl(isDark),
                       userAgentPackageName: 'com.rallypoint.app',
+                      keepBuffer: 5,
+                      panBuffer: 1,
                     ),
                     // Territory boundaries layer (render first so it's below markers)
                     // Always render PolygonLayer (even if empty) to maintain consistent layer order
@@ -391,10 +404,21 @@ class _TeamMapScreenState extends State<TeamMapScreen> {
       }
     }
 
-    allPoints.addAll(state.activeWorkers.map((w) => LatLng(w.latitude, w.longitude)));
-    allPoints.addAll(state.deliveries.map((d) => LatLng(d.latitude, d.longitude)));
-    allPoints.addAll(state.receipts.map((r) => LatLng(r.latitude, r.longitude)));
-    allPoints.addAll(state.donations.map((d) => LatLng(d.latitude, d.longitude)));
+    // Filter out invalid coordinates (0,0 or near it - indicates unset GPS)
+    bool isValidCoord(double lat, double lng) => lat.abs() > 0.1 || lng.abs() > 0.1;
+
+    allPoints.addAll(state.activeWorkers
+        .where((w) => isValidCoord(w.latitude, w.longitude))
+        .map((w) => LatLng(w.latitude, w.longitude)));
+    allPoints.addAll(state.deliveries
+        .where((d) => isValidCoord(d.latitude, d.longitude))
+        .map((d) => LatLng(d.latitude, d.longitude)));
+    allPoints.addAll(state.receipts
+        .where((r) => isValidCoord(r.latitude, r.longitude))
+        .map((r) => LatLng(r.latitude, r.longitude)));
+    allPoints.addAll(state.donations
+        .where((d) => isValidCoord(d.latitude, d.longitude))
+        .map((d) => LatLng(d.latitude, d.longitude)));
 
     if (allPoints.isEmpty) return const LatLng(40.7128, -74.0060);
 
@@ -916,7 +940,7 @@ class _TeamMapScreenState extends State<TeamMapScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text('\$${receipt.amount.toStringAsFixed(2)}', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                      Text(receipt.receiptType == 'book_sale' ? 'Book Sale' : 'Literature', style: const TextStyle(color: AppColors.accent)),
+                      Text('Donation', style: const TextStyle(color: AppColors.accent)),
                     ],
                   ),
                 ),

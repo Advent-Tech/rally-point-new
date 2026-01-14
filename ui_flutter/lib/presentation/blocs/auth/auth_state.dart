@@ -34,3 +34,20 @@ class AuthError extends AuthState {
   @override
   List<Object?> get props => [message];
 }
+
+/// State when user has registered but is pending verification
+/// This is used for team leaders and workers who need admin/leader approval
+class AuthPendingVerification extends AuthState {
+  final String message;
+  final String role; // team_leader or worker
+  final String? email;
+
+  const AuthPendingVerification({
+    required this.message,
+    required this.role,
+    this.email,
+  });
+
+  @override
+  List<Object?> get props => [message, role, email];
+}

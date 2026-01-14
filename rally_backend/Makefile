@@ -162,6 +162,10 @@ migrate-up: ## Run database migrations
 	@docker-compose --env-file .env exec postgres psql -U $(DB_USER) -d $(DB_NAME) -f /docker-entrypoint-initdb.d/010_work_schedules.sql || true
 	@docker-compose --env-file .env exec postgres psql -U $(DB_USER) -d $(DB_NAME) -f /docker-entrypoint-initdb.d/011_delivery_schema_update.sql || true
 	@docker-compose --env-file .env exec postgres psql -U $(DB_USER) -d $(DB_NAME) -f /docker-entrypoint-initdb.d/012_chat_tables.sql || true
+	@docker-compose --env-file .env exec postgres psql -U $(DB_USER) -d $(DB_NAME) -f /docker-entrypoint-initdb.d/016_multi_role_system.sql || true
+	@docker-compose --env-file .env exec postgres psql -U $(DB_USER) -d $(DB_NAME) -f /docker-entrypoint-initdb.d/017_legacy_data_reconciliation.sql || true
+	@docker-compose --env-file .env exec postgres psql -U $(DB_USER) -d $(DB_NAME) -f /docker-entrypoint-initdb.d/018_survey_optional_team.sql || true
+	@docker-compose --env-file .env exec postgres psql -U $(DB_USER) -d $(DB_NAME) -f /docker-entrypoint-initdb.d/019_blogs_table.sql || true
 	@echo "✅ Migrations completed"
 
 migrate-assignments: ## Run territory assignments migration only

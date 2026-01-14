@@ -4,6 +4,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_map/flutter_map.dart';
+import 'package:go_router/go_router.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:intl/intl.dart';
@@ -23,7 +24,7 @@ import '../../widgets/custom_button.dart';
 enum DateFilter { today, thisWeek, thisMonth, all }
 
 /// Simplified Delivery Screen for field workers
-/// Workers record book sales and donations on the spot - no pending states
+/// Workers record donations on the spot - no pending states
 class DeliveryScreen extends StatefulWidget {
   const DeliveryScreen({super.key});
 
@@ -50,13 +51,23 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
       final createdAt = d.createdAt ?? d.completedAt;
       if (createdAt == null) return false;
 
+      // Convert to local time for proper date comparison (backend returns UTC)
+      final localCreatedAt = createdAt.toLocal();
+      final localDate = DateTime(
+        localCreatedAt.year,
+        localCreatedAt.month,
+        localCreatedAt.day,
+      );
+
       switch (_selectedFilter) {
         case DateFilter.today:
-          return createdAt.isAfter(today) || createdAt.isAtSameMomentAs(today);
+          return localDate.isAtSameMomentAs(today) || localDate.isAfter(today);
         case DateFilter.thisWeek:
-          return createdAt.isAfter(weekStart) || createdAt.isAtSameMomentAs(weekStart);
+          return localDate.isAtSameMomentAs(weekStart) ||
+              localDate.isAfter(weekStart);
         case DateFilter.thisMonth:
-          return createdAt.isAfter(monthStart) || createdAt.isAtSameMomentAs(monthStart);
+          return localDate.isAtSameMomentAs(monthStart) ||
+              localDate.isAfter(monthStart);
         case DateFilter.all:
           return true;
       }
@@ -84,7 +95,13 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
       appBar: AppBar(
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
-          onPressed: () => Navigator.of(context).pop(),
+          onPressed: () {
+            if (context.canPop()) {
+              context.pop();
+            } else {
+              context.go('/home');
+            }
+          },
         ),
         title: const Text('Field Activity'),
         actions: [
@@ -122,21 +139,28 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
           if (state is DeliveryListLoaded) {
             filteredDeliveries = _filterDeliveries(state.deliveries);
             // Always calculate today's totals for the summary card
-            final today = DateTime.now();
+            final now = DateTime.now();
+            final today = DateTime(now.year, now.month, now.day);
             todayDeliveries = state.deliveries.where((d) {
               final createdAt = d.createdAt ?? d.completedAt;
               if (createdAt == null) return false;
-              return createdAt.year == today.year &&
-                  createdAt.month == today.month &&
-                  createdAt.day == today.day;
+              // Convert to local time for proper date comparison (backend returns UTC)
+              final localCreatedAt = createdAt.toLocal();
+              final localDate = DateTime(
+                localCreatedAt.year,
+                localCreatedAt.month,
+                localCreatedAt.day,
+              );
+              return localDate.isAtSameMomentAs(today);
             }).toList();
           }
 
-          // Calculate today's totals for summary
-          final bookSales = todayDeliveries.where((d) => !d.isDonation).toList();
-          final donations = todayDeliveries.where((d) => d.isDonation).toList();
-          final totalBookAmount = bookSales.fold<double>(0, (sum, d) => sum + (d.donationAmount ?? 0));
-          final totalDonationAmount = donations.fold<double>(0, (sum, d) => sum + (d.donationAmount ?? 0));
+          // Calculate today's totals for summary (donations only)
+          final donations = todayDeliveries.toList();
+          final totalDonationAmount = donations.fold<double>(
+            0,
+            (sum, d) => sum + (d.donationAmount ?? 0),
+          );
 
           return RefreshIndicator(
             onRefresh: () async {
@@ -150,35 +174,18 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
                 children: [
                   // Today's Summary Card
                   _TodaySummaryCard(
-                    bookSalesCount: bookSales.length,
-                    bookSalesAmount: totalBookAmount,
                     donationsCount: donations.length,
                     donationsAmount: totalDonationAmount,
                     isDark: isDark,
                   ),
                   const SizedBox(height: 24),
 
-                  // Action Buttons
-                  Row(
-                    children: [
-                      Expanded(
-                        child: _ActionButton(
-                          icon: Icons.menu_book,
-                          label: 'Record\nBook Sale',
-                          color: AppColors.primary,
-                          onTap: () => _showRecordSheet(context, isBookSale: true),
-                        ),
-                      ),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: _ActionButton(
-                          icon: Icons.volunteer_activism,
-                          label: 'Record\nDonation',
-                          color: AppColors.success,
-                          onTap: () => _showRecordSheet(context, isBookSale: false),
-                        ),
-                      ),
-                    ],
+                  // Action Button - Record Donation
+                  _ActionButton(
+                    icon: Icons.volunteer_activism,
+                    label: 'Record Donation',
+                    color: AppColors.success,
+                    onTap: () => _showRecordSheet(context),
                   ),
                   const SizedBox(height: 24),
 
@@ -198,9 +205,18 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
                             },
                             selectedColor: AppColors.primary.withAlpha(40),
                             checkmarkColor: AppColors.primary,
+                            backgroundColor: isDark
+                                ? AppColors.surfaceDark
+                                : AppColors.surfaceLight,
                             labelStyle: TextStyle(
-                              color: isSelected ? AppColors.primary : null,
-                              fontWeight: isSelected ? FontWeight.bold : null,
+                              color: isSelected
+                                  ? AppColors.primary
+                                  : (isDark
+                                        ? AppColors.textPrimaryDark
+                                        : AppColors.textPrimaryLight),
+                              fontWeight: isSelected
+                                  ? FontWeight.bold
+                                  : FontWeight.normal,
                             ),
                           ),
                         );
@@ -215,14 +231,15 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
                     children: [
                       Text(
                         _getFilterLabel(),
-                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.bold,
-                        ),
+                        style: Theme.of(context).textTheme.titleMedium
+                            ?.copyWith(fontWeight: FontWeight.bold),
                       ),
                       Text(
                         '${filteredDeliveries.length} records',
                         style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                          color: isDark
+                              ? AppColors.textSecondaryDark
+                              : AppColors.textSecondaryLight,
                         ),
                       ),
                     ],
@@ -274,14 +291,14 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
     }
   }
 
-  void _showRecordSheet(BuildContext context, {required bool isBookSale}) {
+  void _showRecordSheet(BuildContext context) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (sheetContext) => BlocProvider.value(
         value: context.read<DeliveryBloc>(),
-        child: _RecordActivitySheet(isBookSale: isBookSale),
+        child: const _RecordDonationSheet(),
       ),
     );
   }
@@ -295,7 +312,8 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      builder: (context) => _DeliveryDetailSheet(delivery: delivery, isDark: isDark),
+      builder: (context) =>
+          _DeliveryDetailSheet(delivery: delivery, isDark: isDark),
     );
   }
 }
@@ -335,12 +353,12 @@ class _DeliveryDetailSheet extends StatelessWidget {
                   width: 48,
                   height: 48,
                   decoration: BoxDecoration(
-                    color: (delivery.isDonation ? AppColors.success : AppColors.primary).withAlpha(30),
+                    color: AppColors.success.withAlpha(30),
                     borderRadius: BorderRadius.circular(12),
                   ),
-                  child: Icon(
-                    delivery.isDonation ? Icons.volunteer_activism : Icons.menu_book,
-                    color: delivery.isDonation ? AppColors.success : AppColors.primary,
+                  child: const Icon(
+                    Icons.volunteer_activism,
+                    color: AppColors.success,
                   ),
                 ),
                 const SizedBox(width: 16),
@@ -350,12 +368,17 @@ class _DeliveryDetailSheet extends StatelessWidget {
                     children: [
                       Text(
                         delivery.recipientName,
-                        style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                        style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                       Text(
-                        delivery.isDonation ? 'Donation' : 'Book Sale',
+                        'Donation',
                         style: TextStyle(
-                          color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                          color: isDark
+                              ? AppColors.textSecondaryDark
+                              : AppColors.textSecondaryLight,
                         ),
                       ),
                     ],
@@ -363,75 +386,93 @@ class _DeliveryDetailSheet extends StatelessWidget {
                 ),
                 Text(
                   '\$${(delivery.donationAmount ?? 0).toStringAsFixed(2)}',
-                  style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                  style: const TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
               ],
             ),
-          const SizedBox(height: 20),
-          _DetailRow(label: 'Address', value: delivery.address),
-          if (delivery.recipientPhone != null)
-            _DetailRow(label: 'Phone', value: delivery.recipientPhone!),
-          if (delivery.paymentMethod != null)
-            _DetailRow(label: 'Payment', value: delivery.paymentMethod!.toUpperCase()),
-          if (delivery.receiptNumber != null)
-            _DetailRow(label: 'Receipt #', value: delivery.receiptNumber!),
-          if (delivery.createdAt != null)
-            _DetailRow(
-              label: 'Time',
-              value: DateFormat('MMM d, yyyy h:mm a').format(delivery.createdAt!),
-            ),
-          if (delivery.latitude != null && delivery.longitude != null) ...[
-            const SizedBox(height: 16),
-            ClipRRect(
-              borderRadius: BorderRadius.circular(12),
-              child: SizedBox(
-                height: 150,
-                child: FlutterMap(
-                  options: MapOptions(
-                    initialCenter: LatLng(delivery.latitude!, delivery.longitude!),
-                    initialZoom: 15,
-                    interactionOptions: const InteractionOptions(flags: InteractiveFlag.none),
-                  ),
-                  children: [
-                    TileLayer(
-                      urlTemplate: MapConstants.getThemedTileUrl(isDark),
-                      userAgentPackageName: 'com.rallypoint.app',
+            const SizedBox(height: 20),
+            _DetailRow(label: 'Address', value: delivery.address),
+            if (delivery.recipientPhone != null)
+              _DetailRow(label: 'Phone', value: delivery.recipientPhone!),
+            if (delivery.paymentMethod != null)
+              _DetailRow(
+                label: 'Payment',
+                value: delivery.paymentMethod!.toUpperCase(),
+              ),
+            if (delivery.receiptNumber != null)
+              _DetailRow(label: 'Receipt #', value: delivery.receiptNumber!),
+            if (delivery.createdAt != null)
+              _DetailRow(
+                label: 'Time',
+                value: DateFormat(
+                  'MMM d, yyyy h:mm a',
+                ).format(delivery.createdAt!),
+              ),
+            if (delivery.latitude != null && delivery.longitude != null) ...[
+              const SizedBox(height: 16),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: SizedBox(
+                  height: 150,
+                  child: FlutterMap(
+                    options: MapOptions(
+                      initialCenter: LatLng(
+                        delivery.latitude!,
+                        delivery.longitude!,
+                      ),
+                      initialZoom: 15,
+                      interactionOptions: const InteractionOptions(
+                        flags: InteractiveFlag.none,
+                      ),
                     ),
-                    MarkerLayer(
-                      markers: [
-                        Marker(
-                          point: LatLng(delivery.latitude!, delivery.longitude!),
-                          width: 40,
-                          height: 40,
-                          child: Icon(
-                            Icons.location_pin,
-                            color: delivery.isDonation ? AppColors.success : AppColors.primary,
-                            size: 40,
+                    children: [
+                      TileLayer(
+                        urlTemplate: MapConstants.getThemedTileUrl(isDark),
+                        userAgentPackageName: 'com.rallypoint.app',
+                        keepBuffer: 5,
+                        panBuffer: 1,
+                      ),
+                      MarkerLayer(
+                        markers: [
+                          Marker(
+                            point: LatLng(
+                              delivery.latitude!,
+                              delivery.longitude!,
+                            ),
+                            width: 40,
+                            height: 40,
+                            child: const Icon(
+                              Icons.location_pin,
+                              color: AppColors.success,
+                              size: 40,
+                            ),
                           ),
-                        ),
-                      ],
-                    ),
-                  ],
+                        ],
+                      ),
+                    ],
+                  ),
                 ),
               ),
-            ),
-          ],
-          const SizedBox(height: 16),
-          // View Receipt Button
-          if (delivery.receiptNumber != null)
-            SizedBox(
-              width: double.infinity,
-              child: OutlinedButton.icon(
-                onPressed: () => _showReceipt(context, delivery),
-                icon: const Icon(Icons.receipt_long),
-                label: const Text('View Digital Receipt'),
+            ],
+            const SizedBox(height: 16),
+            // View Receipt Button
+            if (delivery.receiptNumber != null)
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: () => _showReceipt(context, delivery),
+                  icon: const Icon(Icons.receipt_long),
+                  label: const Text('View Digital Receipt'),
+                ),
               ),
-            ),
-          const SizedBox(height: 8),
-        ],
+            const SizedBox(height: 8),
+          ],
+        ),
       ),
-    ),
-  );
+    );
   }
 
   void _showReceipt(BuildContext context, DeliveryModel delivery) {
@@ -444,15 +485,11 @@ class _DeliveryDetailSheet extends StatelessWidget {
 }
 
 class _TodaySummaryCard extends StatelessWidget {
-  final int bookSalesCount;
-  final double bookSalesAmount;
   final int donationsCount;
   final double donationsAmount;
   final bool isDark;
 
   const _TodaySummaryCard({
-    required this.bookSalesCount,
-    required this.bookSalesAmount,
     required this.donationsCount,
     required this.donationsAmount,
     required this.isDark,
@@ -460,21 +497,18 @@ class _TodaySummaryCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final totalAmount = bookSalesAmount + donationsAmount;
-    final totalCount = bookSalesCount + donationsCount;
-
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         gradient: LinearGradient(
-          colors: [AppColors.primary, AppColors.primary.withBlue(200)],
+          colors: [AppColors.success, AppColors.success.withBlue(150)],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: AppColors.primary.withAlpha(60),
+            color: AppColors.success.withAlpha(60),
             blurRadius: 20,
             offset: const Offset(0, 10),
           ),
@@ -486,7 +520,10 @@ class _TodaySummaryCard extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text("Today's Total", style: TextStyle(color: Colors.white70, fontSize: 14)),
+              const Text(
+                "Today's Total",
+                style: TextStyle(color: Colors.white70, fontSize: 14),
+              ),
               Text(
                 DateFormat('EEEE, MMM d').format(DateTime.now()),
                 style: const TextStyle(color: Colors.white70, fontSize: 12),
@@ -495,68 +532,16 @@ class _TodaySummaryCard extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           Text(
-            '\$${totalAmount.toStringAsFixed(2)}',
-            style: const TextStyle(color: Colors.white, fontSize: 36, fontWeight: FontWeight.bold),
+            '\$${donationsAmount.toStringAsFixed(2)}',
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 36,
+              fontWeight: FontWeight.bold,
+            ),
           ),
-          Text('$totalCount transactions', style: const TextStyle(color: Colors.white70, fontSize: 14)),
-          const SizedBox(height: 20),
-          Row(
-            children: [
-              Expanded(
-                child: _SummaryItem(
-                  icon: Icons.menu_book,
-                  label: 'Book Sales',
-                  count: bookSalesCount,
-                  amount: bookSalesAmount,
-                ),
-              ),
-              Container(width: 1, height: 40, color: Colors.white24),
-              Expanded(
-                child: _SummaryItem(
-                  icon: Icons.volunteer_activism,
-                  label: 'Donations',
-                  count: donationsCount,
-                  amount: donationsAmount,
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _SummaryItem extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final int count;
-  final double amount;
-
-  const _SummaryItem({
-    required this.icon,
-    required this.label,
-    required this.count,
-    required this.amount,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 12),
-      child: Row(
-        children: [
-          Icon(icon, color: Colors.white70, size: 20),
-          const SizedBox(width: 8),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                '\$${amount.toStringAsFixed(0)}',
-                style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
-              ),
-              Text('$count $label', style: const TextStyle(color: Colors.white70, fontSize: 11)),
-            ],
+          Text(
+            '$donationsCount donations',
+            style: const TextStyle(color: Colors.white70, fontSize: 14),
           ),
         ],
       ),
@@ -598,7 +583,11 @@ class _ActionButton extends StatelessWidget {
               Text(
                 label,
                 textAlign: TextAlign.center,
-                style: TextStyle(fontWeight: FontWeight.bold, color: color, fontSize: 14),
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: color,
+                  fontSize: 14,
+                ),
               ),
             ],
           ),
@@ -620,14 +609,18 @@ class _EmptyState extends StatelessWidget {
       decoration: BoxDecoration(
         color: isDark ? AppColors.surfaceDark : AppColors.surfaceLight,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: isDark ? AppColors.borderDark : AppColors.borderLight),
+        border: Border.all(
+          color: isDark ? AppColors.borderDark : AppColors.borderLight,
+        ),
       ),
       child: Column(
         children: [
           Icon(
             Icons.inbox_outlined,
             size: 64,
-            color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+            color: isDark
+                ? AppColors.textSecondaryDark
+                : AppColors.textSecondaryLight,
           ),
           const SizedBox(height: 16),
           Text(
@@ -635,16 +628,20 @@ class _EmptyState extends StatelessWidget {
             style: TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.w500,
-              color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+              color: isDark
+                  ? AppColors.textSecondaryDark
+                  : AppColors.textSecondaryLight,
             ),
           ),
           const SizedBox(height: 8),
           Text(
-            'Tap the buttons above to record a book sale or donation',
+            'Tap the button above to record a donation',
             textAlign: TextAlign.center,
             style: TextStyle(
               fontSize: 14,
-              color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+              color: isDark
+                  ? AppColors.textSecondaryDark
+                  : AppColors.textSecondaryLight,
             ),
           ),
         ],
@@ -666,7 +663,7 @@ class _ActivityCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = delivery.isDonation ? AppColors.success : AppColors.primary;
+    const color = AppColors.success;
     final time = delivery.createdAt ?? delivery.completedAt;
 
     return Card(
@@ -675,7 +672,9 @@ class _ActivityCard extends StatelessWidget {
       color: isDark ? AppColors.surfaceDark : Colors.white,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
-        side: BorderSide(color: isDark ? AppColors.borderDark : AppColors.borderLight),
+        side: BorderSide(
+          color: isDark ? AppColors.borderDark : AppColors.borderLight,
+        ),
       ),
       child: InkWell(
         onTap: onTap,
@@ -691,8 +690,8 @@ class _ActivityCard extends StatelessWidget {
                   color: color.withAlpha(20),
                   borderRadius: BorderRadius.circular(10),
                 ),
-                child: Icon(
-                  delivery.isDonation ? Icons.volunteer_activism : Icons.menu_book,
+                child: const Icon(
+                  Icons.volunteer_activism,
                   color: color,
                   size: 22,
                 ),
@@ -704,7 +703,10 @@ class _ActivityCard extends StatelessWidget {
                   children: [
                     Text(
                       delivery.recipientName,
-                      style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15),
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w600,
+                        fontSize: 15,
+                      ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
@@ -720,7 +722,9 @@ class _ActivityCard extends StatelessWidget {
                             delivery.address,
                             style: TextStyle(
                               fontSize: 13,
-                              color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                              color: isDark
+                                  ? AppColors.textSecondaryDark
+                                  : AppColors.textSecondaryLight,
                             ),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
@@ -737,14 +741,20 @@ class _ActivityCard extends StatelessWidget {
                 children: [
                   Text(
                     '\$${(delivery.donationAmount ?? 0).toStringAsFixed(2)}',
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: color),
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                      color: color,
+                    ),
                   ),
                   if (time != null)
                     Text(
                       DateFormat('h:mm a').format(time),
                       style: TextStyle(
                         fontSize: 12,
-                        color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                        color: isDark
+                            ? AppColors.textSecondaryDark
+                            : AppColors.textSecondaryLight,
                       ),
                     ),
                 ],
@@ -774,33 +784,38 @@ class _DetailRow extends StatelessWidget {
             width: 80,
             child: Text(
               label,
-              style: const TextStyle(color: AppColors.textSecondaryLight, fontWeight: FontWeight.w500),
+              style: const TextStyle(
+                color: AppColors.textSecondaryLight,
+                fontWeight: FontWeight.w500,
+              ),
             ),
           ),
-          Expanded(child: Text(value, style: const TextStyle(fontWeight: FontWeight.w500))),
+          Expanded(
+            child: Text(
+              value,
+              style: const TextStyle(fontWeight: FontWeight.w500),
+            ),
+          ),
         ],
       ),
     );
   }
 }
 
-/// Sheet for recording book sales or donations with payment processing
-class _RecordActivitySheet extends StatefulWidget {
-  final bool isBookSale;
-
-  const _RecordActivitySheet({required this.isBookSale});
+/// Sheet for recording donations with payment processing
+class _RecordDonationSheet extends StatefulWidget {
+  const _RecordDonationSheet();
 
   @override
-  State<_RecordActivitySheet> createState() => _RecordActivitySheetState();
+  State<_RecordDonationSheet> createState() => _RecordDonationSheetState();
 }
 
-class _RecordActivitySheetState extends State<_RecordActivitySheet> {
+class _RecordDonationSheetState extends State<_RecordDonationSheet> {
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
   final _addressController = TextEditingController();
   final _phoneController = TextEditingController();
   final _amountController = TextEditingController();
-  final _itemController = TextEditingController();
   final _notesController = TextEditingController();
 
   String _paymentMethod = 'cash';
@@ -826,8 +841,10 @@ class _RecordActivitySheetState extends State<_RecordActivitySheet> {
       final storage = await LocalStorage.getInstance();
       final userData = storage.getUserData();
       setState(() {
-        _teamId = userData?['team_id']?.toString() ?? userData?['teamId']?.toString();
-        _workerId = userData?['id']?.toString() ?? userData?['worker_id']?.toString();
+        _teamId =
+            userData?['team_id']?.toString() ?? userData?['teamId']?.toString();
+        _workerId =
+            userData?['id']?.toString() ?? userData?['worker_id']?.toString();
       });
     } catch (e) {
       debugPrint('Error loading user data: $e');
@@ -841,7 +858,8 @@ class _RecordActivitySheetState extends State<_RecordActivitySheet> {
       if (permission == LocationPermission.denied) {
         permission = await Geolocator.requestPermission();
       }
-      if (permission == LocationPermission.denied || permission == LocationPermission.deniedForever) {
+      if (permission == LocationPermission.denied ||
+          permission == LocationPermission.deniedForever) {
         setState(() => _isGettingLocation = false);
         return;
       }
@@ -870,7 +888,11 @@ class _RecordActivitySheetState extends State<_RecordActivitySheet> {
         final assignments = (result as ApiSuccess).data;
         for (final assignment in assignments) {
           if (assignment.geometry == null) continue;
-          if (_isPointInTerritory(_latitude!, _longitude!, assignment.geometry!)) {
+          if (_isPointInTerritory(
+            _latitude!,
+            _longitude!,
+            assignment.geometry!,
+          )) {
             setState(() {
               _territoryId = assignment.territoryId;
               _territoryName = assignment.entityName;
@@ -884,7 +906,11 @@ class _RecordActivitySheetState extends State<_RecordActivitySheet> {
     }
   }
 
-  bool _isPointInTerritory(double lat, double lng, Map<String, dynamic> geometry) {
+  bool _isPointInTerritory(
+    double lat,
+    double lng,
+    Map<String, dynamic> geometry,
+  ) {
     final type = geometry['type'] as String?;
     final coordinates = geometry['coordinates'];
     if (coordinates == null) return false;
@@ -912,7 +938,8 @@ class _RecordActivitySheetState extends State<_RecordActivitySheet> {
     for (int i = 0, j = n - 1; i < n; j = i++) {
       final xi = polygon[i][0], yi = polygon[i][1];
       final xj = polygon[j][0], yj = polygon[j][1];
-      if (((yi > lat) != (yj > lat)) && (lng < (xj - xi) * (lat - yi) / (yj - yi) + xi)) {
+      if (((yi > lat) != (yj > lat)) &&
+          (lng < (xj - xi) * (lat - yi) / (yj - yi) + xi)) {
         inside = !inside;
       }
     }
@@ -925,7 +952,6 @@ class _RecordActivitySheetState extends State<_RecordActivitySheet> {
     _addressController.dispose();
     _phoneController.dispose();
     _amountController.dispose();
-    _itemController.dispose();
     _notesController.dispose();
     super.dispose();
   }
@@ -966,7 +992,6 @@ class _RecordActivitySheetState extends State<_RecordActivitySheet> {
           amount: amount,
           phoneNumber: phone,
           recipientName: _nameController.text.trim(),
-          isBookSale: widget.isBookSale,
         ),
       );
       return result ?? false;
@@ -979,7 +1004,10 @@ class _RecordActivitySheetState extends State<_RecordActivitySheet> {
     if (!_formKey.currentState!.validate()) return;
     if (_teamId == null || _teamId!.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('You must be assigned to a team'), backgroundColor: AppColors.error),
+        const SnackBar(
+          content: Text('You must be assigned to a team'),
+          backgroundColor: AppColors.error,
+        ),
       );
       return;
     }
@@ -990,7 +1018,10 @@ class _RecordActivitySheetState extends State<_RecordActivitySheet> {
     final paymentSuccess = await _processPayment(amount);
     if (!paymentSuccess) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Payment failed. Please try again.'), backgroundColor: AppColors.error),
+        const SnackBar(
+          content: Text('Payment failed. Please try again.'),
+          backgroundColor: AppColors.error,
+        ),
       );
       return;
     }
@@ -1003,19 +1034,23 @@ class _RecordActivitySheetState extends State<_RecordActivitySheet> {
       final request = CreateDeliveryRequest(
         teamId: _teamId!,
         recipientName: _nameController.text.trim(),
-        address: _addressController.text.trim().isNotEmpty ? _addressController.text.trim() : 'Location recorded',
-        recipientPhone: _phoneController.text.trim().isNotEmpty ? _phoneController.text.trim() : null,
+        address: _addressController.text.trim().isNotEmpty
+            ? _addressController.text.trim()
+            : 'Location recorded',
+        recipientPhone: _phoneController.text.trim().isNotEmpty
+            ? _phoneController.text.trim()
+            : null,
         latitude: _latitude,
         longitude: _longitude,
-        deliveryType: widget.isBookSale ? 'door_to_door' : 'donation',
+        deliveryType: 'donation',
         donationAmount: amount,
         paymentMethod: _paymentMethod,
-        notes: _notesController.text.trim().isNotEmpty ? _notesController.text.trim() : null,
+        notes: _notesController.text.trim().isNotEmpty
+            ? _notesController.text.trim()
+            : null,
         territoryId: _territoryId,
         territoryName: _territoryName,
-        items: widget.isBookSale && _itemController.text.trim().isNotEmpty
-            ? [DeliveryItem(name: _itemController.text.trim())]
-            : [],
+        items: [],
       );
 
       context.read<DeliveryBloc>().add(DeliveryCreate(request: request));
@@ -1034,7 +1069,11 @@ class _RecordActivitySheetState extends State<_RecordActivitySheet> {
     }
   }
 
-  void _showReceiptConfirmation(BuildContext context, String receiptNumber, double amount) {
+  void _showReceiptConfirmation(
+    BuildContext context,
+    String receiptNumber,
+    double amount,
+  ) {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -1049,24 +1088,37 @@ class _RecordActivitySheetState extends State<_RecordActivitySheet> {
                 color: AppColors.success.withAlpha(30),
                 shape: BoxShape.circle,
               ),
-              child: const Icon(Icons.check, color: AppColors.success, size: 32),
+              child: const Icon(
+                Icons.check,
+                color: AppColors.success,
+                size: 32,
+              ),
             ),
             const SizedBox(height: 16),
-            const Text('Payment Successful!', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            const Text(
+              'Payment Successful!',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
             const SizedBox(height: 8),
             Text(
               '\$${amount.toStringAsFixed(2)}',
-              style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: AppColors.primary),
+              style: const TextStyle(
+                fontSize: 24,
+                fontWeight: FontWeight.bold,
+                color: AppColors.primary,
+              ),
             ),
             const SizedBox(height: 8),
-            Text('Receipt: $receiptNumber', style: const TextStyle(color: AppColors.textSecondaryLight)),
+            Text(
+              'Receipt: $receiptNumber',
+              style: const TextStyle(color: AppColors.textSecondaryLight),
+            ),
             const SizedBox(height: 16),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
               children: [
                 TextButton.icon(
                   onPressed: () {
-                    // TODO: Share receipt
                     Navigator.pop(context);
                   },
                   icon: const Icon(Icons.share),
@@ -1088,14 +1140,16 @@ class _RecordActivitySheetState extends State<_RecordActivitySheet> {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final color = widget.isBookSale ? AppColors.primary : AppColors.success;
+    const color = AppColors.success;
 
     return Container(
       decoration: BoxDecoration(
         color: isDark ? AppColors.backgroundDark : Colors.white,
         borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
       ),
-      padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+      padding: EdgeInsets.only(
+        bottom: MediaQuery.of(context).viewInsets.bottom,
+      ),
       child: SingleChildScrollView(
         padding: const EdgeInsets.all(24),
         child: Form(
@@ -1110,7 +1164,9 @@ class _RecordActivitySheetState extends State<_RecordActivitySheet> {
                   width: 40,
                   height: 4,
                   decoration: BoxDecoration(
-                    color: isDark ? AppColors.borderDark : AppColors.borderLight,
+                    color: isDark
+                        ? AppColors.borderDark
+                        : AppColors.borderLight,
                     borderRadius: BorderRadius.circular(2),
                   ),
                 ),
@@ -1127,15 +1183,17 @@ class _RecordActivitySheetState extends State<_RecordActivitySheet> {
                       color: color.withAlpha(20),
                       borderRadius: BorderRadius.circular(12),
                     ),
-                    child: Icon(
-                      widget.isBookSale ? Icons.menu_book : Icons.volunteer_activism,
+                    child: const Icon(
+                      Icons.volunteer_activism,
                       color: color,
                     ),
                   ),
                   const SizedBox(width: 16),
                   Text(
-                    widget.isBookSale ? 'Record Book Sale' : 'Record Donation',
-                    style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+                    'Record Donation',
+                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                 ],
               ),
@@ -1143,32 +1201,49 @@ class _RecordActivitySheetState extends State<_RecordActivitySheet> {
 
               // Location status
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 8,
+                ),
                 decoration: BoxDecoration(
-                  color: (_latitude != null ? AppColors.success : AppColors.warning).withAlpha(20),
+                  color:
+                      (_latitude != null
+                              ? AppColors.success
+                              : AppColors.warning)
+                          .withAlpha(20),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     if (_isGettingLocation)
-                      const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2))
+                      const SizedBox(
+                        width: 14,
+                        height: 14,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
                     else
                       Icon(
-                        _latitude != null ? Icons.location_on : Icons.location_off,
+                        _latitude != null
+                            ? Icons.location_on
+                            : Icons.location_off,
                         size: 16,
-                        color: _latitude != null ? AppColors.success : AppColors.warning,
+                        color: _latitude != null
+                            ? AppColors.success
+                            : AppColors.warning,
                       ),
                     const SizedBox(width: 8),
                     Text(
                       _isGettingLocation
                           ? 'Getting location...'
                           : _latitude != null
-                              ? 'Location captured${_territoryName != null ? ' ($_territoryName)' : ''}'
-                              : 'Location not available',
+                          ? 'Location captured${_territoryName != null ? ' ($_territoryName)' : ''}'
+                          : 'Location not available',
                       style: TextStyle(
                         fontSize: 12,
-                        color: _latitude != null ? AppColors.success : AppColors.warning,
+                        color: _latitude != null
+                            ? AppColors.success
+                            : AppColors.warning,
                       ),
                     ),
                   ],
@@ -1179,36 +1254,32 @@ class _RecordActivitySheetState extends State<_RecordActivitySheet> {
               // Name field
               CustomTextField(
                 controller: _nameController,
-                label: widget.isBookSale ? 'Recipient Name' : 'Donor Name',
+                label: 'Donor Name',
                 prefixIcon: Icons.person_outline,
-                validator: (value) => (value == null || value.trim().isEmpty) ? 'Name is required' : null,
+                validator: (value) => (value == null || value.trim().isEmpty)
+                    ? 'Name is required'
+                    : null,
               ),
               const SizedBox(height: 16),
 
               // Amount field
               CustomTextField(
                 controller: _amountController,
-                label: 'Amount (\$)',
+                label: 'Donation Amount (\$)',
                 prefixIcon: Icons.attach_money,
-                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                keyboardType: const TextInputType.numberWithOptions(
+                  decimal: true,
+                ),
                 validator: (value) {
-                  if (value == null || value.trim().isEmpty) return 'Amount is required';
+                  if (value == null || value.trim().isEmpty)
+                    return 'Amount is required';
                   final amount = double.tryParse(value);
-                  if (amount == null || amount <= 0) return 'Enter a valid amount';
+                  if (amount == null || amount <= 0)
+                    return 'Enter a valid amount';
                   return null;
                 },
               ),
               const SizedBox(height: 16),
-
-              // Item name (for book sales)
-              if (widget.isBookSale) ...[
-                CustomTextField(
-                  controller: _itemController,
-                  label: 'Book/Item Name',
-                  prefixIcon: Icons.book_outlined,
-                ),
-                const SizedBox(height: 16),
-              ],
 
               // Address field
               CustomTextField(
@@ -1230,7 +1301,9 @@ class _RecordActivitySheetState extends State<_RecordActivitySheet> {
               // Payment method
               Text(
                 'Payment Method',
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w500),
+                style: Theme.of(
+                  context,
+                ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w500),
               ),
               const SizedBox(height: 8),
               Row(
@@ -1270,7 +1343,9 @@ class _RecordActivitySheetState extends State<_RecordActivitySheet> {
                           'A payment link will be sent to the phone number above. The donor will complete payment on their own device.',
                           style: TextStyle(
                             fontSize: 13,
-                            color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                            color: isDark
+                                ? AppColors.textSecondaryDark
+                                : AppColors.textSecondaryLight,
                           ),
                         ),
                       ),
@@ -1296,10 +1371,10 @@ class _RecordActivitySheetState extends State<_RecordActivitySheet> {
                 child: CustomButton(
                   text: _isSubmitting || _isProcessingPayment
                       ? 'Processing...'
-                      : widget.isBookSale
-                          ? 'Complete Sale'
-                          : 'Complete Donation',
-                  onPressed: _isSubmitting || _isProcessingPayment ? null : _submit,
+                      : 'Record Donation',
+                  onPressed: _isSubmitting || _isProcessingPayment
+                      ? null
+                      : _submit,
                   isLoading: _isSubmitting || _isProcessingPayment,
                 ),
               ),
@@ -1334,12 +1409,18 @@ class _PaymentChip extends StatelessWidget {
         decoration: BoxDecoration(
           color: isSelected ? AppColors.primary : Colors.transparent,
           borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: isSelected ? AppColors.primary : AppColors.borderLight),
+          border: Border.all(
+            color: isSelected ? AppColors.primary : AppColors.borderLight,
+          ),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, size: 16, color: isSelected ? Colors.white : AppColors.textSecondaryLight),
+            Icon(
+              icon,
+              size: 16,
+              color: isSelected ? Colors.white : AppColors.textSecondaryLight,
+            ),
             const SizedBox(width: 6),
             Text(
               label,
@@ -1361,13 +1442,11 @@ class _PaymentLinkDialog extends StatefulWidget {
   final double amount;
   final String phoneNumber;
   final String recipientName;
-  final bool isBookSale;
 
   const _PaymentLinkDialog({
     required this.amount,
     required this.phoneNumber,
     required this.recipientName,
-    required this.isBookSale,
   });
 
   @override
@@ -1406,7 +1485,7 @@ class _PaymentLinkDialogState extends State<_PaymentLinkDialog> {
           'recipient_name': widget.recipientName,
           'amount': (widget.amount * 100).toInt(), // Convert to cents
           'currency': 'usd',
-          'description': widget.isBookSale ? 'Book Purchase' : 'Donation',
+          'description': 'Donation',
         },
       );
 
@@ -1526,8 +1605,14 @@ class _PaymentLinkDialogState extends State<_PaymentLinkDialog> {
                 shape: BoxShape.circle,
               ),
               child: _status == 'sending'
-                  ? const Center(child: CircularProgressIndicator(strokeWidth: 3))
-                  : const Icon(Icons.hourglass_top, color: AppColors.primary, size: 32),
+                  ? const Center(
+                      child: CircularProgressIndicator(strokeWidth: 3),
+                    )
+                  : const Icon(
+                      Icons.hourglass_top,
+                      color: AppColors.primary,
+                      size: 32,
+                    ),
             )
           else if (_status == 'completed')
             Container(
@@ -1537,7 +1622,11 @@ class _PaymentLinkDialogState extends State<_PaymentLinkDialog> {
                 color: AppColors.success.withAlpha(20),
                 shape: BoxShape.circle,
               ),
-              child: const Icon(Icons.check, color: AppColors.success, size: 32),
+              child: const Icon(
+                Icons.check,
+                color: AppColors.success,
+                size: 32,
+              ),
             )
           else
             Container(
@@ -1547,7 +1636,11 @@ class _PaymentLinkDialogState extends State<_PaymentLinkDialog> {
                 color: AppColors.error.withAlpha(20),
                 shape: BoxShape.circle,
               ),
-              child: const Icon(Icons.error_outline, color: AppColors.error, size: 32),
+              child: const Icon(
+                Icons.error_outline,
+                color: AppColors.error,
+                size: 32,
+              ),
             ),
 
           const SizedBox(height: 20),
@@ -1557,10 +1650,10 @@ class _PaymentLinkDialogState extends State<_PaymentLinkDialog> {
             _status == 'sending'
                 ? 'Sending Payment Link...'
                 : _status == 'waiting'
-                    ? 'Waiting for Payment'
-                    : _status == 'completed'
-                        ? 'Payment Received!'
-                        : 'Payment Failed',
+                ? 'Waiting for Payment'
+                : _status == 'completed'
+                ? 'Payment Received!'
+                : 'Payment Failed',
             style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
             textAlign: TextAlign.center,
           ),
@@ -1573,7 +1666,9 @@ class _PaymentLinkDialogState extends State<_PaymentLinkDialog> {
             style: TextStyle(
               fontSize: 28,
               fontWeight: FontWeight.bold,
-              color: _status == 'completed' ? AppColors.success : AppColors.primary,
+              color: _status == 'completed'
+                  ? AppColors.success
+                  : AppColors.primary,
             ),
           ),
 
@@ -1583,7 +1678,11 @@ class _PaymentLinkDialogState extends State<_PaymentLinkDialog> {
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              const Icon(Icons.phone, size: 16, color: AppColors.textSecondaryLight),
+              const Icon(
+                Icons.phone,
+                size: 16,
+                color: AppColors.textSecondaryLight,
+              ),
               const SizedBox(width: 6),
               Text(
                 _formatPhone(widget.phoneNumber),
@@ -1685,7 +1784,10 @@ class _ReceiptDialog extends StatelessWidget {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Text('RECEIPT', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+                const Text(
+                  'RECEIPT',
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                ),
                 IconButton(
                   icon: const Icon(Icons.close),
                   onPressed: () => Navigator.pop(context),
@@ -1706,7 +1808,7 @@ class _ReceiptDialog extends StatelessWidget {
             ),
             const SizedBox(height: 4),
             Text(
-              delivery.isDonation ? 'Donation Receipt' : 'Sales Receipt',
+              'Donation Receipt',
               style: const TextStyle(color: AppColors.textSecondaryLight),
             ),
             const SizedBox(height: 16),
@@ -1720,15 +1822,30 @@ class _ReceiptDialog extends StatelessWidget {
               ),
               child: Text(
                 delivery.receiptNumber ?? 'N/A',
-                style: const TextStyle(fontFamily: 'monospace', fontSize: 16, fontWeight: FontWeight.bold),
+                style: const TextStyle(
+                  fontFamily: 'monospace',
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
             ),
             const SizedBox(height: 24),
 
             // Details
-            _ReceiptRow(label: 'Date', value: DateFormat('MMM d, yyyy h:mm a').format(delivery.createdAt ?? DateTime.now())),
-            _ReceiptRow(label: delivery.isDonation ? 'Donor' : 'Recipient', value: delivery.recipientName),
-            _ReceiptRow(label: 'Payment Method', value: (delivery.paymentMethod ?? 'cash').toUpperCase()),
+            _ReceiptRow(
+              label: 'Date',
+              value: DateFormat(
+                'MMM d, yyyy h:mm a',
+              ).format(delivery.createdAt ?? DateTime.now()),
+            ),
+            _ReceiptRow(
+              label: 'Donor',
+              value: delivery.recipientName,
+            ),
+            _ReceiptRow(
+              label: 'Payment Method',
+              value: (delivery.paymentMethod ?? 'cash').toUpperCase(),
+            ),
             if (delivery.territoryName != null)
               _ReceiptRow(label: 'Territory', value: delivery.territoryName!),
             const SizedBox(height: 16),
@@ -1740,10 +1857,17 @@ class _ReceiptDialog extends StatelessWidget {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  const Text('TOTAL', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                  const Text(
+                    'TOTAL',
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  ),
                   Text(
                     '\$${(delivery.donationAmount ?? 0).toStringAsFixed(2)}',
-                    style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: AppColors.primary),
+                    style: const TextStyle(
+                      fontSize: 24,
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.primary,
+                    ),
                   ),
                 ],
               ),
@@ -1752,10 +1876,10 @@ class _ReceiptDialog extends StatelessWidget {
             const SizedBox(height: 16),
 
             // Footer
-            Text(
-              delivery.isDonation ? 'Thank you for your generous donation!' : 'Thank you for your purchase!',
+            const Text(
+              'Thank you for your generous donation!',
               textAlign: TextAlign.center,
-              style: const TextStyle(fontStyle: FontStyle.italic),
+              style: TextStyle(fontStyle: FontStyle.italic),
             ),
             const SizedBox(height: 24),
 
@@ -1767,7 +1891,9 @@ class _ReceiptDialog extends StatelessWidget {
                     onPressed: () {
                       // TODO: Share receipt
                       ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Share feature coming soon')),
+                        const SnackBar(
+                          content: Text('Share feature coming soon'),
+                        ),
                       );
                     },
                     icon: const Icon(Icons.share),
@@ -1804,7 +1930,10 @@ class _ReceiptRow extends StatelessWidget {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label, style: const TextStyle(color: AppColors.textSecondaryLight)),
+          Text(
+            label,
+            style: const TextStyle(color: AppColors.textSecondaryLight),
+          ),
           Text(value, style: const TextStyle(fontWeight: FontWeight.w500)),
         ],
       ),

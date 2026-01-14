@@ -1,3 +1,5 @@
+import 'dart:convert';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:geolocator/geolocator.dart';
@@ -22,6 +24,7 @@ class _SurveyFormScreenState extends State<SurveyFormScreen> {
   final _formKey = GlobalKey<FormState>();
   final Map<String, dynamic> _answers = {};
   final Map<String, TextEditingController> _textControllers = {};
+  late PageController _pageController;
   bool _isSubmitting = false;
   int _currentQuestionIndex = 0;
   double? _latitude;
@@ -36,6 +39,7 @@ class _SurveyFormScreenState extends State<SurveyFormScreen> {
   @override
   void initState() {
     super.initState();
+    _pageController = PageController(initialPage: 0);
     _getCurrentLocation();
     // Initialize text controllers for text questions
     for (final question in _questions) {
@@ -47,6 +51,7 @@ class _SurveyFormScreenState extends State<SurveyFormScreen> {
 
   @override
   void dispose() {
+    _pageController.dispose();
     for (final controller in _textControllers.values) {
       controller.dispose();
     }
@@ -160,17 +165,36 @@ class _SurveyFormScreenState extends State<SurveyFormScreen> {
 
         if (question.isChoiceQuestion) {
           // Radio, checkbox, select questions
-          answerMap['selected_options'] = answer is List ? answer : [answer];
+          if (answer is List) {
+            answerMap['selected_options'] = answer.map((e) => e?.toString() ?? '').where((e) => e.isNotEmpty).toList();
+          } else {
+            answerMap['selected_options'] = [answer.toString()];
+          }
         } else if (question.isPhotoQuestion) {
           // Photo question - list of photo paths/urls
-          answerMap['photo_urls'] = answer is List ? answer : [];
+          if (answer is List) {
+            answerMap['photo_urls'] = answer.map((e) => e?.toString() ?? '').where((e) => e.isNotEmpty).toList();
+          } else {
+            answerMap['photo_urls'] = <String>[];
+          }
         } else if (question.isSignatureQuestion) {
-          // Signature question - base64 encoded or url
-          // Note: signature data will be uploaded separately and URL stored
-          answerMap['signature_url'] = answer.toString();
+          // Signature question - convert Uint8List to base64 string
+          if (answer is Uint8List) {
+            answerMap['signature_url'] = 'data:image/png;base64,${base64Encode(answer)}';
+          } else if (answer is String && answer.isNotEmpty) {
+            answerMap['signature_url'] = answer;
+          } else {
+            // Skip if no valid signature
+            continue;
+          }
         } else {
           // Text, number, date, rating, boolean questions
-          answerMap['value'] = answer.toString();
+          final valueStr = answer.toString();
+          if (valueStr.isNotEmpty) {
+            answerMap['value'] = valueStr;
+          } else {
+            continue;
+          }
         }
 
         answersList.add(answerMap);
@@ -286,9 +310,8 @@ class _SurveyFormScreenState extends State<SurveyFormScreen> {
                         onPageChanged: (index) {
                           setState(() => _currentQuestionIndex = index);
                         },
-                        controller: PageController(
-                          initialPage: _currentQuestionIndex,
-                        ),
+                        controller: _pageController,
+                        physics: const ClampingScrollPhysics(),
                         itemBuilder: (context, index) {
                           final question = _questions[index];
                           return SingleChildScrollView(
@@ -327,7 +350,10 @@ class _SurveyFormScreenState extends State<SurveyFormScreen> {
                                 text: 'Previous',
                                 type: ButtonType.outline,
                                 onPressed: () {
-                                  setState(() => _currentQuestionIndex--);
+                                  _pageController.previousPage(
+                                    duration: const Duration(milliseconds: 300),
+                                    curve: Curves.easeInOut,
+                                  );
                                 },
                               ),
                             ),
@@ -338,7 +364,10 @@ class _SurveyFormScreenState extends State<SurveyFormScreen> {
                                 ? CustomButton(
                                     text: 'Next',
                                     onPressed: () {
-                                      setState(() => _currentQuestionIndex++);
+                                      _pageController.nextPage(
+                                        duration: const Duration(milliseconds: 300),
+                                        curve: Curves.easeInOut,
+                                      );
                                     },
                                   )
                                 : CustomButton(
@@ -440,6 +469,26 @@ class _SurveyFormScreenState extends State<SurveyFormScreen> {
         setState(() {
           _answers[question.id] = value;
         });
+
+        // Auto-advance for single-select questions (radio, boolean, select, rating)
+        // but not for checkbox (multiple select) or text fields
+        final isSingleSelect = question.questionType == QuestionType.radio ||
+            question.questionType == QuestionType.boolean ||
+            question.questionType == QuestionType.yesNo ||
+            question.questionType == QuestionType.select ||
+            question.questionType == QuestionType.rating;
+
+        if (isSingleSelect && value != null && _currentQuestionIndex < _questions.length - 1) {
+          // Small delay to show the selection before advancing
+          Future.delayed(const Duration(milliseconds: 350), () {
+            if (mounted) {
+              _pageController.nextPage(
+                duration: const Duration(milliseconds: 300),
+                curve: Curves.easeInOut,
+              );
+            }
+          });
+        }
       },
     );
   }

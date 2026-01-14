@@ -50,6 +50,159 @@ class _LoginScreenState extends State<LoginScreen> {
                 backgroundColor: AppColors.error,
               ),
             );
+          } else if (state is AuthPendingVerification) {
+            // Show attractive pending verification dialog
+            showDialog(
+              context: context,
+              barrierDismissible: false,
+              builder: (dialogContext) => Dialog(
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Container(
+                  padding: const EdgeInsets.all(24),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(20),
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [
+                        AppColors.primary.withAlpha(10),
+                        Colors.white,
+                      ],
+                    ),
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      // Icon with animated background
+                      Container(
+                        width: 80,
+                        height: 80,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          gradient: LinearGradient(
+                            colors: [
+                              AppColors.warning.withAlpha(40),
+                              AppColors.primary.withAlpha(40),
+                            ],
+                          ),
+                        ),
+                        child: Icon(
+                          state.role == 'team_leader'
+                              ? Icons.hourglass_top_rounded
+                              : Icons.assignment_ind_rounded,
+                          size: 40,
+                          color: AppColors.primary,
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+                      // Title
+                      Text(
+                        'Account Pending',
+                        style: Theme.of(dialogContext).textTheme.headlineSmall?.copyWith(
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.primary,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      // Subtitle based on role
+                      Text(
+                        state.role == 'team_leader'
+                            ? 'Awaiting Admin Approval'
+                            : 'Awaiting Team Leader Approval',
+                        style: Theme.of(dialogContext).textTheme.bodyMedium?.copyWith(
+                          color: Colors.grey[600],
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+                      // Message
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: Colors.grey[100],
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Text(
+                          state.message,
+                          textAlign: TextAlign.center,
+                          style: Theme.of(dialogContext).textTheme.bodyMedium?.copyWith(
+                            height: 1.5,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      // Info tip
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                        decoration: BoxDecoration(
+                          color: AppColors.info.withAlpha(25),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(
+                            color: AppColors.info.withAlpha(50),
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(
+                              Icons.lightbulb_outline_rounded,
+                              color: AppColors.info,
+                              size: 22,
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Text(
+                                state.role == 'team_leader'
+                                    ? 'An administrator will review and verify your account.'
+                                    : 'Your team leader will approve your join request.',
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  color: AppColors.info,
+                                  height: 1.4,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      if (state.email != null) ...[
+                        const SizedBox(height: 12),
+                        Text(
+                          'Registered email: ${state.email}',
+                          style: Theme.of(dialogContext).textTheme.bodySmall?.copyWith(
+                            color: Colors.grey[500],
+                          ),
+                        ),
+                      ],
+                      const SizedBox(height: 24),
+                      // Button
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton(
+                          onPressed: () => Navigator.of(dialogContext).pop(),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.primary,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                          child: const Text(
+                            'Got it',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            );
           }
         },
         child: SafeArea(

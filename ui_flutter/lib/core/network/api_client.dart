@@ -1,4 +1,3 @@
-import 'dart:io';
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import '../constants/api_constants.dart';
@@ -64,16 +63,13 @@ class ApiClient {
       );
 
   String _getBaseUrl() {
-    if (kReleaseMode) {
-      return ApiConstants.prodBaseUrl;
+    // Use localhost for web development, production URL for mobile
+    if (kIsWeb) {
+      return 'http://localhost:8080';
     }
-    // Development mode
-    if (Platform.isAndroid) {
-      return ApiConstants.devBaseUrl;
-    } else if (Platform.isIOS) {
-      return ApiConstants.devBaseUrlIOS;
-    }
-    return ApiConstants.devBaseUrl;
+    // For mobile: use devBaseUrl for Android emulator, devBaseUrlIOS for iOS
+    // In production, use prodBaseUrl
+    return ApiConstants.prodBaseUrl;
   }
 
   void _setupInterceptors() {

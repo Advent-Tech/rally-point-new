@@ -310,6 +310,15 @@ class _TeamLeaderDashboardState extends State<TeamLeaderDashboard> {
                     ),
                     const SizedBox(height: 12),
                     _ManagementTile(
+                      icon: Icons.verified_user,
+                      title: 'Verify Workers',
+                      subtitle: 'Approve or reject join requests',
+                      color: AppColors.info,
+                      isDark: isDark,
+                      onTap: () => context.push('/leader/worker-verification'),
+                    ),
+                    const SizedBox(height: 12),
+                    _ManagementTile(
                       icon: Icons.analytics_outlined,
                       title: 'Reports & Analytics',
                       subtitle: 'View team performance',

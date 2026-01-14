@@ -26,7 +26,11 @@ class _WalkieScreenState extends State<WalkieScreen> {
     if (authState is AuthAuthenticated) {
       final teamId = authState.user.teamId;
       if (teamId != null) {
-        _walkieBloc.add(WalkieLoadChannels(teamId: teamId));
+        _walkieBloc.add(WalkieLoadChannels(
+          teamId: teamId,
+          userId: authState.user.id,
+          userName: authState.user.fullName,
+        ));
       }
     }
   }
@@ -117,7 +121,11 @@ class _WalkieScreenState extends State<WalkieScreen> {
               onPressed: () {
                 final authState = context.read<AuthBloc>().state;
                 if (authState is AuthAuthenticated && authState.user.teamId != null) {
-                  _walkieBloc.add(WalkieLoadChannels(teamId: authState.user.teamId!));
+                  _walkieBloc.add(WalkieLoadChannels(
+                    teamId: authState.user.teamId!,
+                    userId: authState.user.id,
+                    userName: authState.user.fullName,
+                  ));
                 }
               },
               child: const Text('Retry'),
@@ -307,7 +315,8 @@ class _WalkieScreenState extends State<WalkieScreen> {
             padding: const EdgeInsets.all(16),
             itemCount: state.messages.length,
             itemBuilder: (context, index) {
-              final message = state.messages[state.messages.length - 1 - index];
+              // With reverse: true, index 0 = bottom of list, so use direct index for newest at bottom
+              final message = state.messages[index];
               return _MessageBubble(message: message);
             },
           ),

@@ -19,3 +19,41 @@ class TeamLoadMembers extends TeamEvent {
 class TeamRefresh extends TeamEvent {
   const TeamRefresh();
 }
+
+/// Load join requests for a team (team leader only)
+class TeamLoadJoinRequests extends TeamEvent {
+  final String teamId;
+  final String? status;
+
+  const TeamLoadJoinRequests({required this.teamId, this.status = 'pending'});
+
+  @override
+  List<Object?> get props => [teamId, status];
+}
+
+/// Approve a worker's join request
+class TeamApproveJoinRequest extends TeamEvent {
+  final String requestId;
+  final String teamId;
+
+  const TeamApproveJoinRequest({required this.requestId, required this.teamId});
+
+  @override
+  List<Object?> get props => [requestId, teamId];
+}
+
+/// Reject a worker's join request
+class TeamRejectJoinRequest extends TeamEvent {
+  final String requestId;
+  final String teamId;
+  final String? reason;
+
+  const TeamRejectJoinRequest({
+    required this.requestId,
+    required this.teamId,
+    this.reason,
+  });
+
+  @override
+  List<Object?> get props => [requestId, teamId, reason];
+}

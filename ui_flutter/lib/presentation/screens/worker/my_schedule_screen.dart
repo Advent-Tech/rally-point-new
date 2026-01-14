@@ -514,8 +514,11 @@ class _ScheduleCard extends StatelessWidget {
                     Expanded(
                       child: FilledButton.icon(
                         onPressed: onStart,
-                        icon: const Icon(Icons.play_arrow),
-                        label: const Text('Start Session'),
+                        icon: const Icon(Icons.play_arrow, size: 18),
+                        label: const FittedBox(
+                          fit: BoxFit.scaleDown,
+                          child: Text('Start'),
+                        ),
                         style: FilledButton.styleFrom(
                           backgroundColor: AppColors.success,
                         ),
@@ -525,8 +528,11 @@ class _ScheduleCard extends StatelessWidget {
                     Expanded(
                       child: FilledButton.icon(
                         onPressed: onComplete,
-                        icon: const Icon(Icons.check),
-                        label: const Text('Complete'),
+                        icon: const Icon(Icons.check, size: 18),
+                        label: const FittedBox(
+                          fit: BoxFit.scaleDown,
+                          child: Text('Complete'),
+                        ),
                         style: FilledButton.styleFrom(
                           backgroundColor: AppColors.primary,
                         ),

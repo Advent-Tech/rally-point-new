@@ -53,6 +53,27 @@ func (h *SurveyHandler) CreateSurvey(c *gin.Context) {
 	c.JSON(http.StatusCreated, survey)
 }
 
+// ListSurveys handles listing all surveys (for admin)
+func (h *SurveyHandler) ListSurveys(c *gin.Context) {
+	userID := c.GetString("user_id")
+	if userID == "" {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		return
+	}
+
+	// Get all surveys from the repository
+	surveys, err := h.surveyService.GetAllSurveys()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"surveys": surveys,
+		"count":   len(surveys),
+	})
+}
+
 // GetSurvey handles getting a survey by ID
 func (h *SurveyHandler) GetSurvey(c *gin.Context) {
 	surveyIDStr := c.Param("id")
@@ -334,6 +355,58 @@ func (h *SurveyHandler) AssignSurvey(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "survey assigned successfully"})
+}
+
+// AssignSurveyToWorkers handles assigning a survey to workers via URL path
+// POST /surveys/:id/assignments
+func (h *SurveyHandler) AssignSurveyToWorkers(c *gin.Context) {
+	userID := c.GetString("user_id")
+	if userID == "" {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		return
+	}
+
+	assignerID, err := uuid.Parse(userID)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid user ID"})
+		return
+	}
+
+	// Get survey ID from URL path
+	surveyIDStr := c.Param("id")
+	surveyID, err := uuid.Parse(surveyIDStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid survey ID"})
+		return
+	}
+
+	// Parse request body with worker_ids
+	var body struct {
+		WorkerIDs []uuid.UUID `json:"worker_ids" binding:"required,min=1"`
+		DueDate   *time.Time  `json:"due_date,omitempty"`
+	}
+	if err := c.ShouldBindJSON(&body); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	// Create assign request
+	req := &domain.AssignSurveyRequest{
+		SurveyID: surveyID,
+		UserIDs:  body.WorkerIDs,
+		DueDate:  body.DueDate,
+	}
+
+	err = h.surveyService.AssignSurvey(assignerID, req)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"message":      "survey assigned successfully",
+		"worker_count": len(body.WorkerIDs),
+	})
 }
 
 // GetUserAssignments handles getting assignments for a user

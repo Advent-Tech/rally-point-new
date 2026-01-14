@@ -1,6 +1,7 @@
 package domain
 
 import (
+	"encoding/json"
 	"time"
 
 	"github.com/google/uuid"
@@ -41,8 +42,8 @@ type GeoTerritory struct {
 	Label          *string   `json:"label,omitempty" db:"label"`
 	Order          *float64  `json:"order,omitempty" db:"territory_order"`
 
-	// Geometry - returned as GeoJSON string
-	Geometry       string    `json:"geometry,omitempty" db:"geom"`
+	// Geometry - returned as parsed GeoJSON object
+	Geometry       json.RawMessage `json:"geometry,omitempty" db:"geom"`
 
 	// Metadata
 	SourceFile     *string   `json:"source_file,omitempty" db:"source_file"`
@@ -257,15 +258,15 @@ type TerritoryAssignment struct {
 // TerritoryAssignmentWithDetails includes territory info
 type TerritoryAssignmentWithDetails struct {
 	TerritoryAssignment
-	EntityName   string  `json:"entity_name"`
-	EntityID     string  `json:"entity_id"`
-	City         *string `json:"city,omitempty"`
-	State        *string `json:"state,omitempty"`
-	UnionName    *string `json:"union_name,omitempty"`
-	Conference   *string `json:"conference,omitempty"`
-	Population   *int    `json:"population,omitempty"`
-	HousingUnits *int    `json:"housing_units,omitempty"`
-	Geometry     string  `json:"geometry,omitempty"` // GeoJSON geometry
+	EntityName   string          `json:"entity_name"`
+	EntityID     string          `json:"entity_id"`
+	City         *string         `json:"city,omitempty"`
+	State        *string         `json:"state,omitempty"`
+	UnionName    *string         `json:"union_name,omitempty"`
+	Conference   *string         `json:"conference,omitempty"`
+	Population   *int            `json:"population,omitempty"`
+	HousingUnits *int            `json:"housing_units,omitempty"`
+	Geometry     json.RawMessage `json:"geometry,omitempty"` // GeoJSON geometry
 }
 
 // CreateAssignmentRequest for creating a new territory assignment

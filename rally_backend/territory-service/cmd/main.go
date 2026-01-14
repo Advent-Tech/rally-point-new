@@ -76,15 +76,20 @@ func main() {
 	scheduleRepo := postgres.NewScheduleRepository(db.DB)
 	scheduleService := service.NewScheduleService(scheduleRepo)
 
+	// Initialize allocation components (admin → team leader territory allocations)
+	allocationRepo := postgres.NewAllocationRepository(db.DB)
+	allocationService := service.NewAllocationService(allocationRepo)
+
 	// Initialize handlers
 	territoryHandler := handler.NewTerritoryHandler(territoryService, jwtManager)
 	geoTerritoryHandler := handler.NewGeoTerritoryHandler(geoTerritoryService)
 	assignmentHandler := handler.NewAssignmentHandler(assignmentService)
 	geofenceHandler := handler.NewGeofenceHandler(geofenceService)
 	scheduleHandler := handler.NewScheduleHandler(scheduleService)
+	allocationHandler := handler.NewAllocationHandler(allocationService)
 
 	// Setup router
-	router := setupRouter(territoryHandler, geoTerritoryHandler, assignmentHandler, geofenceHandler, scheduleHandler)
+	router := setupRouter(territoryHandler, geoTerritoryHandler, assignmentHandler, geofenceHandler, scheduleHandler, allocationHandler)
 
 	// Server configuration
 	port := getEnv("PORT", "8083")
@@ -119,7 +124,14 @@ func main() {
 	log.Println("✅ Server exited")
 }
 
-func setupRouter(territoryHandler *handler.TerritoryHandler, geoHandler *handler.GeoTerritoryHandler, assignmentHandler *handler.AssignmentHandler, geofenceHandler *handler.GeofenceHandler, scheduleHandler *handler.ScheduleHandler) *gin.Engine {
+func setupRouter(
+	territoryHandler *handler.TerritoryHandler,
+	geoHandler *handler.GeoTerritoryHandler,
+	assignmentHandler *handler.AssignmentHandler,
+	geofenceHandler *handler.GeofenceHandler,
+	scheduleHandler *handler.ScheduleHandler,
+	allocationHandler *handler.AllocationHandler,
+) *gin.Engine {
 	// Set Gin mode
 	if getEnv("GIN_MODE", "debug") == "release" {
 		gin.SetMode(gin.ReleaseMode)
@@ -150,6 +162,12 @@ func setupRouter(territoryHandler *handler.TerritoryHandler, geoHandler *handler
 			territories.GET("/:id/entries", territoryHandler.GetTerritoryEntries)
 			territories.GET("/team/:teamId", territoryHandler.GetTeamTerritories)
 			territories.GET("/worker/:workerId", territoryHandler.GetWorkerTerritories)
+
+			// Leader allocation routes (team leaders view their allocated territories)
+			territories.GET("/my-allocations", allocationHandler.GetMyAllocations)
+			territories.GET("/my-allocations/geojson", allocationHandler.GetMyAllocationsGeoJSON)
+			territories.GET("/my-allocations/stats", allocationHandler.GetMyAllocationStats)
+			territories.GET("/can-assign/:territoryId", allocationHandler.CheckCanAssign)
 		}
 
 		// Team territories
@@ -185,6 +203,17 @@ func setupRouter(territoryHandler *handler.TerritoryHandler, geoHandler *handler
 		alerts := protected.Group("/alerts")
 		{
 			alerts.PUT("/:alertId/read", territoryHandler.MarkAlertRead)
+		}
+
+		// Admin allocation routes (admin allocates territories to team leaders)
+		admin := protected.Group("/admin")
+		{
+			admin.POST("/territories/allocate", allocationHandler.AllocateTerritory)
+			admin.POST("/territories/allocate-bulk", allocationHandler.AllocateTerritories)
+			admin.GET("/territories/allocations", allocationHandler.ListAllAllocations)
+			admin.GET("/territories/allocations/:id", allocationHandler.GetAllocation)
+			admin.DELETE("/territories/allocations/:id", allocationHandler.RevokeAllocation)
+			admin.GET("/territories/allocations/leader/:leaderId", allocationHandler.GetLeaderAllocations)
 		}
 	}
 

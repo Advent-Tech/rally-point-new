@@ -70,7 +70,42 @@ class WalkieMessage {
     this.isRead = false,
   });
 
-  factory WalkieMessage.fromJson(Map<String, dynamic> json) => _$WalkieMessageFromJson(json);
+  factory WalkieMessage.fromJson(Map<String, dynamic> json) {
+    // Handle various field name formats from backend
+    return WalkieMessage(
+      id: json['id']?.toString() ?? '',
+      channelId: json['channel_id']?.toString() ?? json['team_id']?.toString() ?? '',
+      senderId: json['sender_id']?.toString() ?? json['user_id']?.toString() ?? '',
+      senderName: json['sender_name']?.toString() ??
+                  json['senderName']?.toString() ??
+                  json['user_name']?.toString() ??
+                  json['userName']?.toString() ??
+                  json['display_name']?.toString() ??
+                  'Unknown',
+      senderAvatar: json['sender_avatar']?.toString() ?? json['avatar_url']?.toString(),
+      messageType: json['message_type']?.toString() ?? json['type']?.toString() ?? 'voice',
+      audioUrl: json['audio_url']?.toString() ?? json['message']?.toString(),
+      audioDurationMs: _parseDuration(json['audio_duration_ms'] ?? json['duration']),
+      text: json['text']?.toString() ?? json['message']?.toString(),
+      createdAt: _parseDateTime(json['created_at'] ?? json['sent_at']),
+      isRead: json['is_read'] == true,
+    );
+  }
+
+  static int? _parseDuration(dynamic value) {
+    if (value == null) return null;
+    if (value is int) return value > 100 ? value : value * 1000; // Convert seconds to ms if needed
+    if (value is double) return value > 100 ? value.toInt() : (value * 1000).toInt();
+    final parsed = int.tryParse(value.toString());
+    if (parsed != null) return parsed > 100 ? parsed : parsed * 1000;
+    return null;
+  }
+
+  static DateTime _parseDateTime(dynamic value) {
+    if (value == null) return DateTime.now();
+    if (value is DateTime) return value;
+    return DateTime.tryParse(value.toString()) ?? DateTime.now();
+  }
   Map<String, dynamic> toJson() => _$WalkieMessageToJson(this);
 
   String get formattedDuration {

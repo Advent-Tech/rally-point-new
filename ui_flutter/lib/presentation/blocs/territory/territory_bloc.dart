@@ -26,6 +26,7 @@ class TerritoryBloc extends Bloc<TerritoryEvent, TerritoryState> {
     on<TerritoryLoadUnionStats>(_onLoadUnionStats);
     on<TerritoryLoadChurches>(_onLoadChurches);
     on<TerritoryRefresh>(_onRefresh);
+    on<TerritoryLoadMyAllocations>(_onLoadMyAllocations);
   }
 
   Future<void> _initialize() async {
@@ -419,5 +420,89 @@ class TerritoryBloc extends Bloc<TerritoryEvent, TerritoryState> {
     Emitter<TerritoryState> emit,
   ) async {
     add(const TerritoryLoadAssignments());
+  }
+
+  /// Load territories allocated to the current team leader by admin
+  Future<void> _onLoadMyAllocations(
+    TerritoryLoadMyAllocations event,
+    Emitter<TerritoryState> emit,
+  ) async {
+    emit(TerritoryLoading());
+
+    try {
+      await _initialize();
+
+      final response = await _api.get(
+        ApiConstants.myTerritoryAllocations,
+        queryParameters: {
+          'include_geometry': true,
+        },
+      );
+
+      if (response.statusCode == 200) {
+        final List<dynamic> data = response.data is List
+            ? response.data
+            : response.data['allocations'] ?? response.data['territories'] ?? [];
+
+        debugPrint('Allocation response: ${data.length} items');
+
+        // Convert allocation data to GeoTerritory
+        // The backend returns LeaderTerritoryAllocationWithDetails which has:
+        // - territory_id (UUID of the territory)
+        // - territory_solid (SOLID code)
+        // - entity_name, entity_id, city, state, etc.
+        // We need to map these to GeoTerritory fields
+        final territories = <GeoTerritory>[];
+        for (final json in data) {
+          try {
+            // If nested territory object exists, use it
+            if (json['territory'] != null) {
+              territories.add(GeoTerritory.fromJson(json['territory']));
+            } else {
+              // Map allocation fields to GeoTerritory fields
+              final territoryJson = <String, dynamic>{
+                'id': json['territory_id']?.toString() ?? json['id']?.toString() ?? '',
+                'solid': json['territory_solid'] ?? json['solid'] ?? '',
+                'entity_name': json['entity_name'] ?? '',
+                'entity_id': json['entity_id'] ?? '',
+                'city': json['city'],
+                'state': json['state'],
+                'county': json['county'],
+                'zipcode': json['zipcode'],
+                'population': json['population'],
+                'housing_units': json['housing_units'],
+                'union_name': json['union_name'],
+                'conference': json['conference'],
+                'geometry': json['geometry'],
+                'address': json['address'],
+                'geoid': json['geoid'],
+              };
+              territories.add(GeoTerritory.fromJson(territoryJson));
+            }
+          } catch (e) {
+            debugPrint('Error parsing allocation: $e');
+          }
+        }
+
+        final total = response.data is Map
+            ? response.data['total'] ?? territories.length
+            : territories.length;
+
+        debugPrint('Leader allocations loaded: ${territories.length}');
+
+        emit(TerritoryAllocationsLoaded(
+          territories: territories,
+          total: total,
+        ));
+      } else {
+        emit(const TerritoryAllocationsLoaded(
+          territories: [],
+          total: 0,
+        ));
+      }
+    } catch (e) {
+      debugPrint('Error loading leader allocations: $e');
+      emit(TerritoryError(message: 'Failed to load allocated territories: ${e.toString()}'));
+    }
   }
 }

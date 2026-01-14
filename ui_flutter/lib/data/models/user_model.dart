@@ -24,6 +24,10 @@ class UserModel {
   final bool isActive;
   @JsonKey(name: 'is_online')
   final bool isOnline;
+  @JsonKey(name: 'verification_status')
+  final String? verificationStatus; // pending, verified, rejected
+  @JsonKey(name: 'rejection_reason')
+  final String? rejectionReason;
   @JsonKey(name: 'created_at')
   final DateTime? createdAt;
   @JsonKey(name: 'updated_at')
@@ -42,6 +46,8 @@ class UserModel {
     this.teamName,
     this.isActive = true,
     this.isOnline = false,
+    this.verificationStatus,
+    this.rejectionReason,
     this.createdAt,
     this.updatedAt,
   });
@@ -56,12 +62,19 @@ class UserModel {
     return displayName ?? email;
   }
 
-  bool get isAdmin => role.toLowerCase() == 'admin';
+  bool get isSuperAdmin => role.toLowerCase() == 'superadmin';
+  bool get isAdmin => role.toLowerCase() == 'admin' || isSuperAdmin;
   bool get isTeamLeader {
     final r = role.toLowerCase();
     return r == 'team_leader' || r == 'leader' || r == 'teamleader' || r == 'team-leader';
   }
   bool get isWorker => role.toLowerCase() == 'worker';
+
+  // Verification status helpers
+  bool get isPending => verificationStatus == 'pending';
+  bool get isVerified => verificationStatus == 'verified';
+  bool get isRejected => verificationStatus == 'rejected';
+  bool get needsVerification => isTeamLeader || isWorker;
 
   UserModel copyWith({
     String? id,
@@ -76,6 +89,8 @@ class UserModel {
     String? teamName,
     bool? isActive,
     bool? isOnline,
+    String? verificationStatus,
+    String? rejectionReason,
     DateTime? createdAt,
     DateTime? updatedAt,
   }) {
@@ -92,6 +107,8 @@ class UserModel {
       teamName: teamName ?? this.teamName,
       isActive: isActive ?? this.isActive,
       isOnline: isOnline ?? this.isOnline,
+      verificationStatus: verificationStatus ?? this.verificationStatus,
+      rejectionReason: rejectionReason ?? this.rejectionReason,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
     );
@@ -120,6 +137,41 @@ class AuthResponse {
 
   factory AuthResponse.fromJson(Map<String, dynamic> json) => _$AuthResponseFromJson(json);
   Map<String, dynamic> toJson() => _$AuthResponseToJson(this);
+}
+
+/// Response for registration in the new multi-role system
+/// When verification is pending, no tokens are returned
+@JsonSerializable()
+class RegisterResponse {
+  final String? message;
+  final UserModel? user;
+  @JsonKey(name: 'verification_status')
+  final String? verificationStatus; // pending, verified
+  @JsonKey(name: 'access_token')
+  final String? accessToken;
+  @JsonKey(name: 'refresh_token')
+  final String? refreshToken;
+  @JsonKey(name: 'expires_in')
+  final int? expiresIn;
+
+  const RegisterResponse({
+    this.message,
+    this.user,
+    this.verificationStatus,
+    this.accessToken,
+    this.refreshToken,
+    this.expiresIn,
+  });
+
+  factory RegisterResponse.fromJson(Map<String, dynamic> json) =>
+      _$RegisterResponseFromJson(json);
+  Map<String, dynamic> toJson() => _$RegisterResponseToJson(this);
+
+  /// Returns true if user account is pending verification
+  bool get isPending => verificationStatus == 'pending' || accessToken == null;
+
+  /// Returns true if user can login immediately (has tokens)
+  bool get canLogin => accessToken != null && accessToken!.isNotEmpty;
 }
 
 @JsonSerializable()

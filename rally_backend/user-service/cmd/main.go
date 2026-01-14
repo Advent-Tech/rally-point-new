@@ -55,16 +55,30 @@ func main() {
 	userRepo := postgres.NewUserRepository(db.DB)
 	teamRepo := postgres.NewTeamRepository(db.DB)
 	sessionRepo := postgres.NewSessionRepository(db.DB)
+	joinRequestRepo := postgres.NewJoinRequestRepository(db.DB)
+	blogRepo := postgres.NewBlogRepository(db.DB)
+
+	// Storage path for blog images
+	storagePath := getEnv("STORAGE_PATH", "./uploads")
+	baseURL := getEnv("BASE_URL", "http://localhost:8081")
 
 	// Initialize services
 	teamService := service.NewTeamService(teamRepo, db.DB)
-	userService := service.NewUserService(userRepo, sessionRepo, jwtManager, db.DB)
+	userService := service.NewUserService(userRepo, sessionRepo, joinRequestRepo, jwtManager, db.DB)
+	adminService := service.NewAdminService(userRepo, teamRepo, db.DB)
+	superAdminService := service.NewSuperAdminService(userRepo, db.DB)
+	joinRequestService := service.NewJoinRequestService(joinRequestRepo, userRepo, teamRepo)
+	blogService := service.NewBlogService(blogRepo, storagePath, baseURL)
 
 	// Initialize handlers
 	userHandler := handler.NewUserHandler(userService, teamService, jwtManager)
+	adminHandler := handler.NewAdminHandler(adminService)
+	superAdminHandler := handler.NewSuperAdminHandler(superAdminService)
+	joinRequestHandler := handler.NewJoinRequestHandler(joinRequestService, teamService)
+	blogHandler := handler.NewBlogHandler(blogService)
 
 	// Setup router
-	router := setupRouter(userHandler)
+	router := setupRouter(userHandler, adminHandler, superAdminHandler, joinRequestHandler, blogHandler, storagePath)
 
 	// Server configuration
 	port := getEnv("PORT", "8081")
@@ -99,13 +113,34 @@ func main() {
 	log.Println("✅ Server exited")
 }
 
-func setupRouter(userHandler *handler.UserHandler) *gin.Engine {
+func setupRouter(
+	userHandler *handler.UserHandler,
+	adminHandler *handler.AdminHandler,
+	superAdminHandler *handler.SuperAdminHandler,
+	joinRequestHandler *handler.JoinRequestHandler,
+	blogHandler *handler.BlogHandler,
+	storagePath string,
+) *gin.Engine {
 	// Set Gin mode
 	if getEnv("GIN_MODE", "debug") == "release" {
 		gin.SetMode(gin.ReleaseMode)
 	}
 
 	router := gin.Default()
+
+	// Serve static files for uploads with CORS headers
+	uploadsGroup := router.Group("/uploads")
+	uploadsGroup.Use(func(c *gin.Context) {
+		c.Header("Access-Control-Allow-Origin", "*")
+		c.Header("Access-Control-Allow-Methods", "GET, OPTIONS")
+		c.Header("Access-Control-Allow-Headers", "Origin, Content-Type, Accept")
+		if c.Request.Method == "OPTIONS" {
+			c.AbortWithStatus(204)
+			return
+		}
+		c.Next()
+	})
+	uploadsGroup.Static("/", storagePath)
 
 	// Health check
 	router.GET("/health", userHandler.HealthCheck)
@@ -126,6 +161,13 @@ func setupRouter(userHandler *handler.UserHandler) *gin.Engine {
 			auth.POST("/register", userHandler.Register)
 			auth.POST("/login", userHandler.Login)
 			auth.POST("/refresh", userHandler.RefreshToken)
+		}
+
+		// Public blog routes (read-only, no authentication required)
+		blogs := api.Group("/blogs")
+		{
+			blogs.GET("/", blogHandler.ListBlogs)
+			blogs.GET("/:id", blogHandler.GetBlog)
 		}
 	}
 
@@ -151,6 +193,60 @@ func setupRouter(userHandler *handler.UserHandler) *gin.Engine {
 			teams.POST("/join", userHandler.JoinTeam)
 			teams.POST("/leave", userHandler.LeaveTeam)
 			teams.GET("/:id/workers", userHandler.GetTeamWorkers)
+
+			// Join request routes (workers)
+			teams.POST("/:id/request-join", joinRequestHandler.RequestJoinTeam)
+			teams.GET("/my-request", joinRequestHandler.GetMyJoinRequest)
+			teams.GET("/my-requests", joinRequestHandler.GetMyJoinRequests)
+			teams.DELETE("/my-request", joinRequestHandler.CancelMyJoinRequest)
+
+			// Join request routes (team leaders)
+			teams.GET("/:id/join-requests", joinRequestHandler.GetTeamJoinRequests)
+			teams.PUT("/join-requests/:id/approve", joinRequestHandler.ApproveJoinRequest)
+			teams.PUT("/join-requests/:id/reject", joinRequestHandler.RejectJoinRequest)
+		}
+
+		// Blog routes (protected - create/update/delete requires admin)
+		blogs := protected.Group("/api/blogs")
+		{
+			blogs.POST("/", blogHandler.CreateBlog)
+			blogs.PUT("/:id", blogHandler.UpdateBlog)
+			blogs.DELETE("/:id", blogHandler.DeleteBlog)
+			blogs.POST("/:id/image", blogHandler.UploadImage)
+			blogs.POST("/upload-image", blogHandler.UploadImageDirect)
+		}
+
+		// Admin routes (admin and superadmin only)
+		admin := protected.Group("/api/admin")
+		admin.Use(handler.AdminMiddleware())
+		{
+			// Team leader management
+			admin.GET("/team-leaders", adminHandler.ListTeamLeaders)
+			admin.GET("/team-leaders/:id", adminHandler.GetTeamLeader)
+			admin.PUT("/team-leaders/:id/verify", adminHandler.VerifyTeamLeader)
+			admin.PUT("/team-leaders/:id/reject", adminHandler.RejectTeamLeader)
+
+			// Team management by admin
+			admin.POST("/teams", adminHandler.CreateTeam)
+			admin.PUT("/teams/:id/assign-leader", adminHandler.AssignTeamToLeader)
+			admin.DELETE("/teams/:id/leader", adminHandler.UnassignTeamFromLeader)
+
+			// Worker management
+			admin.GET("/workers/pending", adminHandler.ListPendingWorkers)
+			admin.GET("/workers/verified", adminHandler.ListVerifiedWorkers)
+			admin.PUT("/workers/:id/verify", adminHandler.VerifyWorker)
+			admin.PUT("/workers/:id/reject", adminHandler.RejectWorker)
+		}
+
+		// Superadmin routes (superadmin only)
+		superadmin := protected.Group("/api/superadmin")
+		superadmin.Use(handler.SuperAdminMiddleware())
+		{
+			superadmin.POST("/admins", superAdminHandler.CreateAdmin)
+			superadmin.GET("/admins", superAdminHandler.ListAdmins)
+			superadmin.GET("/admins/:id", superAdminHandler.GetAdmin)
+			superadmin.DELETE("/admins/:id", superAdminHandler.DeleteAdmin)
+			superadmin.PUT("/admins/:id/reset-password", superAdminHandler.ResetAdminPassword)
 		}
 	}
 

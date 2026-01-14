@@ -141,6 +141,10 @@ services:
       - REDIS_URL=redis:6379
       - JWT_SECRET=your-super-secret-jwt-key-change-in-production
       - NATS_URL=nats:4222
+      - STORAGE_PATH=/app/uploads
+      - BASE_URL=http://localhost:8081
+    volumes:
+      - blog_uploads:/app/uploads
     depends_on:
       postgres:
         condition: service_healthy
@@ -338,6 +342,7 @@ volumes:
   postgres_data:
   redis_data:
   audio_storage:
+  blog_uploads:
 
 networks:
   rally_network:

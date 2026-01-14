@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 import '../../core/constants/api_constants.dart';
 import '../../core/network/api_client.dart';
 import '../../core/network/api_result.dart';
@@ -77,10 +78,43 @@ class SurveyRepository {
         ApiConstants.userSurveyResponses,
       );
 
-      final List<dynamic> data = response.data is List
-          ? response.data
-          : (response.data['responses'] ?? []);
-      final responses = data.map((e) => SurveyResponse.fromJson(e)).toList();
+      List<dynamic> data = [];
+      final responseData = response.data;
+
+      if (responseData is List) {
+        data = responseData;
+      } else if (responseData is Map<String, dynamic>) {
+        // Handle various nested structures
+        data = responseData['responses'] as List<dynamic>? ??
+            responseData['data'] as List<dynamic>? ??
+            [];
+      }
+
+      final responses = <SurveyResponse>[];
+      for (final item in data) {
+        try {
+          // Handle nested response structure if present
+          if (item is Map<String, dynamic>) {
+            Map<String, dynamic> responseJson;
+
+            if (item.containsKey('response') && item['response'] is Map<String, dynamic>) {
+              // Nested structure from backend
+              responseJson = Map<String, dynamic>.from(item['response'] as Map<String, dynamic>);
+              // Merge answers into response for parsing
+              if (item.containsKey('answers') && item['answers'] != null) {
+                responseJson['answers'] = item['answers'];
+              }
+            } else {
+              // Flat structure
+              responseJson = item;
+            }
+
+            responses.add(SurveyResponse.fromJson(responseJson));
+          }
+        } catch (e) {
+          debugPrint('Error parsing response item: $e');
+        }
+      }
 
       return ApiResult.success(responses);
     } on DioException catch (e) {
@@ -102,7 +136,28 @@ class SurveyRepository {
         data: request.toJson(),
       );
 
-      final surveyResponse = SurveyResponse.fromJson(response.data);
+      // Handle nested response structure from backend
+      // API returns: {"response": {...}, "answers": [...]}
+      final responseData = response.data;
+      Map<String, dynamic> surveyResponseData;
+
+      if (responseData is Map<String, dynamic>) {
+        if (responseData.containsKey('response')) {
+          // Nested structure - extract the response object
+          surveyResponseData = responseData['response'] as Map<String, dynamic>;
+          // Merge answers if provided separately
+          if (responseData.containsKey('answers')) {
+            surveyResponseData['answers'] = responseData['answers'];
+          }
+        } else {
+          // Flat structure - use as is
+          surveyResponseData = responseData;
+        }
+      } else {
+        return ApiResult.failure('Invalid response format');
+      }
+
+      final surveyResponse = SurveyResponse.fromJson(surveyResponseData);
       return ApiResult.success(surveyResponse);
     } on DioException catch (e) {
       return ApiResult.failure(_handleDioError(e));
@@ -128,7 +183,47 @@ class SurveyRepository {
     }
   }
 
-  // Get team surveys (for team leaders)
+  // Get all surveys (for team leaders to see admin-created surveys)
+  // Backend route: GET /api/surveys
+  Future<ApiResult<List<SurveyModel>>> getAllSurveys() async {
+    try {
+      debugPrint('SurveyRepository: Fetching all surveys from /api/surveys');
+      final response = await _apiClient.dio.get(ApiConstants.surveys);
+
+      debugPrint('SurveyRepository: Response data type: ${response.data.runtimeType}');
+
+      List<dynamic> data = [];
+      if (response.data is List) {
+        data = response.data;
+      } else if (response.data is Map<String, dynamic>) {
+        data = response.data['surveys'] ?? [];
+      }
+
+      debugPrint('SurveyRepository: Found ${data.length} surveys');
+
+      final surveys = <SurveyModel>[];
+      for (final item in data) {
+        try {
+          surveys.add(SurveyModel.fromJson(item));
+        } catch (e) {
+          debugPrint('SurveyRepository: Error parsing survey: $e');
+        }
+      }
+
+      return ApiResult.success(surveys);
+    } on DioException catch (e) {
+      debugPrint('SurveyRepository: DioError fetching all surveys: ${e.message}');
+      if (e.response?.statusCode == 404) {
+        return const ApiResult.success([]);
+      }
+      return ApiResult.failure(_handleDioError(e));
+    } catch (e) {
+      debugPrint('SurveyRepository: Exception fetching all surveys: $e');
+      return ApiResult.failure('Failed to fetch surveys: $e');
+    }
+  }
+
+  // Get team surveys (for team leaders) - legacy endpoint
   // Backend route: GET /api/teams/:teamId/surveys
   Future<ApiResult<List<SurveyModel>>> getTeamSurveys(String teamId) async {
     try {
@@ -155,15 +250,48 @@ class SurveyRepository {
   // Get survey responses (for leaders)
   Future<ApiResult<List<SurveyResponse>>> getSurveyResponses(String surveyId) async {
     try {
+      debugPrint('SurveyRepository: Fetching responses for survey $surveyId');
       final response = await _apiClient.dio.get(
         '${ApiConstants.surveys}/$surveyId/responses',
       );
 
+      debugPrint('SurveyRepository: Response data: ${response.data}');
+
       final List<dynamic> data = response.data is List
           ? response.data
           : (response.data['responses'] ?? []);
-      final responses = data.map((e) => SurveyResponse.fromJson(e)).toList();
 
+      debugPrint('SurveyRepository: Found ${data.length} response items');
+
+      final responses = <SurveyResponse>[];
+      for (final item in data) {
+        try {
+          // Handle nested structure: { "response": {...}, "answers": [...] }
+          if (item is Map<String, dynamic>) {
+            Map<String, dynamic> responseJson;
+
+            if (item.containsKey('response') && item['response'] is Map<String, dynamic>) {
+              // Nested structure from backend
+              responseJson = Map<String, dynamic>.from(item['response'] as Map<String, dynamic>);
+              // Merge answers into response for parsing
+              if (item.containsKey('answers') && item['answers'] != null) {
+                responseJson['answers'] = item['answers'];
+              }
+              debugPrint('SurveyRepository: Parsing nested response with ${(item['answers'] as List?)?.length ?? 0} answers');
+            } else {
+              // Flat structure
+              responseJson = item;
+              debugPrint('SurveyRepository: Parsing flat response');
+            }
+
+            responses.add(SurveyResponse.fromJson(responseJson));
+          }
+        } catch (e) {
+          debugPrint('SurveyRepository: Error parsing response item: $e');
+        }
+      }
+
+      debugPrint('SurveyRepository: Successfully parsed ${responses.length} responses');
       return ApiResult.success(responses);
     } on DioException catch (e) {
       if (e.response?.statusCode == 404) {
@@ -171,6 +299,7 @@ class SurveyRepository {
       }
       return ApiResult.failure(_handleDioError(e));
     } catch (e) {
+      debugPrint('SurveyRepository: Error fetching responses: $e');
       return ApiResult.failure('Failed to fetch survey responses: $e');
     }
   }

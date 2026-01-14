@@ -112,3 +112,8 @@ class TerritoryAssignToWorker extends TerritoryEvent {
   @override
   List<Object?> get props => [territoryId, territorySolid, workerId, teamId, assignedBy, priority, notes];
 }
+
+/// Event to load territories allocated to the current team leader by admin
+class TerritoryLoadMyAllocations extends TerritoryEvent {
+  const TerritoryLoadMyAllocations();
+}

@@ -125,3 +125,17 @@ class TerritoryAssignSuccess extends TerritoryState {
   @override
   List<Object?> get props => [message];
 }
+
+/// State when leader's allocated territories (from admin) are loaded
+class TerritoryAllocationsLoaded extends TerritoryState {
+  final List<GeoTerritory> territories;
+  final int total;
+
+  const TerritoryAllocationsLoaded({
+    required this.territories,
+    this.total = 0,
+  });
+
+  @override
+  List<Object?> get props => [territories, total];
+}

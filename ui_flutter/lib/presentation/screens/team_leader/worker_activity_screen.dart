@@ -762,6 +762,8 @@ class _MapTab extends StatelessWidget {
             TileLayer(
               urlTemplate: MapConstants.getThemedTileUrl(isDark),
               userAgentPackageName: 'com.rallypoint.app',
+              keepBuffer: 5,
+              panBuffer: 1,
             ),
             MarkerLayer(markers: markers),
           ],

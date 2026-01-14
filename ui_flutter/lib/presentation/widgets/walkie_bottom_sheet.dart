@@ -1,5 +1,8 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:just_audio/just_audio.dart';
 import '../../core/theme/app_colors.dart';
 import '../blocs/walkie/walkie_bloc.dart';
 import '../blocs/auth/auth_bloc.dart';
@@ -27,12 +30,30 @@ class WalkieBottomSheet extends StatefulWidget {
 class _WalkieBottomSheetState extends State<WalkieBottomSheet> {
   late WalkieBloc _walkieBloc;
   final TextEditingController _messageController = TextEditingController();
+  WalkieMessage? _replyingTo;
 
   @override
   void initState() {
     super.initState();
     _walkieBloc = WalkieBloc();
     _loadChannels();
+  }
+
+  void _setReplyingTo(WalkieMessage? message) {
+    setState(() => _replyingTo = message);
+    if (message != null) {
+      HapticFeedback.selectionClick();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Replying to ${message.senderName}'),
+          duration: const Duration(seconds: 2),
+          action: SnackBarAction(
+            label: 'Cancel',
+            onPressed: () => setState(() => _replyingTo = null),
+          ),
+        ),
+      );
+    }
   }
 
   void _loadChannels() {
@@ -44,7 +65,7 @@ class _WalkieBottomSheetState extends State<WalkieBottomSheet> {
     if (authState is AuthAuthenticated) {
       teamId ??= authState.user.teamId;
       userId = authState.user.id;
-      userName = authState.user.displayName;
+      userName = authState.user.fullName; // Use fullName to get proper display name
     }
 
     if (teamId != null) {
@@ -325,13 +346,15 @@ class _WalkieBottomSheetState extends State<WalkieBottomSheet> {
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                   itemCount: state.messages.length,
                   itemBuilder: (context, index) {
-                    final message = state.messages[state.messages.length - 1 - index];
+                    // With reverse: true, index 0 = bottom of list, so use direct index for newest at bottom
+                    final message = state.messages[index];
                     return _CompactMessageTile(
                       message: message,
                       isDark: isDark,
-                      onPlay: message.messageType == 'voice' && message.audioUrl != null
+                      onPlay: (message.messageType == 'voice' || message.messageType == 'audio') && message.audioUrl != null
                           ? () => _walkieBloc.add(WalkiePlayMessage(messageId: message.id))
                           : null,
+                      onReply: _setReplyingTo,
                     );
                   },
                 ),
@@ -339,22 +362,38 @@ class _WalkieBottomSheetState extends State<WalkieBottomSheet> {
 
         // Audio level indicator when speaking
         if (state.isSpeaking)
+          _AudioLevelIndicator(audioLevel: state.audioLevel),
+
+        // Reply indicator
+        if (_replyingTo != null)
           Container(
-            height: 4,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             margin: const EdgeInsets.symmetric(horizontal: 16),
             decoration: BoxDecoration(
-              color: Colors.grey.withAlpha(50),
-              borderRadius: BorderRadius.circular(2),
+              color: AppColors.primary.withAlpha(20),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: AppColors.primary.withAlpha(50)),
             ),
-            child: FractionallySizedBox(
-              alignment: Alignment.centerLeft,
-              widthFactor: state.audioLevel.clamp(0.0, 1.0),
-              child: Container(
-                decoration: BoxDecoration(
-                  color: AppColors.success,
-                  borderRadius: BorderRadius.circular(2),
+            child: Row(
+              children: [
+                const Icon(Icons.reply, size: 16, color: AppColors.primary),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Replying to ${_replyingTo!.senderName}',
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: AppColors.primary,
+                      fontWeight: FontWeight.w500,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
                 ),
-              ),
+                GestureDetector(
+                  onTap: () => _setReplyingTo(null),
+                  child: const Icon(Icons.close, size: 18, color: AppColors.primary),
+                ),
+              ],
             ),
           ),
 
@@ -539,99 +578,305 @@ class _ParticipantChip extends StatelessWidget {
   }
 }
 
-class _CompactMessageTile extends StatelessWidget {
+class _CompactMessageTile extends StatefulWidget {
   final WalkieMessage message;
   final bool isDark;
   final VoidCallback? onPlay;
+  final void Function(WalkieMessage)? onReply;
 
   const _CompactMessageTile({
     required this.message,
     required this.isDark,
     this.onPlay,
+    this.onReply,
   });
 
   @override
+  State<_CompactMessageTile> createState() => _CompactMessageTileState();
+}
+
+class _CompactMessageTileState extends State<_CompactMessageTile> {
+  final AudioPlayer _player = AudioPlayer();
+  bool _isPlaying = false;
+  Duration _position = Duration.zero;
+  Duration _duration = Duration.zero;
+  StreamSubscription? _positionSub;
+  StreamSubscription? _durationSub;
+  StreamSubscription? _stateSub;
+
+  @override
+  void initState() {
+    super.initState();
+    _setupPlayerListeners();
+  }
+
+  void _setupPlayerListeners() {
+    _positionSub = _player.positionStream.listen((pos) {
+      if (mounted) setState(() => _position = pos);
+    });
+    _durationSub = _player.durationStream.listen((dur) {
+      if (dur != null && mounted) setState(() => _duration = dur);
+    });
+    _stateSub = _player.playerStateStream.listen((state) {
+      if (mounted) {
+        setState(() {
+          _isPlaying = state.playing;
+          if (state.processingState == ProcessingState.completed) {
+            _isPlaying = false;
+            _position = Duration.zero;
+          }
+        });
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _positionSub?.cancel();
+    _durationSub?.cancel();
+    _stateSub?.cancel();
+    _player.dispose();
+    super.dispose();
+  }
+
+  Future<void> _togglePlayback() async {
+    if (_isPlaying) {
+      await _player.pause();
+    } else {
+      if (_position == Duration.zero || _position >= _duration) {
+        // Start from beginning
+        final audioUrl = widget.message.audioUrl;
+        debugPrint('WalkiePlayback: Attempting to play: $audioUrl');
+        if (audioUrl != null && audioUrl.isNotEmpty) {
+          try {
+            // Check if it's a local file path or a URL
+            if (audioUrl.startsWith('/') || audioUrl.startsWith('file://')) {
+              // Local file path
+              final filePath = audioUrl.startsWith('file://')
+                  ? audioUrl.substring(7)
+                  : audioUrl;
+              debugPrint('WalkiePlayback: Playing local file: $filePath');
+              await _player.setFilePath(filePath);
+            } else if (audioUrl.startsWith('http://') || audioUrl.startsWith('https://')) {
+              // Web URL (Supabase)
+              debugPrint('WalkiePlayback: Playing from URL: $audioUrl');
+              await _player.setUrl(audioUrl);
+            } else {
+              // Assume it's a local path
+              debugPrint('WalkiePlayback: Playing as local path: $audioUrl');
+              await _player.setFilePath(audioUrl);
+            }
+            debugPrint('WalkiePlayback: Duration loaded: ${_player.duration}');
+            await _player.play();
+            debugPrint('WalkiePlayback: Playback started');
+          } catch (e, stackTrace) {
+            debugPrint('WalkiePlayback: Error playing audio: $e');
+            debugPrint('WalkiePlayback: Stack trace: $stackTrace');
+          }
+        } else {
+          debugPrint('WalkiePlayback: No audio URL available');
+        }
+      } else {
+        await _player.play();
+      }
+    }
+    // Also call parent callback for global state
+    widget.onPlay?.call();
+  }
+
+  String _formatDuration(Duration duration) {
+    final minutes = duration.inMinutes;
+    final seconds = duration.inSeconds % 60;
+    return '${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          CircleAvatar(
-            radius: 14,
-            backgroundColor: AppColors.primary.withAlpha(50),
-            child: Text(
-              message.senderName.isNotEmpty ? message.senderName[0].toUpperCase() : '?',
-              style: const TextStyle(
-                fontSize: 11,
-                fontWeight: FontWeight.bold,
-                color: AppColors.primary,
+    return GestureDetector(
+      onLongPress: widget.onReply != null
+          ? () {
+              HapticFeedback.mediumImpact();
+              widget.onReply?.call(widget.message);
+            }
+          : null,
+      child: Padding(
+        padding: const EdgeInsets.only(bottom: 12),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            CircleAvatar(
+              radius: 16,
+              backgroundColor: AppColors.primary.withAlpha(50),
+              child: Text(
+                widget.message.senderName.isNotEmpty
+                    ? widget.message.senderName[0].toUpperCase()
+                    : '?',
+                style: const TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.primary,
+                ),
               ),
             ),
-          ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Text(
-                      message.senderName,
-                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
-                    ),
-                    const SizedBox(width: 6),
-                    Text(
-                      _formatTime(message.createdAt),
-                      style: TextStyle(
-                        fontSize: 10,
-                        color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          widget.message.senderName,
+                          style: const TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
                       ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 2),
-                _buildContent(context),
-              ],
+                      const SizedBox(width: 8),
+                      Text(
+                        _formatTime(widget.message.createdAt),
+                        style: TextStyle(
+                          fontSize: 10,
+                          color: widget.isDark
+                              ? AppColors.textSecondaryDark
+                              : AppColors.textSecondaryLight,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  _buildContent(context),
+                ],
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
 
   Widget _buildContent(BuildContext context) {
-    if (message.messageType == 'voice') {
+    if (widget.message.messageType == 'voice' ||
+        widget.message.messageType == 'audio') {
+      final totalDuration = _duration.inMilliseconds > 0
+          ? _duration
+          : Duration(milliseconds: widget.message.audioDurationMs ?? 0);
+      final progress = totalDuration.inMilliseconds > 0
+          ? (_position.inMilliseconds / totalDuration.inMilliseconds)
+              .clamp(0.0, 1.0)
+          : 0.0;
+
       return GestureDetector(
-        onTap: onPlay,
+        onTap: _togglePlayback,
         child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+          padding: const EdgeInsets.all(10),
           decoration: BoxDecoration(
-            color: AppColors.primary.withAlpha(30),
-            borderRadius: BorderRadius.circular(12),
+            color: _isPlaying
+                ? AppColors.primary.withAlpha(40)
+                : AppColors.primary.withAlpha(20),
+            borderRadius: BorderRadius.circular(14),
+            border: _isPlaying
+                ? Border.all(color: AppColors.primary.withAlpha(100))
+                : null,
           ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Icon(Icons.play_arrow, size: 18, color: AppColors.primary),
-              const SizedBox(width: 4),
-              Text(
-                message.formattedDuration,
-                style: const TextStyle(
-                  fontSize: 12,
-                  color: AppColors.primary,
-                  fontWeight: FontWeight.w500,
-                ),
+              Row(
+                children: [
+                  AnimatedContainer(
+                    duration: const Duration(milliseconds: 200),
+                    width: 32,
+                    height: 32,
+                    decoration: BoxDecoration(
+                      color: _isPlaying
+                          ? AppColors.primary
+                          : AppColors.primary.withAlpha(150),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(
+                      _isPlaying ? Icons.pause : Icons.play_arrow,
+                      size: 18,
+                      color: Colors.white,
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Progress bar
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(2),
+                          child: LinearProgressIndicator(
+                            value: progress,
+                            backgroundColor: Colors.grey.withAlpha(50),
+                            valueColor: AlwaysStoppedAnimation<Color>(
+                              AppColors.primary,
+                            ),
+                            minHeight: 4,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        // Duration text
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              _isPlaying || _position > Duration.zero
+                                  ? _formatDuration(_position)
+                                  : '00:00',
+                              style: TextStyle(
+                                fontSize: 10,
+                                color: widget.isDark
+                                    ? AppColors.textSecondaryDark
+                                    : AppColors.textSecondaryLight,
+                              ),
+                            ),
+                            Text(
+                              widget.message.formattedDuration,
+                              style: TextStyle(
+                                fontSize: 10,
+                                color: widget.isDark
+                                    ? AppColors.textSecondaryDark
+                                    : AppColors.textSecondaryLight,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
               ),
+              // Tap to reply hint
+              if (widget.onReply != null)
+                Padding(
+                  padding: const EdgeInsets.only(top: 6),
+                  child: Text(
+                    'Long press to reply',
+                    style: TextStyle(
+                      fontSize: 9,
+                      color: (widget.isDark
+                              ? AppColors.textSecondaryDark
+                              : AppColors.textSecondaryLight)
+                          .withAlpha(150),
+                      fontStyle: FontStyle.italic,
+                    ),
+                  ),
+                ),
             ],
           ),
         ),
       );
     }
 
-    if (message.messageType == 'alert') {
+    if (widget.message.messageType == 'alert') {
       return Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         decoration: BoxDecoration(
           color: Colors.orange.withAlpha(30),
           borderRadius: BorderRadius.circular(12),
@@ -640,33 +885,48 @@ class _CompactMessageTile extends StatelessWidget {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.warning_amber, size: 16, color: Colors.orange),
-            const SizedBox(width: 4),
-            Text(
-              message.text ?? 'Alert',
-              style: const TextStyle(fontSize: 12, color: Colors.orange),
+            const Icon(Icons.warning_amber, size: 18, color: Colors.orange),
+            const SizedBox(width: 6),
+            Flexible(
+              child: Text(
+                widget.message.text ?? 'Alert',
+                style: const TextStyle(
+                  fontSize: 13,
+                  color: Colors.orange,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
             ),
           ],
         ),
       );
     }
 
-    return Text(
-      message.text ?? '',
-      style: const TextStyle(fontSize: 13),
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: widget.isDark
+            ? Colors.grey.withAlpha(30)
+            : Colors.grey.withAlpha(20),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Text(
+        widget.message.text ?? '',
+        style: const TextStyle(fontSize: 13),
+      ),
     );
   }
 
   String _formatTime(DateTime time) {
     final diff = DateTime.now().difference(time);
     if (diff.inMinutes < 1) return 'now';
-    if (diff.inMinutes < 60) return '${diff.inMinutes}m';
-    if (diff.inHours < 24) return '${diff.inHours}h';
-    return '${diff.inDays}d';
+    if (diff.inMinutes < 60) return '${diff.inMinutes}m ago';
+    if (diff.inHours < 24) return '${diff.inHours}h ago';
+    return '${diff.inDays}d ago';
   }
 }
 
-class _CompactPTTButton extends StatelessWidget {
+class _CompactPTTButton extends StatefulWidget {
   final bool isSpeaking;
   final bool isMuted;
   final VoidCallback onStartSpeaking;
@@ -680,48 +940,170 @@ class _CompactPTTButton extends StatelessWidget {
   });
 
   @override
+  State<_CompactPTTButton> createState() => _CompactPTTButtonState();
+}
+
+class _CompactPTTButtonState extends State<_CompactPTTButton>
+    with SingleTickerProviderStateMixin {
+  bool _isPressed = false;
+  late AnimationController _pulseController;
+  late Animation<double> _pulseAnimation;
+  Timer? _recordingTimer;
+  int _recordingSeconds = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _pulseController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1000),
+    );
+    _pulseAnimation = Tween<double>(begin: 1.0, end: 1.15).animate(
+      CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
+    );
+  }
+
+  @override
+  void dispose() {
+    _pulseController.dispose();
+    _recordingTimer?.cancel();
+    super.dispose();
+  }
+
+  @override
+  void didUpdateWidget(_CompactPTTButton oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.isSpeaking && !oldWidget.isSpeaking) {
+      _pulseController.repeat(reverse: true);
+      _startRecordingTimer();
+    } else if (!widget.isSpeaking && oldWidget.isSpeaking) {
+      _pulseController.stop();
+      _pulseController.reset();
+      _stopRecordingTimer();
+    }
+  }
+
+  void _startRecordingTimer() {
+    _recordingSeconds = 0;
+    _recordingTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+      setState(() => _recordingSeconds++);
+    });
+  }
+
+  void _stopRecordingTimer() {
+    _recordingTimer?.cancel();
+    _recordingTimer = null;
+    _recordingSeconds = 0;
+  }
+
+  String get _formattedDuration {
+    final minutes = _recordingSeconds ~/ 60;
+    final seconds = _recordingSeconds % 60;
+    return '${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
+  }
+
+  void _onPressStart() {
+    if (widget.isMuted || _isPressed) return;
+    setState(() => _isPressed = true);
+    HapticFeedback.mediumImpact();
+    widget.onStartSpeaking();
+  }
+
+  void _onPressEnd() {
+    if (widget.isMuted || !_isPressed) return;
+    setState(() => _isPressed = false);
+    HapticFeedback.lightImpact();
+    widget.onStopSpeaking();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTapDown: isMuted ? null : (_) => onStartSpeaking(),
-      onTapUp: isMuted ? null : (_) => onStopSpeaking(),
-      onTapCancel: isMuted ? null : onStopSpeaking,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 150),
-        height: 52,
-        decoration: BoxDecoration(
-          color: isMuted
-              ? Colors.grey
-              : (isSpeaking ? AppColors.error : AppColors.primary),
-          borderRadius: BorderRadius.circular(26),
-          boxShadow: isSpeaking
-              ? [
-                  BoxShadow(
-                    color: AppColors.error.withAlpha(100),
-                    blurRadius: 12,
-                    spreadRadius: 2,
+    final isActive = _isPressed || widget.isSpeaking;
+
+    return Listener(
+      onPointerDown: (_) => _onPressStart(),
+      onPointerUp: (_) => _onPressEnd(),
+      onPointerCancel: (_) => _onPressEnd(),
+      child: AnimatedBuilder(
+        animation: _pulseAnimation,
+        builder: (context, child) {
+          return Transform.scale(
+            scale: widget.isSpeaking ? _pulseAnimation.value : 1.0,
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 100),
+              height: 56,
+              decoration: BoxDecoration(
+                gradient: widget.isMuted
+                    ? null
+                    : LinearGradient(
+                        colors: isActive
+                            ? [AppColors.error, AppColors.error.withRed(200)]
+                            : [AppColors.primary, AppColors.secondary],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                color: widget.isMuted ? Colors.grey : null,
+                borderRadius: BorderRadius.circular(28),
+                boxShadow: isActive
+                    ? [
+                        BoxShadow(
+                          color: AppColors.error.withAlpha(150),
+                          blurRadius: 16,
+                          spreadRadius: 4,
+                        ),
+                      ]
+                    : [
+                        BoxShadow(
+                          color: AppColors.primary.withAlpha(50),
+                          blurRadius: 8,
+                          spreadRadius: 1,
+                        ),
+                      ],
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 200),
+                    child: Icon(
+                      widget.isMuted
+                          ? Icons.mic_off
+                          : (isActive ? Icons.mic : Icons.mic_none),
+                      key: ValueKey(isActive),
+                      color: Colors.white,
+                      size: 26,
+                    ),
                   ),
-                ]
-              : null,
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              isMuted ? Icons.mic_off : (isSpeaking ? Icons.mic : Icons.mic_none),
-              color: Colors.white,
-              size: 24,
-            ),
-            const SizedBox(width: 8),
-            Text(
-              isMuted ? 'Muted' : (isSpeaking ? 'Release to send' : 'Hold to talk'),
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 15,
-                fontWeight: FontWeight.bold,
+                  const SizedBox(width: 10),
+                  Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        widget.isMuted
+                            ? 'Muted'
+                            : (isActive ? 'Recording...' : 'Hold to talk'),
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 15,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      if (isActive)
+                        Text(
+                          _formattedDuration,
+                          style: TextStyle(
+                            color: Colors.white.withAlpha(200),
+                            fontSize: 12,
+                          ),
+                        ),
+                    ],
+                  ),
+                ],
               ),
             ),
-          ],
-        ),
+          );
+        },
       ),
     );
   }
@@ -773,5 +1155,155 @@ class _PulsatingDotState extends State<_PulsatingDot>
         );
       },
     );
+  }
+}
+
+/// Audio level indicator with animated bars
+class _AudioLevelIndicator extends StatefulWidget {
+  final double audioLevel;
+
+  const _AudioLevelIndicator({required this.audioLevel});
+
+  @override
+  State<_AudioLevelIndicator> createState() => _AudioLevelIndicatorState();
+}
+
+class _AudioLevelIndicatorState extends State<_AudioLevelIndicator>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _animController;
+
+  @override
+  void initState() {
+    super.initState();
+    _animController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 300),
+    )..repeat(reverse: true);
+  }
+
+  @override
+  void dispose() {
+    _animController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    // Use actual audio level, but ensure minimum visibility when recording
+    final displayLevel = widget.audioLevel > 0.01 ? widget.audioLevel : 0.0;
+    final hasSignal = displayLevel > 0.05;
+
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: hasSignal
+            ? AppColors.success.withAlpha(20)
+            : (isDark ? Colors.grey[850] : Colors.grey[100]),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: hasSignal
+              ? AppColors.success.withAlpha(100)
+              : Colors.grey.withAlpha(50),
+        ),
+      ),
+      child: Row(
+        children: [
+          // Mic icon with pulse
+          AnimatedBuilder(
+            animation: _animController,
+            builder: (context, child) {
+              return Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: hasSignal
+                      ? AppColors.success
+                      : AppColors.error,
+                  shape: BoxShape.circle,
+                  boxShadow: [
+                    BoxShadow(
+                      color: (hasSignal ? AppColors.success : AppColors.error)
+                          .withAlpha((100 * _animController.value).toInt()),
+                      blurRadius: 8 * _animController.value,
+                      spreadRadius: 2 * _animController.value,
+                    ),
+                  ],
+                ),
+                child: const Icon(
+                  Icons.mic,
+                  color: Colors.white,
+                  size: 22,
+                ),
+              );
+            },
+          ),
+          const SizedBox(width: 12),
+          // Level bars and status
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  hasSignal ? 'Recording...' : 'No audio detected',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w600,
+                    fontSize: 13,
+                    color: hasSignal ? AppColors.success : AppColors.error,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                // Audio level bars
+                Row(
+                  children: List.generate(20, (index) {
+                    final threshold = index / 20;
+                    final isActive = displayLevel > threshold;
+                    // Animate bars when no signal to show recording is active
+                    final animatedActive = !hasSignal &&
+                        index < 3 &&
+                        _animController.value > (index * 0.3);
+
+                    return Expanded(
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 100),
+                        height: 16,
+                        margin: const EdgeInsets.symmetric(horizontal: 1),
+                        decoration: BoxDecoration(
+                          color: isActive
+                              ? _getBarColor(index / 20)
+                              : (animatedActive
+                                  ? Colors.grey.withAlpha(100)
+                                  : Colors.grey.withAlpha(30)),
+                          borderRadius: BorderRadius.circular(2),
+                        ),
+                      ),
+                    );
+                  }),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  hasSignal
+                      ? 'Level: ${(displayLevel * 100).toInt()}%'
+                      : 'Speak into microphone',
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: isDark
+                        ? AppColors.textSecondaryDark
+                        : AppColors.textSecondaryLight,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Color _getBarColor(double level) {
+    if (level < 0.5) return AppColors.success;
+    if (level < 0.75) return Colors.orange;
+    return AppColors.error;
   }
 }

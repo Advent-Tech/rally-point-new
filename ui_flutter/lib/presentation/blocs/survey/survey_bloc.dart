@@ -80,13 +80,22 @@ class SurveyBloc extends Bloc<SurveyEvent, SurveyState> {
   Future<void> _onSubmit(SurveySubmit event, Emitter<SurveyState> emit) async {
     emit(SurveySubmitting());
 
-    final answers = event.answers.map((a) => AnswerInput(
-      questionId: a['question_id'] as String,
-      value: a['value'] as String?,
-      selectedOptions: (a['selected_options'] as List<dynamic>?)?.cast<String>(),
-      photoUrls: (a['photo_urls'] as List<dynamic>?)?.cast<String>(),
-      signatureUrl: a['signature_url'] as String?,
-    )).toList();
+    final answers = <AnswerInput>[];
+    for (final a in event.answers) {
+      // Skip answers without a valid question_id
+      final questionId = a['question_id'];
+      if (questionId == null || questionId is! String || questionId.isEmpty) {
+        continue;
+      }
+
+      answers.add(AnswerInput(
+        questionId: questionId,
+        value: a['value']?.toString(),
+        selectedOptions: (a['selected_options'] as List<dynamic>?)?.map((e) => e?.toString() ?? '').where((e) => e.isNotEmpty).toList(),
+        photoUrls: (a['photo_urls'] as List<dynamic>?)?.map((e) => e?.toString() ?? '').where((e) => e.isNotEmpty).toList(),
+        signatureUrl: a['signature_url']?.toString(),
+      ));
+    }
 
     final request = SubmitSurveyRequest(
       surveyId: event.surveyId,
@@ -116,15 +125,20 @@ class SurveyBloc extends Bloc<SurveyEvent, SurveyState> {
     List<SurveyModel> surveys = [];
     List<SurveyResponse> responses = [];
 
-    // Both leaders and workers load team surveys if teamId is available
-    if (event.teamId != null) {
-      final teamSurveysResult = await _surveyRepository.getTeamSurveys(event.teamId!);
-      teamSurveysResult.when(
+    // Team leaders see ALL surveys (created by admins)
+    // Workers see only their assigned surveys
+    if (event.isLeader) {
+      // Leaders fetch all surveys from /api/surveys
+      final allSurveysResult = await _surveyRepository.getAllSurveys();
+      allSurveysResult.when(
         success: (data) => surveys = data,
-        failure: (_, __) {},
+        failure: (msg, _) {
+          // Debug: print error
+          print('SurveyBloc: Failed to fetch all surveys for leader: $msg');
+        },
       );
     } else {
-      // Fallback to assignments if no teamId
+      // Workers fetch their assigned surveys
       final surveysResult = await _surveyRepository.getAvailableSurveys();
       surveysResult.when(
         success: (data) => surveys = data,
@@ -132,11 +146,14 @@ class SurveyBloc extends Bloc<SurveyEvent, SurveyState> {
       );
     }
 
-    final responsesResult = await _surveyRepository.getMyResponses();
-    responsesResult.when(
-      success: (data) => responses = data,
-      failure: (_, __) {},
-    );
+    // Workers also load their responses (leaders don't need this)
+    if (!event.isLeader) {
+      final responsesResult = await _surveyRepository.getMyResponses();
+      responsesResult.when(
+        success: (data) => responses = data,
+        failure: (_, __) {},
+      );
+    }
 
     emit(SurveyLoaded(
       availableSurveys: surveys,

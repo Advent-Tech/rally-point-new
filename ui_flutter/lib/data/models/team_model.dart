@@ -127,3 +127,77 @@ class JoinTeamRequest {
   factory JoinTeamRequest.fromJson(Map<String, dynamic> json) => _$JoinTeamRequestFromJson(json);
   Map<String, dynamic> toJson() => _$JoinTeamRequestToJson(this);
 }
+
+/// Model for team join requests (worker requesting to join a team)
+@JsonSerializable()
+class TeamJoinRequest {
+  final String id;
+  @JsonKey(name: 'user_id')
+  final String userId;
+  @JsonKey(name: 'team_id')
+  final String teamId;
+  final String status; // pending, approved, rejected
+  @JsonKey(name: 'requested_at')
+  final DateTime? requestedAt;
+  @JsonKey(name: 'reviewed_by')
+  final String? reviewedBy;
+  @JsonKey(name: 'reviewed_at')
+  final DateTime? reviewedAt;
+  @JsonKey(name: 'rejection_reason')
+  final String? rejectionReason;
+
+  // User details (when joined)
+  @JsonKey(name: 'display_name')
+  final String? displayName;
+  final String? email;
+  @JsonKey(name: 'profile_photo_url')
+  final String? profilePhotoUrl;
+  final String? phone;
+
+  const TeamJoinRequest({
+    required this.id,
+    required this.userId,
+    required this.teamId,
+    required this.status,
+    this.requestedAt,
+    this.reviewedBy,
+    this.reviewedAt,
+    this.rejectionReason,
+    this.displayName,
+    this.email,
+    this.profilePhotoUrl,
+    this.phone,
+  });
+
+  /// Custom fromJson that handles nested user object from backend
+  factory TeamJoinRequest.fromJson(Map<String, dynamic> json) {
+    // Backend returns user details nested in 'user' object
+    final user = json['user'] as Map<String, dynamic>?;
+
+    return TeamJoinRequest(
+      id: json['id']?.toString() ?? '',
+      userId: json['user_id']?.toString() ?? '',
+      teamId: json['team_id']?.toString() ?? '',
+      status: json['status']?.toString() ?? 'pending',
+      requestedAt: json['requested_at'] != null
+          ? DateTime.tryParse(json['requested_at'].toString())
+          : null,
+      reviewedBy: json['reviewed_by']?.toString(),
+      reviewedAt: json['reviewed_at'] != null
+          ? DateTime.tryParse(json['reviewed_at'].toString())
+          : null,
+      rejectionReason: json['rejection_reason']?.toString(),
+      // Extract user details from nested user object, fallback to top-level
+      displayName: user?['display_name']?.toString() ?? json['display_name']?.toString(),
+      email: user?['email']?.toString() ?? json['email']?.toString(),
+      profilePhotoUrl: user?['profile_photo_url']?.toString() ?? json['profile_photo_url']?.toString(),
+      phone: user?['phone']?.toString() ?? json['phone']?.toString(),
+    );
+  }
+
+  Map<String, dynamic> toJson() => _$TeamJoinRequestToJson(this);
+
+  bool get isPending => status == 'pending';
+  bool get isApproved => status == 'approved';
+  bool get isRejected => status == 'rejected';
+}

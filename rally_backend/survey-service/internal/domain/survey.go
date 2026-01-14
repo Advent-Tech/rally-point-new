@@ -11,7 +11,7 @@ type Survey struct {
 	ID               uuid.UUID  `json:"id" db:"id"`
 	Title            string     `json:"title" db:"title"`
 	Description      *string    `json:"description,omitempty" db:"description"`
-	TeamID           uuid.UUID  `json:"team_id" db:"team_id"`
+	TeamID           *uuid.UUID `json:"team_id,omitempty" db:"team_id"`
 	CreatorID        uuid.UUID  `json:"creator_id" db:"creator_id"`
 	IsActive         bool       `json:"is_active" db:"is_active"`
 	RequiresLocation bool       `json:"requires_location" db:"requires_location"`
@@ -74,7 +74,7 @@ type SurveyAssignment struct {
 type CreateSurveyRequest struct {
 	Title            string                  `json:"title" binding:"required"`
 	Description      string                  `json:"description,omitempty"`
-	TeamID           uuid.UUID               `json:"team_id" binding:"required"`
+	TeamID           *uuid.UUID              `json:"team_id,omitempty"`
 	RequiresLocation bool                    `json:"requires_location"`
 	StartDate        *time.Time              `json:"start_date,omitempty"`
 	EndDate          *time.Time              `json:"end_date,omitempty"`
@@ -197,6 +197,7 @@ type SurveyRepository interface {
 	// Survey management
 	CreateSurvey(survey *Survey) error
 	GetSurveyByID(id uuid.UUID) (*Survey, error)
+	GetAllSurveys() ([]*Survey, error)
 	GetSurveysByTeamID(teamID uuid.UUID) ([]*Survey, error)
 	GetSurveysByCreatorID(creatorID uuid.UUID) ([]*Survey, error)
 	UpdateSurvey(survey *Survey) error
@@ -240,6 +241,7 @@ type SurveyService interface {
 	// Survey management
 	CreateSurvey(creatorID uuid.UUID, req *CreateSurveyRequest) (*SurveyWithQuestions, error)
 	GetSurvey(id uuid.UUID) (*SurveyWithQuestions, error)
+	GetAllSurveys() ([]*SurveyWithQuestions, error)
 	UpdateSurvey(id uuid.UUID, req *UpdateSurveyRequest) (*Survey, error)
 	DeleteSurvey(id uuid.UUID) error
 	GetTeamSurveys(teamID uuid.UUID) ([]*SurveyWithQuestions, error)

@@ -53,6 +53,32 @@ func (r *surveyRepository) GetSurveyByID(id uuid.UUID) (*domain.Survey, error) {
 	return survey, err
 }
 
+// GetAllSurveys retrieves all surveys
+func (r *surveyRepository) GetAllSurveys() ([]*domain.Survey, error) {
+	query := `SELECT id, title, description, team_id, created_by, is_active, COALESCE(requires_location, false), start_date, end_date, created_at, updated_at
+		FROM surveys ORDER BY created_at DESC`
+
+	rows, err := r.db.Query(query)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var surveys []*domain.Survey
+	for rows.Next() {
+		survey := &domain.Survey{}
+		err := rows.Scan(
+			&survey.ID, &survey.Title, &survey.Description, &survey.TeamID, &survey.CreatorID,
+			&survey.IsActive, &survey.RequiresLocation, &survey.StartDate, &survey.EndDate, &survey.CreatedAt, &survey.UpdatedAt,
+		)
+		if err != nil {
+			return nil, err
+		}
+		surveys = append(surveys, survey)
+	}
+	return surveys, nil
+}
+
 // GetSurveysByTeamID retrieves surveys by team ID
 func (r *surveyRepository) GetSurveysByTeamID(teamID uuid.UUID) ([]*domain.Survey, error) {
 	query := `SELECT id, title, description, team_id, created_by, is_active, COALESCE(requires_location, false), start_date, end_date, created_at, updated_at

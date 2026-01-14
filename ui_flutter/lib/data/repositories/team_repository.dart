@@ -241,6 +241,64 @@ class TeamRepository {
     }
   }
 
+  // ============ Join Request Methods (for multi-role system) ============
+
+  /// Get pending join requests for a team (team leader only)
+  Future<ApiResult<List<TeamJoinRequest>>> getJoinRequests(String teamId, {String? status}) async {
+    try {
+      final queryParams = <String, dynamic>{};
+      if (status != null) queryParams['status'] = status;
+
+      final response = await _apiClient.dio.get(
+        '${ApiConstants.teams}/$teamId/join-requests',
+        queryParameters: queryParams.isNotEmpty ? queryParams : null,
+      );
+
+      final List<dynamic> data = response.data is List
+          ? response.data
+          : (response.data['requests'] ?? response.data['join_requests'] ?? []);
+
+      final requests = data.map((e) => TeamJoinRequest.fromJson(e as Map<String, dynamic>)).toList();
+      return ApiResult.success(requests);
+    } on DioException catch (e) {
+      if (e.response?.statusCode == 404) {
+        return const ApiResult.success([]);
+      }
+      return ApiResult.failure(_handleDioError(e));
+    } catch (e) {
+      return ApiResult.failure('Failed to fetch join requests: $e');
+    }
+  }
+
+  /// Approve a join request (team leader only)
+  Future<ApiResult<void>> approveJoinRequest(String requestId) async {
+    try {
+      await _apiClient.dio.put(
+        '${ApiConstants.approveJoinRequest}/$requestId/approve',
+      );
+      return const ApiResult.success(null);
+    } on DioException catch (e) {
+      return ApiResult.failure(_handleDioError(e));
+    } catch (e) {
+      return ApiResult.failure('Failed to approve join request: $e');
+    }
+  }
+
+  /// Reject a join request (team leader only)
+  Future<ApiResult<void>> rejectJoinRequest(String requestId, {String? reason}) async {
+    try {
+      await _apiClient.dio.put(
+        '${ApiConstants.rejectJoinRequest}/$requestId/reject',
+        data: reason != null ? {'rejection_reason': reason} : null,
+      );
+      return const ApiResult.success(null);
+    } on DioException catch (e) {
+      return ApiResult.failure(_handleDioError(e));
+    } catch (e) {
+      return ApiResult.failure('Failed to reject join request: $e');
+    }
+  }
+
   String _handleDioError(DioException e) {
     switch (e.type) {
       case DioExceptionType.connectionTimeout:

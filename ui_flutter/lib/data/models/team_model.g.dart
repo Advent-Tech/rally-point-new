@@ -88,3 +88,39 @@ Map<String, dynamic> _$JoinTeamRequestToJson(JoinTeamRequest instance) =>
       'team_id': instance.teamId,
       'team_code': instance.teamCode,
     };
+
+TeamJoinRequest _$TeamJoinRequestFromJson(Map<String, dynamic> json) =>
+    TeamJoinRequest(
+      id: json['id'] as String,
+      userId: json['user_id'] as String,
+      teamId: json['team_id'] as String,
+      status: json['status'] as String,
+      requestedAt: json['requested_at'] == null
+          ? null
+          : DateTime.parse(json['requested_at'] as String),
+      reviewedBy: json['reviewed_by'] as String?,
+      reviewedAt: json['reviewed_at'] == null
+          ? null
+          : DateTime.parse(json['reviewed_at'] as String),
+      rejectionReason: json['rejection_reason'] as String?,
+      displayName: json['display_name'] as String?,
+      email: json['email'] as String?,
+      profilePhotoUrl: json['profile_photo_url'] as String?,
+      phone: json['phone'] as String?,
+    );
+
+Map<String, dynamic> _$TeamJoinRequestToJson(TeamJoinRequest instance) =>
+    <String, dynamic>{
+      'id': instance.id,
+      'user_id': instance.userId,
+      'team_id': instance.teamId,
+      'status': instance.status,
+      'requested_at': instance.requestedAt?.toIso8601String(),
+      'reviewed_by': instance.reviewedBy,
+      'reviewed_at': instance.reviewedAt?.toIso8601String(),
+      'rejection_reason': instance.rejectionReason,
+      'display_name': instance.displayName,
+      'email': instance.email,
+      'profile_photo_url': instance.profilePhotoUrl,
+      'phone': instance.phone,
+    };

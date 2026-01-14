@@ -102,9 +102,15 @@ func RoleMiddleware(requiredRoles ...string) gin.HandlerFunc {
 			return
 		}
 
+		// Superadmin and admin can access everything
+		if role == "superadmin" || role == "admin" {
+			c.Next()
+			return
+		}
+
 		// Check if user has any of the required roles
 		for _, requiredRole := range requiredRoles {
-			if role == requiredRole || role == "admin" { // Admin can access everything
+			if role == requiredRole {
 				c.Next()
 				return
 			}
@@ -112,6 +118,87 @@ func RoleMiddleware(requiredRoles ...string) gin.HandlerFunc {
 
 		c.JSON(http.StatusForbidden, gin.H{"error": "insufficient permissions"})
 		c.Abort()
+	}
+}
+
+// SuperAdminMiddleware ensures only superadmin can access
+func SuperAdminMiddleware() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		userRole, exists := c.Get("user_role")
+		if !exists {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "user role not found"})
+			c.Abort()
+			return
+		}
+
+		role, ok := userRole.(string)
+		if !ok {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid user role"})
+			c.Abort()
+			return
+		}
+
+		if role != "superadmin" {
+			c.JSON(http.StatusForbidden, gin.H{"error": "superadmin access required"})
+			c.Abort()
+			return
+		}
+
+		c.Next()
+	}
+}
+
+// AdminMiddleware ensures only admin or superadmin can access
+func AdminMiddleware() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		userRole, exists := c.Get("user_role")
+		if !exists {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "user role not found"})
+			c.Abort()
+			return
+		}
+
+		role, ok := userRole.(string)
+		if !ok {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid user role"})
+			c.Abort()
+			return
+		}
+
+		if role != "admin" && role != "superadmin" {
+			c.JSON(http.StatusForbidden, gin.H{"error": "admin access required"})
+			c.Abort()
+			return
+		}
+
+		c.Next()
+	}
+}
+
+// TeamLeaderMiddleware ensures only team leaders, admins, or superadmins can access
+func TeamLeaderMiddleware() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		userRole, exists := c.Get("user_role")
+		if !exists {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "user role not found"})
+			c.Abort()
+			return
+		}
+
+		role, ok := userRole.(string)
+		if !ok {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid user role"})
+			c.Abort()
+			return
+		}
+
+		if role != "team_leader" && role != "admin" && role != "superadmin" {
+			c.JSON(http.StatusForbidden, gin.H{"error": "team leader access required"})
+			c.Abort()
+			return
+		}
+
+		c.Next()
 	}
 }
 

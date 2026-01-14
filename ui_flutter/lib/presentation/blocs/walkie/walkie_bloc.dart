@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -9,6 +8,7 @@ import '../../../core/constants/api_constants.dart';
 import '../../../data/models/walkie_model.dart';
 import '../../../services/audio_service.dart';
 import '../../../services/websocket_service.dart';
+import '../../../services/supabase_service.dart';
 
 part 'walkie_event.dart';
 part 'walkie_state.dart';
@@ -28,7 +28,10 @@ class WalkieBloc extends Bloc<WalkieEvent, WalkieState> {
 
   // Audio recording state
   Timer? _speakingTimer;
-  int _speakingDurationMs = 0;
+
+  // Audio level tracking for diagnostics
+  List<double> _recordingAudioLevels = [];
+  double _maxAudioLevel = 0.0;
 
   WalkieBloc() : super(WalkieInitial()) {
     on<WalkieLoadChannels>(_onLoadChannels);
@@ -189,6 +192,8 @@ class WalkieBloc extends Bloc<WalkieEvent, WalkieState> {
         data: {
           'channel_id': event.channelId,
           'team_id': event.channelId, // Use channel ID as team ID for now
+          'speaker_name': _currentUserName ?? 'Unknown',
+          'speaker_id': _currentUserId ?? '',
         },
       );
 
@@ -281,6 +286,10 @@ class WalkieBloc extends Bloc<WalkieEvent, WalkieState> {
     try {
       await _initialize();
 
+      // Reset audio level tracking
+      _recordingAudioLevels = [];
+      _maxAudioLevel = 0.0;
+
       // Start actual audio recording
       final started = await _audio.startRecording();
       if (!started) {
@@ -288,16 +297,12 @@ class WalkieBloc extends Bloc<WalkieEvent, WalkieState> {
         return;
       }
 
-      // Start recording timer
-      _speakingDurationMs = 0;
-      _speakingTimer = Timer.periodic(const Duration(milliseconds: 100), (_) {
-        _speakingDurationMs += 100;
-      });
-
       emit(currentState.copyWith(
         isSpeaking: true,
         audioLevel: 0.0,
       ));
+
+      debugPrint('WalkieBloc: Audio level tracking started - watch for levels during recording');
 
       // Notify others via WebSocket
       _wsService?.startSpeaking(currentState.channel.id);
@@ -318,9 +323,6 @@ class WalkieBloc extends Bloc<WalkieEvent, WalkieState> {
     _speakingTimer?.cancel();
     _speakingTimer = null;
 
-    final durationMs = _speakingDurationMs;
-    _speakingDurationMs = 0;
-
     emit(currentState.copyWith(isSpeaking: false, audioLevel: 0.0));
 
     // Notify others via WebSocket
@@ -339,6 +341,68 @@ class WalkieBloc extends Bloc<WalkieEvent, WalkieState> {
 
       debugPrint('WalkieBloc: Recording stopped, duration: ${result.durationMs}ms, path: ${result.path}');
 
+      // Log audio level summary for diagnostics
+      if (_recordingAudioLevels.isNotEmpty) {
+        final avgLevel = _recordingAudioLevels.reduce((a, b) => a + b) / _recordingAudioLevels.length;
+        final nonZeroLevels = _recordingAudioLevels.where((l) => l > 0.05).length;
+        debugPrint('WalkieBloc: AUDIO DIAGNOSTIC SUMMARY:');
+        debugPrint('  - Samples collected: ${_recordingAudioLevels.length}');
+        debugPrint('  - Max level: ${_maxAudioLevel.toStringAsFixed(3)}');
+        debugPrint('  - Average level: ${avgLevel.toStringAsFixed(3)}');
+        debugPrint('  - Samples > 0.05: $nonZeroLevels (${(nonZeroLevels / _recordingAudioLevels.length * 100).toStringAsFixed(1)}%)');
+        if (_maxAudioLevel < 0.1) {
+          debugPrint('  - WARNING: Very low audio levels detected! Microphone may not be capturing sound.');
+          debugPrint('  - Try: 1) Speak louder, 2) Check mic permission, 3) Check if another app is using mic');
+        }
+      } else {
+        debugPrint('WalkieBloc: WARNING - No audio level samples collected during recording!');
+      }
+
+      // Verify file exists and has content
+      final audioFile = File(result.path);
+      if (!await audioFile.exists()) {
+        debugPrint('WalkieBloc: Audio file does not exist!');
+        return;
+      }
+      final fileSize = await audioFile.length();
+      debugPrint('WalkieBloc: Audio file size: $fileSize bytes');
+
+      // Log first bytes to verify file header
+      try {
+        final bytes = await audioFile.readAsBytes();
+        if (bytes.length >= 12) {
+          final header = bytes.sublist(0, 12);
+          debugPrint('WalkieBloc: File header (first 12 bytes): $header');
+          // WAV files start with "RIFF"
+          final headerStr = String.fromCharCodes(header.sublist(0, 4));
+          debugPrint('WalkieBloc: Header string: $headerStr');
+        }
+      } catch (e) {
+        debugPrint('WalkieBloc: Error reading file header: $e');
+      }
+
+      // Analyze WAV file content to check for actual audio
+      // This is more reliable than getAmplitude() which doesn't work on some devices
+      debugPrint('WalkieBloc: Analyzing WAV file for audio content...');
+      final analysis = await AudioService.analyzeWavFile(result.path);
+      if (analysis.hasAudio) {
+        debugPrint('WalkieBloc: ✓ WAV file contains audio!');
+        debugPrint('  - Max amplitude: ${(analysis.maxAmplitude * 100).toStringAsFixed(1)}%');
+        debugPrint('  - Non-silent: ${analysis.percentNonSilent.toStringAsFixed(1)}%');
+      } else {
+        debugPrint('WalkieBloc: ✗ WAV file appears to be silent or empty');
+        if (analysis.error != null) {
+          debugPrint('  - Error: ${analysis.error}');
+        }
+        debugPrint('  - Max amplitude: ${(analysis.maxAmplitude * 100).toStringAsFixed(1)}%');
+        debugPrint('  - This confirms microphone is NOT capturing audio on this device');
+      }
+
+      if (fileSize < 1000) {
+        debugPrint('WalkieBloc: Audio file too small ($fileSize bytes), likely empty');
+        return;
+      }
+
       // Only send if > 500ms
       if (result.durationMs < 500) {
         debugPrint('WalkieBloc: Recording too short, discarding');
@@ -347,11 +411,18 @@ class WalkieBloc extends Bloc<WalkieEvent, WalkieState> {
 
       // Upload to Supabase
       String? audioUrl;
+      debugPrint('WalkieBloc: Starting Supabase upload process...');
       try {
+        debugPrint('WalkieBloc: Calling _uploadAudioToSupabase with path: ${result.path}, channelId: ${currentState.channel.id}');
         audioUrl = await _uploadAudioToSupabase(result.path, currentState.channel.id);
-        debugPrint('WalkieBloc: Audio uploaded to: $audioUrl');
-      } catch (e) {
+        if (audioUrl != null) {
+          debugPrint('WalkieBloc: Audio uploaded successfully to: $audioUrl');
+        } else {
+          debugPrint('WalkieBloc: Upload returned null - will use local path as fallback');
+        }
+      } catch (e, stackTrace) {
         debugPrint('WalkieBloc: Failed to upload to Supabase: $e');
+        debugPrint('WalkieBloc: Stack trace: $stackTrace');
         // Continue with local file as fallback
       }
 
@@ -363,6 +434,8 @@ class WalkieBloc extends Bloc<WalkieEvent, WalkieState> {
           'message': audioUrl ?? result.path,
           'message_type': 'audio',
           'duration': result.durationMs ~/ 1000, // Convert to seconds
+          'sender_name': _currentUserName, // Include sender name for backend to use
+          'sender_id': _currentUserId,
         },
       );
 
@@ -375,7 +448,8 @@ class WalkieBloc extends Bloc<WalkieEvent, WalkieState> {
           id: messageData['id']?.toString() ?? DateTime.now().millisecondsSinceEpoch.toString(),
           channelId: currentState.channel.id,
           senderId: messageData['sender_id']?.toString() ?? _currentUserId ?? '',
-          senderName: messageData['sender_name']?.toString() ?? _currentUserName ?? 'You',
+          // Use _currentUserName first since backend returns hardcoded "User"
+          senderName: _currentUserName ?? messageData['sender_name']?.toString() ?? 'You',
           messageType: 'audio',
           audioUrl: audioUrl ?? result.path,
           audioDurationMs: result.durationMs,
@@ -395,37 +469,35 @@ class WalkieBloc extends Bloc<WalkieEvent, WalkieState> {
     }
   }
 
-  /// Upload audio file to backend storage
-  /// TODO: Add supabase_flutter to pubspec.yaml and implement Supabase upload
+  /// Upload audio file directly to Supabase Storage
+  /// Returns the public URL of the uploaded audio
   Future<String?> _uploadAudioToSupabase(String filePath, String channelId) async {
+    debugPrint('WalkieBloc._uploadAudioToSupabase: ENTRY');
+    debugPrint('WalkieBloc._uploadAudioToSupabase: filePath=$filePath');
+    debugPrint('WalkieBloc._uploadAudioToSupabase: channelId=$channelId');
+
     try {
-      final file = File(filePath);
+      debugPrint('WalkieBloc._uploadAudioToSupabase: Getting SupabaseService instance...');
+      final supabaseService = await SupabaseService.getInstance();
+      debugPrint('WalkieBloc._uploadAudioToSupabase: SupabaseService instance obtained successfully');
 
-      if (!await file.exists()) {
-        throw Exception('Audio file not found');
-      }
-
-      final bytes = await file.readAsBytes();
-      final fileName = 'walkie-talkie/$channelId/${DateTime.now().millisecondsSinceEpoch}.m4a';
-
-      // Upload via backend API instead of direct Supabase
-      // The backend will handle Supabase upload
-      final response = await _api.post(
-        '/api/walkie/upload',
-        data: {
-          'file_name': fileName,
-          'content_type': 'audio/mp4',
-          'audio_data': base64Encode(bytes),
-        },
+      debugPrint('WalkieBloc._uploadAudioToSupabase: Calling uploadAudioFile...');
+      final audioUrl = await supabaseService.uploadAudioFile(
+        filePath: filePath,
+        teamId: channelId,
       );
+      debugPrint('WalkieBloc._uploadAudioToSupabase: uploadAudioFile returned: $audioUrl');
 
-      if (response.statusCode == 200 || response.statusCode == 201) {
-        return response.data['url'] as String?;
+      if (audioUrl != null) {
+        debugPrint('WalkieBloc._uploadAudioToSupabase: SUCCESS - URL: $audioUrl');
+        return audioUrl;
       }
 
+      debugPrint('WalkieBloc._uploadAudioToSupabase: Upload returned null');
       return null;
-    } catch (e) {
-      debugPrint('WalkieBloc: Audio upload error: $e');
+    } catch (e, stackTrace) {
+      debugPrint('WalkieBloc._uploadAudioToSupabase: ERROR: $e');
+      debugPrint('WalkieBloc._uploadAudioToSupabase: Stack: $stackTrace');
       rethrow;
     }
   }
@@ -468,9 +540,9 @@ class WalkieBloc extends Bloc<WalkieEvent, WalkieState> {
       final message = WalkieMessage.fromJson(event.messageData);
       final updatedMessages = [...currentState.messages, message];
 
-      // Find speaker if voice message
+      // Find speaker if voice/audio message
       WalkieParticipant? currentSpeaker;
-      if (message.messageType == 'voice') {
+      if (message.messageType == 'voice' || message.messageType == 'audio') {
         currentSpeaker = currentState.participants.firstWhere(
           (p) => p.userId == message.senderId,
           orElse: () => WalkieParticipant(
@@ -486,11 +558,19 @@ class WalkieBloc extends Bloc<WalkieEvent, WalkieState> {
       ));
 
       // Auto-play voice messages from others
-      if (message.messageType == 'voice' &&
+      if ((message.messageType == 'voice' || message.messageType == 'audio') &&
           message.audioUrl != null &&
           message.senderId != _currentUserId) {
         debugPrint('WalkieBloc: Auto-playing voice message from ${message.senderName}');
-        await _audio.playFromUrl(message.audioUrl!, audioId: message.id);
+        final audioPath = message.audioUrl!;
+        if (audioPath.startsWith('/') || audioPath.startsWith('file://')) {
+          final filePath = audioPath.startsWith('file://') ? audioPath.substring(7) : audioPath;
+          await _audio.playFromFile(filePath, audioId: message.id);
+        } else if (audioPath.startsWith('http://') || audioPath.startsWith('https://')) {
+          await _audio.playFromUrl(audioPath, audioId: message.id);
+        } else {
+          await _audio.playFromFile(audioPath, audioId: message.id);
+        }
       }
 
       // Clear current speaker after message duration
@@ -527,18 +607,20 @@ class WalkieBloc extends Bloc<WalkieEvent, WalkieState> {
       );
 
       if (message.audioUrl != null) {
-        // Update current speaker
-        final speaker = currentState.participants.firstWhere(
-          (p) => p.userId == message.senderId,
-          orElse: () => WalkieParticipant(
-            userId: message.senderId,
-            displayName: message.senderName,
-          ),
-        );
+        // Don't set currentSpeaker during playback - it's only for live speaking
+        // The "speaking" indicator should only show during actual live transmission
 
-        emit(currentState.copyWith(currentSpeaker: speaker));
-
-        await _audio.playFromUrl(message.audioUrl!, audioId: message.id);
+        // Check if it's a local file or URL
+        final audioPath = message.audioUrl!;
+        if (audioPath.startsWith('/') || audioPath.startsWith('file://')) {
+          final filePath = audioPath.startsWith('file://') ? audioPath.substring(7) : audioPath;
+          await _audio.playFromFile(filePath, audioId: message.id);
+        } else if (audioPath.startsWith('http://') || audioPath.startsWith('https://')) {
+          await _audio.playFromUrl(audioPath, audioId: message.id);
+        } else {
+          // Assume local file
+          await _audio.playFromFile(audioPath, audioId: message.id);
+        }
         debugPrint('WalkieBloc: Playing message ${message.id}');
       }
     } catch (e) {
@@ -553,6 +635,17 @@ class WalkieBloc extends Bloc<WalkieEvent, WalkieState> {
     final currentState = state;
     if (currentState is! WalkieInChannel) return;
     if (!currentState.isSpeaking) return;
+
+    // Track audio levels for diagnostics
+    _recordingAudioLevels.add(event.level);
+    if (event.level > _maxAudioLevel) {
+      _maxAudioLevel = event.level;
+    }
+
+    // Log every 5th sample (every 500ms) to avoid log spam
+    if (_recordingAudioLevels.length % 5 == 0) {
+      debugPrint('WalkieBloc: Audio level: ${event.level.toStringAsFixed(3)} (max so far: ${_maxAudioLevel.toStringAsFixed(3)})');
+    }
 
     emit(currentState.copyWith(audioLevel: event.level));
   }

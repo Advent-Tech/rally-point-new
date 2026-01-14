@@ -146,6 +146,71 @@ func (t *TeamService) GetTeamsByLeader(leaderID uuid.UUID) ([]*domain.Team, erro
 	return t.teamRepo.GetByLeaderID(leaderID)
 }
 
+func (t *TeamService) GetAllTeams() ([]*domain.Team, error) {
+	sqlQuery := `
+		SELECT t.id, t.name, t.description, t.leader_id, u.display_name as leader_name,
+		       t.photo_url, t.worker_count, t.created_at, t.updated_at
+		FROM teams t
+		LEFT JOIN users u ON t.leader_id = u.id
+		ORDER BY t.name
+	`
+
+	rows, err := t.db.Query(sqlQuery)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get all teams: %w", err)
+	}
+	defer rows.Close()
+
+	var teams []*domain.Team
+	for rows.Next() {
+		team := &domain.Team{}
+		var description sql.NullString
+		var photoURL sql.NullString
+		var leaderID sql.NullString
+		var leaderName sql.NullString
+
+		err := rows.Scan(
+			&team.ID,
+			&team.Name,
+			&description,
+			&leaderID,
+			&leaderName,
+			&photoURL,
+			&team.WorkerCount,
+			&team.CreatedAt,
+			&team.UpdatedAt,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan team row: %w", err)
+		}
+
+		// Handle nullable fields
+		if description.Valid {
+			team.Description = &description.String
+		}
+		if photoURL.Valid {
+			team.PhotoURL = &photoURL.String
+		}
+		if leaderID.Valid {
+			parsedID, err := uuid.Parse(leaderID.String)
+			if err == nil {
+				team.LeaderID = parsedID
+			}
+		}
+		if leaderName.Valid {
+			team.LeaderName = &leaderName.String
+		}
+
+		teams = append(teams, team)
+	}
+
+	if err = rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating team rows: %w", err)
+	}
+
+	return teams, nil
+}
+
 func (t *TeamService) SearchTeams(query string) ([]*domain.Team, error) {
 	if query == "" {
 		return nil, fmt.Errorf("search query is required")

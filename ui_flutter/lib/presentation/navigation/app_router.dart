@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import '../blocs/auth/auth_bloc.dart';
 import '../blocs/team_map/team_map_bloc.dart';
+import '../blocs/prayer_request/prayer_request_bloc.dart';
 import '../screens/splash_screen.dart';
 import '../screens/auth/login_screen.dart';
 import '../screens/auth/register_screen.dart';
@@ -18,6 +19,7 @@ import '../screens/team_leader/reports_screen.dart';
 import '../screens/team_leader/schedule_screen.dart';
 import '../screens/team_leader/team_map_screen.dart';
 import '../screens/team_leader/worker_activity_screen.dart';
+import '../screens/team_leader/worker_verification_screen.dart';
 import '../screens/home/log_visit_screen.dart';
 import '../screens/walkie/walkie_screen.dart';
 import '../screens/worker/my_schedule_screen.dart';
@@ -25,6 +27,10 @@ import '../screens/field/field_action_screen.dart';
 import '../screens/chat/conversations_screen.dart';
 import '../screens/chat/chat_screen.dart';
 import '../screens/chat/team_chat_screen.dart';
+import '../screens/blog/blog_screen.dart';
+import '../screens/blog/blog_detail_screen.dart';
+import '../screens/prayer/prayer_request_screen.dart';
+import '../screens/prayer/prayer_request_form_screen.dart';
 import '../widgets/bottom_nav_shell.dart';
 
 class AppRouter {
@@ -67,6 +73,11 @@ class AppRouter {
 
           // Prevent workers from accessing leader routes
           if (authState.user.isWorker && state.matchedLocation.startsWith('/leader')) {
+            return '/home';
+          }
+
+          // Prevent workers from viewing prayer requests list (they can only create)
+          if (authState.user.isWorker && state.matchedLocation == '/prayer-requests') {
             return '/home';
           }
 
@@ -182,7 +193,40 @@ class AppRouter {
                 );
               },
             ),
+            GoRoute(
+              path: '/blogs',
+              pageBuilder: (context, state) => const NoTransitionPage(
+                child: BlogScreen(),
+              ),
+            ),
+            GoRoute(
+              path: '/prayer-requests',
+              pageBuilder: (context, state) => NoTransitionPage(
+                child: BlocProvider(
+                  create: (_) => PrayerRequestBloc(),
+                  child: const PrayerRequestScreen(),
+                ),
+              ),
+            ),
           ],
+        ),
+
+        // Prayer request form route (accessible from anywhere)
+        GoRoute(
+          path: '/prayer-requests/new',
+          builder: (context, state) => BlocProvider(
+            create: (_) => PrayerRequestBloc(),
+            child: const PrayerRequestFormScreen(),
+          ),
+        ),
+
+        // Blog detail route (accessible from anywhere)
+        GoRoute(
+          path: '/blogs/:id',
+          builder: (context, state) {
+            final blogId = state.pathParameters['id'] ?? '';
+            return BlogDetailScreen(blogId: blogId);
+          },
         ),
 
         // Team Leader Routes - Stack Navigation (no bottom nav)
@@ -249,6 +293,11 @@ class AppRouter {
             );
           },
         ),
+        // Team Leader Worker Verification Route
+        GoRoute(
+          path: '/leader/worker-verification',
+          builder: (context, state) => const WorkerVerificationScreen(),
+        ),
         // Team Leader Survey Route
         GoRoute(
           path: '/leader/survey',
@@ -273,6 +322,26 @@ class AppRouter {
             final conversationId = state.pathParameters['conversationId'] ?? '';
             return ChatScreen(conversationId: conversationId);
           },
+        ),
+        // Team Leader Blog Route
+        GoRoute(
+          path: '/leader/blogs',
+          builder: (context, state) => const BlogScreen(),
+        ),
+        // Team Leader Prayer Request Routes
+        GoRoute(
+          path: '/leader/prayer-requests',
+          builder: (context, state) => BlocProvider(
+            create: (_) => PrayerRequestBloc(),
+            child: const PrayerRequestScreen(),
+          ),
+        ),
+        GoRoute(
+          path: '/leader/prayer-requests/new',
+          builder: (context, state) => BlocProvider(
+            create: (_) => PrayerRequestBloc(),
+            child: const PrayerRequestFormScreen(),
+          ),
         ),
 
         // Admin Routes (placeholder for future implementation)

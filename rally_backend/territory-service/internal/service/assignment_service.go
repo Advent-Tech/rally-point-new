@@ -9,12 +9,21 @@ import (
 
 // assignmentService implements TerritoryAssignmentService
 type assignmentService struct {
-	repo domain.TerritoryAssignmentRepository
+	repo           domain.TerritoryAssignmentRepository
+	allocationRepo domain.LeaderTerritoryAllocationRepository
 }
 
 // NewAssignmentService creates a new assignment service
 func NewAssignmentService(repo domain.TerritoryAssignmentRepository) domain.TerritoryAssignmentService {
 	return &assignmentService{repo: repo}
+}
+
+// NewAssignmentServiceWithAllocation creates a new assignment service with allocation validation
+func NewAssignmentServiceWithAllocation(repo domain.TerritoryAssignmentRepository, allocationRepo domain.LeaderTerritoryAllocationRepository) domain.TerritoryAssignmentService {
+	return &assignmentService{
+		repo:           repo,
+		allocationRepo: allocationRepo,
+	}
 }
 
 // AssignTerritory creates a new territory assignment
@@ -27,6 +36,17 @@ func (s *assignmentService) AssignTerritory(req *domain.CreateAssignmentRequest)
 	}
 	if req.AssignedBy == uuid.Nil {
 		return nil, fmt.Errorf("assigned_by is required")
+	}
+
+	// If allocation repository is available, validate that the leader has this territory allocated
+	if s.allocationRepo != nil {
+		isAllocated, err := s.allocationRepo.IsLeaderAllocated(req.AssignedBy, req.TerritoryID)
+		if err != nil {
+			return nil, fmt.Errorf("failed to check territory allocation: %w", err)
+		}
+		if !isAllocated {
+			return nil, fmt.Errorf("you can only assign territories that have been allocated to you by admin")
+		}
 	}
 
 	assignment := &domain.TerritoryAssignment{

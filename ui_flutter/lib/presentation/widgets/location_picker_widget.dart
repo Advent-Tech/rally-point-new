@@ -386,6 +386,16 @@ class _LocationPickerWidgetState extends State<LocationPickerWidget> {
                       options: MapOptions(
                         initialCenter: _center,
                         initialZoom: _initialZoom,
+                        onMapReady: () {
+                          // Move to current location when map is ready
+                          if (_currentLocation != null) {
+                            Future.delayed(const Duration(milliseconds: 100), () {
+                              if (mounted) {
+                                _mapController.move(_currentLocation!, _initialZoom);
+                              }
+                            });
+                          }
+                        },
                         onTap: (tapPosition, point) {
                           final isInside = _isPointInTerritories(point);
                           setState(() {
@@ -401,6 +411,8 @@ class _LocationPickerWidgetState extends State<LocationPickerWidget> {
                             Theme.of(context).brightness == Brightness.dark,
                           ),
                           userAgentPackageName: 'com.rallypoint.app',
+                          keepBuffer: 5,
+                          panBuffer: 1,
                         ),
                         // Territory polygon layer
                         if (widget.territories.isNotEmpty)

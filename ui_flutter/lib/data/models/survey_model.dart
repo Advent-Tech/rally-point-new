@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:json_annotation/json_annotation.dart';
 
 part 'survey_model.g.dart';
@@ -250,7 +251,52 @@ class SurveyResponse {
     this.answers,
   });
 
-  factory SurveyResponse.fromJson(Map<String, dynamic> json) => _$SurveyResponseFromJson(json);
+  factory SurveyResponse.fromJson(Map<String, dynamic> json) {
+    // Handle submitted_at as alias for completed_at
+    DateTime? completedAt;
+    if (json['completed_at'] != null) {
+      completedAt = DateTime.tryParse(json['completed_at'].toString());
+    } else if (json['submitted_at'] != null) {
+      completedAt = DateTime.tryParse(json['submitted_at'].toString());
+    }
+
+    // Handle answers - could be a list, JSON string, or nested structure
+    List<SurveyAnswer>? answers;
+    if (json['answers'] != null) {
+      if (json['answers'] is List) {
+        answers = (json['answers'] as List)
+            .map((e) => SurveyAnswer.fromJson(e as Map<String, dynamic>))
+            .toList();
+      } else if (json['answers'] is String) {
+        // Backend sometimes returns answers as a JSON string
+        try {
+          final decoded = jsonDecode(json['answers'] as String);
+          if (decoded is List) {
+            answers = decoded
+                .map((e) => SurveyAnswer.fromJson(e as Map<String, dynamic>))
+                .toList();
+          }
+        } catch (_) {
+          // If JSON decode fails, try to parse as simple format
+        }
+      }
+    }
+
+    return SurveyResponse(
+      id: json['id'] as String,
+      surveyId: json['survey_id'] as String,
+      respondentId: json['respondent_id'] as String?,
+      territoryId: json['territory_id'] as String?,
+      latitude: (json['latitude'] as num?)?.toDouble(),
+      longitude: (json['longitude'] as num?)?.toDouble(),
+      completedAt: completedAt,
+      createdAt: json['created_at'] != null
+          ? DateTime.tryParse(json['created_at'].toString())
+          : null,
+      answers: answers,
+    );
+  }
+
   Map<String, dynamic> toJson() => _$SurveyResponseToJson(this);
 }
 
@@ -280,7 +326,18 @@ class SurveyAnswer {
     this.signatureUrl,
   });
 
-  factory SurveyAnswer.fromJson(Map<String, dynamic> json) => _$SurveyAnswerFromJson(json);
+  factory SurveyAnswer.fromJson(Map<String, dynamic> json) {
+    // Handle both full format and simplified format from JSON string
+    return SurveyAnswer(
+      id: json['id'] as String? ?? '',
+      responseId: json['response_id'] as String? ?? '',
+      questionId: json['question_id'] as String? ?? '',
+      value: json['answer'] as String? ?? json['value'] as String?,
+      selectedOptions: (json['selected_options'] as List<dynamic>?)?.cast<String>(),
+      photoUrls: (json['photo_urls'] as List<dynamic>?)?.cast<String>(),
+      signatureUrl: json['signature_url'] as String?,
+    );
+  }
   Map<String, dynamic> toJson() => _$SurveyAnswerToJson(this);
 }
 

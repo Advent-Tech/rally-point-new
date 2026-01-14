@@ -8,18 +8,22 @@ import (
 
 // User represents a user in the system
 type User struct {
-	ID              uuid.UUID  `json:"id" db:"id"`
-	Email           string     `json:"email" db:"email"`
-	PasswordHash    string     `json:"-" db:"password_hash"`
-	DisplayName     string     `json:"display_name" db:"display_name"`
-	Role            string     `json:"role" db:"role"`
-	Phone           *string    `json:"phone,omitempty" db:"phone"`
-	ProfilePhotoURL *string    `json:"profile_photo_url,omitempty" db:"profile_photo_url"`
-	TeamID          *uuid.UUID `json:"team_id,omitempty" db:"team_id"`
-	IsOnline        bool       `json:"is_online" db:"is_online"`
-	LastActiveAt    time.Time  `json:"last_active_at" db:"last_active_at"`
-	CreatedAt       time.Time  `json:"created_at" db:"created_at"`
-	UpdatedAt       time.Time  `json:"updated_at" db:"updated_at"`
+	ID                 uuid.UUID  `json:"id" db:"id"`
+	Email              string     `json:"email" db:"email"`
+	PasswordHash       string     `json:"-" db:"password_hash"`
+	DisplayName        string     `json:"display_name" db:"display_name"`
+	Role               string     `json:"role" db:"role"`
+	Phone              *string    `json:"phone,omitempty" db:"phone"`
+	ProfilePhotoURL    *string    `json:"profile_photo_url,omitempty" db:"profile_photo_url"`
+	TeamID             *uuid.UUID `json:"team_id,omitempty" db:"team_id"`
+	IsOnline           bool       `json:"is_online" db:"is_online"`
+	LastActiveAt       time.Time  `json:"last_active_at" db:"last_active_at"`
+	VerificationStatus string     `json:"verification_status" db:"verification_status"`
+	VerifiedBy         *uuid.UUID `json:"verified_by,omitempty" db:"verified_by"`
+	VerifiedAt         *time.Time `json:"verified_at,omitempty" db:"verified_at"`
+	RejectionReason    *string    `json:"rejection_reason,omitempty" db:"rejection_reason"`
+	CreatedAt          time.Time  `json:"created_at" db:"created_at"`
+	UpdatedAt          time.Time  `json:"updated_at" db:"updated_at"`
 }
 
 // Team represents a team in the system
@@ -28,6 +32,7 @@ type Team struct {
 	Name        string    `json:"name" db:"name"`
 	Description *string   `json:"description,omitempty" db:"description"`
 	LeaderID    uuid.UUID `json:"leader_id" db:"leader_id"`
+	LeaderName  *string   `json:"leader_name,omitempty"` // Not in DB, populated by JOIN
 	PhotoURL    *string   `json:"photo_url,omitempty" db:"photo_url"`
 	WorkerCount int       `json:"worker_count" db:"worker_count"`
 	CreatedAt   time.Time `json:"created_at" db:"created_at"`
@@ -103,14 +108,37 @@ type RefreshTokenRequest struct {
 
 // UserRole constants
 const (
+	RoleSuperAdmin = "superadmin"
 	RoleAdmin      = "admin"
 	RoleTeamLeader = "team_leader"
 	RoleWorker     = "worker"
 )
 
+// Verification status constants
+const (
+	VerificationPending  = "pending"
+	VerificationVerified = "verified"
+	VerificationRejected = "rejected"
+)
+
 // ValidRoles returns a list of valid user roles
 func ValidRoles() []string {
 	return []string{RoleAdmin, RoleTeamLeader, RoleWorker}
+}
+
+// AllRoles returns all roles including superadmin (for internal use)
+func AllRoles() []string {
+	return []string{RoleSuperAdmin, RoleAdmin, RoleTeamLeader, RoleWorker}
+}
+
+// IsAdminRole checks if the role has admin privileges
+func IsAdminRole(role string) bool {
+	return role == RoleSuperAdmin || role == RoleAdmin
+}
+
+// RequiresVerification checks if a role requires verification
+func RequiresVerification(role string) bool {
+	return role == RoleTeamLeader || role == RoleWorker
 }
 
 // IsValidRole checks if a role is valid
@@ -133,6 +161,11 @@ type UserRepository interface {
 	GetByTeamID(teamID uuid.UUID) ([]*User, error)
 	UpdateLastActive(id uuid.UUID) error
 	SetOnlineStatus(id uuid.UUID, isOnline bool) error
+	// New methods for multi-role system
+	GetByRole(role string) ([]*User, error)
+	GetByRoleAndStatus(role, status string) ([]*User, error)
+	UpdateVerificationStatus(userID uuid.UUID, status string, verifiedBy *uuid.UUID, reason *string) error
+	UpdatePassword(userID uuid.UUID, passwordHash string) error
 }
 
 // TeamRepository defines the interface for team data access
@@ -179,4 +212,5 @@ type TeamService interface {
 	GetUserTeams(userID uuid.UUID) ([]*Team, error)
 	GetTeamsByLeader(leaderID uuid.UUID) ([]*Team, error)
 	SearchTeams(query string) ([]*Team, error)
+	GetAllTeams() ([]*Team, error)
 }

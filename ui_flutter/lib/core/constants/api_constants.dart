@@ -3,7 +3,8 @@ class ApiConstants {
   ApiConstants._();
 
   // Base URLs
-  static const String prodBaseUrl = 'https://api.rallypoint.app';
+  // EC2 Production Server
+  static const String prodBaseUrl = 'http://18.188.1.122:8080';
   static const String devBaseUrl = 'http://10.0.2.2:8080'; // Android emulator
   static const String devBaseUrlIOS = 'http://localhost:8080'; // iOS simulator
 
@@ -42,10 +43,22 @@ class ApiConstants {
   static const String teamStats = '/api/teams'; // + /{id}/stats
   static const String teamWorkerStats = '/api/teams'; // + /{id}/worker-stats
 
+  // Team Join Request Endpoints (new multi-role system)
+  static const String requestJoinTeam = '/api/teams'; // + /{id}/request-join
+  static const String myJoinRequest = '/api/teams/my-request';
+  static const String myJoinRequests = '/api/teams/my-requests';
+  static const String teamJoinRequests = '/api/teams'; // + /{id}/join-requests
+  static const String approveJoinRequest =
+      '/api/teams/join-requests'; // + /{id}/approve
+  static const String rejectJoinRequest =
+      '/api/teams/join-requests'; // + /{id}/reject
+
   // Work Session Endpoints
   static const String workSessions = '/api/geofence';
-  static const String workerSessions = '/api/geofence/worker'; // + /{workerId}/sessions
-  static const String workerCurrentSession = '/api/geofence/worker'; // + /{workerId}/current
+  static const String workerSessions =
+      '/api/geofence/worker'; // + /{workerId}/sessions
+  static const String workerCurrentSession =
+      '/api/geofence/worker'; // + /{workerId}/current
 
   // Activity Endpoints
   static const String teamActivity = '/api/teams'; // + /{id}/activity
@@ -69,6 +82,9 @@ class ApiConstants {
   static const String territories = '/api/territories';
   static const String territoriesNearby = '/api/territories/nearby';
   static const String territoriesSearch = '/api/territories/search';
+  // Leader territory allocations (territories assigned to team leader by admin)
+  static const String myTerritoryAllocations =
+      '/api/territories/my-allocations';
   static const String geoTerritories = '/api/geo/territories';
   static const String geoTerritoriesSearch = '/api/geo/territories/search';
   static const String geoTerritoriesList = '/api/geo/territories/list';
@@ -99,7 +115,8 @@ class ApiConstants {
   // Note: Use trailing slash for POST to avoid 307 redirect from Gin router
   static const String deliveries = '/api/deliveries';
   static const String deliveriesCreate = '/api/deliveries/';
-  static const String workerDeliveries = '/api/workers'; // + /{workerId}/deliveries
+  static const String workerDeliveries =
+      '/api/workers'; // + /{workerId}/deliveries
   static const String routes = '/api/routes';
 
   // Payment Endpoints
@@ -113,9 +130,32 @@ class ApiConstants {
   static const String walkieStart = '/api/walkie/start';
   static const String walkieEnd = '/api/walkie/end';
   static const String walkieMessages = '/api/walkie/messages';
+  static const String walkieUpload = '/api/walkie/upload';
+  static const String walkieAudio = '/api/walkie/audio'; // + /{sessionId}
 
   // Ministry Contacts
   static const String ministryContacts = '/api/ministry-contacts';
+
+  // Blog Endpoints
+  static const String blogs = '/api/blogs';
+  static const String blogUploadImage = '/api/blogs/upload-image';
+
+  // Prayer Request Endpoints
+  static const String prayerRequests = '/api/prayer-requests';
+  static const String prayerRequestsCreate = '/api/prayer-requests/';
+  static const String prayerRequestsMe = '/api/prayer-requests/me';
+  static const String prayerRequestsMap = '/api/prayer-requests/map';
+  static const String prayerRequestsStats = '/api/prayer-requests/stats';
+  static const String prayerRequestsWorker = '/api/prayer-requests/worker'; // + /{workerId}
+  static const String prayerRequestsTeam = '/api/prayer-requests/team'; // + /{teamId}
+  static const String prayerRequestsTerritory = '/api/prayer-requests/territory'; // + /{territoryId}
+
+  // Donation Endpoints
+  static const String donations = '/api/donations';
+  static const String donationsCreate = '/api/donations/';
+  static const String donationsWorker = '/api/donations/worker'; // + /{workerId}
+  static const String donationsTeam = '/api/donations/team'; // + /{teamId}
+  static const String donationsStats = '/api/donations/stats';
 
   // WebSocket Endpoints
   static const String wsLocation = '/ws/location';

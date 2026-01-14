@@ -10,7 +10,7 @@ SurveyModel _$SurveyModelFromJson(Map<String, dynamic> json) => SurveyModel(
       id: json['id'] as String,
       title: json['title'] as String,
       description: json['description'] as String?,
-      status: json['status'] as String,
+      status: json['status'] as String? ?? 'published',
       questionCount: (json['question_count'] as num?)?.toInt() ?? 0,
       responseCount: (json['response_count'] as num?)?.toInt() ?? 0,
       isActive: json['is_active'] as bool? ?? true,

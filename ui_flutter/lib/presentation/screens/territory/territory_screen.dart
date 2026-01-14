@@ -1,8 +1,12 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
+import '../../../core/constants/api_constants.dart';
+import '../../../core/network/api_client.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../data/models/territory_model.dart';
+import '../../blocs/auth/auth_bloc.dart';
 import '../../blocs/territory/territory_bloc.dart';
 import '../../widgets/custom_text_field.dart';
 import '../../widgets/custom_button.dart';
@@ -20,6 +24,7 @@ class _TerritoryScreenState extends State<TerritoryScreen> with TickerProviderSt
   late TabController _tabController;
   final _searchController = TextEditingController();
   bool _isFabExpanded = false;
+  Timer? _searchDebounce;
 
   @override
   void initState() {
@@ -31,9 +36,26 @@ class _TerritoryScreenState extends State<TerritoryScreen> with TickerProviderSt
 
   @override
   void dispose() {
+    _searchDebounce?.cancel();
     _tabController.dispose();
     _searchController.dispose();
     super.dispose();
+  }
+
+  void _onSearchChanged(String value) {
+    // Cancel previous timer
+    _searchDebounce?.cancel();
+
+    if (value.length < 2) return;
+
+    // Debounce: wait 500ms after user stops typing before searching
+    _searchDebounce = Timer(const Duration(milliseconds: 500), () {
+      context.read<TerritoryBloc>().add(TerritorySearch(query: value));
+      // Switch to Map tab to show results on map
+      if (_tabController.index != 2) {
+        _tabController.animateTo(2);
+      }
+    });
   }
 
   @override
@@ -66,11 +88,7 @@ class _TerritoryScreenState extends State<TerritoryScreen> with TickerProviderSt
             child: CustomSearchField(
               controller: _searchController,
               hint: 'Search territories...',
-              onChanged: (value) {
-                if (value.length >= 2) {
-                  context.read<TerritoryBloc>().add(TerritorySearch(query: value));
-                }
-              },
+              onChanged: _onSearchChanged,
             ),
           ),
           // Tab Content
@@ -91,49 +109,53 @@ class _TerritoryScreenState extends State<TerritoryScreen> with TickerProviderSt
   }
 
   Widget _buildCommunicationFab(BuildContext context, bool isDark) {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.end,
-      children: [
-        // Mini FABs (shown when expanded)
-        if (_isFabExpanded) ...[
-          // Chat button
-          _MiniActionButton(
-            icon: Icons.chat_bubble,
-            label: 'Chat',
-            color: AppColors.secondary,
-            onTap: () {
-              setState(() => _isFabExpanded = false);
-              context.push('/chat');
-            },
-          ),
-          const SizedBox(height: 12),
-          // Walkie-talkie button
-          _MiniActionButton(
-            icon: Icons.speaker_phone,
-            label: 'Walkie',
-            color: AppColors.primary,
-            onTap: () {
-              setState(() => _isFabExpanded = false);
-              showWalkieBottomSheet(context);
-            },
-          ),
-          const SizedBox(height: 12),
-        ],
-        // Main FAB
-        FloatingActionButton(
-          onPressed: () => setState(() => _isFabExpanded = !_isFabExpanded),
-          backgroundColor: _isFabExpanded ? Colors.grey : AppColors.primary,
-          child: AnimatedRotation(
-            duration: const Duration(milliseconds: 200),
-            turns: _isFabExpanded ? 0.125 : 0,
-            child: Icon(
-              _isFabExpanded ? Icons.close : Icons.forum,
-              color: Colors.white,
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: [
+          // Mini FABs (shown when expanded)
+          if (_isFabExpanded) ...[
+            // Chat button
+            _MiniActionButton(
+              icon: Icons.chat_bubble,
+              label: 'Chat',
+              color: AppColors.secondary,
+              onTap: () {
+                setState(() => _isFabExpanded = false);
+                context.push('/chat');
+              },
+            ),
+            const SizedBox(height: 12),
+            // Walkie-talkie button
+            _MiniActionButton(
+              icon: Icons.speaker_phone,
+              label: 'Walkie',
+              color: AppColors.primary,
+              onTap: () {
+                setState(() => _isFabExpanded = false);
+                showWalkieBottomSheet(context);
+              },
+            ),
+            const SizedBox(height: 12),
+          ],
+          // Main FAB
+          FloatingActionButton(
+            heroTag: 'territory_fab',
+            onPressed: () => setState(() => _isFabExpanded = !_isFabExpanded),
+            backgroundColor: _isFabExpanded ? Colors.grey : AppColors.primary,
+            child: AnimatedRotation(
+              duration: const Duration(milliseconds: 200),
+              turns: _isFabExpanded ? 0.125 : 0,
+              child: Icon(
+                _isFabExpanded ? Icons.close : Icons.forum,
+                color: Colors.white,
+              ),
             ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 
@@ -514,15 +536,36 @@ class _AvailableTab extends StatefulWidget {
 }
 
 class _AvailableTabState extends State<_AvailableTab> {
+  bool _isTeamLeader = false;
+
   @override
   void initState() {
     super.initState();
     widget.tabController.addListener(_onTabChange);
+    _checkUserRole();
+  }
+
+  void _checkUserRole() {
+    final authState = context.read<AuthBloc>().state;
+    if (authState is AuthAuthenticated) {
+      setState(() {
+        _isTeamLeader = authState.user.isTeamLeader;
+      });
+    }
   }
 
   void _onTabChange() {
-    if (!mounted) return; // Prevent using context after dispose
+    if (!mounted) return;
     if (widget.tabController.index == 1) {
+      _loadTerritories();
+    }
+  }
+
+  void _loadTerritories() {
+    // Team leaders see only their allocated territories from admin
+    if (_isTeamLeader) {
+      context.read<TerritoryBloc>().add(const TerritoryLoadMyAllocations());
+    } else {
       context.read<TerritoryBloc>().add(const TerritoryLoadAvailable());
     }
   }
@@ -533,6 +576,20 @@ class _AvailableTabState extends State<_AvailableTab> {
     super.dispose();
   }
 
+  void _showAssignToWorkerDialog(BuildContext context, GeoTerritory territory) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) => _AssignToWorkerSheet(
+        territory: territory,
+        isDark: widget.isDark,
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return BlocBuilder<TerritoryBloc, TerritoryState>(
@@ -541,6 +598,35 @@ class _AvailableTabState extends State<_AvailableTab> {
           return const Center(child: CircularProgressIndicator());
         }
 
+        // Handle team leader's allocated territories
+        if (state is TerritoryAllocationsLoaded) {
+          if (state.territories.isEmpty) {
+            return _EmptyAllocationsView(isDark: widget.isDark);
+          }
+          return RefreshIndicator(
+            onRefresh: () async {
+              context.read<TerritoryBloc>().add(const TerritoryLoadMyAllocations());
+            },
+            child: ListView.builder(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              itemCount: state.territories.length,
+              itemBuilder: (context, index) {
+                final territory = state.territories[index];
+                return _TerritoryCard(
+                  name: territory.entityName,
+                  union: territory.unionName ?? '',
+                  households: territory.housingUnits ?? 0,
+                  status: 'allocated',
+                  isDark: widget.isDark,
+                  isLeaderView: true,
+                  onAssign: () => _showAssignToWorkerDialog(context, territory),
+                );
+              },
+            ),
+          );
+        }
+
+        // Handle regular available territories for workers
         if (state is TerritoryAvailableLoaded) {
           return RefreshIndicator(
             onRefresh: () async {
@@ -571,11 +657,68 @@ class _AvailableTabState extends State<_AvailableTab> {
         // Empty state - trigger load if not already loading
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (state is! TerritoryLoading) {
-            context.read<TerritoryBloc>().add(const TerritoryLoadAvailable());
+            _loadTerritories();
           }
         });
         return const Center(child: CircularProgressIndicator());
       },
+    );
+  }
+}
+
+class _EmptyAllocationsView extends StatelessWidget {
+  final bool isDark;
+
+  const _EmptyAllocationsView({required this.isDark});
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              width: 100,
+              height: 100,
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    AppColors.info.withAlpha(40),
+                    AppColors.primary.withAlpha(40),
+                  ],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.map_outlined,
+                size: 48,
+                color: AppColors.info,
+              ),
+            ),
+            const SizedBox(height: 24),
+            Text(
+              'No Allocated Territories',
+              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              'You don\'t have any territories allocated yet.\n'
+              'An admin will allocate territories to you.',
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                height: 1.5,
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
@@ -587,6 +730,8 @@ class _TerritoryCard extends StatelessWidget {
   final String status;
   final bool isDark;
   final VoidCallback? onRequest;
+  final VoidCallback? onAssign;
+  final bool isLeaderView;
 
   const _TerritoryCard({
     required this.name,
@@ -595,6 +740,8 @@ class _TerritoryCard extends StatelessWidget {
     required this.status,
     required this.isDark,
     this.onRequest,
+    this.onAssign,
+    this.isLeaderView = false,
   });
 
   @override
@@ -610,6 +757,10 @@ class _TerritoryCard extends StatelessWidget {
       case 'assigned':
         statusColor = AppColors.success;
         statusText = 'Assigned';
+        break;
+      case 'allocated':
+        statusColor = AppColors.info;
+        statusText = 'Allocated';
         break;
       default:
         statusColor = AppColors.primary;
@@ -685,7 +836,7 @@ class _TerritoryCard extends StatelessWidget {
                 ),
               ],
             ),
-            if (status == 'available') ...[
+            if (status == 'available' && onRequest != null) ...[
               const SizedBox(height: 16),
               SizedBox(
                 width: double.infinity,
@@ -693,7 +844,20 @@ class _TerritoryCard extends StatelessWidget {
                   text: 'Request Territory',
                   type: ButtonType.outline,
                   size: ButtonSize.small,
-                  onPressed: onRequest ?? () {},
+                  onPressed: onRequest!,
+                ),
+              ),
+            ],
+            if (isLeaderView && status == 'allocated' && onAssign != null) ...[
+              const SizedBox(height: 16),
+              SizedBox(
+                width: double.infinity,
+                child: CustomButton(
+                  text: 'Assign to Worker',
+                  icon: Icons.person_add,
+                  type: ButtonType.primary,
+                  size: ButtonSize.small,
+                  onPressed: onAssign!,
                 ),
               ),
             ],
@@ -717,22 +881,50 @@ class _MapTab extends StatefulWidget {
 class _MapTabState extends State<_MapTab> {
   GeoTerritory? _selectedTerritory;
   final List<VisitMarker> _visitMarkers = [];
+  bool _isTeamLeader = false;
 
   @override
   void initState() {
     super.initState();
     widget.tabController.addListener(_onTabChange);
+    _checkUserRole();
+    // Load data immediately on init to prevent blank map on first load
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        _loadMapData();
+      }
+    });
+  }
+
+  void _checkUserRole() {
+    final authState = context.read<AuthBloc>().state;
+    if (authState is AuthAuthenticated) {
+      setState(() {
+        _isTeamLeader = authState.user.isTeamLeader;
+      });
+    }
+  }
+
+  void _loadMapData() {
+    final state = context.read<TerritoryBloc>().state;
+    // Team leaders see only their allocated territories from admin
+    if (_isTeamLeader) {
+      if (state is! TerritoryAllocationsLoaded && state is! TerritoryLoading) {
+        context.read<TerritoryBloc>().add(const TerritoryLoadMyAllocations());
+      }
+    } else {
+      // Workers see available territories
+      if (state is! TerritoryAvailableLoaded && state is! TerritoryLoading) {
+        context.read<TerritoryBloc>().add(const TerritoryLoadAvailable(limit: 50));
+      }
+    }
   }
 
   void _onTabChange() {
     if (!mounted) return; // Prevent using context after dispose
     // Load territories when Map tab is selected
     if (widget.tabController.index == 2) {
-      final state = context.read<TerritoryBloc>().state;
-      // Load available territories if not already loaded
-      if (state is! TerritoryAvailableLoaded && state is! TerritoryLoading) {
-        context.read<TerritoryBloc>().add(const TerritoryLoadAvailable(limit: 50));
-      }
+      _loadMapData();
     }
   }
 
@@ -746,6 +938,31 @@ class _MapTabState extends State<_MapTab> {
   Widget build(BuildContext context) {
     return BlocBuilder<TerritoryBloc, TerritoryState>(
       builder: (context, state) {
+        // Handle search results - prioritize showing search results
+        if (state is TerritorySearchResults && state.territories.isNotEmpty) {
+          final territoriesWithGeometry = state.territories
+              .where((t) => t.geometry != null)
+              .toList();
+
+          if (territoriesWithGeometry.isNotEmpty) {
+            return _buildMapView(territoriesWithGeometry, isSearchResult: true, searchQuery: state.query);
+          }
+        }
+
+        // Handle searching state
+        if (state is TerritorySearching) {
+          return const Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                CircularProgressIndicator(),
+                SizedBox(height: 16),
+                Text('Searching territories...'),
+              ],
+            ),
+          );
+        }
+
         // Check if we have territories from assignments
         if (state is TerritoryAssignmentsLoaded && state.assignments.isNotEmpty) {
           // Convert assignments to GeoTerritory for the map
@@ -771,7 +988,22 @@ class _MapTabState extends State<_MapTab> {
           }
         }
 
-        // Check if we have available territories
+        // Handle team leader's allocated territories
+        if (state is TerritoryAllocationsLoaded) {
+          if (state.territories.isEmpty) {
+            return _buildEmptyAllocationsState(context);
+          }
+          final territoriesWithGeometry = state.territories
+              .where((t) => t.geometry != null)
+              .toList();
+
+          if (territoriesWithGeometry.isNotEmpty) {
+            return _buildMapView(territoriesWithGeometry, isLeaderView: true);
+          }
+          return _buildEmptyAllocationsState(context);
+        }
+
+        // Check if we have available territories (for workers)
         if (state is TerritoryAvailableLoaded && state.territories.isNotEmpty) {
           final territoriesWithGeometry = state.territories
               .where((t) => t.geometry != null)
@@ -790,7 +1022,7 @@ class _MapTabState extends State<_MapTab> {
         // Empty or no geometry - trigger load
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (state is! TerritoryLoading) {
-            context.read<TerritoryBloc>().add(const TerritoryLoadAvailable(limit: 50));
+            _loadMapData();
           }
         });
 
@@ -799,7 +1031,7 @@ class _MapTabState extends State<_MapTab> {
     );
   }
 
-  Widget _buildMapView(List<GeoTerritory> territories) {
+  Widget _buildMapView(List<GeoTerritory> territories, {bool isSearchResult = false, String? searchQuery, bool isLeaderView = false}) {
     return Stack(
       children: [
         TerritoryMapWidget(
@@ -814,15 +1046,16 @@ class _MapTabState extends State<_MapTab> {
           visitMarkers: _visitMarkers,
           allowAddVisit: true,
           onAddVisit: (lat, lng) => _showAddVisitDialog(context, lat, lng),
+          fitToTerritories: isSearchResult, // Zoom to fit territories when searching
         ),
-        // Territory count badge
+        // Territory count badge with search indicator
         Positioned(
           left: 16,
           top: 16,
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: isSearchResult ? AppColors.primary : Colors.white,
               borderRadius: BorderRadius.circular(20),
               boxShadow: [
                 BoxShadow(
@@ -835,16 +1068,32 @@ class _MapTabState extends State<_MapTab> {
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Icon(Icons.map_outlined, size: 16, color: AppColors.primary),
+                Icon(
+                  isSearchResult ? Icons.search : Icons.map_outlined,
+                  size: 16,
+                  color: isSearchResult ? Colors.white : AppColors.primary,
+                ),
                 const SizedBox(width: 6),
                 Text(
-                  '${territories.length} territories',
-                  style: const TextStyle(
+                  isSearchResult
+                      ? '${territories.length} results for "$searchQuery"'
+                      : '${territories.length} territories',
+                  style: TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w600,
-                    color: AppColors.textPrimaryLight,
+                    color: isSearchResult ? Colors.white : AppColors.textPrimaryLight,
                   ),
                 ),
+                if (isSearchResult) ...[
+                  const SizedBox(width: 8),
+                  GestureDetector(
+                    onTap: () {
+                      // Clear search and reload available
+                      context.read<TerritoryBloc>().add(const TerritoryLoadAvailable(limit: 50));
+                    },
+                    child: const Icon(Icons.close, size: 16, color: Colors.white),
+                  ),
+                ],
               ],
             ),
           ),
@@ -1078,7 +1327,67 @@ class _MapTabState extends State<_MapTab> {
               text: 'Load Territories',
               icon: Icons.refresh,
               onPressed: () {
-                context.read<TerritoryBloc>().add(const TerritoryLoadAvailable(limit: 50));
+                _loadMapData();
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildEmptyAllocationsState(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              width: 100,
+              height: 100,
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    AppColors.info.withAlpha(40),
+                    AppColors.primary.withAlpha(40),
+                  ],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.map_outlined,
+                size: 48,
+                color: AppColors.info,
+              ),
+            ),
+            const SizedBox(height: 24),
+            Text(
+              'No Allocated Territories',
+              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              'You don\'t have any territories allocated yet.\n'
+              'An admin will allocate territories to you\n'
+              'that you can then assign to your team workers.',
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: widget.isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                height: 1.5,
+              ),
+            ),
+            const SizedBox(height: 24),
+            CustomButton(
+              text: 'Refresh',
+              icon: Icons.refresh,
+              type: ButtonType.outline,
+              onPressed: () {
+                context.read<TerritoryBloc>().add(const TerritoryLoadMyAllocations());
               },
             ),
           ],
@@ -1093,7 +1402,7 @@ class _MapTabState extends State<_MapTab> {
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      builder: (context) => Container(
+      builder: (sheetContext) => Container(
         padding: const EdgeInsets.all(24),
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -1117,13 +1426,13 @@ class _MapTabState extends State<_MapTab> {
                     children: [
                       Text(
                         territory.entityName,
-                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        style: Theme.of(sheetContext).textTheme.titleMedium?.copyWith(
                           fontWeight: FontWeight.bold,
                         ),
                       ),
                       Text(
                         'ID: ${territory.solid}',
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        style: Theme.of(sheetContext).textTheme.bodySmall?.copyWith(
                           color: AppColors.textSecondaryLight,
                         ),
                       ),
@@ -1132,7 +1441,7 @@ class _MapTabState extends State<_MapTab> {
                 ),
                 IconButton(
                   icon: const Icon(Icons.close),
-                  onPressed: () => Navigator.pop(context),
+                  onPressed: () => Navigator.pop(sheetContext),
                 ),
               ],
             ),
@@ -1163,21 +1472,49 @@ class _MapTabState extends State<_MapTab> {
                 value: '${territory.population}',
               ),
             const SizedBox(height: 20),
-            SizedBox(
-              width: double.infinity,
-              child: CustomButton(
-                text: 'Request Territory',
-                onPressed: () {
-                  Navigator.pop(context);
-                  context.read<TerritoryBloc>().add(
-                    TerritoryRequestAssignment(territoryId: territory.id),
-                  );
-                },
+            // Show different button based on role
+            if (_isTeamLeader)
+              SizedBox(
+                width: double.infinity,
+                child: CustomButton(
+                  text: 'Assign to Worker',
+                  icon: Icons.person_add,
+                  onPressed: () {
+                    Navigator.pop(sheetContext);
+                    _showAssignToWorkerDialog(context, territory);
+                  },
+                ),
+              )
+            else
+              SizedBox(
+                width: double.infinity,
+                child: CustomButton(
+                  text: 'Request Territory',
+                  onPressed: () {
+                    Navigator.pop(sheetContext);
+                    context.read<TerritoryBloc>().add(
+                      TerritoryRequestAssignment(territoryId: territory.id),
+                    );
+                  },
+                ),
               ),
-            ),
             const SizedBox(height: 12),
           ],
         ),
+      ),
+    );
+  }
+
+  void _showAssignToWorkerDialog(BuildContext context, GeoTerritory territory) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) => _AssignToWorkerSheet(
+        territory: territory,
+        isDark: widget.isDark,
       ),
     );
   }
@@ -1325,6 +1662,337 @@ class _MiniActionButton extends StatelessWidget {
           child: Icon(icon, color: Colors.white, size: 20),
         ),
       ],
+    );
+  }
+}
+
+/// Bottom sheet for team leaders to assign a territory to a worker
+class _AssignToWorkerSheet extends StatefulWidget {
+  final GeoTerritory territory;
+  final bool isDark;
+
+  const _AssignToWorkerSheet({
+    required this.territory,
+    required this.isDark,
+  });
+
+  @override
+  State<_AssignToWorkerSheet> createState() => _AssignToWorkerSheetState();
+}
+
+class _AssignToWorkerSheetState extends State<_AssignToWorkerSheet> {
+  List<dynamic> _workers = [];
+  bool _isLoading = true;
+  String? _selectedWorkerId;
+  String? _teamId;
+  String? _leaderId;
+  final _notesController = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    _loadTeamWorkers();
+  }
+
+  @override
+  void dispose() {
+    _notesController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _loadTeamWorkers() async {
+    try {
+      final authState = context.read<AuthBloc>().state;
+      if (authState is! AuthAuthenticated) {
+        setState(() => _isLoading = false);
+        return;
+      }
+
+      _leaderId = authState.user.id;
+      _teamId = authState.user.teamId;
+
+      if (_teamId == null) {
+        setState(() => _isLoading = false);
+        return;
+      }
+
+      final api = await ApiClient.getInstance();
+      final response = await api.get(
+        '${ApiConstants.teams}/$_teamId/workers',
+      );
+
+      if (response.statusCode == 200) {
+        final data = response.data is List
+            ? response.data
+            : response.data['workers'] ?? response.data['members'] ?? [];
+        setState(() {
+          _workers = data;
+          _isLoading = false;
+        });
+      } else {
+        setState(() => _isLoading = false);
+      }
+    } catch (e) {
+      debugPrint('Error loading team workers: $e');
+      setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _assignTerritory() async {
+    if (_selectedWorkerId == null || _teamId == null || _leaderId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please select a worker'),
+          backgroundColor: AppColors.warning,
+        ),
+      );
+      return;
+    }
+
+    context.read<TerritoryBloc>().add(
+      TerritoryAssignToWorker(
+        territoryId: widget.territory.id,
+        territorySolid: widget.territory.solid,
+        workerId: _selectedWorkerId!,
+        teamId: _teamId!,
+        assignedBy: _leaderId!,
+        notes: _notesController.text.isNotEmpty ? _notesController.text : null,
+      ),
+    );
+
+    Navigator.pop(context);
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Territory assignment submitted'),
+        backgroundColor: AppColors.success,
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.only(
+        left: 24,
+        right: 24,
+        top: 24,
+        bottom: MediaQuery.of(context).viewInsets.bottom + 24,
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header
+          Row(
+            children: [
+              Container(
+                width: 48,
+                height: 48,
+                decoration: BoxDecoration(
+                  color: AppColors.primary.withAlpha(30),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(Icons.person_add, color: AppColors.primary),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Assign Territory',
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    Text(
+                      widget.territory.entityName,
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: AppColors.textSecondaryLight,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              IconButton(
+                icon: const Icon(Icons.close),
+                onPressed: () => Navigator.pop(context),
+              ),
+            ],
+          ),
+          const SizedBox(height: 20),
+
+          // Territory info
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: AppColors.info.withAlpha(20),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.location_on, size: 18, color: AppColors.info),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        widget.territory.entityName,
+                        style: const TextStyle(fontWeight: FontWeight.w600),
+                      ),
+                      if (widget.territory.displayLocation.isNotEmpty)
+                        Text(
+                          widget.territory.displayLocation,
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: widget.isDark
+                                ? AppColors.textSecondaryDark
+                                : AppColors.textSecondaryLight,
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+                if (widget.territory.housingUnits != null)
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: AppColors.primary.withAlpha(20),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      '${widget.territory.housingUnits} units',
+                      style: const TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.primary,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 20),
+
+          // Select worker
+          Text(
+            'Select Worker',
+            style: Theme.of(context).textTheme.titleSmall?.copyWith(
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 8),
+
+          if (_isLoading)
+            const Center(child: CircularProgressIndicator())
+          else if (_workers.isEmpty)
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: AppColors.warning.withAlpha(20),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.warning_amber, color: AppColors.warning),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      'No workers in your team yet.\nWorkers need to join and be approved first.',
+                      style: TextStyle(
+                        color: widget.isDark
+                            ? AppColors.textSecondaryDark
+                            : AppColors.textSecondaryLight,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            )
+          else
+            Container(
+              constraints: const BoxConstraints(maxHeight: 200),
+              child: ListView.builder(
+                shrinkWrap: true,
+                itemCount: _workers.length,
+                itemBuilder: (context, index) {
+                  final worker = _workers[index];
+                  final workerId = worker['id']?.toString() ?? '';
+                  final workerName = worker['display_name'] ?? worker['name'] ?? 'Worker';
+                  final workerEmail = worker['email'] ?? '';
+                  final isSelected = _selectedWorkerId == workerId;
+
+                  return ListTile(
+                    leading: CircleAvatar(
+                      backgroundColor: isSelected
+                          ? AppColors.primary
+                          : AppColors.primary.withAlpha(30),
+                      child: Text(
+                        workerName.isNotEmpty ? workerName[0].toUpperCase() : '?',
+                        style: TextStyle(
+                          color: isSelected ? Colors.white : AppColors.primary,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                    title: Text(
+                      workerName,
+                      style: TextStyle(
+                        fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                      ),
+                    ),
+                    subtitle: Text(
+                      workerEmail,
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: widget.isDark
+                            ? AppColors.textSecondaryDark
+                            : AppColors.textSecondaryLight,
+                      ),
+                    ),
+                    trailing: isSelected
+                        ? const Icon(Icons.check_circle, color: AppColors.primary)
+                        : const Icon(Icons.circle_outlined, color: Colors.grey),
+                    onTap: () {
+                      setState(() => _selectedWorkerId = workerId);
+                    },
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    selected: isSelected,
+                    selectedTileColor: AppColors.primary.withAlpha(10),
+                  );
+                },
+              ),
+            ),
+          const SizedBox(height: 16),
+
+          // Notes
+          TextField(
+            controller: _notesController,
+            maxLines: 2,
+            decoration: const InputDecoration(
+              labelText: 'Notes (optional)',
+              hintText: 'Add any notes for the worker',
+              prefixIcon: Icon(Icons.notes),
+              border: OutlineInputBorder(),
+            ),
+          ),
+          const SizedBox(height: 20),
+
+          // Assign button
+          SizedBox(
+            width: double.infinity,
+            child: CustomButton(
+              text: 'Assign Territory',
+              icon: Icons.check,
+              onPressed: _workers.isNotEmpty ? _assignTerritory : null,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

@@ -13,19 +13,21 @@ import (
 )
 
 type userService struct {
-	userRepo    domain.UserRepository
-	sessionRepo domain.SessionRepository
-	jwtManager  *auth.JWTManager
-	db          *sql.DB
+	userRepo        domain.UserRepository
+	sessionRepo     domain.SessionRepository
+	joinRequestRepo domain.JoinRequestRepository
+	jwtManager      *auth.JWTManager
+	db              *sql.DB
 }
 
 // NewUserService creates a new user service
-func NewUserService(userRepo domain.UserRepository, sessionRepo domain.SessionRepository, jwtManager *auth.JWTManager, db *sql.DB) domain.UserService {
+func NewUserService(userRepo domain.UserRepository, sessionRepo domain.SessionRepository, joinRequestRepo domain.JoinRequestRepository, jwtManager *auth.JWTManager, db *sql.DB) domain.UserService {
 	return &userService{
-		userRepo:    userRepo,
-		sessionRepo: sessionRepo,
-		jwtManager:  jwtManager,
-		db:          db,
+		userRepo:        userRepo,
+		sessionRepo:     sessionRepo,
+		joinRequestRepo: joinRequestRepo,
+		jwtManager:      jwtManager,
+		db:              db,
 	}
 }
 
@@ -67,100 +69,82 @@ func (s *userService) Register(req *domain.CreateUserRequest) (*domain.AuthRespo
 		role = domain.RoleWorker
 	}
 
-	// Validate role
+	// Validate role - only allow team_leader and worker for public registration
 	if !domain.IsValidRole(role) {
 		return nil, fmt.Errorf("invalid role: %s", role)
 	}
 
+	// Determine verification status based on role
+	// Team leaders and workers require verification before they can login
+	verificationStatus := domain.VerificationPending
+	if role == domain.RoleAdmin {
+		// Admins cannot self-register - must be created by superadmin
+		return nil, fmt.Errorf("admin accounts cannot be created through registration")
+	}
+
 	// Create user
 	user := &domain.User{
-		ID:           uuid.New(),
-		Email:        req.Email,
-		PasswordHash: string(hashedPassword),
-		DisplayName:  req.DisplayName,
-		Role:         role,
-		IsOnline:     true,
-		LastActiveAt: time.Now(),
-		CreatedAt:    time.Now(),
-		UpdatedAt:    time.Now(),
+		ID:                 uuid.New(),
+		Email:              req.Email,
+		PasswordHash:       string(hashedPassword),
+		DisplayName:        req.DisplayName,
+		Role:               role,
+		IsOnline:           false, // Not online until verified and logged in
+		LastActiveAt:       time.Now(),
+		VerificationStatus: verificationStatus,
+		CreatedAt:          time.Now(),
+		UpdatedAt:          time.Now(),
 	}
 
 	if req.Phone != "" {
 		user.Phone = &req.Phone
 	}
 
-	// Handle team creation for team leaders
-	var teamID *uuid.UUID
-	if role == domain.RoleTeamLeader && req.TeamName != "" {
-		// Create user first
-		err = s.userRepo.Create(user)
-		if err != nil {
-			return nil, fmt.Errorf("failed to create user: %w", err)
-		}
-
-		// Then create team for the user
-		createdTeamID, err := s.createTeamForLeader(user.ID, req.TeamName)
-		if err != nil {
-			return nil, fmt.Errorf("failed to create team for team leader: %w", err)
-		}
-		teamID = createdTeamID
-		user.TeamID = teamID
-
-		// Update user with team ID
-		err = s.userRepo.Update(user)
-		if err != nil {
-			return nil, fmt.Errorf("failed to update user with team ID: %w", err)
-		}
-
-		fmt.Printf("🏆 Created team %s for team leader %s\n", req.TeamName, req.DisplayName)
-	} else {
-		// Handle worker joining an existing team
-		if role == domain.RoleWorker && req.TeamID != nil && *req.TeamID != "" {
-			parsedTeamID, err := uuid.Parse(*req.TeamID)
-			if err != nil {
-				return nil, fmt.Errorf("invalid team_id: %w", err)
-			}
-			user.TeamID = &parsedTeamID
-			fmt.Printf("👷 Worker %s joining team %s\n", req.DisplayName, *req.TeamID)
-		}
-
-		// Create user (with or without team)
-		err = s.userRepo.Create(user)
-		if err != nil {
-			return nil, fmt.Errorf("failed to create user: %w", err)
-		}
-	}
-
-	// Generate tokens
-	tokenPair, err := s.jwtManager.GenerateTokenPair(user.ID, user.Email, user.Role, user.TeamID, user.DisplayName)
+	// Create user (teams are now created by admin and assigned to leaders)
+	err = s.userRepo.Create(user)
 	if err != nil {
-		return nil, fmt.Errorf("failed to generate tokens: %w", err)
+		return nil, fmt.Errorf("failed to create user: %w", err)
 	}
 
-	// Create session (if session repository is available)
-	if s.sessionRepo != nil {
-		session := &domain.UserSession{
-			ID:           uuid.New(),
-			UserID:       user.ID,
-			RefreshToken: tokenPair.RefreshToken,
-			ExpiresAt:    time.Now().Add(7 * 24 * time.Hour), // 7 days
-			CreatedAt:    time.Now(),
-		}
+	fmt.Printf("📝 User %s registered as %s (pending verification)\n", req.DisplayName, role)
 
-		err = s.sessionRepo.Create(session)
+	// For workers, automatically create a join request if team_id was provided
+	if role == domain.RoleWorker && req.TeamID != nil && *req.TeamID != "" {
+		teamID, err := uuid.Parse(*req.TeamID)
 		if err != nil {
-			return nil, fmt.Errorf("failed to create session: %w", err)
+			// Don't fail registration, just log and skip join request
+			fmt.Printf("⚠️ Invalid team_id provided for worker %s: %v\n", req.DisplayName, err)
+		} else if s.joinRequestRepo != nil {
+			// Create the join request
+			joinRequest := &domain.TeamJoinRequest{
+				ID:          uuid.New(),
+				UserID:      user.ID,
+				TeamID:      teamID,
+				Status:      domain.JoinRequestPending,
+				RequestedAt: time.Now(),
+				CreatedAt:   time.Now(),
+				UpdatedAt:   time.Now(),
+			}
+
+			err = s.joinRequestRepo.Create(joinRequest)
+			if err != nil {
+				// Don't fail registration, just log the error
+				fmt.Printf("⚠️ Failed to create join request for worker %s: %v\n", req.DisplayName, err)
+			} else {
+				fmt.Printf("📨 Join request created for worker %s to team %s\n", req.DisplayName, teamID)
+			}
 		}
 	}
 
+	// For pending users, return a response without tokens (they can't login yet)
 	// Remove password hash from response
 	user.PasswordHash = ""
 
 	return &domain.AuthResponse{
 		User:         user,
-		AccessToken:  tokenPair.AccessToken,
-		RefreshToken: tokenPair.RefreshToken,
-		ExpiresIn:    tokenPair.ExpiresIn,
+		AccessToken:  "", // No token for unverified users
+		RefreshToken: "",
+		ExpiresIn:    0,
 	}, nil
 }
 
@@ -176,6 +160,26 @@ func (s *userService) Login(req *domain.LoginRequest) (*domain.AuthResponse, err
 	err = bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(req.Password))
 	if err != nil {
 		return nil, fmt.Errorf("invalid credentials")
+	}
+
+	// Check verification status - only verified users can login
+	// Superadmin and admin are always verified (created through proper channels)
+	if domain.RequiresVerification(user.Role) {
+		if user.VerificationStatus == domain.VerificationPending {
+			return nil, fmt.Errorf("your account is pending verification. Please wait for admin approval")
+		}
+		if user.VerificationStatus == domain.VerificationRejected {
+			reason := "Your account has been rejected"
+			if user.RejectionReason != nil && *user.RejectionReason != "" {
+				reason = fmt.Sprintf("Your account has been rejected: %s", *user.RejectionReason)
+			}
+			return nil, fmt.Errorf(reason)
+		}
+	}
+
+	// For workers, also check if they have a team (required after verification)
+	if user.Role == domain.RoleWorker && user.TeamID == nil {
+		return nil, fmt.Errorf("you need to be approved to join a team before you can login")
 	}
 
 	// Update last active and online status

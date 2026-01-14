@@ -101,19 +101,11 @@ func setupRouter(surveyHandler *handler.SurveyHandler) *gin.Engine {
 
 	router := gin.Default()
 
-	// CORS middleware
-	router.Use(func(c *gin.Context) {
-		c.Header("Access-Control-Allow-Origin", "*")
-		c.Header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
-		c.Header("Access-Control-Allow-Headers", "Origin, Content-Type, Authorization")
+	// Disable automatic trailing slash redirect (causes 307 issues with POST)
+	router.RedirectTrailingSlash = false
 
-		if c.Request.Method == "OPTIONS" {
-			c.AbortWithStatus(204)
-			return
-		}
-
-		c.Next()
-	})
+	// NOTE: CORS is handled by API Gateway - do NOT add CORS middleware here
+	// Adding CORS headers here causes duplicate headers when proxied through gateway
 
 	// Health check
 	router.GET("/health", surveyHandler.HealthCheck)
@@ -125,9 +117,14 @@ func setupRouter(surveyHandler *handler.SurveyHandler) *gin.Engine {
 	protected := api.Group("/")
 	protected.Use(surveyHandler.AuthMiddleware())
 	{
-		// Survey management
+		// Survey management - handle both with and without trailing slash
 		surveys := protected.Group("/surveys")
 		{
+			// Without trailing slash (primary)
+			surveys.GET("", surveyHandler.ListSurveys)
+			surveys.POST("", surveyHandler.CreateSurvey)
+			// With trailing slash (fallback)
+			surveys.GET("/", surveyHandler.ListSurveys)
 			surveys.POST("/", surveyHandler.CreateSurvey)
 			surveys.GET("/:id", surveyHandler.GetSurvey)
 			surveys.PUT("/:id", surveyHandler.UpdateSurvey)
@@ -135,6 +132,7 @@ func setupRouter(surveyHandler *handler.SurveyHandler) *gin.Engine {
 			surveys.GET("/:id/responses", surveyHandler.GetSurveyResponses)
 			surveys.POST("/:id/responses", surveyHandler.SubmitSurveyResponse)
 			surveys.GET("/:id/analytics", surveyHandler.GetSurveyAnalytics)
+			surveys.POST("/:id/assignments", surveyHandler.AssignSurveyToWorkers)
 
 			// Question management
 			surveys.POST("/:id/questions", surveyHandler.AddQuestion)

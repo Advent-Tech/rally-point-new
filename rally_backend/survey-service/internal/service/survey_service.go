@@ -134,6 +134,27 @@ func (s *surveyService) GetSurvey(id uuid.UUID) (*domain.SurveyWithQuestions, er
 	}, nil
 }
 
+// GetAllSurveys retrieves all surveys with their questions
+func (s *surveyService) GetAllSurveys() ([]*domain.SurveyWithQuestions, error) {
+	surveys, err := s.surveyRepo.GetAllSurveys()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get surveys: %w", err)
+	}
+
+	var result []*domain.SurveyWithQuestions
+	for _, survey := range surveys {
+		questions, err := s.surveyRepo.GetQuestionsBySurveyID(survey.ID)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get questions for survey %s: %w", survey.ID, err)
+		}
+		result = append(result, &domain.SurveyWithQuestions{
+			Survey:    survey,
+			Questions: questions,
+		})
+	}
+	return result, nil
+}
+
 // UpdateSurvey updates a survey
 func (s *surveyService) UpdateSurvey(id uuid.UUID, req *domain.UpdateSurveyRequest) (*domain.Survey, error) {
 	survey, err := s.surveyRepo.GetSurveyByID(id)

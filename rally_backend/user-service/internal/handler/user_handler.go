@@ -338,8 +338,14 @@ func (h *UserHandler) ListTeams(c *gin.Context) {
 		return
 	}
 
-	// If no filter provided, return empty or all teams (limited)
-	c.JSON(http.StatusOK, gin.H{"teams": []interface{}{}, "count": 0})
+	// If no filter provided, return all teams
+	teams, err := h.teamService.GetAllTeams()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"teams": teams, "count": len(teams)})
 }
 
 // AuthMiddleware validates JWT tokens

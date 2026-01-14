@@ -11,38 +11,22 @@ func CORSMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		origin := c.GetHeader("Origin")
 
-		// Allow specific origins or all origins in development
-		allowedOrigins := []string{
-			"http://localhost:3000",
-			"http://localhost:3001",
-			"http://localhost:8083",
-			"http://localhost:8084",
-			"http://localhost:19006",
-			"https://rally-point.app",
-			"https://app.rally-point.com",
-		}
-
-		// Check if origin is allowed
-		allowed := false
-		for _, allowedOrigin := range allowedOrigins {
-			if origin == allowedOrigin {
-				allowed = true
-				break
-			}
-		}
-
-		// In development, allow all origins
-		if origin != "" && (allowed || gin.Mode() == gin.DebugMode) {
+		// In development, allow all localhost origins (Flutter web uses dynamic ports)
+		// For production, this should be restricted to specific domains
+		if origin != "" {
 			c.Header("Access-Control-Allow-Origin", origin)
+		} else {
+			// Fallback for requests without Origin header
+			c.Header("Access-Control-Allow-Origin", "*")
 		}
 
-		c.Header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS, PATCH")
-		c.Header("Access-Control-Allow-Headers", "Origin, Content-Type, Authorization, X-Requested-With, X-User-ID, X-Team-ID")
-		c.Header("Access-Control-Expose-Headers", "X-RateLimit-Remaining, X-RateLimit-Reset")
+		c.Header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS, PATCH, HEAD")
+		c.Header("Access-Control-Allow-Headers", "Origin, Content-Type, Authorization, X-Requested-With, X-User-ID, X-Team-ID, Accept")
+		c.Header("Access-Control-Expose-Headers", "X-RateLimit-Remaining, X-RateLimit-Reset, Content-Length")
 		c.Header("Access-Control-Allow-Credentials", "true")
 		c.Header("Access-Control-Max-Age", "86400") // 24 hours
 
-		// Handle preflight requests
+		// Handle preflight requests immediately
 		if c.Request.Method == "OPTIONS" {
 			c.AbortWithStatus(http.StatusNoContent)
 			return

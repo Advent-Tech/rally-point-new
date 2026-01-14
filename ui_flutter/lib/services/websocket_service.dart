@@ -208,13 +208,11 @@ class WebSocketService {
     if (kReleaseMode) {
       return 'wss://api.rallypoint.app${ApiConstants.wsGeneric}';
     }
-    // Development
-    if (Platform.isAndroid) {
-      return 'ws://10.0.2.2:8080${ApiConstants.wsGeneric}';
-    } else if (Platform.isIOS) {
-      return 'ws://localhost:8080${ApiConstants.wsGeneric}';
-    }
-    return 'ws://localhost:8080${ApiConstants.wsGeneric}';
+    // Development - use production server for real devices
+    // Convert http://18.188.1.122:8080 to ws://18.188.1.122:8080
+    final baseUrl = ApiConstants.prodBaseUrl;
+    final wsBase = baseUrl.replaceFirst('http://', 'ws://').replaceFirst('https://', 'wss://');
+    return '$wsBase${ApiConstants.wsGeneric}';
   }
 
   /// Message stream for reactive updates

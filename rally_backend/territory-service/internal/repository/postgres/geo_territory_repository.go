@@ -622,17 +622,17 @@ func (r *geoTerritoryRepository) GetChurchByEntityID(entityID string) (*domain.C
 }
 
 func (r *geoTerritoryRepository) GetUnionStats() ([]*domain.UnionStats, error) {
+	// Use materialized view for fast stats retrieval
+	// The view is pre-computed and indexed, taking <1ms instead of 50+ seconds
 	query := `
 		SELECT
 			union_name,
-			COUNT(*) as territory_count,
-			COUNT(DISTINCT entity_id) as church_count,
-			COUNT(DISTINCT conference) as conference_count,
-			SUM(COALESCE(population, 0)) as total_population,
-			SUM(COALESCE(housing_units, 0)) as total_housing
-		FROM territories
-		WHERE union_name IS NOT NULL
-		GROUP BY union_name
+			territory_count,
+			church_count,
+			conference_count,
+			total_population,
+			total_housing
+		FROM union_stats_mv
 		ORDER BY union_name
 	`
 
@@ -809,17 +809,23 @@ func (r *geoTerritoryRepository) scanTerritory(row *sql.Row) (*domain.GeoTerrito
 	var unionName, conference, geoid, zid, label, sourceFile sql.NullString
 	var population, housingUnits sql.NullInt64
 	var order sql.NullFloat64
+	var geometryJSON sql.NullString
 
 	err := row.Scan(
 		&t.ID, &t.FID, &t.SOLID, &t.EntityName, &t.EntityID, &groupID,
 		&address, &streetAddress, &city, &county, &state, &zipcode,
 		&population, &housingUnits, &unionName, &conference,
 		&geoid, &zid, &label, &order,
-		&t.Geometry,
+		&geometryJSON,
 		&sourceFile, &t.ImportedAt, &t.CreatedAt, &t.UpdatedAt,
 	)
 	if err != nil {
 		return nil, err
+	}
+
+	// Convert geometry string to json.RawMessage
+	if geometryJSON.Valid && geometryJSON.String != "" {
+		t.Geometry = json.RawMessage(geometryJSON.String)
 	}
 
 	// Set nullable fields
@@ -892,17 +898,23 @@ func (r *geoTerritoryRepository) scanTerritories(rows *sql.Rows, err error) ([]*
 		var unionName, conference, geoid, zid, label, sourceFile sql.NullString
 		var population, housingUnits sql.NullInt64
 		var order sql.NullFloat64
+		var geometryJSON sql.NullString
 
 		err := rows.Scan(
 			&t.ID, &t.FID, &t.SOLID, &t.EntityName, &t.EntityID, &groupID,
 			&address, &streetAddress, &city, &county, &state, &zipcode,
 			&population, &housingUnits, &unionName, &conference,
 			&geoid, &zid, &label, &order,
-			&t.Geometry,
+			&geometryJSON,
 			&sourceFile, &t.ImportedAt, &t.CreatedAt, &t.UpdatedAt,
 		)
 		if err != nil {
 			continue
+		}
+
+		// Convert geometry string to json.RawMessage
+		if geometryJSON.Valid && geometryJSON.String != "" {
+			t.Geometry = json.RawMessage(geometryJSON.String)
 		}
 
 		// Set nullable fields
