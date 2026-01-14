@@ -1,6 +1,7 @@
 class ApiConstants {
   // Base URL - change this based on environment
-  static const String baseUrl = 'http://localhost:8080';
+  //static const String baseUrl = 'http://localhost:8080';
+  static const String baseUrl = 'http://18.188.1.122:8080';
 
   // Auth endpoints
   static const String login = '/api/auth/login';
@@ -16,8 +17,10 @@ class ApiConstants {
   static const String adminWorkers = '/api/admin/workers';
   static const String adminWorkersPending = '/api/admin/workers/pending';
   static const String adminWorkersVerified = '/api/admin/workers/verified';
-  static const String adminTerritoryAllocate = '/api/admin/territories/allocate';
-  static const String adminTerritoryAllocations = '/api/admin/territories/allocations';
+  static const String adminTerritoryAllocate =
+      '/api/admin/territories/allocate';
+  static const String adminTerritoryAllocations =
+      '/api/admin/territories/allocations';
 
   // User management (via admin proxy)
   static const String adminUsers = '/api/admin/users';
@@ -26,7 +29,8 @@ class ApiConstants {
   static const String territories = '/api/geo/territories';
   static const String territoriesList = '/api/geo/territories/list';
   static const String territoriesSearch = '/api/geo/territories/search';
-  static const String territoriesInBounds = '/api/geo/territories'; // ?bounds=minLng,minLat,maxLng,maxLat
+  static const String territoriesInBounds =
+      '/api/geo/territories'; // ?bounds=minLng,minLat,maxLng,maxLat
   static const String unionStats = '/api/geo/stats/unions';
 
   // Survey endpoints
@@ -56,15 +60,18 @@ class ApiConstants {
 
   // Geofence & Worker tracking endpoints
   static const String activeWorkers = '/api/geofence/workers/active';
-  static const String workerSessions = '/api/geofence/worker'; // + /{workerId}/sessions
-  static const String teamActiveWorkers = '/api/geofence/teams'; // + /{teamId}/workers/active
+  static const String workerSessions =
+      '/api/geofence/worker'; // + /{workerId}/sessions
+  static const String teamActiveWorkers =
+      '/api/geofence/teams'; // + /{teamId}/workers/active
 
   // Church locations
   static const String churches = '/api/geo/churches';
 
   // Delivery stats endpoints
   static const String teamDeliveryStats = '/api/teams'; // + /{teamId}/stats
-  static const String teamWorkerStats = '/api/teams'; // + /{teamId}/worker-stats
+  static const String teamWorkerStats =
+      '/api/teams'; // + /{teamId}/worker-stats
 
   // Conference stats
   static const String conferenceStats = '/api/geo/stats/conferences';
