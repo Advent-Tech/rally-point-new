@@ -96,12 +96,13 @@ class ApiClient {
       },
     ));
 
-    // Logging Interceptor (debug only)
+    // Logging Interceptor (debug only) - body logging disabled for performance
+    // Large responses (like geometry data) can cause 8000ms+ frame times when logged
     if (!kReleaseMode) {
       _dio.interceptors.add(LogInterceptor(
-        requestHeader: true,
-        requestBody: true,
-        responseBody: true,
+        requestHeader: false,
+        requestBody: false,
+        responseBody: false,
         responseHeader: false,
         error: true,
         logPrint: (obj) => debugPrint(obj.toString()),

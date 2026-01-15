@@ -1,4 +1,5 @@
-import 'package:flutter/foundation.dart';
+import 'dart:convert';
+
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:equatable/equatable.dart';
 import '../../../core/network/api_client.dart';
@@ -28,8 +29,6 @@ class TeamMapBloc extends Bloc<TeamMapEvent, TeamMapState> {
   Future<void> _onLoad(TeamMapLoad event, Emitter<TeamMapState> emit) async {
     emit(TeamMapLoading());
     _currentTeamId = event.teamId;
-
-    debugPrint('TeamMapBloc: Loading map for teamId: ${event.teamId}');
 
     try {
       await _initialize();
@@ -82,14 +81,10 @@ class TeamMapBloc extends Bloc<TeamMapEvent, TeamMapState> {
         '/api/teams/$teamId/deliveries',
       );
 
-      debugPrint('TeamMapBloc: Deliveries response status: ${response.statusCode}');
-
       if (response.statusCode == 200) {
         final List<dynamic> data = response.data is List
             ? response.data
             : response.data['deliveries'] ?? [];
-
-        debugPrint('TeamMapBloc: Found ${data.length} deliveries');
 
         // API returns nested structure: { "delivery": {...}, "items": [...] }
         // Extract the delivery object from each item
@@ -100,8 +95,8 @@ class TeamMapBloc extends Bloc<TeamMapEvent, TeamMapState> {
           return MapDeliveryMarker.fromJson(deliveryData);
         }).where((d) => d.latitude != 0 && d.longitude != 0).toList();
       }
-    } catch (e) {
-      debugPrint('TeamMapBloc: Error fetching deliveries: $e');
+    } catch (_) {
+      // Silent fail - return empty list
     }
     return [];
   }
@@ -151,23 +146,17 @@ class TeamMapBloc extends Bloc<TeamMapEvent, TeamMapState> {
   }
 
   Future<List<TerritoryBoundary>> _fetchTerritoryBoundaries(String teamId) async {
-    debugPrint('TeamMapBloc: Fetching territories for team: $teamId');
-
     try {
       // Try the GeoJSON endpoint first (returns proper GeoJSON FeatureCollection)
       final response = await _apiClient!.get(
         '/api/geo/assignments/team/$teamId/geojson',
       );
 
-      debugPrint('TeamMapBloc: GeoJSON endpoint response status: ${response.statusCode}');
-      debugPrint('TeamMapBloc: GeoJSON response data: ${response.data}');
-
       if (response.statusCode == 200) {
         final data = response.data;
         // GeoJSON FeatureCollection format
         if (data['type'] == 'FeatureCollection' && data['features'] != null) {
           final features = data['features'] as List;
-          debugPrint('TeamMapBloc: Found ${features.length} features in GeoJSON');
           final territories = <TerritoryBoundary>[];
           for (final f in features) {
             final territory = TerritoryBoundary.fromGeoJsonFeature(f as Map<String, dynamic>);
@@ -175,27 +164,21 @@ class TeamMapBloc extends Bloc<TeamMapEvent, TeamMapState> {
               territories.add(territory);
             }
           }
-          debugPrint('TeamMapBloc: Returning ${territories.length} territories from GeoJSON');
           return territories;
         }
       }
 
       // Fallback: Try the assignments endpoint (same as delivery screen)
-      debugPrint('TeamMapBloc: Trying fallback assignments endpoint');
       final fallbackResponse = await _apiClient!.get(
         ApiConstants.myAssignments,
         queryParameters: {'team_id': teamId},
       );
-
-      debugPrint('TeamMapBloc: Fallback response status: ${fallbackResponse.statusCode}');
-      debugPrint('TeamMapBloc: Fallback response data: ${fallbackResponse.data}');
 
       if (fallbackResponse.statusCode == 200) {
         final List<dynamic> data = fallbackResponse.data is List
             ? fallbackResponse.data
             : fallbackResponse.data['assignments'] ?? [];
 
-        debugPrint('TeamMapBloc: Found ${data.length} assignments in fallback');
         final territories = <TerritoryBoundary>[];
         for (final json in data) {
           final territory = TerritoryBoundary.fromAssignment(json as Map<String, dynamic>);
@@ -203,15 +186,11 @@ class TeamMapBloc extends Bloc<TeamMapEvent, TeamMapState> {
             territories.add(territory);
           }
         }
-        debugPrint('TeamMapBloc: Returning ${territories.length} territories from fallback');
         return territories;
       }
-    } catch (e, stack) {
-      // Log error for debugging
-      debugPrint('Error fetching territory boundaries: $e');
-      debugPrint('Stack trace: $stack');
+    } catch (_) {
+      // Silent fail - return empty list
     }
-    debugPrint('TeamMapBloc: Returning empty territories list');
     return [];
   }
 

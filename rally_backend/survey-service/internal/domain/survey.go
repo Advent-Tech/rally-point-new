@@ -8,17 +8,18 @@ import (
 
 // Survey represents a survey in the system
 type Survey struct {
-	ID               uuid.UUID  `json:"id" db:"id"`
-	Title            string     `json:"title" db:"title"`
-	Description      *string    `json:"description,omitempty" db:"description"`
-	TeamID           *uuid.UUID `json:"team_id,omitempty" db:"team_id"`
-	CreatorID        uuid.UUID  `json:"creator_id" db:"creator_id"`
-	IsActive         bool       `json:"is_active" db:"is_active"`
-	RequiresLocation bool       `json:"requires_location" db:"requires_location"`
-	StartDate        *time.Time `json:"start_date,omitempty" db:"start_date"`
-	EndDate          *time.Time `json:"end_date,omitempty" db:"end_date"`
-	CreatedAt        time.Time  `json:"created_at" db:"created_at"`
-	UpdatedAt        time.Time  `json:"updated_at" db:"updated_at"`
+	ID               uuid.UUID   `json:"id" db:"id"`
+	Title            string      `json:"title" db:"title"`
+	Description      *string     `json:"description,omitempty" db:"description"`
+	TeamID           *uuid.UUID  `json:"team_id,omitempty" db:"team_id"`
+	TeamIDs          []uuid.UUID `json:"team_ids,omitempty"` // Assigned teams from junction table
+	CreatorID        uuid.UUID   `json:"creator_id" db:"creator_id"`
+	IsActive         bool        `json:"is_active" db:"is_active"`
+	RequiresLocation bool        `json:"requires_location" db:"requires_location"`
+	StartDate        *time.Time  `json:"start_date,omitempty" db:"start_date"`
+	EndDate          *time.Time  `json:"end_date,omitempty" db:"end_date"`
+	CreatedAt        time.Time   `json:"created_at" db:"created_at"`
+	UpdatedAt        time.Time   `json:"updated_at" db:"updated_at"`
 }
 
 // SurveyQuestion represents a question in a survey
@@ -75,10 +76,20 @@ type CreateSurveyRequest struct {
 	Title            string                  `json:"title" binding:"required"`
 	Description      string                  `json:"description,omitempty"`
 	TeamID           *uuid.UUID              `json:"team_id,omitempty"`
+	TeamIDs          []uuid.UUID             `json:"team_ids,omitempty"` // For multi-team assignment
+	AssignToAllTeams bool                    `json:"assign_to_all_teams,omitempty"`
 	RequiresLocation bool                    `json:"requires_location"`
 	StartDate        *time.Time              `json:"start_date,omitempty"`
 	EndDate          *time.Time              `json:"end_date,omitempty"`
 	Questions        []CreateQuestionRequest `json:"questions" binding:"required,min=1"`
+}
+
+// SurveyTeam represents a survey-team assignment in the junction table
+type SurveyTeam struct {
+	ID        uuid.UUID `json:"id" db:"id"`
+	SurveyID  uuid.UUID `json:"survey_id" db:"survey_id"`
+	TeamID    uuid.UUID `json:"team_id" db:"team_id"`
+	CreatedAt time.Time `json:"created_at" db:"created_at"`
 }
 
 // CreateQuestionRequest represents the request to create a survey question
@@ -202,6 +213,12 @@ type SurveyRepository interface {
 	GetSurveysByCreatorID(creatorID uuid.UUID) ([]*Survey, error)
 	UpdateSurvey(survey *Survey) error
 	DeleteSurvey(id uuid.UUID) error
+
+	// Survey-Team junction management
+	AddSurveyTeams(surveyID uuid.UUID, teamIDs []uuid.UUID) error
+	GetSurveyTeams(surveyID uuid.UUID) ([]uuid.UUID, error)
+	RemoveSurveyTeams(surveyID uuid.UUID) error
+	GetAllTeamIDs() ([]uuid.UUID, error)
 	
 	// Question management
 	CreateQuestion(question *SurveyQuestion) error

@@ -45,23 +45,15 @@ class _TeamMapScreenState extends State<TeamMapScreen> {
 
     if (teamId == null && authState is AuthAuthenticated) {
       teamId = authState.user.teamId;
-      debugPrint('TeamMapScreen: User teamId from auth: ${authState.user.teamId}');
-      debugPrint('TeamMapScreen: User ID: ${authState.user.id}');
-      debugPrint('TeamMapScreen: User role: ${authState.user.role}');
 
       // If user is a team leader but has no teamId, try to fetch their led team
       if (teamId == null && authState.user.isTeamLeader) {
-        debugPrint('TeamMapScreen: Team leader has no teamId, fetching led team...');
         teamId = await _fetchLedTeamId(authState.user.id);
-        debugPrint('TeamMapScreen: Found led team: $teamId');
       }
     }
 
-    debugPrint('TeamMapScreen: Final teamId to use: $teamId');
     if (teamId != null && mounted) {
       context.read<TeamMapBloc>().add(TeamMapLoad(teamId: teamId));
-    } else {
-      debugPrint('TeamMapScreen: WARNING - No teamId available! Cannot load map.');
     }
   }
 
@@ -80,8 +72,8 @@ class _TeamMapScreenState extends State<TeamMapScreen> {
           return teams[0]['id']?.toString();
         }
       }
-    } catch (e) {
-      debugPrint('TeamMapScreen: Error fetching led team: $e');
+    } catch (_) {
+      // Silent fail - team fetch is optional
     }
     return null;
   }
@@ -95,21 +87,33 @@ class _TeamMapScreenState extends State<TeamMapScreen> {
   void _fitToAllMarkers(TeamMapLoaded state) {
     if (!_isMapReady) return;
 
-    final allPoints = <LatLng>[];
+    final territoryPoints = <LatLng>[];
 
-    // ALWAYS include territory boundaries first for overview
-    // This ensures all assigned territories are visible on the map
+    // Collect territory boundary points first - these are the primary view for team leaders
     if (state.showTerritories) {
       for (final territory in state.territoryBoundaries) {
-        debugPrint('_fitToAllMarkers: Adding ${territory.coordinates.length} points from ${territory.name}');
         for (final coord in territory.coordinates) {
           if (coord.length >= 2) {
-            allPoints.add(LatLng(coord[1], coord[0])); // [lng, lat] -> LatLng(lat, lng)
+            territoryPoints.add(LatLng(coord[1], coord[0])); // [lng, lat] -> LatLng(lat, lng)
           }
         }
       }
     }
-    debugPrint('_fitToAllMarkers: Total points: ${allPoints.length}');
+
+    // If we have territory boundaries, fit ONLY to territories
+    // This prevents distant markers (e.g., test data in different countries) from zooming out too far
+    if (territoryPoints.isNotEmpty) {
+      final bounds = _calculateBounds(territoryPoints);
+      if (bounds != null) {
+        _mapController.fitCamera(
+          CameraFit.bounds(bounds: bounds, padding: const EdgeInsets.all(50)),
+        );
+      }
+      return;
+    }
+
+    // No territories - fall back to fitting all markers
+    final allPoints = <LatLng>[];
 
     // Filter out invalid coordinates (0,0 or near it - indicates unset GPS)
     bool isValidCoord(double lat, double lng) => lat.abs() > 0.1 || lng.abs() > 0.1;
@@ -243,7 +247,7 @@ class _TeamMapScreenState extends State<TeamMapScreen> {
                       setState(() => _isMapReady = true);
                       // Fit to data if available after a short delay
                       if (hasData) {
-                        Future.delayed(const Duration(milliseconds: 100), () {
+                        Future.delayed(const Duration(milliseconds: 300), () {
                           if (mounted) {
                             _fitToAllMarkers(state);
                           }
@@ -260,17 +264,14 @@ class _TeamMapScreenState extends State<TeamMapScreen> {
                     ),
                     // Territory boundaries layer (render first so it's below markers)
                     // Always render PolygonLayer (even if empty) to maintain consistent layer order
-                    Builder(builder: (context) {
-                      debugPrint('PolygonLayer: showTerritories=${state.showTerritories}, territoryCount=${state.territoryBoundaries.length}');
-                      final polygons = state.showTerritories
+                    PolygonLayer(
+                      polygons: state.showTerritories
                           ? _buildTerritoryPolygons(
                               state.territoryBoundaries,
                               state.activeWorkers.map((w) => w.territoryName).toSet(),
                             )
-                          : <Polygon>[];
-                      debugPrint('PolygonLayer: built ${polygons.length} polygons');
-                      return PolygonLayer(polygons: polygons);
-                    }),
+                          : <Polygon>[],
+                    ),
                     // Territory center markers - tap to zoom to territory
                     if (state.showTerritories && state.territoryBoundaries.isNotEmpty)
                       MarkerLayer(markers: _buildTerritoryCenterMarkers(state.territoryBoundaries)),
@@ -381,53 +382,6 @@ class _TeamMapScreenState extends State<TeamMapScreen> {
         },
       ),
     );
-  }
-
-  LatLng _getCenter(TeamMapLoaded state) {
-    final allPoints = <LatLng>[];
-
-    // Include territory boundaries for center calculation (use centroids, not all points)
-    for (final territory in state.territoryBoundaries) {
-      if (territory.coordinates.isNotEmpty) {
-        // Calculate territory centroid
-        double sumLat = 0, sumLng = 0;
-        for (final coord in territory.coordinates) {
-          if (coord.length >= 2) {
-            sumLat += coord[1]; // lat
-            sumLng += coord[0]; // lng
-          }
-        }
-        allPoints.add(LatLng(
-          sumLat / territory.coordinates.length,
-          sumLng / territory.coordinates.length,
-        ));
-      }
-    }
-
-    // Filter out invalid coordinates (0,0 or near it - indicates unset GPS)
-    bool isValidCoord(double lat, double lng) => lat.abs() > 0.1 || lng.abs() > 0.1;
-
-    allPoints.addAll(state.activeWorkers
-        .where((w) => isValidCoord(w.latitude, w.longitude))
-        .map((w) => LatLng(w.latitude, w.longitude)));
-    allPoints.addAll(state.deliveries
-        .where((d) => isValidCoord(d.latitude, d.longitude))
-        .map((d) => LatLng(d.latitude, d.longitude)));
-    allPoints.addAll(state.receipts
-        .where((r) => isValidCoord(r.latitude, r.longitude))
-        .map((r) => LatLng(r.latitude, r.longitude)));
-    allPoints.addAll(state.donations
-        .where((d) => isValidCoord(d.latitude, d.longitude))
-        .map((d) => LatLng(d.latitude, d.longitude)));
-
-    if (allPoints.isEmpty) return const LatLng(40.7128, -74.0060);
-
-    double sumLat = 0, sumLng = 0;
-    for (final p in allPoints) {
-      sumLat += p.latitude;
-      sumLng += p.longitude;
-    }
-    return LatLng(sumLat / allPoints.length, sumLng / allPoints.length);
   }
 
   // Color palette for different territories
@@ -588,24 +542,14 @@ class _TeamMapScreenState extends State<TeamMapScreen> {
 
   List<Polygon> _buildTerritoryPolygons(List<TerritoryBoundary> territories, Set<String> activeTerritoriesNames) {
     final polygons = <Polygon>[];
-    debugPrint('_buildTerritoryPolygons: Building polygons for ${territories.length} territories');
 
     for (final territory in territories) {
-      debugPrint('Territory: ${territory.name}, coordinates count: ${territory.coordinates.length}');
-
       // Convert coordinates [lng, lat] to LatLng
       final points = territory.coordinates
           .map((coord) => LatLng(coord[1], coord[0])) // coord is [lng, lat]
           .toList();
 
-      debugPrint('Territory ${territory.name}: ${points.length} points');
-      if (points.length < 3) {
-        debugPrint('Skipping territory ${territory.name} - not enough points');
-        continue;
-      }
-      if (points.isNotEmpty) {
-        debugPrint('First point: ${points.first.latitude}, ${points.first.longitude}');
-      }
+      if (points.length < 3) continue;
 
       // Use consistent color based on territory name (matches worker colors)
       final territoryColor = _getWorkerColor(territory.name);

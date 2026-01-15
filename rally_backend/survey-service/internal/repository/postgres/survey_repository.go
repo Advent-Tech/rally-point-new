@@ -473,17 +473,17 @@ func (r *surveyRepository) GetQuestionStats(questionID uuid.UUID) (*domain.Quest
 }
 
 func (r *surveyRepository) GetResponseTrends(surveyID uuid.UUID, days int) ([]domain.ResponseTrend, error) {
-	query := `SELECT DATE(created_at) as date, COUNT(*) as responses 
-		FROM survey_responses 
+	query := `SELECT DATE(created_at) as date, COUNT(*) as responses
+		FROM survey_responses
 		WHERE survey_id = $1 AND created_at >= NOW() - INTERVAL '%d days'
 		GROUP BY DATE(created_at) ORDER BY date`
-	
+
 	rows, err := r.db.Query(fmt.Sprintf(query, days), surveyID)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	
+
 	var trends []domain.ResponseTrend
 	for rows.Next() {
 		var trend domain.ResponseTrend
@@ -493,6 +493,86 @@ func (r *surveyRepository) GetResponseTrends(surveyID uuid.UUID, days int) ([]do
 		}
 		trends = append(trends, trend)
 	}
-	
+
 	return trends, nil
+}
+
+// AddSurveyTeams adds team associations for a survey
+func (r *surveyRepository) AddSurveyTeams(surveyID uuid.UUID, teamIDs []uuid.UUID) error {
+	if len(teamIDs) == 0 {
+		return nil
+	}
+
+	tx, err := r.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	stmt, err := tx.Prepare(`INSERT INTO survey_teams (id, survey_id, team_id, created_at) VALUES ($1, $2, $3, NOW()) ON CONFLICT (survey_id, team_id) DO NOTHING`)
+	if err != nil {
+		return err
+	}
+	defer stmt.Close()
+
+	for _, teamID := range teamIDs {
+		_, err := stmt.Exec(uuid.New(), surveyID, teamID)
+		if err != nil {
+			return err
+		}
+	}
+
+	return tx.Commit()
+}
+
+// GetSurveyTeams retrieves all team IDs associated with a survey
+func (r *surveyRepository) GetSurveyTeams(surveyID uuid.UUID) ([]uuid.UUID, error) {
+	query := `SELECT team_id FROM survey_teams WHERE survey_id = $1`
+
+	rows, err := r.db.Query(query, surveyID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var teamIDs []uuid.UUID
+	for rows.Next() {
+		var teamID uuid.UUID
+		err := rows.Scan(&teamID)
+		if err != nil {
+			return nil, err
+		}
+		teamIDs = append(teamIDs, teamID)
+	}
+
+	return teamIDs, nil
+}
+
+// RemoveSurveyTeams removes all team associations for a survey
+func (r *surveyRepository) RemoveSurveyTeams(surveyID uuid.UUID) error {
+	_, err := r.db.Exec(`DELETE FROM survey_teams WHERE survey_id = $1`, surveyID)
+	return err
+}
+
+// GetAllTeamIDs retrieves all team IDs from the teams table
+func (r *surveyRepository) GetAllTeamIDs() ([]uuid.UUID, error) {
+	query := `SELECT id FROM teams WHERE is_active = true`
+
+	rows, err := r.db.Query(query)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var teamIDs []uuid.UUID
+	for rows.Next() {
+		var teamID uuid.UUID
+		err := rows.Scan(&teamID)
+		if err != nil {
+			return nil, err
+		}
+		teamIDs = append(teamIDs, teamID)
+	}
+
+	return teamIDs, nil
 }

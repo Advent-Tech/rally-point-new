@@ -73,6 +73,7 @@ class SurveysScreen extends StatefulWidget {
 class _SurveysScreenState extends State<SurveysScreen> {
   List<SurveyModel> _surveys = [];
   List<UserModel> _workers = [];
+  List<TeamModel> _teams = [];
   bool _isLoading = true;
   SurveyModel? _selectedSurvey;
   List<SurveyResponse>? _selectedSurveyResponses;
@@ -111,6 +112,19 @@ class _SurveysScreenState extends State<SurveysScreen> {
         debugPrint('Could not load workers: $e');
       }
 
+      // Load all teams for survey assignment
+      try {
+        final teamsResponse = await api.get(ApiConstants.teams);
+        if (teamsResponse.statusCode == 200) {
+          final data = teamsResponse.data is List
+              ? teamsResponse.data
+              : teamsResponse.data['teams'] ?? [];
+          _teams = (data as List).map((json) => TeamModel.fromJson(json)).toList();
+        }
+      } catch (e) {
+        debugPrint('Could not load teams: $e');
+      }
+
       setState(() => _isLoading = false);
     } catch (e) {
       setState(() => _isLoading = false);
@@ -144,7 +158,9 @@ class _SurveysScreenState extends State<SurveysScreen> {
     final descController = TextEditingController();
     bool requiresLocation = false;
     bool assignToAllWorkers = false;
+    bool assignToAllTeams = false;
     List<_QuestionData> questions = [];
+    List<TeamModel> selectedTeams = [];
     List<UserModel> selectedWorkers = [];
 
     if (!mounted) return;
@@ -205,6 +221,104 @@ class _SurveysScreenState extends State<SurveysScreen> {
                           ),
                           maxLines: 3,
                         ),
+                        const SizedBox(height: 16),
+                        // Team Assignment Section
+                        _SectionHeader(title: 'Assign to Teams', icon: Icons.groups_outlined),
+                        const SizedBox(height: 12),
+                        if (_teams.isEmpty)
+                          Container(
+                            padding: const EdgeInsets.all(16),
+                            decoration: BoxDecoration(
+                              color: AppColors.warning.withAlpha(20),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: const Row(
+                              children: [
+                                Icon(Icons.info_outline, color: AppColors.warning),
+                                SizedBox(width: 12),
+                                Expanded(
+                                  child: Text(
+                                    'No teams available. Please create a team first.',
+                                    style: TextStyle(color: AppColors.warning),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          )
+                        else ...[
+                          // Assign to all teams toggle
+                          Container(
+                            decoration: BoxDecoration(
+                              color: assignToAllTeams ? AppColors.primary.withAlpha(20) : Colors.grey.shade100,
+                              borderRadius: BorderRadius.circular(8),
+                              border: assignToAllTeams ? Border.all(color: AppColors.primary) : null,
+                            ),
+                            child: CheckboxListTile(
+                              title: const Text('Assign to all teams'),
+                              subtitle: Text(
+                                assignToAllTeams
+                                    ? 'Survey will be available to all ${_teams.length} teams'
+                                    : 'Select this to assign to all teams at once',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: assignToAllTeams ? AppColors.primary : Colors.grey.shade600,
+                                ),
+                              ),
+                              value: assignToAllTeams,
+                              onChanged: (v) => setDialogState(() {
+                                assignToAllTeams = v ?? false;
+                                if (assignToAllTeams) {
+                                  selectedTeams = List.from(_teams);
+                                } else {
+                                  selectedTeams = [];
+                                }
+                              }),
+                              controlAffinity: ListTileControlAffinity.leading,
+                              activeColor: AppColors.primary,
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          // Individual team selection (only shown when not assigning to all)
+                          if (!assignToAllTeams)
+                            DropdownSearch<TeamModel>.multiSelection(
+                              popupProps: PopupPropsMultiSelection.menu(
+                                showSearchBox: true,
+                                searchFieldProps: TextFieldProps(
+                                  decoration: InputDecoration(
+                                    hintText: 'Search teams by name...',
+                                    prefixIcon: const Icon(Icons.search),
+                                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                                  ),
+                                ),
+                                constraints: const BoxConstraints(maxHeight: 300),
+                              ),
+                              items: _teams,
+                              itemAsString: (item) => item.name,
+                              filterFn: (item, filter) {
+                                return item.name.toLowerCase().contains(filter.toLowerCase());
+                              },
+                              dropdownDecoratorProps: const DropDownDecoratorProps(
+                                dropdownSearchDecoration: InputDecoration(
+                                  labelText: 'Select Teams *',
+                                  hintText: 'Choose teams for this survey',
+                                  border: OutlineInputBorder(),
+                                ),
+                              ),
+                              selectedItems: selectedTeams,
+                              onChanged: (v) => setDialogState(() => selectedTeams = v),
+                              dropdownBuilder: (context, items) {
+                                if (items.isEmpty) return const Text('No teams selected');
+                                return Wrap(
+                                  spacing: 4,
+                                  runSpacing: 4,
+                                  children: items.map((t) => Chip(
+                                    label: Text(t.name, style: const TextStyle(fontSize: 12)),
+                                    onDeleted: () => setDialogState(() => selectedTeams.remove(t)),
+                                  )).toList(),
+                                );
+                              },
+                            ),
+                        ],
                         const SizedBox(height: 16),
                         SwitchListTile(
                           title: const Text('Require GPS Location'),
@@ -407,6 +521,12 @@ class _SurveysScreenState extends State<SurveysScreen> {
                           );
                           return;
                         }
+                        if (!assignToAllTeams && selectedTeams.isEmpty) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Please select at least one team or assign to all teams')),
+                          );
+                          return;
+                        }
                         if (questions.isEmpty) {
                           ScaffoldMessenger.of(context).showSnackBar(
                             const SnackBar(content: Text('Please add at least one question')),
@@ -433,6 +553,8 @@ class _SurveysScreenState extends State<SurveysScreen> {
                         _createSurvey(
                           title: titleController.text,
                           description: descController.text,
+                          teamIds: selectedTeams.map((t) => t.id).toList(),
+                          assignToAllTeams: assignToAllTeams,
                           requiresLocation: requiresLocation,
                           questions: questions,
                           workerIds: selectedWorkers.map((w) => w.id).toList(),
@@ -453,6 +575,8 @@ class _SurveysScreenState extends State<SurveysScreen> {
   Future<void> _createSurvey({
     required String title,
     required String description,
+    required List<String> teamIds,
+    required bool assignToAllTeams,
     required bool requiresLocation,
     required List<_QuestionData> questions,
     required List<String> workerIds,
@@ -473,12 +597,14 @@ class _SurveysScreenState extends State<SurveysScreen> {
         };
       }).toList();
 
-      // Create survey
+      // Create survey with multi-team support
       final response = await api.post(
         ApiConstants.surveys,
         data: {
           'title': title,
           'description': description,
+          'team_ids': teamIds,
+          'assign_to_all_teams': assignToAllTeams,
           'requires_location': requiresLocation,
           'questions': questionsList,
         },
@@ -495,10 +621,12 @@ class _SurveysScreenState extends State<SurveysScreen> {
         }
       }
 
-      if (mounted) {
+      if (mounted && response.statusCode == 201) {
+        final teamText = assignToAllTeams ? 'all teams' : '${teamIds.length} team${teamIds.length > 1 ? 's' : ''}';
+        final workerText = workerIds.isNotEmpty ? ' and assigned to ${workerIds.length} workers' : '';
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Survey created${workerIds.isNotEmpty ? ' and assigned to ${workerIds.length} workers' : ''}'),
+            content: Text('Survey created successfully for $teamText$workerText'),
             backgroundColor: AppColors.success,
           ),
         );

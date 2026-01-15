@@ -229,19 +229,28 @@ class TerritoryBoundary {
 
   /// Parse from GeoJSON feature
   factory TerritoryBoundary.fromGeoJsonFeature(Map<String, dynamic> feature) {
-    debugPrint('TerritoryBoundary.fromGeoJsonFeature: feature keys: ${feature.keys}');
     final properties = feature['properties'] as Map<String, dynamic>? ?? {};
     final geometry = feature['geometry'];
-    debugPrint('TerritoryBoundary: geometry type: ${geometry.runtimeType}');
-    debugPrint('TerritoryBoundary: geometry: $geometry');
 
-    final geometryMap = geometry is Map<String, dynamic> ? geometry : <String, dynamic>{};
+    // Handle case where geometry might be a string (JSON not auto-parsed)
+    Map<String, dynamic> geometryMap;
+    if (geometry is Map<String, dynamic>) {
+      geometryMap = geometry;
+    } else if (geometry is String) {
+      // Try to parse if it's a JSON string
+      try {
+        geometryMap = Map<String, dynamic>.from(jsonDecode(geometry));
+      } catch (_) {
+        geometryMap = <String, dynamic>{};
+      }
+    } else {
+      geometryMap = <String, dynamic>{};
+    }
 
     // Extract coordinates based on geometry type
     List<List<double>> coords = [];
     final geometryType = geometryMap['type'] as String?;
     final rawCoordinates = geometryMap['coordinates'];
-    debugPrint('TerritoryBoundary: geometryType: $geometryType, hasCoordinates: ${rawCoordinates != null}');
 
     if (rawCoordinates != null) {
       if (geometryType == 'Polygon') {
@@ -259,10 +268,8 @@ class TerritoryBoundary {
         // Take only the first polygon for simplicity
         if ((rawCoordinates as List).isNotEmpty) {
           final firstPolygon = rawCoordinates[0] as List;
-          debugPrint('MultiPolygon firstPolygon length: ${firstPolygon.length}');
           if (firstPolygon.isNotEmpty) {
             final outer = firstPolygon[0] as List;
-            debugPrint('MultiPolygon outer ring points: ${outer.length}');
             coords = outer.map<List<double>>((point) {
               final p = point as List;
               return [
@@ -270,13 +277,11 @@ class TerritoryBoundary {
                 (p[1] as num).toDouble(),
               ];
             }).toList();
-            debugPrint('Extracted ${coords.length} coordinates for MultiPolygon');
           }
         }
       }
     }
 
-    debugPrint('TerritoryBoundary FINAL: ${coords.length} coordinates');
     return TerritoryBoundary(
       id: feature['id']?.toString() ?? properties['id']?.toString() ?? '',
       name: properties['entity_name']?.toString() ??

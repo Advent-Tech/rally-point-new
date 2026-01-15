@@ -27,11 +27,29 @@ func (s *surveyService) CreateSurvey(creatorID uuid.UUID, req *domain.CreateSurv
 		return nil, fmt.Errorf("survey must have at least one question")
 	}
 
-	// Create survey
+	// Determine team IDs for multi-team assignment
+	var teamIDs []uuid.UUID
+	if req.AssignToAllTeams {
+		// Get all active team IDs
+		allTeamIDs, err := s.surveyRepo.GetAllTeamIDs()
+		if err != nil {
+			return nil, fmt.Errorf("failed to get all teams: %w", err)
+		}
+		teamIDs = allTeamIDs
+	} else if len(req.TeamIDs) > 0 {
+		// Use provided team IDs
+		teamIDs = req.TeamIDs
+	} else if req.TeamID != nil {
+		// Backward compatibility: use single team ID
+		teamIDs = []uuid.UUID{*req.TeamID}
+	}
+
+	// Create survey (team_id is now optional in DB)
 	survey := &domain.Survey{
 		ID:               uuid.New(),
 		Title:            req.Title,
-		TeamID:           req.TeamID,
+		TeamID:           req.TeamID, // Keep for backward compatibility
+		TeamIDs:          teamIDs,    // Assigned teams
 		CreatorID:        creatorID,
 		IsActive:         true,
 		RequiresLocation: req.RequiresLocation,
@@ -48,6 +66,14 @@ func (s *surveyService) CreateSurvey(creatorID uuid.UUID, req *domain.CreateSurv
 	err := s.surveyRepo.CreateSurvey(survey)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create survey: %w", err)
+	}
+
+	// Add team associations to junction table
+	if len(teamIDs) > 0 {
+		err = s.surveyRepo.AddSurveyTeams(survey.ID, teamIDs)
+		if err != nil {
+			return nil, fmt.Errorf("failed to assign survey to teams: %w", err)
+		}
 	}
 
 	// Create questions
