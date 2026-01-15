@@ -556,7 +556,7 @@ func (r *surveyRepository) RemoveSurveyTeams(surveyID uuid.UUID) error {
 
 // GetAllTeamIDs retrieves all team IDs from the teams table
 func (r *surveyRepository) GetAllTeamIDs() ([]uuid.UUID, error) {
-	query := `SELECT id FROM teams WHERE is_active = true`
+	query := `SELECT id FROM teams`
 
 	rows, err := r.db.Query(query)
 	if err != nil {
