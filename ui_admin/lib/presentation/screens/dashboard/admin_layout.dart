@@ -79,37 +79,42 @@ class _AdminLayoutState extends State<AdminLayout> {
       backgroundColor: AppColors.surface,
       elevation: 0,
       leading: IconButton(
-        icon: const Icon(Icons.menu),
+        icon: Container(
+          padding: const EdgeInsets.all(6),
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [Color(0xFF6366F1), Color(0xFF8B5CF6)],
+            ),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: const Icon(Icons.menu, color: Colors.white, size: 20),
+        ),
         onPressed: () => _scaffoldKey.currentState?.openDrawer(),
       ),
-      title: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            width: 32,
-            height: 32,
-            decoration: BoxDecoration(
-              color: AppColors.primary,
-              borderRadius: BorderRadius.circular(6),
-            ),
-            child: const Icon(
-              Icons.admin_panel_settings,
-              color: Colors.white,
-              size: 18,
-            ),
-          ),
-          const SizedBox(width: 8),
-          const Text(
-            'Admin Panel',
-            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-          ),
-        ],
+      title: SizedBox(
+        height: 36,
+        child: Image.asset(
+          'assets/horizontal-logo.png',
+          fit: BoxFit.contain,
+        ),
       ),
       actions: [
-        IconButton(
-          icon: const Icon(Icons.logout),
-          onPressed: () => _showLogoutDialog(context),
-          tooltip: 'Logout',
+        Container(
+          margin: const EdgeInsets.only(right: 8),
+          child: IconButton(
+            icon: Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: const Color(0xFFEF4444).withAlpha(20),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: const Icon(Icons.logout, color: Color(0xFFEF4444), size: 20),
+            ),
+            onPressed: () => _showLogoutDialog(context),
+            tooltip: 'Logout',
+          ),
         ),
       ],
     );
@@ -122,39 +127,28 @@ class _AdminLayoutState extends State<AdminLayout> {
         child: SafeArea(
           child: Column(
             children: [
-              // Header
+              // Header with Logo
               Container(
-                height: 64,
-                padding: const EdgeInsets.symmetric(horizontal: 16),
+                height: 72,
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                 child: Row(
                   children: [
+                    Expanded(
+                      child: Image.asset(
+                        'assets/horizontal-logo.png',
+                        fit: BoxFit.contain,
+                        alignment: Alignment.centerLeft,
+                      ),
+                    ),
                     Container(
-                      width: 40,
-                      height: 40,
                       decoration: BoxDecoration(
-                        color: AppColors.primary,
+                        color: AppColors.textSecondary.withAlpha(20),
                         borderRadius: BorderRadius.circular(8),
                       ),
-                      child: const Icon(
-                        Icons.admin_panel_settings,
-                        color: Colors.white,
-                        size: 24,
+                      child: IconButton(
+                        icon: const Icon(Icons.close),
+                        onPressed: () => Navigator.pop(context),
                       ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Text(
-                        'Admin Panel',
-                        style:
-                            Theme.of(context).textTheme.titleMedium?.copyWith(
-                                  fontWeight: FontWeight.bold,
-                                ),
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.close),
-                      onPressed: () => Navigator.pop(context),
                     ),
                   ],
                 ),
@@ -175,9 +169,16 @@ class _AdminLayoutState extends State<AdminLayout> {
                 padding: const EdgeInsets.all(16),
                 child: SizedBox(
                   width: double.infinity,
-                  child: OutlinedButton.icon(
-                    icon: const Icon(Icons.logout),
-                    label: const Text('Logout'),
+                  child: ElevatedButton.icon(
+                    icon: const Icon(Icons.logout, color: Colors.white),
+                    label: const Text('Logout', style: TextStyle(color: Colors.white)),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFFEF4444),
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
                     onPressed: () {
                       Navigator.pop(context);
                       _showLogoutDialog(context);
@@ -202,41 +203,42 @@ class _AdminLayoutState extends State<AdminLayout> {
       ),
       child: Column(
         children: [
-          // Header
+          // Header with Logo
           Container(
-            height: 64,
+            height: 72,
             padding: EdgeInsets.symmetric(
               horizontal: _isExpanded ? 16 : 8,
+              vertical: 12,
             ),
-            child: Row(
-              children: [
-                Container(
-                  width: 40,
-                  height: 40,
-                  decoration: BoxDecoration(
-                    color: AppColors.primary,
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: const Icon(
-                    Icons.admin_panel_settings,
-                    color: Colors.white,
-                    size: 24,
-                  ),
-                ),
-                if (_isExpanded) ...[
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Text(
-                      'Admin Panel',
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.bold,
-                          ),
-                      overflow: TextOverflow.ellipsis,
+            child: _isExpanded
+                ? Image.asset(
+                    'assets/horizontal-logo.png',
+                    fit: BoxFit.contain,
+                  )
+                : Container(
+                    width: 48,
+                    height: 48,
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: [Color(0xFF6366F1), Color(0xFF8B5CF6)],
+                      ),
+                      borderRadius: BorderRadius.circular(12),
+                      boxShadow: [
+                        BoxShadow(
+                          color: const Color(0xFF6366F1).withAlpha(60),
+                          blurRadius: 8,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    child: const Icon(
+                      Icons.location_on,
+                      color: Colors.white,
+                      size: 28,
                     ),
                   ),
-                ],
-              ],
-            ),
           ),
           const Divider(height: 1),
 
@@ -251,24 +253,37 @@ class _AdminLayoutState extends State<AdminLayout> {
           // Footer
           const Divider(height: 1),
           Padding(
-            padding: const EdgeInsets.all(8),
+            padding: const EdgeInsets.all(12),
             child: Row(
               children: [
-                IconButton(
-                  icon: Icon(
-                    _isExpanded ? Icons.chevron_left : Icons.chevron_right,
+                Container(
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF6366F1).withAlpha(20),
+                    borderRadius: BorderRadius.circular(10),
                   ),
-                  onPressed: () {
-                    setState(() => _isExpanded = !_isExpanded);
-                  },
-                  tooltip: _isExpanded ? 'Collapse' : 'Expand',
+                  child: IconButton(
+                    icon: Icon(
+                      _isExpanded ? Icons.chevron_left : Icons.chevron_right,
+                      color: const Color(0xFF6366F1),
+                    ),
+                    onPressed: () {
+                      setState(() => _isExpanded = !_isExpanded);
+                    },
+                    tooltip: _isExpanded ? 'Collapse' : 'Expand',
+                  ),
                 ),
                 if (_isExpanded) ...[
                   const Spacer(),
-                  IconButton(
-                    icon: const Icon(Icons.logout),
-                    onPressed: () => _showLogoutDialog(context),
-                    tooltip: 'Logout',
+                  Container(
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFEF4444).withAlpha(20),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: IconButton(
+                      icon: const Icon(Icons.logout, color: Color(0xFFEF4444)),
+                      onPressed: () => _showLogoutDialog(context),
+                      tooltip: 'Logout',
+                    ),
                   ),
                 ],
               ],
@@ -290,6 +305,7 @@ class _AdminLayoutState extends State<AdminLayout> {
         currentPath: widget.currentPath,
         isExpanded: isExpanded,
         onTap: () => _navigateTo(context, '/dashboard'),
+        iconColor: const Color(0xFF6366F1), // Indigo
       ),
       _NavItem(
         icon: Icons.people_outlined,
@@ -299,6 +315,7 @@ class _AdminLayoutState extends State<AdminLayout> {
         currentPath: widget.currentPath,
         isExpanded: isExpanded,
         onTap: () => _navigateTo(context, '/users'),
+        iconColor: const Color(0xFF3B82F6), // Blue
       ),
       _NavItem(
         icon: Icons.groups_outlined,
@@ -308,6 +325,7 @@ class _AdminLayoutState extends State<AdminLayout> {
         currentPath: widget.currentPath,
         isExpanded: isExpanded,
         onTap: () => _navigateTo(context, '/teams'),
+        iconColor: const Color(0xFF8B5CF6), // Purple
       ),
       _NavItem(
         icon: Icons.map_outlined,
@@ -317,6 +335,7 @@ class _AdminLayoutState extends State<AdminLayout> {
         currentPath: widget.currentPath,
         isExpanded: isExpanded,
         onTap: () => _navigateTo(context, '/territories'),
+        iconColor: const Color(0xFF10B981), // Emerald
       ),
       _NavItem(
         icon: Icons.assignment_outlined,
@@ -326,6 +345,7 @@ class _AdminLayoutState extends State<AdminLayout> {
         currentPath: widget.currentPath,
         isExpanded: isExpanded,
         onTap: () => _navigateTo(context, '/surveys'),
+        iconColor: const Color(0xFFF59E0B), // Amber
       ),
       _NavItem(
         icon: Icons.volunteer_activism_outlined,
@@ -335,6 +355,7 @@ class _AdminLayoutState extends State<AdminLayout> {
         currentPath: widget.currentPath,
         isExpanded: isExpanded,
         onTap: () => _navigateTo(context, '/donations'),
+        iconColor: const Color(0xFFEC4899), // Pink
       ),
       _NavItem(
         icon: Icons.article_outlined,
@@ -344,15 +365,17 @@ class _AdminLayoutState extends State<AdminLayout> {
         currentPath: widget.currentPath,
         isExpanded: isExpanded,
         onTap: () => _navigateTo(context, '/blogs'),
+        iconColor: const Color(0xFF14B8A6), // Teal
       ),
       _NavItem(
-        icon: Icons.volunteer_activism_outlined,
-        selectedIcon: Icons.volunteer_activism,
+        icon: Icons.favorite_outlined,
+        selectedIcon: Icons.favorite,
         label: 'Prayer Requests',
         path: '/prayer-requests',
         currentPath: widget.currentPath,
         isExpanded: isExpanded,
         onTap: () => _navigateTo(context, '/prayer-requests'),
+        iconColor: const Color(0xFFEF4444), // Red
       ),
       _NavItem(
         icon: Icons.analytics_outlined,
@@ -362,6 +385,7 @@ class _AdminLayoutState extends State<AdminLayout> {
         currentPath: widget.currentPath,
         isExpanded: isExpanded,
         onTap: () => _navigateTo(context, '/analytics'),
+        iconColor: const Color(0xFF06B6D4), // Cyan
       ),
       _NavItem(
         icon: Icons.explore_outlined,
@@ -371,6 +395,7 @@ class _AdminLayoutState extends State<AdminLayout> {
         currentPath: widget.currentPath,
         isExpanded: isExpanded,
         onTap: () => _navigateTo(context, '/activity-map'),
+        iconColor: const Color(0xFF84CC16), // Lime
       ),
       if (isSuperAdmin) ...[
         Padding(
@@ -388,6 +413,7 @@ class _AdminLayoutState extends State<AdminLayout> {
           currentPath: widget.currentPath,
           isExpanded: isExpanded,
           onTap: () => _navigateTo(context, '/admins'),
+          iconColor: const Color(0xFFFF6B35), // Orange
         ),
       ],
     ];
@@ -434,6 +460,7 @@ class _NavItem extends StatelessWidget {
   final String currentPath;
   final bool isExpanded;
   final VoidCallback onTap;
+  final Color iconColor;
 
   const _NavItem({
     required this.icon,
@@ -443,6 +470,7 @@ class _NavItem extends StatelessWidget {
     required this.currentPath,
     required this.isExpanded,
     required this.onTap,
+    required this.iconColor,
   });
 
   bool get isSelected => currentPath.startsWith(path);
@@ -452,22 +480,39 @@ class _NavItem extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
       child: Material(
-        color: isSelected ? AppColors.primary.withAlpha(20) : Colors.transparent,
-        borderRadius: BorderRadius.circular(8),
+        color: isSelected ? iconColor.withAlpha(25) : Colors.transparent,
+        borderRadius: BorderRadius.circular(12),
         child: InkWell(
-          borderRadius: BorderRadius.circular(8),
+          borderRadius: BorderRadius.circular(12),
           onTap: onTap,
           child: Padding(
             padding: EdgeInsets.symmetric(
-              horizontal: isExpanded ? 12 : 16,
+              horizontal: isExpanded ? 12 : 12,
               vertical: 12,
             ),
             child: Row(
               children: [
-                Icon(
-                  isSelected ? selectedIcon : icon,
-                  color: isSelected ? AppColors.primary : AppColors.textSecondary,
-                  size: 22,
+                Container(
+                  width: 36,
+                  height: 36,
+                  decoration: BoxDecoration(
+                    color: isSelected ? iconColor : iconColor.withAlpha(30),
+                    borderRadius: BorderRadius.circular(10),
+                    boxShadow: isSelected
+                        ? [
+                            BoxShadow(
+                              color: iconColor.withAlpha(60),
+                              blurRadius: 8,
+                              offset: const Offset(0, 2),
+                            ),
+                          ]
+                        : null,
+                  ),
+                  child: Icon(
+                    isSelected ? selectedIcon : icon,
+                    color: isSelected ? Colors.white : iconColor,
+                    size: 20,
+                  ),
                 ),
                 if (isExpanded) ...[
                   const SizedBox(width: 12),
@@ -475,13 +520,22 @@ class _NavItem extends StatelessWidget {
                     child: Text(
                       label,
                       style: TextStyle(
-                        color:
-                            isSelected ? AppColors.primary : AppColors.textPrimary,
-                        fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                        color: isSelected ? iconColor : AppColors.textPrimary,
+                        fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
+                        fontSize: 14,
                       ),
                       overflow: TextOverflow.ellipsis,
                     ),
                   ),
+                  if (isSelected)
+                    Container(
+                      width: 6,
+                      height: 6,
+                      decoration: BoxDecoration(
+                        color: iconColor,
+                        shape: BoxShape.circle,
+                      ),
+                    ),
                 ],
               ],
             ),

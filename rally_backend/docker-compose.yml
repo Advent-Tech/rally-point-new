@@ -142,7 +142,7 @@ services:
       - JWT_SECRET=your-super-secret-jwt-key-change-in-production
       - NATS_URL=nats:4222
       - STORAGE_PATH=/app/uploads
-      - BASE_URL=http://localhost:8081
+      - BASE_URL=http://18.188.1.122:8081
     volumes:
       - blog_uploads:/app/uploads
     depends_on:
