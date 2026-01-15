@@ -8,11 +8,8 @@ import '../../blocs/territory/territory_bloc.dart';
 import '../../blocs/worker_schedule/worker_schedule_bloc.dart';
 import '../../blocs/schedule/schedule_bloc.dart';
 import '../../blocs/delivery/delivery_bloc.dart';
-import '../../../core/theme/app_colors.dart';
-import '../../widgets/custom_button.dart';
-import '../../widgets/session_tracking_card.dart';
-import '../../widgets/app_logo.dart';
-import '../../widgets/walkie_bottom_sheet.dart';
+import '../../../core/theme/theme.dart';
+import '../../widgets/widgets.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -194,7 +191,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 IconButton(
                   icon: CircleAvatar(
                     radius: 16,
-                    backgroundColor: AppColors.primary.withAlpha(50),
+                    backgroundColor: AppColors.primary.withValues(alpha: 0.2),
                     child: Text(
                       userName.isNotEmpty ? userName[0].toUpperCase() : 'L',
                       style: const TextStyle(
@@ -241,7 +238,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                           decoration: BoxDecoration(
-                            color: AppColors.primary.withAlpha(30),
+                            color: AppColors.primary.withValues(alpha: 0.12),
                             borderRadius: BorderRadius.circular(20),
                           ),
                           child: Row(
@@ -267,68 +264,130 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             ),
 
-            // Team Stats Overview
+            // Team Overview Section Header
             SliverToBoxAdapter(
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 20),
-                child: Container(
-                  padding: const EdgeInsets.all(20),
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [
-                        AppColors.primary,
-                        AppColors.primary.withAlpha(200),
-                      ],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'Team Overview',
+                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        "Today's Overview",
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 18,
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      BlocBuilder<TerritoryBloc, TerritoryState>(
-                        builder: (context, territoryState) {
-                          // Get territory count from allocations (for leaders)
-                          int territoryCount = 0;
-                          if (territoryState is TerritoryAllocationsLoaded) {
-                            territoryCount = territoryState.territories.length;
-                          } else if (territoryState is TerritoryAssignmentsLoaded) {
-                            territoryCount = territoryState.assignments.length;
-                          }
+                    TextButton(
+                      onPressed: () => context.go('/reports'),
+                      child: const Text('Loading...'),
+                    ),
+                  ],
+                ),
+              ),
+            ),
 
-                          return Row(
-                            children: [
-                              _LeaderStatItem(
-                                icon: Icons.people,
-                                value: '-', // TODO: Load from team bloc
-                                label: 'Active Workers',
+            const SliverToBoxAdapter(child: SizedBox(height: 16)),
+
+            // Team Overview Stats Grid
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                child: BlocBuilder<TerritoryBloc, TerritoryState>(
+                  builder: (context, territoryState) {
+                    int territoryCount = 0;
+                    if (territoryState is TerritoryAllocationsLoaded) {
+                      territoryCount = territoryState.territories.length;
+                    } else if (territoryState is TerritoryAssignmentsLoaded) {
+                      territoryCount = territoryState.assignments.length;
+                    }
+
+                    return Column(
+                      children: [
+                        Row(
+                          children: [
+                            Expanded(
+                              child: OverviewStatCard(
+                                icon: Icons.people_outline,
+                                iconBackgroundColor: AppColors.primary,
+                                title: 'Total Workers',
+                                value: '0',
+                                unit: 'workers',
+                                description: 'Team members',
+                                trendText: '0 online now',
                               ),
-                              _LeaderStatItem(
-                                icon: Icons.map,
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: OverviewStatCard(
+                                icon: Icons.location_on_outlined,
+                                iconBackgroundColor: AppColors.secondary,
+                                title: 'Active Workers',
+                                value: '0',
+                                unit: 'tracking',
+                                description: 'Currently in field',
+                                trendText: 'No active tracking',
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: OverviewStatCard(
+                                icon: Icons.map_outlined,
+                                iconBackgroundColor: AppColors.warning,
+                                title: 'Territories',
                                 value: '$territoryCount',
-                                label: 'Territories',
+                                unit: 'areas',
+                                description: 'Assigned to team',
+                                trendText: 'All assigned',
                               ),
-                              _LeaderStatItem(
-                                icon: Icons.assignment_turned_in,
-                                value: '-', // TODO: Load from survey bloc
-                                label: 'Surveys Done',
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: BlocBuilder<DeliveryBloc, DeliveryState>(
+                                builder: (context, deliveryState) {
+                                  int deliveryCount = 0;
+                                  if (deliveryState is DeliveryListLoaded) {
+                                    deliveryCount = deliveryState.deliveries.length;
+                                  }
+                                  return OverviewStatCard(
+                                    icon: Icons.local_shipping_outlined,
+                                    iconBackgroundColor: AppColors.accent,
+                                    title: "Today's Deliveries",
+                                    value: '$deliveryCount',
+                                    unit: 'books',
+                                    description: 'Delivered today',
+                                    trendText: '$deliveryCount total',
+                                    trendColor: deliveryCount > 0 ? AppColors.success : AppColors.error,
+                                  );
+                                },
                               ),
-                            ],
-                          );
-                        },
-                      ),
-                    ],
-                  ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: OverviewStatCard(
+                                icon: Icons.assignment_outlined,
+                                iconBackgroundColor: AppColors.info,
+                                title: 'Completed Surveys',
+                                value: '0',
+                                unit: 'responses',
+                                description: 'Survey responses',
+                                trendText: 'This month',
+                                trendColor: AppColors.success,
+                              ),
+                            ),
+                            const Expanded(child: SizedBox()), // Empty space for odd number
+                          ],
+                        ),
+                      ],
+                    );
+                  },
                 ),
               ),
             ),
@@ -395,89 +454,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
             const SliverToBoxAdapter(child: SizedBox(height: 24)),
 
-            // Quick Actions for Leaders
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Quick Actions',
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: _QuickActionCard(
-                            icon: Icons.add_chart,
-                            label: 'New Survey',
-                            color: AppColors.warning,
-                            onTap: () => context.go('/survey'),
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: _QuickActionCard(
-                            icon: Icons.person_add,
-                            label: 'Add Worker',
-                            color: AppColors.primary,
-                            onTap: () => context.go('/team'),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: _QuickActionCard(
-                            icon: Icons.chat_bubble_outline,
-                            label: 'Team Chat',
-                            color: AppColors.secondary,
-                            onTap: () => context.go('/chat'),
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: _QuickActionCard(
-                            icon: Icons.speaker_phone,
-                            label: 'Walkie-Talkie',
-                            color: AppColors.accent,
-                            onTap: () => showWalkieBottomSheet(context),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: _QuickActionCard(
-                            icon: Icons.volunteer_activism,
-                            label: 'Prayer Requests',
-                            color: AppColors.info,
-                            onTap: () => context.go('/leader/prayer-requests'),
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: _QuickActionCard(
-                            icon: Icons.article_outlined,
-                            label: 'News & Updates',
-                            color: AppColors.warning,
-                            onTap: () => context.go('/leader/blogs'),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-            ),
+            // Quick Actions for Leaders - removed since Management section covers these
 
             const SliverToBoxAdapter(child: SizedBox(height: 24)),
 
@@ -581,7 +558,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 IconButton(
                   icon: CircleAvatar(
                     radius: 16,
-                    backgroundColor: AppColors.primary.withAlpha(50),
+                    backgroundColor: AppColors.primary.withValues(alpha: 0.2),
                     child: Text(
                       authState is AuthAuthenticated
                           ? (authState.user.displayName?.isNotEmpty == true
@@ -651,120 +628,97 @@ class _HomeScreenState extends State<HomeScreen> {
 
             const SliverToBoxAdapter(child: SizedBox(height: 16)),
 
-            // Quick Actions (Worker)
+            // Location Status Banner
+            SliverToBoxAdapter(
+              child: Center(
+                child: BlocBuilder<WorkSessionBloc, WorkSessionState>(
+                  builder: (context, sessionState) {
+                    final isActive = sessionState is WorkSessionActive;
+                    return LocationStatusBanner(
+                      isActive: isActive,
+                      onTap: () {
+                        if (isActive) {
+                          _showEndSessionDialog(context);
+                        } else {
+                          _showTerritorySelectionSheet(context);
+                        }
+                      },
+                    );
+                  },
+                ),
+              ),
+            ),
+
+            const SliverToBoxAdapter(child: SizedBox(height: 8)),
+
+            // Quick Actions Section Header
             SliverToBoxAdapter(
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 20),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Quick Actions',
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: BlocBuilder<WorkSessionBloc, WorkSessionState>(
-                            builder: (context, sessionState) {
-                              final isActive = sessionState is WorkSessionActive;
-                              return _QuickActionCard(
-                                icon: isActive ? Icons.stop_rounded : Icons.play_arrow_rounded,
-                                label: isActive ? 'End Session' : 'Start Session',
-                                color: isActive ? AppColors.error : AppColors.success,
-                                onTap: () {
-                                  if (isActive) {
-                                    _showEndSessionDialog(context);
-                                  } else {
-                                    _showTerritorySelectionSheet(context);
-                                  }
-                                },
-                              );
-                            },
-                          ),
+                child: Text(
+                  'Quick Action',
+                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ),
+
+            const SliverToBoxAdapter(child: SizedBox(height: 16)),
+
+            // Quick Actions Grid (Worker) - Large colorful tiles
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                child: BlocBuilder<WorkSessionBloc, WorkSessionState>(
+                  builder: (context, sessionState) {
+                    return QuickActionGrid(
+                      actions: [
+                        QuickActionTileData(
+                          icon: Icons.map_outlined,
+                          label: 'My Territory',
+                          backgroundColor: QuickActionColors.territory,
+                          onTap: () => context.go('/territory'),
                         ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: _QuickActionCard(
-                            icon: Icons.local_shipping_outlined,
-                            label: 'New Delivery',
-                            color: AppColors.accent,
-                            onTap: () => context.go('/delivery'),
-                          ),
+                        QuickActionTileData(
+                          icon: Icons.menu_book_outlined,
+                          label: 'Deliver Book',
+                          backgroundColor: QuickActionColors.delivery,
+                          onTap: () => context.go('/delivery'),
                         ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: _QuickActionCard(
-                            icon: Icons.assignment_outlined,
-                            label: 'Quick Survey',
-                            color: AppColors.warning,
-                            onTap: () => context.go('/survey'),
-                          ),
+                        QuickActionTileData(
+                          icon: Icons.assignment_outlined,
+                          label: 'Survey Form',
+                          backgroundColor: QuickActionColors.survey,
+                          onTap: () => context.go('/survey'),
                         ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: _QuickActionCard(
-                            icon: Icons.map_outlined,
-                            label: 'Territory',
-                            color: AppColors.primary,
-                            onTap: () => context.go('/territory'),
-                          ),
+                        QuickActionTileData(
+                          icon: Icons.groups_outlined,
+                          label: 'Team Group',
+                          backgroundColor: QuickActionColors.team,
+                          onTap: () => context.go('/chat'),
                         ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    // Prayer Request - workers can only create, not view list
-                    SizedBox(
-                      width: double.infinity,
-                      child: _QuickActionCard(
-                        icon: Icons.volunteer_activism,
-                        label: 'New Prayer Request',
-                        color: AppColors.secondary,
-                        onTap: () => context.go('/prayer-requests/new'),
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    // Communication row
-                    Row(
-                      children: [
-                        Expanded(
-                          child: _QuickActionCard(
-                            icon: Icons.chat_bubble_outline,
-                            label: 'Chat',
-                            color: AppColors.primary,
-                            onTap: () => context.go('/chat'),
-                          ),
+                        QuickActionTileData(
+                          icon: Icons.gps_fixed,
+                          label: 'GPS Tracking',
+                          backgroundColor: QuickActionColors.tracking,
+                          onTap: () {
+                            if (sessionState is WorkSessionActive) {
+                              _showEndSessionDialog(context);
+                            } else {
+                              _showTerritorySelectionSheet(context);
+                            }
+                          },
                         ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: _QuickActionCard(
-                            icon: Icons.speaker_phone,
-                            label: 'Walkie-Talkie',
-                            color: AppColors.accent,
-                            onTap: () => showWalkieBottomSheet(context),
-                          ),
+                        QuickActionTileData(
+                          icon: Icons.emoji_events_outlined,
+                          label: 'Achievements',
+                          backgroundColor: QuickActionColors.achievements,
+                          onTap: () {}, // TODO: Navigate to achievements
                         ),
                       ],
-                    ),
-                    const SizedBox(height: 12),
-                    // News row
-                    SizedBox(
-                      width: double.infinity,
-                      child: _QuickActionCard(
-                        icon: Icons.article_outlined,
-                        label: 'News & Updates',
-                        color: AppColors.warning,
-                        onTap: () => context.go('/blogs'),
-                      ),
-                    ),
-                  ],
+                    );
+                  },
                 ),
               ),
             ),
@@ -793,115 +747,102 @@ class _HomeScreenState extends State<HomeScreen> {
 
             const SliverToBoxAdapter(child: SizedBox(height: 24)),
 
-            // Today's Stats
+            // Ministry Overview Section
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                child: Text(
+                  'Ministry Overview',
+                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ),
+
+            const SliverToBoxAdapter(child: SizedBox(height: 16)),
+
+            // Ministry Stats Grid
             SliverToBoxAdapter(
               child: BlocBuilder<WorkSessionBloc, WorkSessionState>(
                 builder: (context, sessionState) {
-                  String timeActive = '0h 0m';
-                  int visitsCount = 0;
-                  String? territoryName;
+                  String hoursActive = '0.0';
 
                   if (sessionState is WorkSessionActive) {
-                    timeActive = sessionState.session.formattedDuration;
-                    visitsCount = sessionState.todayVisits.length;
-                    territoryName = sessionState.session.territoryName;
+                    // Convert duration to hours
+                    final duration = sessionState.session.duration;
+                    hoursActive = (duration.inMinutes / 60).toStringAsFixed(1);
                   }
 
                   return Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 20),
                     child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            Text(
-                              "Today's Progress",
-                              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                                fontWeight: FontWeight.bold,
+                            Expanded(
+                              child: OverviewStatCard(
+                                icon: Icons.route_outlined,
+                                iconBackgroundColor: AppColors.primary,
+                                title: 'Distance Covered',
+                                value: '0.0',
+                                unit: 'km',
+                                description: 'Total distance',
+                                trendText: 'No data',
+                                trendColor: AppColors.error,
                               ),
                             ),
-                            if (territoryName != null)
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                decoration: BoxDecoration(
-                                  color: AppColors.success.withAlpha(30),
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Container(
-                                      width: 8,
-                                      height: 8,
-                                      decoration: const BoxDecoration(
-                                        color: AppColors.success,
-                                        shape: BoxShape.circle,
-                                      ),
-                                    ),
-                                    const SizedBox(width: 6),
-                                    Text(
-                                      territoryName,
-                                      style: const TextStyle(
-                                        fontSize: 12,
-                                        fontWeight: FontWeight.w500,
-                                        color: AppColors.success,
-                                      ),
-                                    ),
-                                  ],
-                                ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: BlocBuilder<DeliveryBloc, DeliveryState>(
+                                builder: (context, deliveryState) {
+                                  int deliveryCount = 0;
+                                  if (deliveryState is DeliveryListLoaded) {
+                                    deliveryCount = deliveryState.deliveries.length;
+                                  }
+                                  return OverviewStatCard(
+                                    icon: Icons.menu_book_outlined,
+                                    iconBackgroundColor: AppColors.secondary,
+                                    title: 'Books Delivered',
+                                    value: '$deliveryCount',
+                                    unit: 'books',
+                                    description: 'Total deliveries',
+                                    trendText: deliveryCount > 0 ? '$deliveryCount total' : 'No activity',
+                                    trendColor: deliveryCount > 0 ? AppColors.success : AppColors.error,
+                                  );
+                                },
                               ),
+                            ),
                           ],
                         ),
-                        const SizedBox(height: 16),
-                        Container(
-                          padding: const EdgeInsets.all(20),
-                          decoration: BoxDecoration(
-                            color: isDark ? AppColors.surfaceDark : AppColors.surfaceLight,
-                            borderRadius: BorderRadius.circular(16),
-                            border: Border.all(
-                              color: isDark ? AppColors.borderDark : AppColors.borderLight,
+                        const SizedBox(height: 12),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: OverviewStatCard(
+                                icon: Icons.schedule_outlined,
+                                iconBackgroundColor: AppColors.accent,
+                                title: 'Hours Active',
+                                value: hoursActive,
+                                unit: 'hours',
+                                description: 'Total ministry time',
+                                trendText: 'No surveys',
+                                trendColor: AppColors.error,
+                              ),
                             ),
-                          ),
-                          child: Column(
-                            children: [
-                              Row(
-                                children: [
-                                  _StatItem(
-                                    icon: Icons.timer_outlined,
-                                    value: timeActive,
-                                    label: 'Time Active',
-                                    color: AppColors.primary,
-                                  ),
-                                  const SizedBox(width: 16),
-                                  _StatItem(
-                                    icon: Icons.route_outlined,
-                                    value: '0.0 km',
-                                    label: 'Distance',
-                                    color: AppColors.secondary,
-                                  ),
-                                ],
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: OverviewStatCard(
+                                icon: Icons.attach_money,
+                                iconBackgroundColor: AppColors.success,
+                                title: 'Donations Collected',
+                                value: '\$0',
+                                description: 'Total donations',
+                                trendText: 'No donations',
+                                trendColor: AppColors.error,
                               ),
-                              const SizedBox(height: 16),
-                              Row(
-                                children: [
-                                  _StatItem(
-                                    icon: Icons.home_work_outlined,
-                                    value: '$visitsCount',
-                                    label: 'Visits',
-                                    color: AppColors.accent,
-                                  ),
-                                  const SizedBox(width: 16),
-                                  _StatItem(
-                                    icon: Icons.local_shipping_outlined,
-                                    value: '0',
-                                    label: 'Deliveries',
-                                    color: AppColors.success,
-                                  ),
-                                ],
-                              ),
-                            ],
-                          ),
+                            ),
+                          ],
                         ),
                       ],
                     ),
@@ -954,7 +895,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         if (state is TerritoryAssignmentsLoaded && state.assignments.isNotEmpty) {
                           final assignment = state.assignments.first;
                           final territoryName = assignment.entityName ?? 'Territory ${assignment.entityId}';
-                          final completeness = assignment.completenessPercentage ?? 0.0;
+                          final completeness = assignment.completenessPercentage;
 
                           return GestureDetector(
                             onTap: () => context.go('/territory'),
@@ -973,7 +914,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                     width: 56,
                                     height: 56,
                                     decoration: BoxDecoration(
-                                      color: AppColors.primary.withAlpha(30),
+                                      color: AppColors.primary.withValues(alpha: 0.12),
                                       borderRadius: BorderRadius.circular(12),
                                     ),
                                     child: const Icon(
@@ -999,7 +940,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                             Container(
                                               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                                               decoration: BoxDecoration(
-                                                color: AppColors.success.withAlpha(30),
+                                                color: AppColors.success.withValues(alpha: 0.12),
                                                 borderRadius: BorderRadius.circular(4),
                                               ),
                                               child: Text(
@@ -1154,7 +1095,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                         width: 40,
                                         height: 40,
                                         decoration: BoxDecoration(
-                                          color: color.withAlpha(30),
+                                          color: color.withValues(alpha: 0.12),
                                           borderRadius: BorderRadius.circular(10),
                                         ),
                                         child: const Icon(
@@ -1239,117 +1180,6 @@ class _HomeScreenState extends State<HomeScreen> {
             const SliverToBoxAdapter(child: SizedBox(height: 100)),
           ],
         ),
-      ),
-    );
-  }
-}
-
-class _QuickActionCard extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final Color color;
-  final VoidCallback onTap;
-
-  const _QuickActionCard({
-    required this.icon,
-    required this.label,
-    required this.color,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
-    return Material(
-      color: isDark ? AppColors.surfaceDark : AppColors.surfaceLight,
-      borderRadius: BorderRadius.circular(16),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(16),
-        child: Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(
-              color: isDark ? AppColors.borderDark : AppColors.borderLight,
-            ),
-          ),
-          child: Column(
-            children: [
-              Container(
-                width: 48,
-                height: 48,
-                decoration: BoxDecoration(
-                  color: color.withAlpha(30),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Icon(icon, color: color, size: 24),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                label,
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  fontWeight: FontWeight.w500,
-                ),
-                textAlign: TextAlign.center,
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _StatItem extends StatelessWidget {
-  final IconData icon;
-  final String value;
-  final String label;
-  final Color color;
-
-  const _StatItem({
-    required this.icon,
-    required this.value,
-    required this.label,
-    required this.color,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
-    return Expanded(
-      child: Row(
-        children: [
-          Container(
-            width: 40,
-            height: 40,
-            decoration: BoxDecoration(
-              color: color.withAlpha(30),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Icon(icon, color: color, size: 20),
-          ),
-          const SizedBox(width: 12),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                value,
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              Text(
-                label,
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
-                ),
-              ),
-            ],
-          ),
-        ],
       ),
     );
   }
@@ -1531,7 +1361,7 @@ class _TerritoryListItem extends StatelessWidget {
         width: 48,
         height: 48,
         decoration: BoxDecoration(
-          color: AppColors.primary.withAlpha(30),
+          color: AppColors.primary.withValues(alpha: 0.12),
           borderRadius: BorderRadius.circular(12),
         ),
         child: const Icon(
@@ -1554,7 +1384,7 @@ class _TerritoryListItem extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                 decoration: BoxDecoration(
-                  color: _getStatusColor(status).withAlpha(30),
+                  color: _getStatusColor(status).withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(4),
                 ),
                 child: Text(
@@ -1636,8 +1466,8 @@ class _TodayScheduleCard extends StatelessWidget {
           gradient: isNow
               ? LinearGradient(
                   colors: [
-                    AppColors.success.withOpacity(0.15),
-                    AppColors.success.withOpacity(0.05),
+                    AppColors.success.withValues(alpha: 0.15),
+                    AppColors.success.withValues(alpha: 0.05),
                   ],
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
@@ -1688,7 +1518,7 @@ class _TodayScheduleCard extends StatelessWidget {
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                         decoration: BoxDecoration(
-                          color: statusColor.withOpacity(0.2),
+                          color: statusColor.withValues(alpha: 0.2),
                           borderRadius: BorderRadius.circular(8),
                         ),
                         child: Text(
@@ -1726,7 +1556,7 @@ class _TodayScheduleCard extends StatelessWidget {
                             Container(
                               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                               decoration: BoxDecoration(
-                                color: statusColor.withOpacity(0.2),
+                                color: statusColor.withValues(alpha: 0.2),
                                 borderRadius: BorderRadius.circular(4),
                               ),
                               child: Text(
@@ -1751,7 +1581,7 @@ class _TodayScheduleCard extends StatelessWidget {
                 width: double.infinity,
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: AppColors.success.withOpacity(0.1),
+                  color: AppColors.success.withValues(alpha: 0.1),
                   borderRadius: const BorderRadius.only(
                     bottomLeft: Radius.circular(16),
                     bottomRight: Radius.circular(16),
@@ -1799,7 +1629,7 @@ class _NoScheduleCard extends StatelessWidget {
               width: 48,
               height: 48,
               decoration: BoxDecoration(
-                color: AppColors.secondary.withOpacity(0.2),
+                color: AppColors.secondary.withValues(alpha: 0.2),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Icon(
@@ -1898,7 +1728,7 @@ class _ManagementListCard extends StatelessWidget {
                           width: 48,
                           height: 48,
                           decoration: BoxDecoration(
-                            color: item.color.withAlpha(30),
+                            color: item.color.withValues(alpha: 0.12),
                             borderRadius: BorderRadius.circular(12),
                           ),
                           child: Icon(item.icon, color: item.color, size: 24),
@@ -1951,55 +1781,6 @@ class _ManagementListCard extends StatelessWidget {
   }
 }
 
-// Leader stat item for dashboard
-class _LeaderStatItem extends StatelessWidget {
-  final IconData icon;
-  final String value;
-  final String label;
-
-  const _LeaderStatItem({
-    required this.icon,
-    required this.value,
-    required this.label,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Expanded(
-      child: Column(
-        children: [
-          Container(
-            width: 40,
-            height: 40,
-            decoration: BoxDecoration(
-              color: Colors.white.withAlpha(50),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Icon(icon, color: Colors.white, size: 20),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            value,
-            style: const TextStyle(
-              color: Colors.white,
-              fontWeight: FontWeight.bold,
-              fontSize: 20,
-            ),
-          ),
-          Text(
-            label,
-            style: TextStyle(
-              color: Colors.white.withAlpha(200),
-              fontSize: 11,
-            ),
-            textAlign: TextAlign.center,
-          ),
-        ],
-      ),
-    );
-  }
-}
-
 // Activity item for team activity feed
 class _ActivityItem extends StatelessWidget {
   final IconData icon;
@@ -2025,7 +1806,7 @@ class _ActivityItem extends StatelessWidget {
         width: 40,
         height: 40,
         decoration: BoxDecoration(
-          color: color.withAlpha(30),
+          color: color.withValues(alpha: 0.12),
           borderRadius: BorderRadius.circular(10),
         ),
         child: Icon(icon, color: color, size: 20),

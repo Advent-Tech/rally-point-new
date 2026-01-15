@@ -536,6 +536,13 @@ class _TerritoriesScreenState extends State<TerritoriesScreen> with SingleTicker
   }
 
   Widget _buildOverview() {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isMobile = screenWidth < 768;
+
+    if (isMobile) {
+      return _buildMobileOverview();
+    }
+
     return Row(
       children: [
         // Map view (takes most of the space)
@@ -825,6 +832,258 @@ class _TerritoriesScreenState extends State<TerritoriesScreen> with SingleTicker
           ),
         ),
       ],
+    );
+  }
+
+  // Mobile-optimized overview with map and expandable bottom sheet for stats
+  Widget _buildMobileOverview() {
+    return Stack(
+      children: [
+        // Full-screen map
+        FlutterMap(
+          mapController: _mapController,
+          options: MapOptions(
+            initialCenter: _initialCenter,
+            initialZoom: 10,
+            minZoom: 4,
+            maxZoom: 18,
+            onMapReady: () {
+              setState(() => _isMapReady = true);
+              Future.delayed(const Duration(milliseconds: 300), _loadTerritoriesInBounds);
+            },
+            onPositionChanged: _onMapPositionChanged,
+          ),
+          children: [
+            TileLayer(
+              urlTemplate: MapConstants.getTileUrl(),
+              userAgentPackageName: 'com.rallypoint.admin',
+              tileSize: 512,
+              zoomOffset: -1,
+            ),
+            if (_currentZoom >= _polygonZoomThreshold)
+              PolygonLayer(polygons: _buildPolygons()),
+            MarkerLayer(markers: _buildMarkers()),
+          ],
+        ),
+        // Loading indicator
+        if (_isLoadingMap)
+          Positioned(
+            top: 16,
+            left: 16,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(20),
+                boxShadow: [
+                  BoxShadow(color: Colors.black.withAlpha(30), blurRadius: 8),
+                ],
+              ),
+              child: const Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)),
+                  SizedBox(width: 8),
+                  Text('Loading...', style: TextStyle(fontSize: 12)),
+                ],
+              ),
+            ),
+          ),
+        // Zoom controls (smaller on mobile)
+        Positioned(
+          right: 12,
+          top: 12,
+          child: Column(
+            children: [
+              _ZoomButton(icon: Icons.add, onPressed: () {
+                final zoom = _mapController.camera.zoom;
+                _mapController.move(_mapController.camera.center, zoom + 1);
+              }),
+              const SizedBox(height: 6),
+              _ZoomButton(icon: Icons.remove, onPressed: () {
+                final zoom = _mapController.camera.zoom;
+                _mapController.move(_mapController.camera.center, zoom - 1);
+              }),
+              const SizedBox(height: 6),
+              _ZoomButton(icon: Icons.my_location, onPressed: () {
+                _mapController.move(_initialCenter, 12);
+              }),
+            ],
+          ),
+        ),
+        // Stats button (opens bottom sheet)
+        Positioned(
+          left: 12,
+          bottom: 12,
+          child: GestureDetector(
+            onTap: _showMobileStatsSheet,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12),
+                boxShadow: [
+                  BoxShadow(color: Colors.black.withAlpha(30), blurRadius: 8),
+                ],
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.bar_chart, color: AppColors.primary, size: 20),
+                  const SizedBox(width: 8),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        '${_unionStats.length} Unions',
+                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                      ),
+                      Text(
+                        '${_territoriesCache.length} territories loaded',
+                        style: TextStyle(fontSize: 11, color: AppColors.textSecondary),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(width: 8),
+                  Icon(Icons.expand_less, color: AppColors.textSecondary, size: 20),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  // Mobile stats bottom sheet
+  void _showMobileStatsSheet() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => DraggableScrollableSheet(
+        initialChildSize: 0.5,
+        minChildSize: 0.3,
+        maxChildSize: 0.9,
+        builder: (context, scrollController) => Container(
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+          ),
+          child: Column(
+            children: [
+              // Handle bar
+              Container(
+                margin: const EdgeInsets.only(top: 12),
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.grey[300],
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              // Header
+              Padding(
+                padding: const EdgeInsets.all(16),
+                child: Row(
+                  children: [
+                    Text(
+                      'Territory Statistics',
+                      style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+                    ),
+                    const Spacer(),
+                    IconButton(
+                      icon: const Icon(Icons.close),
+                      onPressed: () => Navigator.pop(context),
+                    ),
+                  ],
+                ),
+              ),
+              // Mini stats
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: Row(
+                  children: [
+                    _MiniStatBox(
+                      label: 'Unions',
+                      value: '${_unionStats.length}',
+                      color: AppColors.primary,
+                    ),
+                    const SizedBox(width: 8),
+                    _MiniStatBox(
+                      label: 'Territories',
+                      value: _formatNumber(_unionStats.fold(0, (sum, u) => sum + u.territoryCount)),
+                      color: AppColors.info,
+                    ),
+                    const SizedBox(width: 8),
+                    _MiniStatBox(
+                      label: 'Allocated',
+                      value: '${_allocations.length}',
+                      color: AppColors.success,
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 12),
+              const Divider(height: 1),
+              // Union list
+              Expanded(
+                child: _isLoadingStats
+                    ? const Center(child: CircularProgressIndicator())
+                    : _statsError != null
+                        ? Center(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(Icons.error_outline, color: AppColors.error, size: 40),
+                                const SizedBox(height: 8),
+                                TextButton.icon(
+                                  onPressed: () {
+                                    Navigator.pop(context);
+                                    _loadUnionStats();
+                                  },
+                                  icon: const Icon(Icons.refresh),
+                                  label: const Text('Retry'),
+                                ),
+                              ],
+                            ),
+                          )
+                        : ListView.builder(
+                            controller: scrollController,
+                            padding: const EdgeInsets.symmetric(vertical: 8),
+                            itemCount: _unionStats.length,
+                            itemBuilder: (context, index) {
+                              final stats = _unionStats[index];
+                              final color = _unionColors[index % _unionColors.length];
+                              return ListTile(
+                                dense: true,
+                                leading: Container(
+                                  width: 12,
+                                  height: 12,
+                                  decoration: BoxDecoration(
+                                    color: color,
+                                    borderRadius: BorderRadius.circular(2),
+                                  ),
+                                ),
+                                title: Text(stats.unionName, style: const TextStyle(fontWeight: FontWeight.w500)),
+                                subtitle: Text('${_formatNumber(stats.territoryCount)} territories'),
+                                trailing: Text(
+                                  '${_formatNumber(stats.totalHousingUnits)} homes',
+                                  style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                                ),
+                                onTap: () {
+                                  Navigator.pop(context);
+                                  _loadUnionTerritories(stats.unionName);
+                                },
+                              );
+                            },
+                          ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 

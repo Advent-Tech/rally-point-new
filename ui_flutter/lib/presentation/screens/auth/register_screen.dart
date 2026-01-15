@@ -10,6 +10,7 @@ import '../../../data/models/team_model.dart';
 import '../../../data/repositories/team_repository.dart';
 import '../../widgets/custom_text_field.dart';
 import '../../widgets/custom_button.dart';
+import '../../widgets/feedback/app_snackbar.dart';
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
@@ -239,41 +240,21 @@ class _RegisterScreenState extends State<RegisterScreen> {
           case ApiSuccess<TeamModel>(:final data):
             _selectTeam(data);
             if (mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text('Found team: ${data.name}'),
-                  backgroundColor: AppColors.success,
-                ),
-              );
+              AppSnackbar.success(context, message: 'Found team: ${data.name}');
             }
           case ApiFailure<TeamModel>(:final message):
             if (mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text('Team not found: $message'),
-                  backgroundColor: AppColors.error,
-                ),
-              );
+              AppSnackbar.error(context, message: 'Team not found: $message');
             }
         }
       } else {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Invalid team link. Please paste a valid team invite link.'),
-              backgroundColor: AppColors.warning,
-            ),
-          );
+          AppSnackbar.warning(context, message: 'Invalid team link. Please paste a valid team invite link.');
         }
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Failed to access clipboard'),
-            backgroundColor: AppColors.error,
-          ),
-        );
+        AppSnackbar.error(context, message: 'Failed to access clipboard');
       }
     }
   }
@@ -282,12 +263,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
     if (_formKey.currentState?.validate() ?? false) {
       // Validate team requirements for workers
       if (_selectedRole == 'worker' && _selectedTeam == null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Please select a team to request joining'),
-            backgroundColor: AppColors.error,
-          ),
-        );
+        AppSnackbar.error(context, message: 'Please select a team to request joining');
         return;
       }
 
@@ -318,12 +294,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
       body: BlocListener<AuthBloc, AuthState>(
         listener: (context, state) {
           if (state is AuthError) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(state.message),
-                backgroundColor: AppColors.error,
-              ),
-            );
+            AppSnackbar.error(context, message: state.message);
           } else if (state is AuthPendingVerification) {
             // Show pending verification dialog and navigate to login
             showDialog(
@@ -351,7 +322,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     Container(
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
-                        color: AppColors.info.withAlpha(20),
+                        color: AppColors.info.withValues(alpha: 0.08),
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: Row(
@@ -484,9 +455,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     Container(
                       padding: const EdgeInsets.all(16),
                       decoration: BoxDecoration(
-                        color: AppColors.info.withAlpha(15),
+                        color: AppColors.info.withValues(alpha: 0.06),
                         borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: AppColors.info.withAlpha(40)),
+                        border: Border.all(color: AppColors.info.withValues(alpha: 0.16)),
                       ),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -588,9 +559,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                         decoration: BoxDecoration(
-                          color: AppColors.success.withAlpha(20),
+                          color: AppColors.success.withValues(alpha: 0.08),
                           borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: AppColors.success.withAlpha(50)),
+                          border: Border.all(color: AppColors.success.withValues(alpha: 0.2)),
                         ),
                         child: Row(
                           children: [
@@ -612,7 +583,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                       'Led by ${_selectedTeam!.leaderName}',
                                       style: TextStyle(
                                         fontSize: 12,
-                                        color: AppColors.success.withAlpha(180),
+                                        color: AppColors.success.withValues(alpha: 0.7),
                                       ),
                                     ),
                                 ],
@@ -752,7 +723,7 @@ class _RoleCard extends StatelessWidget {
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
           color: isSelected
-              ? AppColors.primary.withAlpha(20)
+              ? AppColors.primary.withValues(alpha: 0.08)
               : (isDark ? AppColors.surfaceDark : AppColors.surfaceLight),
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
@@ -769,7 +740,7 @@ class _RoleCard extends StatelessWidget {
               height: 48,
               decoration: BoxDecoration(
                 color: isSelected
-                    ? AppColors.primary.withAlpha(30)
+                    ? AppColors.primary.withValues(alpha: 0.12)
                     : (isDark ? AppColors.borderDark : AppColors.borderLight),
                 borderRadius: BorderRadius.circular(12),
               ),

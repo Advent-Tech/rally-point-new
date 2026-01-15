@@ -11,7 +11,8 @@ class UsersScreen extends StatefulWidget {
   State<UsersScreen> createState() => _UsersScreenState();
 }
 
-class _UsersScreenState extends State<UsersScreen> with SingleTickerProviderStateMixin {
+class _UsersScreenState extends State<UsersScreen>
+    with SingleTickerProviderStateMixin {
   late TabController _tabController;
   List<UserModel> _pendingLeaders = [];
   List<UserModel> _pendingWorkers = [];
@@ -37,9 +38,9 @@ class _UsersScreenState extends State<UsersScreen> with SingleTickerProviderStat
 
       // Load pending team leaders
       final leadersResponse = await api.get(ApiConstants.adminTeamLeaders);
-      debugPrint('Leaders response: ${leadersResponse.statusCode} - ${leadersResponse.data}');
+      debugPrint(
+          'Leaders response: ${leadersResponse.statusCode} - ${leadersResponse.data}');
       if (leadersResponse.statusCode == 200) {
-        // Backend returns { leaders: [...], total, pending, verified, rejected }
         final data = leadersResponse.data is List
             ? leadersResponse.data
             : leadersResponse.data['leaders'] ?? [];
@@ -56,9 +57,8 @@ class _UsersScreenState extends State<UsersScreen> with SingleTickerProviderStat
         final data = workersResponse.data is List
             ? workersResponse.data
             : workersResponse.data['workers'] ?? [];
-        _pendingWorkers = (data as List)
-            .map((json) => UserModel.fromJson(json))
-            .toList();
+        _pendingWorkers =
+            (data as List).map((json) => UserModel.fromJson(json)).toList();
       }
 
       setState(() => _isLoading = false);
@@ -168,28 +168,34 @@ class _UsersScreenState extends State<UsersScreen> with SingleTickerProviderStat
 
   @override
   Widget build(BuildContext context) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isMobile = screenWidth < 768;
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('User Management'),
         bottom: TabBar(
           controller: _tabController,
+          isScrollable: isMobile,
           tabs: [
             Tab(
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Text('Pending Leaders'),
+                  Text(isMobile ? 'Leaders' : 'Pending Leaders'),
                   if (_pendingLeaders.isNotEmpty) ...[
                     const SizedBox(width: 8),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 2),
                       decoration: BoxDecoration(
                         color: AppColors.warning,
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Text(
                         '${_pendingLeaders.length}',
-                        style: const TextStyle(color: Colors.white, fontSize: 12),
+                        style:
+                            const TextStyle(color: Colors.white, fontSize: 12),
                       ),
                     ),
                   ],
@@ -200,25 +206,27 @@ class _UsersScreenState extends State<UsersScreen> with SingleTickerProviderStat
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Text('Pending Workers'),
+                  Text(isMobile ? 'Workers' : 'Pending Workers'),
                   if (_pendingWorkers.isNotEmpty) ...[
                     const SizedBox(width: 8),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 2),
                       decoration: BoxDecoration(
                         color: AppColors.warning,
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Text(
                         '${_pendingWorkers.length}',
-                        style: const TextStyle(color: Colors.white, fontSize: 12),
+                        style:
+                            const TextStyle(color: Colors.white, fontSize: 12),
                       ),
                     ),
                   ],
                 ],
               ),
             ),
-            const Tab(text: 'All Users'),
+            Tab(text: isMobile ? 'All' : 'All Users'),
           ],
         ),
       ),
@@ -257,97 +265,204 @@ class _UsersScreenState extends State<UsersScreen> with SingleTickerProviderStat
       );
     }
 
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isMobile = screenWidth < 768;
+
     return RefreshIndicator(
       onRefresh: _loadData,
       child: ListView.builder(
-        padding: const EdgeInsets.all(16),
+        padding: EdgeInsets.all(isMobile ? 12 : 16),
         itemCount: users.length,
         itemBuilder: (context, index) {
           final user = users[index];
           return Card(
-            margin: const EdgeInsets.only(bottom: 12),
+            margin: EdgeInsets.only(bottom: isMobile ? 8 : 12),
             child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Row(
-                children: [
-                  CircleAvatar(
-                    backgroundColor: AppColors.primary.withAlpha(30),
-                    child: Text(
-                      user.fullName.isNotEmpty ? user.fullName[0].toUpperCase() : '?',
-                      style: const TextStyle(
-                        color: AppColors.primary,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          user.fullName,
-                          style: const TextStyle(fontWeight: FontWeight.w600),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          user.email,
-                          style: TextStyle(
-                            color: AppColors.textSecondary,
-                            fontSize: 13,
-                          ),
-                        ),
-                        if (user.teamName != null) ...[
-                          const SizedBox(height: 4),
-                          Text(
-                            'Team: ${user.teamName}',
-                            style: TextStyle(
-                              color: AppColors.textSecondary,
-                              fontSize: 13,
-                            ),
-                          ),
-                        ],
-                      ],
-                    ),
-                  ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: AppColors.warning.withAlpha(30),
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    child: const Text(
-                      'Pending',
-                      style: TextStyle(
-                        color: AppColors.warning,
-                        fontWeight: FontWeight.w600,
-                        fontSize: 12,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  OutlinedButton(
-                    onPressed: () => _showRejectDialog(user),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: AppColors.error,
-                      side: const BorderSide(color: AppColors.error),
-                    ),
-                    child: const Text('Reject'),
-                  ),
-                  const SizedBox(width: 8),
-                  ElevatedButton(
-                    onPressed: () => _verifyUser(user),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.success,
-                    ),
-                    child: const Text('Verify'),
-                  ),
-                ],
-              ),
+              padding: EdgeInsets.all(isMobile ? 12 : 16),
+              child: isMobile
+                  ? _buildMobileUserCard(user)
+                  : _buildDesktopUserCard(user),
             ),
           );
         },
       ),
+    );
+  }
+
+  Widget _buildDesktopUserCard(UserModel user) {
+    return Row(
+      children: [
+        CircleAvatar(
+          backgroundColor: AppColors.primary.withAlpha(30),
+          child: Text(
+            user.fullName.isNotEmpty ? user.fullName[0].toUpperCase() : '?',
+            style: const TextStyle(
+              color: AppColors.primary,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ),
+        const SizedBox(width: 16),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                user.fullName,
+                style: const TextStyle(fontWeight: FontWeight.w600),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                user.email,
+                style: TextStyle(
+                  color: AppColors.textSecondary,
+                  fontSize: 13,
+                ),
+              ),
+              if (user.teamName != null) ...[
+                const SizedBox(height: 4),
+                Text(
+                  'Team: ${user.teamName}',
+                  style: TextStyle(
+                    color: AppColors.textSecondary,
+                    fontSize: 13,
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+          decoration: BoxDecoration(
+            color: AppColors.warning.withAlpha(30),
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: const Text(
+            'Pending',
+            style: TextStyle(
+              color: AppColors.warning,
+              fontWeight: FontWeight.w600,
+              fontSize: 12,
+            ),
+          ),
+        ),
+        const SizedBox(width: 16),
+        OutlinedButton(
+          onPressed: () => _showRejectDialog(user),
+          style: OutlinedButton.styleFrom(
+            foregroundColor: AppColors.error,
+            side: const BorderSide(color: AppColors.error),
+          ),
+          child: const Text('Reject'),
+        ),
+        const SizedBox(width: 8),
+        ElevatedButton(
+          onPressed: () => _verifyUser(user),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: AppColors.success,
+          ),
+          child: const Text('Verify'),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildMobileUserCard(UserModel user) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            CircleAvatar(
+              radius: 20,
+              backgroundColor: AppColors.primary.withAlpha(30),
+              child: Text(
+                user.fullName.isNotEmpty ? user.fullName[0].toUpperCase() : '?',
+                style: const TextStyle(
+                  color: AppColors.primary,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    user.fullName,
+                    style: const TextStyle(
+                        fontWeight: FontWeight.w600, fontSize: 15),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    user.email,
+                    style: TextStyle(
+                      color: AppColors.textSecondary,
+                      fontSize: 12,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ),
+            ),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              decoration: BoxDecoration(
+                color: AppColors.warning.withAlpha(30),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Text(
+                'Pending',
+                style: TextStyle(
+                  color: AppColors.warning,
+                  fontWeight: FontWeight.w600,
+                  fontSize: 11,
+                ),
+              ),
+            ),
+          ],
+        ),
+        if (user.teamName != null) ...[
+          const SizedBox(height: 8),
+          Text(
+            'Team: ${user.teamName}',
+            style: TextStyle(
+              color: AppColors.textSecondary,
+              fontSize: 12,
+            ),
+          ),
+        ],
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            Expanded(
+              child: OutlinedButton(
+                onPressed: () => _showRejectDialog(user),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: AppColors.error,
+                  side: const BorderSide(color: AppColors.error),
+                  padding: const EdgeInsets.symmetric(vertical: 10),
+                ),
+                child: const Text('Reject'),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: ElevatedButton(
+                onPressed: () => _verifyUser(user),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.success,
+                  padding: const EdgeInsets.symmetric(vertical: 10),
+                ),
+                child: const Text('Verify'),
+              ),
+            ),
+          ],
+        ),
+      ],
     );
   }
 

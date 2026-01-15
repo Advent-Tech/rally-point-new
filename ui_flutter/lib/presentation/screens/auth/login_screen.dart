@@ -6,6 +6,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../widgets/custom_text_field.dart';
 import '../../widgets/custom_button.dart';
 import '../../widgets/app_logo.dart';
+import '../../widgets/feedback/app_snackbar.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -44,12 +45,7 @@ class _LoginScreenState extends State<LoginScreen> {
       body: BlocListener<AuthBloc, AuthState>(
         listener: (context, state) {
           if (state is AuthError) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(state.message),
-                backgroundColor: AppColors.error,
-              ),
-            );
+            AppSnackbar.error(context, message: state.message);
           } else if (state is AuthPendingVerification) {
             // Show attractive pending verification dialog
             showDialog(
@@ -67,7 +63,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
                       colors: [
-                        AppColors.primary.withAlpha(10),
+                        AppColors.primary.withValues(alpha: 0.04),
                         Colors.white,
                       ],
                     ),
@@ -83,8 +79,8 @@ class _LoginScreenState extends State<LoginScreen> {
                           shape: BoxShape.circle,
                           gradient: LinearGradient(
                             colors: [
-                              AppColors.warning.withAlpha(40),
-                              AppColors.primary.withAlpha(40),
+                              AppColors.warning.withValues(alpha: 0.16),
+                              AppColors.primary.withValues(alpha: 0.16),
                             ],
                           ),
                         ),
@@ -137,10 +133,10 @@ class _LoginScreenState extends State<LoginScreen> {
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                         decoration: BoxDecoration(
-                          color: AppColors.info.withAlpha(25),
+                          color: AppColors.info.withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(10),
                           border: Border.all(
-                            color: AppColors.info.withAlpha(50),
+                            color: AppColors.info.withValues(alpha: 0.2),
                           ),
                         ),
                         child: Row(

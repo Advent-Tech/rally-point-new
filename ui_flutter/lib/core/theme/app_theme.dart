@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'app_colors.dart';
+import 'app_theme_extensions.dart';
 import 'app_typography.dart';
 
 /// App Theme Configuration
@@ -14,6 +15,7 @@ class AppTheme {
       brightness: Brightness.light,
       primaryColor: AppColors.primary,
       scaffoldBackgroundColor: AppColors.backgroundLight,
+      extensions: lightThemeExtensions,
       colorScheme: const ColorScheme.light(
         primary: AppColors.primary,
         primaryContainer: AppColors.primaryLight,
@@ -59,7 +61,7 @@ class AppTheme {
       ),
       navigationBarTheme: NavigationBarThemeData(
         backgroundColor: AppColors.surfaceLight,
-        indicatorColor: AppColors.primary.withOpacity(0.1),
+        indicatorColor: AppColors.primary.withValues(alpha: 0.1),
         labelTextStyle: WidgetStateProperty.resolveWith((states) {
           if (states.contains(WidgetState.selected)) {
             return const TextStyle(
@@ -80,7 +82,7 @@ class AppTheme {
       cardTheme: CardThemeData(
         color: AppColors.cardLight,
         elevation: 2,
-        shadowColor: Colors.black.withAlpha(25),
+        shadowColor: Colors.black.withValues(alpha: 0.1),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(16),
         ),
@@ -170,7 +172,7 @@ class AppTheme {
       ),
       chipTheme: ChipThemeData(
         backgroundColor: AppColors.backgroundLight,
-        selectedColor: AppColors.primary.withOpacity(0.1),
+        selectedColor: AppColors.primary.withValues(alpha: 0.1),
         labelStyle: const TextStyle(
           fontFamily: 'Inter',
           fontSize: 14,
@@ -197,6 +199,7 @@ class AppTheme {
       brightness: Brightness.dark,
       primaryColor: AppColors.primary,
       scaffoldBackgroundColor: AppColors.backgroundDark,
+      extensions: darkThemeExtensions,
       colorScheme: const ColorScheme.dark(
         primary: AppColors.primary,
         primaryContainer: AppColors.primaryDark,
@@ -242,7 +245,7 @@ class AppTheme {
       ),
       navigationBarTheme: NavigationBarThemeData(
         backgroundColor: AppColors.surfaceDark,
-        indicatorColor: AppColors.primary.withOpacity(0.2),
+        indicatorColor: AppColors.primary.withValues(alpha: 0.2),
         labelTextStyle: WidgetStateProperty.resolveWith((states) {
           if (states.contains(WidgetState.selected)) {
             return const TextStyle(
@@ -263,7 +266,7 @@ class AppTheme {
       cardTheme: CardThemeData(
         color: AppColors.cardDark,
         elevation: 2,
-        shadowColor: Colors.black.withAlpha(76),
+        shadowColor: Colors.black.withValues(alpha: 0.3),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(16),
         ),
@@ -344,7 +347,7 @@ class AppTheme {
       ),
       chipTheme: ChipThemeData(
         backgroundColor: AppColors.surfaceDark,
-        selectedColor: AppColors.primary.withOpacity(0.2),
+        selectedColor: AppColors.primary.withValues(alpha: 0.2),
         labelStyle: const TextStyle(
           fontFamily: 'Inter',
           fontSize: 14,

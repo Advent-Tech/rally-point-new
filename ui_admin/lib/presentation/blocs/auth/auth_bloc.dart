@@ -86,6 +86,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     try {
       await _initialize();
 
+      print('[AuthBloc] Attempting login for ${event.email}');
       final response = await _api.post(
         ApiConstants.login,
         data: {
@@ -94,9 +95,14 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
         },
       );
 
+      print('[AuthBloc] Response status: ${response.statusCode}');
+      print('[AuthBloc] Response data type: ${response.data.runtimeType}');
+      print('[AuthBloc] Response data: ${response.data}');
+
       if (response.statusCode == 200) {
         final authResponse = AuthResponse.fromJson(response.data);
         final user = authResponse.user;
+        print('[AuthBloc] Parsed user: ${user?.email}, role: ${user?.role}');
 
         // Check if user is admin or superadmin
         if (user == null || (!user.isAdmin && !user.isSuperAdmin)) {
@@ -119,7 +125,9 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
       } else {
         emit(const AuthError(message: 'Login failed. Please check your credentials.'));
       }
-    } catch (e) {
+    } catch (e, stackTrace) {
+      print('[AuthBloc] Login error: $e');
+      print('[AuthBloc] Stack trace: $stackTrace');
       String message = 'Login failed';
       if (e.toString().contains('401')) {
         message = 'Invalid email or password';

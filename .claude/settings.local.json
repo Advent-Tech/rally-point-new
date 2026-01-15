@@ -18,7 +18,8 @@
       "Bash(docker-compose logs:*)",
       "Bash(for port in 8080 8081 8082 8083 8084 8085 8086 8087)",
       "Bash(do echo \"Port $port:\")",
-      "Bash(done)"
+      "Bash(done)",
+      "Bash(ssh:*)"
     ]
   }
 }

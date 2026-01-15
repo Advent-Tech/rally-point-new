@@ -187,32 +187,43 @@ class SurveyRepository {
   // Backend route: GET /api/surveys
   Future<ApiResult<List<SurveyModel>>> getAllSurveys() async {
     try {
-      debugPrint('SurveyRepository: Fetching all surveys from /api/surveys');
+      debugPrint('SurveyRepository: Fetching all surveys from ${ApiConstants.surveys}');
       final response = await _apiClient.dio.get(ApiConstants.surveys);
 
+      debugPrint('SurveyRepository: Response status: ${response.statusCode}');
       debugPrint('SurveyRepository: Response data type: ${response.data.runtimeType}');
+      debugPrint('SurveyRepository: Response data: ${response.data}');
 
       List<dynamic> data = [];
       if (response.data is List) {
         data = response.data;
+        debugPrint('SurveyRepository: Data is a List with ${data.length} items');
       } else if (response.data is Map<String, dynamic>) {
-        data = response.data['surveys'] ?? [];
+        final map = response.data as Map<String, dynamic>;
+        debugPrint('SurveyRepository: Data is a Map with keys: ${map.keys.toList()}');
+        // Try multiple possible keys
+        data = map['surveys'] as List<dynamic>? ??
+               map['data'] as List<dynamic>? ??
+               map['items'] as List<dynamic>? ??
+               [];
+        debugPrint('SurveyRepository: Extracted ${data.length} items from map');
       }
-
-      debugPrint('SurveyRepository: Found ${data.length} surveys');
 
       final surveys = <SurveyModel>[];
       for (final item in data) {
         try {
+          debugPrint('SurveyRepository: Parsing survey item: $item');
           surveys.add(SurveyModel.fromJson(item));
         } catch (e) {
           debugPrint('SurveyRepository: Error parsing survey: $e');
         }
       }
 
+      debugPrint('SurveyRepository: Successfully parsed ${surveys.length} surveys');
       return ApiResult.success(surveys);
     } on DioException catch (e) {
       debugPrint('SurveyRepository: DioError fetching all surveys: ${e.message}');
+      debugPrint('SurveyRepository: DioError response: ${e.response?.data}');
       if (e.response?.statusCode == 404) {
         return const ApiResult.success([]);
       }

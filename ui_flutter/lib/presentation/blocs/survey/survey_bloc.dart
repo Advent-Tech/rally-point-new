@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:equatable/equatable.dart';
 import '../../../core/network/api_result.dart';
@@ -125,36 +126,71 @@ class SurveyBloc extends Bloc<SurveyEvent, SurveyState> {
     List<SurveyModel> surveys = [];
     List<SurveyResponse> responses = [];
 
+    debugPrint('SurveyBloc: _onRefresh called, isLeader: ${event.isLeader}');
+
     // Team leaders see ALL surveys (created by admins)
     // Workers see only their assigned surveys
     if (event.isLeader) {
       // Leaders fetch all surveys from /api/surveys
+      debugPrint('SurveyBloc: Fetching all surveys for leader...');
       final allSurveysResult = await _surveyRepository.getAllSurveys();
       allSurveysResult.when(
-        success: (data) => surveys = data,
+        success: (data) {
+          surveys = data;
+          debugPrint('SurveyBloc: Leader - loaded ${surveys.length} surveys');
+        },
         failure: (msg, _) {
-          // Debug: print error
-          print('SurveyBloc: Failed to fetch all surveys for leader: $msg');
+          debugPrint('SurveyBloc: Leader - failed to fetch surveys: $msg');
         },
       );
     } else {
       // Workers fetch their assigned surveys
+      debugPrint('SurveyBloc: Fetching available surveys for worker...');
       final surveysResult = await _surveyRepository.getAvailableSurveys();
       surveysResult.when(
-        success: (data) => surveys = data,
-        failure: (_, __) {},
+        success: (data) {
+          surveys = data;
+          debugPrint('SurveyBloc: Worker - loaded ${surveys.length} available surveys');
+        },
+        failure: (msg, _) {
+          debugPrint('SurveyBloc: Worker - failed to fetch available surveys: $msg');
+          // For workers, also try fetching all surveys as fallback
+        },
       );
+
+      // If worker has no assignments, try fetching all published surveys
+      if (surveys.isEmpty) {
+        debugPrint('SurveyBloc: Worker has no assignments, trying to fetch all surveys...');
+        final allSurveysResult = await _surveyRepository.getAllSurveys();
+        allSurveysResult.when(
+          success: (data) {
+            // Filter to only published surveys for workers
+            surveys = data.where((s) => s.isPublished).toList();
+            debugPrint('SurveyBloc: Worker - found ${surveys.length} published surveys');
+          },
+          failure: (msg, _) {
+            debugPrint('SurveyBloc: Worker - failed to fetch all surveys: $msg');
+          },
+        );
+      }
     }
 
     // Workers also load their responses (leaders don't need this)
     if (!event.isLeader) {
+      debugPrint('SurveyBloc: Fetching worker responses...');
       final responsesResult = await _surveyRepository.getMyResponses();
       responsesResult.when(
-        success: (data) => responses = data,
-        failure: (_, __) {},
+        success: (data) {
+          responses = data;
+          debugPrint('SurveyBloc: Worker - loaded ${responses.length} responses');
+        },
+        failure: (msg, _) {
+          debugPrint('SurveyBloc: Worker - failed to fetch responses: $msg');
+        },
       );
     }
 
+    debugPrint('SurveyBloc: Emitting SurveyLoaded with ${surveys.length} surveys, ${responses.length} responses');
     emit(SurveyLoaded(
       availableSurveys: surveys,
       myResponses: responses,

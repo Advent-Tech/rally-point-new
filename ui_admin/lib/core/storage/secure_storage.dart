@@ -1,8 +1,12 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class SecureStorage {
   static SecureStorage? _instance;
-  late FlutterSecureStorage _storage;
+  FlutterSecureStorage? _storage;
+  SharedPreferences? _webStorage;
+  bool _useWebFallback = false;
 
   static const String _accessTokenKey = 'access_token';
   static const String _refreshTokenKey = 'refresh_token';
@@ -15,64 +19,100 @@ class SecureStorage {
   static Future<SecureStorage> getInstance() async {
     if (_instance == null) {
       _instance = SecureStorage._internal();
-      _instance!._storage = const FlutterSecureStorage(
-        aOptions: AndroidOptions(encryptedSharedPreferences: true),
-        iOptions: IOSOptions(accessibility: KeychainAccessibility.first_unlock),
-      );
+
+      if (kIsWeb) {
+        // On web, use SharedPreferences (localStorage) as fallback
+        // since flutter_secure_storage requires HTTPS for Web Crypto API
+        _instance!._useWebFallback = true;
+        _instance!._webStorage = await SharedPreferences.getInstance();
+      } else {
+        _instance!._storage = const FlutterSecureStorage(
+          aOptions: AndroidOptions(encryptedSharedPreferences: true),
+          iOptions: IOSOptions(accessibility: KeychainAccessibility.first_unlock),
+        );
+      }
     }
     return _instance!;
   }
 
+  Future<void> _write(String key, String value) async {
+    if (_useWebFallback) {
+      await _webStorage!.setString(key, value);
+    } else {
+      await _storage!.write(key: key, value: value);
+    }
+  }
+
+  Future<String?> _read(String key) async {
+    if (_useWebFallback) {
+      return _webStorage!.getString(key);
+    } else {
+      return _storage!.read(key: key);
+    }
+  }
+
+  Future<void> _delete(String key) async {
+    if (_useWebFallback) {
+      await _webStorage!.remove(key);
+    } else {
+      await _storage!.delete(key: key);
+    }
+  }
+
   // Token management
   Future<void> saveAccessToken(String token) async {
-    await _storage.write(key: _accessTokenKey, value: token);
+    await _write(_accessTokenKey, token);
   }
 
   Future<String?> getAccessToken() async {
-    return _storage.read(key: _accessTokenKey);
+    return _read(_accessTokenKey);
   }
 
   Future<void> saveRefreshToken(String token) async {
-    await _storage.write(key: _refreshTokenKey, value: token);
+    await _write(_refreshTokenKey, token);
   }
 
   Future<String?> getRefreshToken() async {
-    return _storage.read(key: _refreshTokenKey);
+    return _read(_refreshTokenKey);
   }
 
   // User info
   Future<void> saveUserRole(String role) async {
-    await _storage.write(key: _userRoleKey, value: role);
+    await _write(_userRoleKey, role);
   }
 
   Future<String?> getUserRole() async {
-    return _storage.read(key: _userRoleKey);
+    return _read(_userRoleKey);
   }
 
   Future<void> saveUserId(String id) async {
-    await _storage.write(key: _userIdKey, value: id);
+    await _write(_userIdKey, id);
   }
 
   Future<String?> getUserId() async {
-    return _storage.read(key: _userIdKey);
+    return _read(_userIdKey);
   }
 
   Future<void> saveUserEmail(String email) async {
-    await _storage.write(key: _userEmailKey, value: email);
+    await _write(_userEmailKey, email);
   }
 
   Future<String?> getUserEmail() async {
-    return _storage.read(key: _userEmailKey);
+    return _read(_userEmailKey);
   }
 
   // Clear all
   Future<void> clearAll() async {
-    await _storage.deleteAll();
+    if (_useWebFallback) {
+      await _webStorage!.clear();
+    } else {
+      await _storage!.deleteAll();
+    }
   }
 
   Future<void> clearTokens() async {
-    await _storage.delete(key: _accessTokenKey);
-    await _storage.delete(key: _refreshTokenKey);
+    await _delete(_accessTokenKey);
+    await _delete(_refreshTokenKey);
   }
 
   // Check if logged in

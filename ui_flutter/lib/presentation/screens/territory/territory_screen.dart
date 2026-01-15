@@ -4,14 +4,11 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/constants/api_constants.dart';
 import '../../../core/network/api_client.dart';
-import '../../../core/theme/app_colors.dart';
+import '../../../core/theme/theme.dart';
 import '../../../data/models/territory_model.dart';
 import '../../blocs/auth/auth_bloc.dart';
 import '../../blocs/territory/territory_bloc.dart';
-import '../../widgets/custom_text_field.dart';
-import '../../widgets/custom_button.dart';
-import '../../widgets/territory_map_widget.dart';
-import '../../widgets/walkie_bottom_sheet.dart';
+import '../../widgets/widgets.dart';
 
 class TerritoryScreen extends StatefulWidget {
   const TerritoryScreen({super.key});
@@ -222,7 +219,7 @@ class _FilterChip extends StatelessWidget {
       label: Text(label),
       selected: selected,
       onSelected: (value) {},
-      selectedColor: AppColors.primary.withAlpha(50),
+      selectedColor: AppColors.primary.withValues(alpha: 0.2),
       checkmarkColor: AppColors.primary,
     );
   }
@@ -268,12 +265,21 @@ class _MyAreasTabState extends State<_MyAreasTab> {
     return BlocBuilder<TerritoryBloc, TerritoryState>(
       builder: (context, state) {
         if (state is TerritoryLoading) {
-          return const Center(child: CircularProgressIndicator());
+          return const SkeletonList(
+            itemCount: 5,
+            padding: EdgeInsets.symmetric(horizontal: AppSpacing.md),
+          );
         }
 
         if (state is TerritoryAssignmentsLoaded) {
           if (state.assignments.isEmpty) {
-            return _EmptyAssignmentsView(isDark: widget.isDark);
+            return EmptyState(
+              icon: Icons.map_outlined,
+              title: 'No Assigned Territories',
+              description: 'You don\'t have any territories assigned yet.\nBrowse available territories to request one.',
+              actionLabel: 'Browse Available',
+              onAction: () {},
+            );
           }
 
           return RefreshIndicator(
@@ -281,7 +287,7 @@ class _MyAreasTabState extends State<_MyAreasTab> {
               context.read<TerritoryBloc>().add(const TerritoryLoadAssignments());
             },
             child: ListView.builder(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
+              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
               itemCount: state.assignments.length,
               itemBuilder: (context, index) {
                 final assignment = state.assignments[index];
@@ -300,92 +306,26 @@ class _MyAreasTabState extends State<_MyAreasTab> {
         }
 
         if (state is TerritoryError) {
-          return Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(Icons.error_outline, size: 48, color: AppColors.error),
-                const SizedBox(height: 16),
-                Text(state.message),
-                const SizedBox(height: 16),
-                CustomButton(
-                  text: 'Retry',
-                  onPressed: () {
-                    context.read<TerritoryBloc>().add(const TerritoryLoadAssignments());
-                  },
-                ),
-              ],
-            ),
+          return ErrorState(
+            message: state.message,
+            onRetry: () {
+              context.read<TerritoryBloc>().add(const TerritoryLoadAssignments());
+            },
           );
         }
 
-        return _EmptyAssignmentsView(isDark: widget.isDark);
+        return EmptyState(
+          icon: Icons.map_outlined,
+          title: 'No Assigned Territories',
+          description: 'You don\'t have any territories assigned yet.\nBrowse available territories to request one.',
+          actionLabel: 'Browse Available',
+          onAction: () {},
+        );
       },
     );
   }
 }
 
-class _EmptyAssignmentsView extends StatelessWidget {
-  final bool isDark;
-
-  const _EmptyAssignmentsView({required this.isDark});
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(32),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              width: 100,
-              height: 100,
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [
-                    AppColors.primary.withAlpha(40),
-                    AppColors.secondary.withAlpha(40),
-                  ],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(
-                Icons.map_outlined,
-                size: 48,
-                color: AppColors.primary,
-              ),
-            ),
-            const SizedBox(height: 24),
-            Text(
-              'No Assigned Territories',
-              style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 12),
-            Text(
-              'You don\'t have any territories assigned yet.\nBrowse available territories to request one.',
-              textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
-                height: 1.5,
-              ),
-            ),
-            const SizedBox(height: 32),
-            CustomButton(
-              text: 'Browse Available',
-              icon: Icons.search,
-              onPressed: () {},
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
 
 class _AssignmentCard extends StatelessWidget {
   final String name;
@@ -424,28 +364,28 @@ class _AssignmentCard extends StatelessWidget {
     }
 
     return Card(
-      margin: const EdgeInsets.only(bottom: 12),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      margin: const EdgeInsets.only(bottom: AppSpacing.sm),
+      shape: RoundedRectangleBorder(borderRadius: AppSpacing.borderRadiusLg),
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: AppSpacing.borderRadiusLg,
         child: Padding(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.all(AppSpacing.md),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Row(
                 children: [
                   Container(
-                    width: 48,
-                    height: 48,
+                    width: AppSpacing.avatarLg,
+                    height: AppSpacing.avatarLg,
                     decoration: BoxDecoration(
-                      color: statusColor.withAlpha(30),
-                      borderRadius: BorderRadius.circular(12),
+                      color: statusColor.withValues(alpha: 0.12),
+                      borderRadius: AppSpacing.borderRadiusMd,
                     ),
                     child: Icon(Icons.location_on, color: statusColor),
                   ),
-                  const SizedBox(width: 12),
+                  const SizedBox(width: AppSpacing.sm),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -467,10 +407,10 @@ class _AssignmentCard extends StatelessWidget {
                     ),
                   ),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm, vertical: 6),
                     decoration: BoxDecoration(
-                      color: statusColor.withAlpha(30),
-                      borderRadius: BorderRadius.circular(20),
+                      color: statusColor.withValues(alpha: 0.12),
+                      borderRadius: AppSpacing.borderRadiusFull,
                     ),
                     child: Text(
                       status.toUpperCase(),
@@ -483,7 +423,7 @@ class _AssignmentCard extends StatelessWidget {
                   ),
                 ],
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: AppSpacing.md),
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -505,7 +445,7 @@ class _AssignmentCard extends StatelessWidget {
                       ),
                     ],
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: AppSpacing.xs),
                   ClipRRect(
                     borderRadius: BorderRadius.circular(4),
                     child: LinearProgressIndicator(
@@ -595,20 +535,29 @@ class _AvailableTabState extends State<_AvailableTab> {
     return BlocBuilder<TerritoryBloc, TerritoryState>(
       builder: (context, state) {
         if (state is TerritoryLoading) {
-          return const Center(child: CircularProgressIndicator());
+          return const SkeletonList(
+            itemCount: 5,
+            padding: EdgeInsets.symmetric(horizontal: AppSpacing.md),
+          );
         }
 
         // Handle team leader's allocated territories
         if (state is TerritoryAllocationsLoaded) {
           if (state.territories.isEmpty) {
-            return _EmptyAllocationsView(isDark: widget.isDark);
+            return EmptyState(
+              icon: Icons.map_outlined,
+              title: 'No Allocated Territories',
+              description: 'You don\'t have any territories allocated yet.\nAn admin will allocate territories to you.',
+              iconColor: AppColors.info,
+              secondaryColor: AppColors.primary,
+            );
           }
           return RefreshIndicator(
             onRefresh: () async {
               context.read<TerritoryBloc>().add(const TerritoryLoadMyAllocations());
             },
             child: ListView.builder(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
+              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
               itemCount: state.territories.length,
               itemBuilder: (context, index) {
                 final territory = state.territories[index];
@@ -633,7 +582,7 @@ class _AvailableTabState extends State<_AvailableTab> {
               context.read<TerritoryBloc>().add(const TerritoryLoadAvailable());
             },
             child: ListView.builder(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
+              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
               itemCount: state.territories.length,
               itemBuilder: (context, index) {
                 final territory = state.territories[index];
@@ -660,65 +609,11 @@ class _AvailableTabState extends State<_AvailableTab> {
             _loadTerritories();
           }
         });
-        return const Center(child: CircularProgressIndicator());
+        return const SkeletonList(
+          itemCount: 5,
+          padding: EdgeInsets.symmetric(horizontal: AppSpacing.md),
+        );
       },
-    );
-  }
-}
-
-class _EmptyAllocationsView extends StatelessWidget {
-  final bool isDark;
-
-  const _EmptyAllocationsView({required this.isDark});
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(32),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              width: 100,
-              height: 100,
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [
-                    AppColors.info.withAlpha(40),
-                    AppColors.primary.withAlpha(40),
-                  ],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(
-                Icons.map_outlined,
-                size: 48,
-                color: AppColors.info,
-              ),
-            ),
-            const SizedBox(height: 24),
-            Text(
-              'No Allocated Territories',
-              style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 12),
-            Text(
-              'You don\'t have any territories allocated yet.\n'
-              'An admin will allocate territories to you.',
-              textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
-                height: 1.5,
-              ),
-            ),
-          ],
-        ),
-      ),
     );
   }
 }
@@ -768,25 +663,25 @@ class _TerritoryCard extends StatelessWidget {
     }
 
     return Card(
-      margin: const EdgeInsets.only(bottom: 12),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      margin: const EdgeInsets.only(bottom: AppSpacing.smd),
+      shape: RoundedRectangleBorder(borderRadius: AppSpacing.borderRadiusLg),
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(AppSpacing.md),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
               children: [
                 Container(
-                  width: 48,
-                  height: 48,
+                  width: AppSpacing.avatarLg,
+                  height: AppSpacing.avatarLg,
                   decoration: BoxDecoration(
-                    color: AppColors.primary.withAlpha(30),
-                    borderRadius: BorderRadius.circular(12),
+                    color: AppColors.primary.withValues(alpha: 0.12),
+                    borderRadius: AppSpacing.borderRadiusMd,
                   ),
                   child: const Icon(Icons.location_on, color: AppColors.primary),
                 ),
-                const SizedBox(width: 12),
+                const SizedBox(width: AppSpacing.smd),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -807,10 +702,10 @@ class _TerritoryCard extends StatelessWidget {
                   ),
                 ),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  padding: const EdgeInsets.symmetric(horizontal: AppSpacing.smd, vertical: 6),
                   decoration: BoxDecoration(
-                    color: statusColor.withAlpha(30),
-                    borderRadius: BorderRadius.circular(20),
+                    color: statusColor.withValues(alpha: 0.12),
+                    borderRadius: AppSpacing.borderRadiusFull,
                   ),
                   child: Text(
                     statusText,
@@ -823,11 +718,11 @@ class _TerritoryCard extends StatelessWidget {
                 ),
               ],
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: AppSpacing.md),
             Row(
               children: [
-                Icon(Icons.home_outlined, size: 16, color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight),
-                const SizedBox(width: 4),
+                Icon(Icons.home_outlined, size: AppSpacing.iconSm, color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight),
+                const SizedBox(width: AppSpacing.xs),
                 Text(
                   '$households households',
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
@@ -837,7 +732,7 @@ class _TerritoryCard extends StatelessWidget {
               ],
             ),
             if (status == 'available' && onRequest != null) ...[
-              const SizedBox(height: 16),
+              const SizedBox(height: AppSpacing.md),
               SizedBox(
                 width: double.infinity,
                 child: CustomButton(
@@ -849,7 +744,7 @@ class _TerritoryCard extends StatelessWidget {
               ),
             ],
             if (isLeaderView && status == 'allocated' && onAssign != null) ...[
-              const SizedBox(height: 16),
+              const SizedBox(height: AppSpacing.md),
               SizedBox(
                 width: double.infinity,
                 child: CustomButton(
@@ -1050,16 +945,16 @@ class _MapTabState extends State<_MapTab> {
         ),
         // Territory count badge with search indicator
         Positioned(
-          left: 16,
-          top: 16,
+          left: AppSpacing.md,
+          top: AppSpacing.md,
           child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.smd, vertical: AppSpacing.sm),
             decoration: BoxDecoration(
               color: isSearchResult ? AppColors.primary : Colors.white,
-              borderRadius: BorderRadius.circular(20),
+              borderRadius: AppSpacing.borderRadiusFull,
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withAlpha(30),
+                  color: Colors.black.withValues(alpha: 0.12),
                   blurRadius: 4,
                   offset: const Offset(0, 2),
                 ),
@@ -1100,13 +995,13 @@ class _MapTabState extends State<_MapTab> {
         ),
         // Long press hint
         Positioned(
-          left: 16,
-          bottom: 16,
+          left: AppSpacing.md,
+          bottom: AppSpacing.md,
           child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.smd, vertical: AppSpacing.sm),
             decoration: BoxDecoration(
-              color: Colors.black.withAlpha(180),
-              borderRadius: BorderRadius.circular(20),
+              color: Colors.black.withValues(alpha: 0.7),
+              borderRadius: AppSpacing.borderRadiusFull,
             ),
             child: const Row(
               mainAxisSize: MainAxisSize.min,
@@ -1154,15 +1049,15 @@ class _MapTabState extends State<_MapTab> {
               Row(
                 children: [
                   Container(
-                    width: 48,
-                    height: 48,
+                    width: AppSpacing.avatarLg,
+                    height: AppSpacing.avatarLg,
                     decoration: BoxDecoration(
-                      color: AppColors.primary.withAlpha(30),
-                      borderRadius: BorderRadius.circular(12),
+                      color: AppColors.primary.withValues(alpha: 0.12),
+                      borderRadius: AppSpacing.borderRadiusMd,
                     ),
                     child: const Icon(Icons.add_location_alt, color: AppColors.primary),
                   ),
-                  const SizedBox(width: 12),
+                  const SizedBox(width: AppSpacing.smd),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1275,12 +1170,7 @@ class _MapTabState extends State<_MapTab> {
                       ));
                     });
                     Navigator.pop(context);
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Visit logged successfully'),
-                        backgroundColor: AppColors.success,
-                      ),
-                    );
+                    AppSnackbar.success(context, message: 'Visit logged successfully');
                   },
                 ),
               ),
@@ -1292,107 +1182,27 @@ class _MapTabState extends State<_MapTab> {
   }
 
   Widget _buildEmptyState(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(32),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              width: 80,
-              height: 80,
-              decoration: BoxDecoration(
-                color: AppColors.secondary.withAlpha(30),
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(Icons.map, size: 40, color: AppColors.secondary),
-            ),
-            const SizedBox(height: 24),
-            Text(
-              'No Territories to Display',
-              style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'No territories with map data available.\nTry loading available territories.',
-              textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: widget.isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
-              ),
-            ),
-            const SizedBox(height: 24),
-            CustomButton(
-              text: 'Load Territories',
-              icon: Icons.refresh,
-              onPressed: () {
-                _loadMapData();
-              },
-            ),
-          ],
-        ),
-      ),
+    return EmptyState(
+      icon: Icons.map,
+      title: 'No Territories to Display',
+      description: 'No territories with map data available.\nTry loading available territories.',
+      iconColor: AppColors.secondary,
+      actionLabel: 'Load Territories',
+      onAction: _loadMapData,
     );
   }
 
   Widget _buildEmptyAllocationsState(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(32),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              width: 100,
-              height: 100,
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [
-                    AppColors.info.withAlpha(40),
-                    AppColors.primary.withAlpha(40),
-                  ],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(
-                Icons.map_outlined,
-                size: 48,
-                color: AppColors.info,
-              ),
-            ),
-            const SizedBox(height: 24),
-            Text(
-              'No Allocated Territories',
-              style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 12),
-            Text(
-              'You don\'t have any territories allocated yet.\n'
-              'An admin will allocate territories to you\n'
-              'that you can then assign to your team workers.',
-              textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: widget.isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
-                height: 1.5,
-              ),
-            ),
-            const SizedBox(height: 24),
-            CustomButton(
-              text: 'Refresh',
-              icon: Icons.refresh,
-              type: ButtonType.outline,
-              onPressed: () {
-                context.read<TerritoryBloc>().add(const TerritoryLoadMyAllocations());
-              },
-            ),
-          ],
-        ),
-      ),
+    return EmptyState(
+      icon: Icons.map_outlined,
+      title: 'No Allocated Territories',
+      description: 'You don\'t have any territories allocated yet.\nAn admin will allocate territories to you\nthat you can then assign to your team workers.',
+      iconColor: AppColors.info,
+      secondaryColor: AppColors.primary,
+      actionLabel: 'Refresh',
+      onAction: () {
+        context.read<TerritoryBloc>().add(const TerritoryLoadMyAllocations());
+      },
     );
   }
 
@@ -1411,15 +1221,15 @@ class _MapTabState extends State<_MapTab> {
             Row(
               children: [
                 Container(
-                  width: 48,
-                  height: 48,
+                  width: AppSpacing.avatarLg,
+                  height: AppSpacing.avatarLg,
                   decoration: BoxDecoration(
-                    color: AppColors.primary.withAlpha(30),
-                    borderRadius: BorderRadius.circular(12),
+                    color: AppColors.primary.withValues(alpha: 0.12),
+                    borderRadius: AppSpacing.borderRadiusMd,
                   ),
                   child: const Icon(Icons.location_on, color: AppColors.primary),
                 ),
-                const SizedBox(width: 12),
+                const SizedBox(width: AppSpacing.smd),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -1445,7 +1255,7 @@ class _MapTabState extends State<_MapTab> {
                 ),
               ],
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: AppSpacing.mlg),
             _DetailRow(
               icon: Icons.location_city,
               label: 'Location',
@@ -1579,12 +1389,12 @@ class _OutcomeChip extends StatelessWidget {
     return GestureDetector(
       onTap: onSelected,
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.smd, vertical: AppSpacing.sm),
         decoration: BoxDecoration(
-          color: selected ? color.withAlpha(30) : Colors.grey.withAlpha(20),
-          borderRadius: BorderRadius.circular(20),
+          color: selected ? color.withValues(alpha: 0.12) : Colors.grey.withValues(alpha: 0.08),
+          borderRadius: AppSpacing.borderRadiusFull,
           border: Border.all(
-            color: selected ? color : Colors.grey.withAlpha(60),
+            color: selected ? color : Colors.grey.withValues(alpha: 0.24),
             width: selected ? 2 : 1,
           ),
         ),
@@ -1593,7 +1403,7 @@ class _OutcomeChip extends StatelessWidget {
           children: [
             Icon(
               icon,
-              size: 16,
+              size: AppSpacing.iconSm,
               color: selected ? color : AppColors.textSecondaryLight,
             ),
             const SizedBox(width: 6),
@@ -1633,13 +1443,13 @@ class _MiniActionButton extends StatelessWidget {
       children: [
         // Label
         Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.smd, vertical: 6),
           decoration: BoxDecoration(
             color: Colors.white,
-            borderRadius: BorderRadius.circular(8),
+            borderRadius: AppSpacing.borderRadiusSm,
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withAlpha(25),
+                color: Colors.black.withValues(alpha: 0.1),
                 blurRadius: 4,
                 offset: const Offset(0, 2),
               ),
@@ -1740,12 +1550,7 @@ class _AssignToWorkerSheetState extends State<_AssignToWorkerSheet> {
 
   Future<void> _assignTerritory() async {
     if (_selectedWorkerId == null || _teamId == null || _leaderId == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please select a worker'),
-          backgroundColor: AppColors.warning,
-        ),
-      );
+      AppSnackbar.warning(context, message: 'Please select a worker');
       return;
     }
 
@@ -1762,12 +1567,7 @@ class _AssignToWorkerSheetState extends State<_AssignToWorkerSheet> {
 
     Navigator.pop(context);
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Territory assignment submitted'),
-        backgroundColor: AppColors.success,
-      ),
-    );
+    AppSnackbar.success(context, message: 'Territory assignment submitted');
   }
 
   @override
@@ -1787,15 +1587,15 @@ class _AssignToWorkerSheetState extends State<_AssignToWorkerSheet> {
           Row(
             children: [
               Container(
-                width: 48,
-                height: 48,
+                width: AppSpacing.avatarLg,
+                height: AppSpacing.avatarLg,
                 decoration: BoxDecoration(
-                  color: AppColors.primary.withAlpha(30),
-                  borderRadius: BorderRadius.circular(12),
+                  color: AppColors.primary.withValues(alpha: 0.12),
+                  borderRadius: AppSpacing.borderRadiusMd,
                 ),
                 child: const Icon(Icons.person_add, color: AppColors.primary),
               ),
-              const SizedBox(width: 12),
+              const SizedBox(width: AppSpacing.smd),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -1825,10 +1625,10 @@ class _AssignToWorkerSheetState extends State<_AssignToWorkerSheet> {
 
           // Territory info
           Container(
-            padding: const EdgeInsets.all(12),
+            padding: const EdgeInsets.all(AppSpacing.smd),
             decoration: BoxDecoration(
-              color: AppColors.info.withAlpha(20),
-              borderRadius: BorderRadius.circular(12),
+              color: AppColors.info.withValues(alpha: 0.08),
+              borderRadius: AppSpacing.borderRadiusMd,
             ),
             child: Row(
               children: [
@@ -1857,10 +1657,10 @@ class _AssignToWorkerSheetState extends State<_AssignToWorkerSheet> {
                 ),
                 if (widget.territory.housingUnits != null)
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm, vertical: AppSpacing.xs),
                     decoration: BoxDecoration(
-                      color: AppColors.primary.withAlpha(20),
-                      borderRadius: BorderRadius.circular(8),
+                      color: AppColors.primary.withValues(alpha: 0.08),
+                      borderRadius: AppSpacing.borderRadiusSm,
                     ),
                     child: Text(
                       '${widget.territory.housingUnits} units',
@@ -1889,10 +1689,10 @@ class _AssignToWorkerSheetState extends State<_AssignToWorkerSheet> {
             const Center(child: CircularProgressIndicator())
           else if (_workers.isEmpty)
             Container(
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.all(AppSpacing.md),
               decoration: BoxDecoration(
-                color: AppColors.warning.withAlpha(20),
-                borderRadius: BorderRadius.circular(12),
+                color: AppColors.warning.withValues(alpha: 0.08),
+                borderRadius: AppSpacing.borderRadiusMd,
               ),
               child: Row(
                 children: [
@@ -1928,7 +1728,7 @@ class _AssignToWorkerSheetState extends State<_AssignToWorkerSheet> {
                     leading: CircleAvatar(
                       backgroundColor: isSelected
                           ? AppColors.primary
-                          : AppColors.primary.withAlpha(30),
+                          : AppColors.primary.withValues(alpha: 0.12),
                       child: Text(
                         workerName.isNotEmpty ? workerName[0].toUpperCase() : '?',
                         style: TextStyle(
@@ -1959,10 +1759,10 @@ class _AssignToWorkerSheetState extends State<_AssignToWorkerSheet> {
                       setState(() => _selectedWorkerId = workerId);
                     },
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: AppSpacing.borderRadiusMd,
                     ),
                     selected: isSelected,
-                    selectedTileColor: AppColors.primary.withAlpha(10),
+                    selectedTileColor: AppColors.primary.withValues(alpha: 0.04),
                   );
                 },
               ),

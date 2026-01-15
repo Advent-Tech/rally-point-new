@@ -20,7 +20,7 @@ func NewAssignmentRepository(db *sql.DB) domain.TerritoryAssignmentRepository {
 	return &assignmentRepository{db: db}
 }
 
-// Create creates a new territory assignment
+// Create creates a new territory assignment or updates if one already exists for the same territory+team
 func (r *assignmentRepository) Create(assignment *domain.TerritoryAssignment) error {
 	// Get the SOLID from the territory
 	var solid string
@@ -29,16 +29,6 @@ func (r *assignmentRepository) Create(assignment *domain.TerritoryAssignment) er
 		return fmt.Errorf("territory not found: %w", err)
 	}
 	assignment.TerritorySOLID = solid
-
-	query := `
-		INSERT INTO territory_assignments (
-			id, territory_id, territory_solid, team_id, assigned_worker_id,
-			assigned_by, assigned_at, expires_at, status, priority, notes,
-			created_at, updated_at
-		) VALUES (
-			$1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13
-		)
-	`
 
 	now := time.Now()
 	assignment.ID = uuid.New()
@@ -53,7 +43,28 @@ func (r *assignmentRepository) Create(assignment *domain.TerritoryAssignment) er
 		assignment.Priority = "medium"
 	}
 
-	_, err = r.db.Exec(query,
+	// Use UPSERT: if assignment already exists for territory+team, update the worker assignment
+	query := `
+		INSERT INTO territory_assignments (
+			id, territory_id, territory_solid, team_id, assigned_worker_id,
+			assigned_by, assigned_at, expires_at, status, priority, notes,
+			created_at, updated_at
+		) VALUES (
+			$1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13
+		)
+		ON CONFLICT (territory_id, team_id) DO UPDATE SET
+			assigned_worker_id = EXCLUDED.assigned_worker_id,
+			assigned_by = EXCLUDED.assigned_by,
+			assigned_at = NOW(),
+			priority = EXCLUDED.priority,
+			notes = COALESCE(EXCLUDED.notes, territory_assignments.notes),
+			status = 'active',
+			updated_at = NOW()
+		RETURNING id
+	`
+
+	// Use QueryRow to get the actual ID (either new or existing)
+	err = r.db.QueryRow(query,
 		assignment.ID,
 		assignment.TerritoryID,
 		assignment.TerritorySOLID,
@@ -67,7 +78,7 @@ func (r *assignmentRepository) Create(assignment *domain.TerritoryAssignment) er
 		assignment.Notes,
 		assignment.CreatedAt,
 		assignment.UpdatedAt,
-	)
+	).Scan(&assignment.ID)
 
 	return err
 }

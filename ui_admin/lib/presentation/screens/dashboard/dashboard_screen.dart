@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/network/api_client.dart';
 import '../../../core/constants/api_constants.dart';
@@ -39,7 +40,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
       // Fetch team leaders stats
       try {
-        final leadersResponse = await apiClient.get(ApiConstants.adminTeamLeaders);
+        final leadersResponse =
+            await apiClient.get(ApiConstants.adminTeamLeaders);
         if (leadersResponse.data != null) {
           _totalUsers = leadersResponse.data['total'] ?? 0;
           _pendingLeaders = leadersResponse.data['pending'] ?? 0;
@@ -60,7 +62,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
       // Fetch territory allocations
       try {
-        final allocationsResponse = await apiClient.get(ApiConstants.adminTerritoryAllocations);
+        final allocationsResponse =
+            await apiClient.get(ApiConstants.adminTerritoryAllocations);
         if (allocationsResponse.data != null) {
           _allocatedTerritories = allocationsResponse.data['total'] ?? 0;
         }
@@ -71,9 +74,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
       // Fetch territory stats (union stats)
       try {
         final territoryResponse = await apiClient.get(ApiConstants.unionStats);
-        if (territoryResponse.data != null && territoryResponse.data['unions'] != null) {
+        if (territoryResponse.data != null &&
+            territoryResponse.data['unions'] != null) {
           final unions = territoryResponse.data['unions'] as List;
-          _totalTerritories = unions.fold<int>(0, (sum, u) => sum + ((u['territory_count'] ?? 0) as int));
+          _totalTerritories = unions.fold<int>(
+              0, (sum, u) => sum + ((u['territory_count'] ?? 0) as int));
         }
       } catch (e) {
         debugPrint('Failed to load territory stats: $e');
@@ -110,6 +115,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Widget build(BuildContext context) {
     final authState = context.watch<AuthBloc>().state;
     final user = authState is AuthAuthenticated ? authState.user : null;
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isMobile = screenWidth < 768;
+    final isTablet = screenWidth >= 768 && screenWidth < 1024;
 
     return Scaffold(
       appBar: AppBar(
@@ -120,7 +128,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             onPressed: _loadDashboardData,
             tooltip: 'Refresh',
           ),
-          if (user != null)
+          if (user != null && !isMobile)
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
               child: Center(
@@ -138,25 +146,37 @@ class _DashboardScreenState extends State<DashboardScreen> {
               onRefresh: _loadDashboardData,
               child: SingleChildScrollView(
                 physics: const AlwaysScrollableScrollPhysics(),
-                padding: const EdgeInsets.all(24),
+                padding: EdgeInsets.all(isMobile ? 16 : 24),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     // Welcome Message
                     Text(
-                      'Welcome back, ${user?.email ?? 'Admin'}!',
-                      style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                            fontWeight: FontWeight.bold,
-                          ),
+                      'Welcome back${user != null ? '!' : ', Admin!'}',
+                      style:
+                          Theme.of(context).textTheme.headlineSmall?.copyWith(
+                                fontWeight: FontWeight.bold,
+                                fontSize: isMobile ? 20 : null,
+                              ),
                     ),
+                    if (isMobile && user != null) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        user.email,
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                              color: AppColors.textSecondary,
+                            ),
+                      ),
+                    ],
                     const SizedBox(height: 8),
                     Text(
                       'Here\'s an overview of your Rally Point system.',
                       style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                             color: AppColors.textSecondary,
+                            fontSize: isMobile ? 14 : null,
                           ),
                     ),
-                    const SizedBox(height: 32),
+                    SizedBox(height: isMobile ? 20 : 32),
 
                     if (_error != null)
                       Container(
@@ -168,7 +188,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         ),
                         child: Row(
                           children: [
-                            const Icon(Icons.error_outline, color: AppColors.error),
+                            const Icon(Icons.error_outline,
+                                color: AppColors.error),
                             const SizedBox(width: 12),
                             Expanded(
                               child: Text(
@@ -183,14 +204,30 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     // Stats Grid
                     LayoutBuilder(
                       builder: (context, constraints) {
-                        final crossAxisCount = constraints.maxWidth > 1200 ? 4 : (constraints.maxWidth > 800 ? 3 : 2);
+                        int crossAxisCount;
+                        double childAspectRatio;
+
+                        if (constraints.maxWidth > 1200) {
+                          crossAxisCount = 4;
+                          childAspectRatio = 1.8;
+                        } else if (constraints.maxWidth > 800) {
+                          crossAxisCount = 3;
+                          childAspectRatio = 1.6;
+                        } else if (constraints.maxWidth > 500) {
+                          crossAxisCount = 2;
+                          childAspectRatio = 1.5;
+                        } else {
+                          crossAxisCount = 2;
+                          childAspectRatio = 1.3;
+                        }
+
                         return GridView.count(
                           crossAxisCount: crossAxisCount,
                           shrinkWrap: true,
                           physics: const NeverScrollableScrollPhysics(),
-                          mainAxisSpacing: 16,
-                          crossAxisSpacing: 16,
-                          childAspectRatio: 1.8,
+                          mainAxisSpacing: isMobile ? 12 : 16,
+                          crossAxisSpacing: isMobile ? 12 : 16,
+                          childAspectRatio: childAspectRatio,
                           children: [
                             _StatCard(
                               title: 'Team Leaders',
@@ -198,12 +235,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
                               subtitle: '$_pendingLeaders pending',
                               icon: Icons.people,
                               color: AppColors.primary,
+                              isMobile: isMobile,
                             ),
                             _StatCard(
                               title: 'Active Teams',
                               value: _activeTeams.toString(),
                               icon: Icons.groups,
                               color: AppColors.secondary,
+                              isMobile: isMobile,
                             ),
                             _StatCard(
                               title: 'Territories',
@@ -211,69 +250,86 @@ class _DashboardScreenState extends State<DashboardScreen> {
                               subtitle: '$_allocatedTerritories allocated',
                               icon: Icons.map,
                               color: AppColors.info,
+                              isMobile: isMobile,
                             ),
                             _StatCard(
                               title: 'Surveys',
                               value: _totalSurveys.toString(),
                               icon: Icons.assignment,
                               color: AppColors.warning,
+                              isMobile: isMobile,
                             ),
                           ],
                         );
                       },
                     ),
-                    const SizedBox(height: 32),
+                    SizedBox(height: isMobile ? 24 : 32),
 
                     // Quick Actions
                     Text(
                       'Quick Actions',
                       style: Theme.of(context).textTheme.titleLarge?.copyWith(
                             fontWeight: FontWeight.bold,
+                            fontSize: isMobile ? 18 : null,
                           ),
                     ),
-                    const SizedBox(height: 16),
-                    Wrap(
-                      spacing: 16,
-                      runSpacing: 16,
-                      children: [
-                        _QuickActionCard(
-                          title: 'Verify Team Leaders',
-                          description: 'Review pending team leader accounts',
-                          icon: Icons.verified_user,
-                          color: AppColors.success,
-                          badge: _pendingLeaders > 0 ? _pendingLeaders.toString() : null,
-                          onTap: () {
-                            // Navigate to users screen
-                          },
-                        ),
-                        _QuickActionCard(
-                          title: 'Allocate Territories',
-                          description: 'Assign territories to team leaders',
-                          icon: Icons.add_location,
-                          color: AppColors.primary,
-                          onTap: () {
-                            // Navigate to territories screen
-                          },
-                        ),
-                        _QuickActionCard(
-                          title: 'Create Survey',
-                          description: 'Design a new survey for teams',
-                          icon: Icons.add_chart,
-                          color: AppColors.info,
-                          onTap: () {
-                            // Navigate to surveys screen
-                          },
-                        ),
-                        _QuickActionCard(
-                          title: 'View Donations',
-                          description: 'Check donation reports',
-                          icon: Icons.volunteer_activism,
-                          color: AppColors.warning,
-                          onTap: () {
-                            // Navigate to donations screen
-                          },
-                        ),
-                      ],
+                    SizedBox(height: isMobile ? 12 : 16),
+
+                    // Responsive Quick Actions
+                    LayoutBuilder(
+                      builder: (context, constraints) {
+                        final cardWidth = isMobile
+                            ? constraints.maxWidth
+                            : (isTablet
+                                ? (constraints.maxWidth - 16) / 2
+                                : 280.0);
+
+                        return Wrap(
+                          spacing: 16,
+                          runSpacing: 16,
+                          children: [
+                            _QuickActionCard(
+                              title: 'Verify Team Leaders',
+                              description: 'Review pending team leader accounts',
+                              icon: Icons.verified_user,
+                              color: AppColors.success,
+                              badge: _pendingLeaders > 0
+                                  ? _pendingLeaders.toString()
+                                  : null,
+                              width: cardWidth,
+                              isMobile: isMobile,
+                              onTap: () => context.go('/users'),
+                            ),
+                            _QuickActionCard(
+                              title: 'Allocate Territories',
+                              description: 'Assign territories to team leaders',
+                              icon: Icons.add_location,
+                              color: AppColors.primary,
+                              width: cardWidth,
+                              isMobile: isMobile,
+                              onTap: () => context.go('/territories'),
+                            ),
+                            _QuickActionCard(
+                              title: 'Create Survey',
+                              description: 'Design a new survey for teams',
+                              icon: Icons.add_chart,
+                              color: AppColors.info,
+                              width: cardWidth,
+                              isMobile: isMobile,
+                              onTap: () => context.go('/surveys'),
+                            ),
+                            _QuickActionCard(
+                              title: 'View Donations',
+                              description: 'Check donation reports',
+                              icon: Icons.volunteer_activism,
+                              color: AppColors.warning,
+                              width: cardWidth,
+                              isMobile: isMobile,
+                              onTap: () => context.go('/donations'),
+                            ),
+                          ],
+                        );
+                      },
                     ),
                   ],
                 ),
@@ -289,6 +345,7 @@ class _StatCard extends StatelessWidget {
   final String? subtitle;
   final IconData icon;
   final Color color;
+  final bool isMobile;
 
   const _StatCard({
     required this.title,
@@ -296,13 +353,14 @@ class _StatCard extends StatelessWidget {
     this.subtitle,
     required this.icon,
     required this.color,
+    this.isMobile = false,
   });
 
   @override
   Widget build(BuildContext context) {
     return Card(
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: EdgeInsets.all(isMobile ? 12 : 16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -311,17 +369,17 @@ class _StatCard extends StatelessWidget {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Container(
-                  padding: const EdgeInsets.all(8),
+                  padding: EdgeInsets.all(isMobile ? 6 : 8),
                   decoration: BoxDecoration(
                     color: color.withAlpha(30),
                     borderRadius: BorderRadius.circular(8),
                   ),
-                  child: Icon(icon, color: color, size: 20),
+                  child: Icon(icon, color: color, size: isMobile ? 16 : 20),
                 ),
-                const Icon(
+                Icon(
                   Icons.trending_up,
                   color: AppColors.success,
-                  size: 16,
+                  size: isMobile ? 14 : 16,
                 ),
               ],
             ),
@@ -330,6 +388,7 @@ class _StatCard extends StatelessWidget {
               value,
               style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                     fontWeight: FontWeight.bold,
+                    fontSize: isMobile ? 20 : null,
                   ),
             ),
             const SizedBox(height: 2),
@@ -337,7 +396,9 @@ class _StatCard extends StatelessWidget {
               title,
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
                     color: AppColors.textSecondary,
+                    fontSize: isMobile ? 11 : null,
                   ),
+              overflow: TextOverflow.ellipsis,
             ),
             if (subtitle != null) ...[
               const SizedBox(height: 2),
@@ -345,8 +406,9 @@ class _StatCard extends StatelessWidget {
                 subtitle!,
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
                       color: color,
-                      fontSize: 11,
+                      fontSize: isMobile ? 10 : 11,
                     ),
+                overflow: TextOverflow.ellipsis,
               ),
             ],
           ],
@@ -363,6 +425,8 @@ class _QuickActionCard extends StatelessWidget {
   final Color color;
   final String? badge;
   final VoidCallback onTap;
+  final double width;
+  final bool isMobile;
 
   const _QuickActionCard({
     required this.title,
@@ -371,37 +435,40 @@ class _QuickActionCard extends StatelessWidget {
     required this.color,
     this.badge,
     required this.onTap,
+    required this.width,
+    this.isMobile = false,
   });
 
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      width: 250,
+      width: width,
       child: Card(
         child: InkWell(
           onTap: onTap,
           borderRadius: BorderRadius.circular(12),
           child: Padding(
-            padding: const EdgeInsets.all(16),
+            padding: EdgeInsets.all(isMobile ? 12 : 16),
             child: Row(
               children: [
                 Stack(
                   clipBehavior: Clip.none,
                   children: [
                     Container(
-                      padding: const EdgeInsets.all(12),
+                      padding: EdgeInsets.all(isMobile ? 10 : 12),
                       decoration: BoxDecoration(
                         color: color.withAlpha(30),
                         borderRadius: BorderRadius.circular(12),
                       ),
-                      child: Icon(icon, color: color),
+                      child: Icon(icon, color: color, size: isMobile ? 20 : 24),
                     ),
                     if (badge != null)
                       Positioned(
                         top: -6,
                         right: -6,
                         child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 6, vertical: 2),
                           decoration: BoxDecoration(
                             color: AppColors.error,
                             borderRadius: BorderRadius.circular(10),
@@ -418,28 +485,35 @@ class _QuickActionCard extends StatelessWidget {
                       ),
                   ],
                 ),
-                const SizedBox(width: 16),
+                SizedBox(width: isMobile ? 12 : 16),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
                     children: [
                       Text(
                         title,
-                        style: const TextStyle(fontWeight: FontWeight.w600),
+                        style: TextStyle(
+                          fontWeight: FontWeight.w600,
+                          fontSize: isMobile ? 14 : null,
+                        ),
                       ),
                       const SizedBox(height: 4),
                       Text(
                         description,
                         style: Theme.of(context).textTheme.bodySmall?.copyWith(
                               color: AppColors.textSecondary,
+                              fontSize: isMobile ? 12 : null,
                             ),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
                       ),
                     ],
                   ),
                 ),
-                const Icon(
+                Icon(
                   Icons.arrow_forward_ios,
-                  size: 16,
+                  size: isMobile ? 14 : 16,
                   color: AppColors.textSecondary,
                 ),
               ],

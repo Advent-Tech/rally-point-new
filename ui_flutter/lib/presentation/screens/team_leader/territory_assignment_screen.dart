@@ -10,6 +10,7 @@ import '../../blocs/team/team_bloc.dart';
 import '../../blocs/territory/territory_bloc.dart';
 import '../../widgets/custom_button.dart';
 import '../../widgets/territory_map_widget.dart';
+import '../../widgets/feedback/app_snackbar.dart';
 
 class TerritoryAssignmentScreen extends StatefulWidget {
   final String? preSelectedWorkerId;
@@ -1595,20 +1596,10 @@ class _AssignmentBottomSheetState extends State<_AssignmentBottomSheet> {
       listener: (context, state) {
         if (state is TerritoryAssignSuccess) {
           Navigator.pop(context);
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(state.message),
-              backgroundColor: Colors.green,
-            ),
-          );
+          AppSnackbar.success(context, message: state.message);
         } else if (state is TerritoryError && _isAssigning) {
           setState(() => _isAssigning = false);
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(state.message),
-              backgroundColor: Colors.red,
-            ),
-          );
+          AppSnackbar.error(context, message: state.message);
         }
       },
       builder: (context, territoryState) {
@@ -1912,22 +1903,12 @@ class _AssignmentBottomSheetState extends State<_AssignmentBottomSheet> {
                           ? () {
                               final authState = context.read<AuthBloc>().state;
                               if (authState is! AuthAuthenticated) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
-                                    content: Text('Not authenticated'),
-                                    backgroundColor: Colors.red,
-                                  ),
-                                );
+                                AppSnackbar.error(context, message: 'Not authenticated');
                                 return;
                               }
                               final user = authState.user;
                               if (user.teamId == null) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
-                                    content: Text('No team assigned'),
-                                    backgroundColor: Colors.red,
-                                  ),
-                                );
+                                AppSnackbar.error(context, message: 'No team assigned');
                                 return;
                               }
 

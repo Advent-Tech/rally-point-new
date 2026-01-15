@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../../blocs/work_session/work_session_bloc.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../widgets/custom_button.dart';
+import '../../widgets/feedback/app_snackbar.dart';
 
 class LogVisitScreen extends StatefulWidget {
   const LogVisitScreen({super.key});
@@ -41,12 +42,7 @@ class _LogVisitScreenState extends State<LogVisitScreen> {
         notes: _notesController.text.trim().isEmpty ? null : _notesController.text.trim(),
       ));
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Visit logged successfully'),
-          backgroundColor: AppColors.success,
-        ),
-      );
+      AppSnackbar.success(context, message: 'Visit logged successfully');
 
       context.pop();
     }
@@ -109,16 +105,16 @@ class _LogVisitScreenState extends State<LogVisitScreen> {
                   Container(
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
-                      color: AppColors.primary.withAlpha(20),
+                      color: AppColors.primary.withValues(alpha: 0.08),
                       borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: AppColors.primary.withAlpha(50)),
+                      border: Border.all(color: AppColors.primary.withValues(alpha: 0.2)),
                     ),
                     child: Row(
                       children: [
                         Container(
                           padding: const EdgeInsets.all(10),
                           decoration: BoxDecoration(
-                            color: AppColors.primary.withAlpha(30),
+                            color: AppColors.primary.withValues(alpha: 0.12),
                             borderRadius: BorderRadius.circular(8),
                           ),
                           child: const Icon(
@@ -210,7 +206,7 @@ class _LogVisitScreenState extends State<LogVisitScreen> {
                         child: Container(
                           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                           decoration: BoxDecoration(
-                            color: isSelected ? color.withAlpha(30) : (isDark ? AppColors.surfaceDark : AppColors.surfaceLight),
+                            color: isSelected ? color.withValues(alpha: 0.12) : (isDark ? AppColors.surfaceDark : AppColors.surfaceLight),
                             borderRadius: BorderRadius.circular(20),
                             border: Border.all(
                               color: isSelected ? color : (isDark ? AppColors.borderDark : AppColors.borderLight),
@@ -291,7 +287,7 @@ class _LogVisitScreenState extends State<LogVisitScreen> {
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                           decoration: BoxDecoration(
-                            color: AppColors.primary.withAlpha(20),
+                            color: AppColors.primary.withValues(alpha: 0.08),
                             borderRadius: BorderRadius.circular(12),
                           ),
                           child: Text(

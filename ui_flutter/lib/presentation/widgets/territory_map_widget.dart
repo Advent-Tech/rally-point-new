@@ -82,6 +82,9 @@ class _TerritoryMapWidgetState extends State<TerritoryMapWidget> {
 
   bool _hasInitiallyFitTerritories = false;
 
+  // Cache parsed geometries to avoid repeated parsing
+  final Map<String, List<LatLng>> _geometryCache = {};
+
   @override
   void initState() {
     super.initState();
@@ -94,6 +97,12 @@ class _TerritoryMapWidgetState extends State<TerritoryMapWidget> {
   @override
   void didUpdateWidget(TerritoryMapWidget oldWidget) {
     super.didUpdateWidget(oldWidget);
+
+    // Clear geometry cache if territories changed
+    if (_territoriesChanged(oldWidget.territories, widget.territories)) {
+      _geometryCache.clear();
+    }
+
     // Fit to territories when:
     // 1. Territories were empty and now have data (initial load)
     // 2. Territory IDs actually changed
@@ -124,7 +133,6 @@ class _TerritoryMapWidgetState extends State<TerritoryMapWidget> {
   void _fitToAllTerritories() {
     final bounds = _calculateBounds();
     if (bounds != null && _isMapReady) {
-      debugPrint('TerritoryMapWidget: Fitting camera to bounds');
       _mapController.fitCamera(
         CameraFit.bounds(
           bounds: bounds,
@@ -134,14 +142,13 @@ class _TerritoryMapWidgetState extends State<TerritoryMapWidget> {
       _hasInitiallyFitTerritories = true;
     } else if (_isMapReady && !_hasInitiallyFitTerritories) {
       // No valid bounds, ensure we show US center
-      debugPrint('TerritoryMapWidget: No bounds, moving to US center');
       _mapController.move(const LatLng(39.8283, -98.5795), 4);
       _hasInitiallyFitTerritories = true;
     }
   }
 
   void _focusOnTerritory(GeoTerritory territory) {
-    final coords = _parseGeometry(territory.geometry);
+    final coords = _parseGeometryForTerritory(territory);
     if (coords.isEmpty) return;
 
     final bounds = _calculateBoundsFromCoords(coords);
@@ -166,25 +173,17 @@ class _TerritoryMapWidgetState extends State<TerritoryMapWidget> {
   }
 
   LatLngBounds? _calculateBounds() {
-    if (widget.territories.isEmpty) {
-      debugPrint('TerritoryMapWidget: No territories to calculate bounds');
-      return null;
-    }
-
-    debugPrint('TerritoryMapWidget: Calculating bounds for ${widget.territories.length} territories');
+    if (widget.territories.isEmpty) return null;
 
     double? minLat, maxLat, minLng, maxLng;
 
     for (final territory in widget.territories) {
-      final coords = _parseGeometry(territory.geometry);
-      debugPrint('TerritoryMapWidget: Territory ${territory.solid} has ${coords.length} coords, geometry: ${territory.geometry?.keys}');
+      final coords = _parseGeometryForTerritory(territory);
 
       for (final coord in coords) {
         // Skip invalid coordinates (0, 0 or very close)
-        if (coord.latitude.abs() < 0.1 && coord.longitude.abs() < 0.1) {
-          debugPrint('TerritoryMapWidget: Skipping invalid coord (0, 0)');
-          continue;
-        }
+        if (coord.latitude.abs() < 0.1 && coord.longitude.abs() < 0.1) continue;
+
         if (minLat == null || coord.latitude < minLat) minLat = coord.latitude;
         if (maxLat == null || coord.latitude > maxLat) maxLat = coord.latitude;
         if (minLng == null || coord.longitude < minLng) minLng = coord.longitude;
@@ -193,11 +192,9 @@ class _TerritoryMapWidgetState extends State<TerritoryMapWidget> {
     }
 
     if (minLat == null || maxLat == null || minLng == null || maxLng == null) {
-      debugPrint('TerritoryMapWidget: No valid coordinates found');
       return null;
     }
 
-    debugPrint('TerritoryMapWidget: Bounds: lat($minLat, $maxLat), lng($minLng, $maxLng)');
     return LatLngBounds(
       LatLng(minLat, minLng),
       LatLng(maxLat, maxLng),
@@ -312,17 +309,13 @@ class _TerritoryMapWidgetState extends State<TerritoryMapWidget> {
   List<Polygon> _buildPolygons() {
     final polygons = <Polygon>[];
 
-    for (final territory in widget.territories) {
-      final coords = _parseGeometry(territory.geometry);
-      if (coords.isEmpty) {
-        debugPrint('Territory ${territory.solid} has no geometry data');
-        continue;
-      }
+    for (int i = 0; i < widget.territories.length; i++) {
+      final territory = widget.territories[i];
+      final coords = _parseGeometryForTerritory(territory);
+      if (coords.isEmpty) continue;
 
       final isSelected = widget.selectedTerritory?.id == territory.id;
-
-      // Use different colors for each territory to make boundaries clear
-      final colorIndex = widget.territories.indexOf(territory) % _territoryColors.length;
+      final colorIndex = i % _territoryColors.length;
       final baseColor = isSelected ? AppColors.primary : _territoryColors[colorIndex];
 
       polygons.add(Polygon(
@@ -457,27 +450,29 @@ class _TerritoryMapWidgetState extends State<TerritoryMapWidget> {
     return markers;
   }
 
-  List<LatLng> _parseGeometry(Map<String, dynamic>? geometry) {
-    if (geometry == null) {
-      debugPrint('TerritoryMapWidget._parseGeometry: geometry is null');
-      return [];
+  /// Parse geometry with caching to avoid repeated parsing
+  List<LatLng> _parseGeometryForTerritory(GeoTerritory territory) {
+    // Check cache first
+    if (_geometryCache.containsKey(territory.id)) {
+      return _geometryCache[territory.id]!;
     }
+
+    final coords = _parseGeometryRaw(territory.geometry);
+    _geometryCache[territory.id] = coords;
+    return coords;
+  }
+
+  List<LatLng> _parseGeometryRaw(Map<String, dynamic>? geometry) {
+    if (geometry == null) return [];
 
     try {
       final type = geometry['type'] as String?;
       final coordinates = geometry['coordinates'];
 
-      debugPrint('TerritoryMapWidget._parseGeometry: type=$type, hasCoords=${coordinates != null}');
-
       if (coordinates == null) return [];
 
       if (type == 'Polygon') {
         final ring = coordinates[0] as List;
-        debugPrint('TerritoryMapWidget._parseGeometry: Polygon with ${ring.length} points');
-        if (ring.isNotEmpty) {
-          final firstCoord = ring[0] as List;
-          debugPrint('TerritoryMapWidget._parseGeometry: First coord: [${firstCoord[0]}, ${firstCoord[1]}]');
-        }
         return ring.map<LatLng>((coord) {
           final c = coord as List;
           return LatLng(c[1].toDouble(), c[0].toDouble());
@@ -485,27 +480,20 @@ class _TerritoryMapWidgetState extends State<TerritoryMapWidget> {
       } else if (type == 'MultiPolygon') {
         final firstPolygon = coordinates[0] as List;
         final ring = firstPolygon[0] as List;
-        debugPrint('TerritoryMapWidget._parseGeometry: MultiPolygon with ${ring.length} points');
-        if (ring.isNotEmpty) {
-          final firstCoord = ring[0] as List;
-          debugPrint('TerritoryMapWidget._parseGeometry: First coord: [${firstCoord[0]}, ${firstCoord[1]}]');
-        }
         return ring.map<LatLng>((coord) {
           final c = coord as List;
           return LatLng(c[1].toDouble(), c[0].toDouble());
         }).toList();
-      } else {
-        debugPrint('TerritoryMapWidget._parseGeometry: Unknown geometry type: $type');
       }
     } catch (e) {
-      debugPrint('TerritoryMapWidget._parseGeometry: Error parsing geometry: $e');
+      debugPrint('TerritoryMapWidget: Error parsing geometry: $e');
     }
 
     return [];
   }
 
   LatLng? _getTerritoryCenter(GeoTerritory territory) {
-    final coords = _parseGeometry(territory.geometry);
+    final coords = _parseGeometryForTerritory(territory);
     if (coords.isEmpty) return null;
 
     double sumLat = 0, sumLng = 0;
@@ -518,7 +506,7 @@ class _TerritoryMapWidgetState extends State<TerritoryMapWidget> {
   }
 
   bool _isPointInTerritory(LatLng point, GeoTerritory territory) {
-    final coords = _parseGeometry(territory.geometry);
+    final coords = _parseGeometryForTerritory(territory);
     if (coords.isEmpty) return false;
 
     bool inside = false;
