@@ -835,203 +835,230 @@ class _BlogsScreenState extends State<BlogsScreen> {
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
-          : Row(
-              children: [
-                // Blog List (Left Panel)
-                SizedBox(
-                  width: 400,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Padding(
-                        padding: const EdgeInsets.all(16),
-                        child: Text(
-                          'Blog Posts (${_blogs.length})',
-                          style: const TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                      Expanded(
-                        child: _blogs.isEmpty
-                            ? _buildEmptyState()
-                            : ListView.builder(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 16,
-                                ),
-                                itemCount: _blogs.length,
-                                itemBuilder: (context, index) {
-                                  final blog = _blogs[index];
-                                  final isSelected =
-                                      _selectedBlog?.id == blog.id;
-                                  return Card(
-                                    color: isSelected
-                                        ? AppColors.primary.withAlpha(20)
-                                        : null,
-                                    child: ListTile(
-                                      leading: ClipRRect(
-                                        borderRadius: BorderRadius.circular(8),
-                                        child: SizedBox(
-                                          width: 56,
-                                          height: 56,
-                                          child: blog.imageUrl != null
-                                              ? Image.network(
-                                                  blog.imageUrl!,
-                                                  fit: BoxFit.cover,
-                                                  errorBuilder: (_, __, ___) =>
-                                                      Container(
-                                                        color: AppColors.primary
-                                                            .withAlpha(30),
-                                                        child: const Icon(
-                                                          Icons.article,
-                                                          color:
-                                                              AppColors.primary,
-                                                        ),
-                                                      ),
-                                                )
-                                              : Container(
-                                                  color: AppColors.primary
-                                                      .withAlpha(30),
-                                                  child: const Icon(
-                                                    Icons.article,
-                                                    color: AppColors.primary,
-                                                  ),
-                                                ),
-                                        ),
-                                      ),
-                                      title: Text(
-                                        blog.title,
-                                        style: const TextStyle(
-                                          fontWeight: FontWeight.w600,
-                                        ),
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                      subtitle: Column(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
-                                        children: [
-                                          Text(
-                                            blog.formattedDate,
-                                            style: TextStyle(
-                                              fontSize: 12,
-                                              color: Colors.grey.shade600,
-                                            ),
-                                          ),
-                                          const SizedBox(height: 4),
-                                          Row(
-                                            children: [
-                                              Container(
-                                                padding:
-                                                    const EdgeInsets.symmetric(
-                                                      horizontal: 6,
-                                                      vertical: 2,
-                                                    ),
-                                                decoration: BoxDecoration(
-                                                  color: blog.isPublished
-                                                      ? AppColors.success
-                                                            .withAlpha(30)
-                                                      : Colors.grey.withAlpha(
-                                                          30,
-                                                        ),
-                                                  borderRadius:
-                                                      BorderRadius.circular(4),
-                                                ),
-                                                child: Text(
-                                                  blog.isPublished
-                                                      ? 'Published'
-                                                      : 'Draft',
-                                                  style: TextStyle(
-                                                    fontSize: 10,
-                                                    fontWeight: FontWeight.w600,
-                                                    color: blog.isPublished
-                                                        ? AppColors.success
-                                                        : Colors.grey,
-                                                  ),
-                                                ),
-                                              ),
-                                              const SizedBox(width: 8),
-                                              Icon(
-                                                Icons.visibility,
-                                                size: 14,
-                                                color: Colors.grey.shade500,
-                                              ),
-                                              const SizedBox(width: 2),
-                                              Text(
-                                                '${blog.viewCount}',
-                                                style: TextStyle(
-                                                  fontSize: 12,
-                                                  color: Colors.grey.shade500,
-                                                ),
-                                              ),
-                                            ],
-                                          ),
-                                        ],
-                                      ),
-                                      trailing: PopupMenuButton(
-                                        itemBuilder: (context) => [
-                                          const PopupMenuItem(
-                                            value: 'edit',
-                                            child: Text('Edit'),
-                                          ),
-                                          const PopupMenuItem(
-                                            value: 'delete',
-                                            child: Text('Delete'),
-                                          ),
-                                        ],
-                                        onSelected: (value) {
-                                          if (value == 'edit')
-                                            _showEditBlogDialog(blog);
-                                          if (value == 'delete')
-                                            _deleteBlog(blog);
-                                        },
-                                      ),
-                                      onTap: () =>
-                                          setState(() => _selectedBlog = blog),
+          : LayoutBuilder(
+              builder: (context, constraints) {
+                final isMobile = constraints.maxWidth < 768;
+
+                // Mobile: Show either list or details
+                if (isMobile) {
+                  return _selectedBlog == null
+                      ? _buildBlogList()
+                      : Column(
+                          children: [
+                            // Back button
+                            Container(
+                              padding: const EdgeInsets.all(8),
+                              child: Row(
+                                children: [
+                                  IconButton(
+                                    icon: const Icon(Icons.arrow_back),
+                                    onPressed: () => setState(() {
+                                      _selectedBlog = null;
+                                    }),
+                                  ),
+                                  const Text(
+                                    'Back to Blog Posts',
+                                    style: TextStyle(fontWeight: FontWeight.w500),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const Divider(height: 1),
+                            Expanded(
+                              child: _BlogPreviewPanel(
+                                blog: _selectedBlog!,
+                                onEdit: () => _showEditBlogDialog(_selectedBlog!),
+                                onDelete: () => _deleteBlog(_selectedBlog!),
+                                isMobile: true,
+                              ),
+                            ),
+                          ],
+                        );
+                }
+
+                // Desktop/Tablet: Side-by-side layout
+                return Row(
+                  children: [
+                    // Blog List (Left Panel)
+                    SizedBox(
+                      width: constraints.maxWidth < 1024 ? 320 : 400,
+                      child: _buildBlogList(),
+                    ),
+
+                    // Divider
+                    const VerticalDivider(width: 1),
+
+                    // Blog Preview (Right Panel)
+                    Expanded(
+                      child: _selectedBlog == null
+                          ? Center(
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(
+                                    Icons.article_outlined,
+                                    size: 64,
+                                    color: Colors.grey.shade400,
+                                  ),
+                                  const SizedBox(height: 16),
+                                  Text(
+                                    'Select a blog post to preview',
+                                    style: TextStyle(
+                                      color: Colors.grey.shade600,
+                                      fontSize: 16,
                                     ),
-                                  );
-                                },
+                                  ),
+                                ],
                               ),
-                      ),
-                    ],
-                  ),
-                ),
-
-                // Divider
-                const VerticalDivider(width: 1),
-
-                // Blog Preview (Right Panel)
-                Expanded(
-                  child: _selectedBlog == null
-                      ? Center(
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(
-                                Icons.article_outlined,
-                                size: 64,
-                                color: Colors.grey.shade400,
-                              ),
-                              const SizedBox(height: 16),
-                              Text(
-                                'Select a blog post to preview',
-                                style: TextStyle(
-                                  color: Colors.grey.shade600,
-                                  fontSize: 16,
-                                ),
-                              ),
-                            ],
-                          ),
-                        )
-                      : _BlogPreviewPanel(
-                          blog: _selectedBlog!,
-                          onEdit: () => _showEditBlogDialog(_selectedBlog!),
-                          onDelete: () => _deleteBlog(_selectedBlog!),
-                        ),
-                ),
-              ],
+                            )
+                          : _BlogPreviewPanel(
+                              blog: _selectedBlog!,
+                              onEdit: () => _showEditBlogDialog(_selectedBlog!),
+                              onDelete: () => _deleteBlog(_selectedBlog!),
+                              isMobile: false,
+                            ),
+                    ),
+                  ],
+                );
+              },
             ),
+    );
+  }
+
+  Widget _buildBlogList() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.all(16),
+          child: Text(
+            'Blog Posts (${_blogs.length})',
+            style: const TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ),
+        Expanded(
+          child: _blogs.isEmpty
+              ? _buildEmptyState()
+              : ListView.builder(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  itemCount: _blogs.length,
+                  itemBuilder: (context, index) {
+                    final blog = _blogs[index];
+                    final isSelected = _selectedBlog?.id == blog.id;
+                    return Card(
+                      color: isSelected ? AppColors.primary.withAlpha(20) : null,
+                      child: ListTile(
+                        leading: ClipRRect(
+                          borderRadius: BorderRadius.circular(8),
+                          child: SizedBox(
+                            width: 56,
+                            height: 56,
+                            child: blog.imageUrl != null
+                                ? Image.network(
+                                    blog.imageUrl!,
+                                    fit: BoxFit.cover,
+                                    errorBuilder: (_, __, ___) => Container(
+                                      color: AppColors.primary.withAlpha(30),
+                                      child: const Icon(
+                                        Icons.article,
+                                        color: AppColors.primary,
+                                      ),
+                                    ),
+                                  )
+                                : Container(
+                                    color: AppColors.primary.withAlpha(30),
+                                    child: const Icon(
+                                      Icons.article,
+                                      color: AppColors.primary,
+                                    ),
+                                  ),
+                          ),
+                        ),
+                        title: Text(
+                          blog.title,
+                          style: const TextStyle(fontWeight: FontWeight.w600),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        subtitle: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              blog.formattedDate,
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.grey.shade600,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Row(
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 6,
+                                    vertical: 2,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: blog.isPublished
+                                        ? AppColors.success.withAlpha(30)
+                                        : Colors.grey.withAlpha(30),
+                                    borderRadius: BorderRadius.circular(4),
+                                  ),
+                                  child: Text(
+                                    blog.isPublished ? 'Published' : 'Draft',
+                                    style: TextStyle(
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.w600,
+                                      color: blog.isPublished
+                                          ? AppColors.success
+                                          : Colors.grey,
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Icon(
+                                  Icons.visibility,
+                                  size: 14,
+                                  color: Colors.grey.shade500,
+                                ),
+                                const SizedBox(width: 2),
+                                Text(
+                                  '${blog.viewCount}',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: Colors.grey.shade500,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                        trailing: PopupMenuButton(
+                          itemBuilder: (context) => [
+                            const PopupMenuItem(
+                              value: 'edit',
+                              child: Text('Edit'),
+                            ),
+                            const PopupMenuItem(
+                              value: 'delete',
+                              child: Text('Delete'),
+                            ),
+                          ],
+                          onSelected: (value) {
+                            if (value == 'edit') _showEditBlogDialog(blog);
+                            if (value == 'delete') _deleteBlog(blog);
+                          },
+                        ),
+                        onTap: () => setState(() => _selectedBlog = blog),
+                      ),
+                    );
+                  },
+                ),
+        ),
+      ],
     );
   }
 
@@ -1062,17 +1089,19 @@ class _BlogPreviewPanel extends StatelessWidget {
   final BlogModel blog;
   final VoidCallback onEdit;
   final VoidCallback onDelete;
+  final bool isMobile;
 
   const _BlogPreviewPanel({
     required this.blog,
     required this.onEdit,
     required this.onDelete,
+    this.isMobile = false,
   });
 
   @override
   Widget build(BuildContext context) {
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(24),
+      padding: EdgeInsets.all(isMobile ? 16 : 24),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -1082,15 +1111,15 @@ class _BlogPreviewPanel extends StatelessWidget {
             children: [
               OutlinedButton.icon(
                 onPressed: onEdit,
-                icon: const Icon(Icons.edit, size: 18),
-                label: const Text('Edit'),
+                icon: Icon(Icons.edit, size: isMobile ? 16 : 18),
+                label: Text(isMobile ? 'Edit' : 'Edit'),
               ),
               const SizedBox(width: 8),
               OutlinedButton.icon(
                 onPressed: onDelete,
-                icon: const Icon(
+                icon: Icon(
                   Icons.delete,
-                  size: 18,
+                  size: isMobile ? 16 : 18,
                   color: AppColors.error,
                 ),
                 label: const Text(
@@ -1103,19 +1132,19 @@ class _BlogPreviewPanel extends StatelessWidget {
               ),
             ],
           ),
-          const SizedBox(height: 24),
+          SizedBox(height: isMobile ? 16 : 24),
 
           // Featured Image
           if (blog.imageUrl != null)
             ClipRRect(
-              borderRadius: BorderRadius.circular(16),
+              borderRadius: BorderRadius.circular(isMobile ? 12 : 16),
               child: Image.network(
                 blog.imageUrl!,
-                height: 300,
+                height: isMobile ? 180 : 300,
                 width: double.infinity,
                 fit: BoxFit.cover,
                 errorBuilder: (_, __, ___) => Container(
-                  height: 300,
+                  height: isMobile ? 180 : 300,
                   color: Colors.grey.shade200,
                   child: const Center(
                     child: Icon(Icons.broken_image, size: 48),
@@ -1123,68 +1152,120 @@ class _BlogPreviewPanel extends StatelessWidget {
                 ),
               ),
             ),
-          const SizedBox(height: 24),
+          SizedBox(height: isMobile ? 16 : 24),
 
-          // Meta Info
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 6,
+          // Meta Info - Wrap on mobile
+          isMobile
+              ? Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 4,
+                      ),
+                      decoration: BoxDecoration(
+                        color: blog.isPublished
+                            ? AppColors.success.withAlpha(30)
+                            : Colors.grey.withAlpha(30),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Text(
+                        blog.isPublished ? 'Published' : 'Draft',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w600,
+                          fontSize: 12,
+                          color: blog.isPublished ? AppColors.success : Colors.grey,
+                        ),
+                      ),
+                    ),
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.calendar_today, size: 14, color: Colors.grey.shade600),
+                        const SizedBox(width: 4),
+                        Text(
+                          blog.formattedDate,
+                          style: TextStyle(color: Colors.grey.shade600, fontSize: 12),
+                        ),
+                      ],
+                    ),
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.visibility, size: 14, color: Colors.grey.shade600),
+                        const SizedBox(width: 4),
+                        Text(
+                          '${blog.viewCount} views',
+                          style: TextStyle(color: Colors.grey.shade600, fontSize: 12),
+                        ),
+                      ],
+                    ),
+                  ],
+                )
+              : Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 6,
+                      ),
+                      decoration: BoxDecoration(
+                        color: blog.isPublished
+                            ? AppColors.success.withAlpha(30)
+                            : Colors.grey.withAlpha(30),
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      child: Text(
+                        blog.isPublished ? 'Published' : 'Draft',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w600,
+                          color: blog.isPublished ? AppColors.success : Colors.grey,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    Icon(Icons.calendar_today, size: 16, color: Colors.grey.shade600),
+                    const SizedBox(width: 4),
+                    Text(
+                      blog.formattedDate,
+                      style: TextStyle(color: Colors.grey.shade600),
+                    ),
+                    const SizedBox(width: 16),
+                    Icon(Icons.visibility, size: 16, color: Colors.grey.shade600),
+                    const SizedBox(width: 4),
+                    Text(
+                      '${blog.viewCount} views',
+                      style: TextStyle(color: Colors.grey.shade600),
+                    ),
+                    if (blog.authorName != null) ...[
+                      const SizedBox(width: 16),
+                      Icon(Icons.person, size: 16, color: Colors.grey.shade600),
+                      const SizedBox(width: 4),
+                      Text(
+                        blog.authorName!,
+                        style: TextStyle(color: Colors.grey.shade600),
+                      ),
+                    ],
+                  ],
                 ),
-                decoration: BoxDecoration(
-                  color: blog.isPublished
-                      ? AppColors.success.withAlpha(30)
-                      : Colors.grey.withAlpha(30),
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: Text(
-                  blog.isPublished ? 'Published' : 'Draft',
-                  style: TextStyle(
-                    fontWeight: FontWeight.w600,
-                    color: blog.isPublished ? AppColors.success : Colors.grey,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 16),
-              Icon(Icons.calendar_today, size: 16, color: Colors.grey.shade600),
-              const SizedBox(width: 4),
-              Text(
-                blog.formattedDate,
-                style: TextStyle(color: Colors.grey.shade600),
-              ),
-              const SizedBox(width: 16),
-              Icon(Icons.visibility, size: 16, color: Colors.grey.shade600),
-              const SizedBox(width: 4),
-              Text(
-                '${blog.viewCount} views',
-                style: TextStyle(color: Colors.grey.shade600),
-              ),
-              if (blog.authorName != null) ...[
-                const SizedBox(width: 16),
-                Icon(Icons.person, size: 16, color: Colors.grey.shade600),
-                const SizedBox(width: 4),
-                Text(
-                  blog.authorName!,
-                  style: TextStyle(color: Colors.grey.shade600),
-                ),
-              ],
-            ],
-          ),
-          const SizedBox(height: 24),
+          SizedBox(height: isMobile ? 16 : 24),
 
           // Title
           Text(
             blog.title,
-            style: const TextStyle(fontSize: 28, fontWeight: FontWeight.bold),
+            style: TextStyle(
+              fontSize: isMobile ? 22 : 28,
+              fontWeight: FontWeight.bold,
+            ),
           ),
-          const SizedBox(height: 16),
+          SizedBox(height: isMobile ? 12 : 16),
 
           // Excerpt
           if (blog.excerpt != null && blog.excerpt!.isNotEmpty) ...[
             Container(
-              padding: const EdgeInsets.all(16),
+              padding: EdgeInsets.all(isMobile ? 12 : 16),
               decoration: BoxDecoration(
                 color: AppColors.primary.withAlpha(10),
                 borderRadius: BorderRadius.circular(12),
@@ -1193,17 +1274,23 @@ class _BlogPreviewPanel extends StatelessWidget {
               child: Text(
                 blog.excerpt!,
                 style: TextStyle(
-                  fontSize: 16,
+                  fontSize: isMobile ? 14 : 16,
                   fontStyle: FontStyle.italic,
                   color: Colors.grey.shade700,
                 ),
               ),
             ),
-            const SizedBox(height: 24),
+            SizedBox(height: isMobile ? 16 : 24),
           ],
 
           // Content
-          Text(blog.content, style: const TextStyle(fontSize: 16, height: 1.8)),
+          Text(
+            blog.content,
+            style: TextStyle(
+              fontSize: isMobile ? 14 : 16,
+              height: 1.8,
+            ),
+          ),
         ],
       ),
     );

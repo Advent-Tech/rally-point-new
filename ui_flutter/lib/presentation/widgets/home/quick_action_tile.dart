@@ -23,46 +23,47 @@ class QuickActionTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final size = isSmall ? 100.0 : 120.0;
-    final iconSize = isSmall ? 32.0 : 40.0;
+    final iconSize = isSmall ? 48.0 : 56.0;
     final borderRadius = isSmall ? 20.0 : 24.0;
 
     return GestureDetector(
       onTap: onTap,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            width: size,
-            height: size,
-            decoration: BoxDecoration(
-              color: backgroundColor,
-              borderRadius: BorderRadius.circular(borderRadius),
-              boxShadow: [
-                BoxShadow(
-                  color: backgroundColor.withValues(alpha: 0.3),
-                  blurRadius: 12,
-                  offset: const Offset(0, 4),
-                ),
-              ],
+      child: Container(
+        decoration: BoxDecoration(
+          color: backgroundColor,
+          borderRadius: BorderRadius.circular(borderRadius),
+          boxShadow: [
+            BoxShadow(
+              color: backgroundColor.withValues(alpha: 0.3),
+              blurRadius: 12,
+              offset: const Offset(0, 4),
             ),
-            child: Icon(
+          ],
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
               icon,
               color: Colors.white,
               size: iconSize,
             ),
-          ),
-          const SizedBox(height: AppSpacing.sm),
-          Text(
-            label,
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-              fontWeight: FontWeight.w600,
+            const SizedBox(height: AppSpacing.smd),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm),
+              child: Text(
+                label,
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w600,
+                  color: Colors.white,
+                ),
+                textAlign: TextAlign.center,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
             ),
-            textAlign: TextAlign.center,
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -83,14 +84,15 @@ class QuickActionGrid extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Use GridView with 2 columns for consistent layout
     return GridView.builder(
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
-      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: crossAxisCount,
-        mainAxisSpacing: spacing,
-        crossAxisSpacing: spacing,
-        childAspectRatio: 0.85,
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 2,
+        mainAxisSpacing: AppSpacing.md,
+        crossAxisSpacing: AppSpacing.md,
+        childAspectRatio: 1.0,
       ),
       itemCount: actions.length,
       itemBuilder: (context, index) {
@@ -100,6 +102,7 @@ class QuickActionGrid extends StatelessWidget {
           label: action.label,
           backgroundColor: action.backgroundColor,
           onTap: action.onTap,
+          isSmall: true,
         );
       },
     );
@@ -121,27 +124,27 @@ class QuickActionTileData {
   });
 }
 
-/// Predefined colors for quick action tiles matching the reference design
+/// Predefined colors for quick action tiles - elegant vibrant palette
 class QuickActionColors {
   QuickActionColors._();
 
-  /// Purple/Lavender - My Territory
-  static const Color territory = Color(0xFFB8A9E8);
+  /// Purple - My Territory
+  static const Color territory = Color(0xFF7E57C2);
 
-  /// Pink/Coral - Deliver Book
-  static const Color delivery = Color(0xFFF5B5B5);
+  /// Coral/Rose - Donation
+  static const Color delivery = Color(0xFFE57373);
 
-  /// Tan/Beige - Survey Form
-  static const Color survey = Color(0xFFE8D5B5);
+  /// Amber/Gold - Survey Form
+  static const Color survey = Color(0xFFFFB74D);
 
-  /// Teal/Blue - Team Group
-  static const Color team = Color(0xFF5CB8B2);
+  /// Teal - Team Group
+  static const Color team = Color(0xFF4DB6AC);
 
   /// Green - GPS Tracking
-  static const Color tracking = Color(0xFF4CAF50);
+  static const Color tracking = Color(0xFF66BB6A);
 
   /// Orange - Achievements
-  static const Color achievements = Color(0xFFFFA726);
+  static const Color achievements = Color(0xFFFF8A65);
 
   /// Blue - Chat
   static const Color chat = Color(0xFF42A5F5);
@@ -152,7 +155,7 @@ class QuickActionColors {
   /// Green - Start Session
   static const Color startSession = Color(0xFF66BB6A);
 
-  /// Purple - Prayer
+  /// Deep Purple - Prayer
   static const Color prayer = Color(0xFF9575CD);
 
   /// Indigo - News

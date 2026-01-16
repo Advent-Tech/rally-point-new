@@ -26,10 +26,12 @@ class _LoginScreenState extends State<LoginScreen> {
 
   void _handleLogin() {
     if (_formKey.currentState?.validate() ?? false) {
-      context.read<AuthBloc>().add(AuthLogin(
-            email: _emailController.text.trim(),
-            password: _passwordController.text,
-          ));
+      context.read<AuthBloc>().add(
+        AuthLogin(
+          email: _emailController.text.trim(),
+          password: _passwordController.text,
+        ),
+      );
     }
   }
 
@@ -60,34 +62,27 @@ class _LoginScreenState extends State<LoginScreen> {
                   mainAxisAlignment: MainAxisAlignment.center,
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    // Logo and Title
-                    Container(
-                      width: 80,
-                      height: 80,
-                      decoration: BoxDecoration(
-                        color: AppColors.primary,
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                      child: const Icon(
-                        Icons.admin_panel_settings,
-                        size: 48,
-                        color: Colors.white,
+                    // Logo
+                    Center(
+                      child: Image.asset(
+                        'assets/logo.png',
+                        height: 80,
+                        fit: BoxFit.contain,
                       ),
                     ),
                     const SizedBox(height: 24),
                     Text(
-                      'Rally Point Admin',
-                      style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                            fontWeight: FontWeight.bold,
-                          ),
+                      'Admin Panel',
+                      style: Theme.of(context).textTheme.headlineSmall
+                          ?.copyWith(fontWeight: FontWeight.bold),
                       textAlign: TextAlign.center,
                     ),
                     const SizedBox(height: 8),
                     Text(
                       'Sign in to access the admin panel',
                       style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                            color: AppColors.textSecondary,
-                          ),
+                        color: AppColors.textSecondary,
+                      ),
                       textAlign: TextAlign.center,
                     ),
                     const SizedBox(height: 48),
@@ -105,7 +100,9 @@ class _LoginScreenState extends State<LoginScreen> {
                         if (value == null || value.isEmpty) {
                           return 'Please enter your email';
                         }
-                        if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(value)) {
+                        if (!RegExp(
+                          r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$',
+                        ).hasMatch(value)) {
                           return 'Please enter a valid email';
                         }
                         return null;
@@ -128,7 +125,9 @@ class _LoginScreenState extends State<LoginScreen> {
                                 : Icons.visibility_off_outlined,
                           ),
                           onPressed: () {
-                            setState(() => _obscurePassword = !_obscurePassword);
+                            setState(
+                              () => _obscurePassword = !_obscurePassword,
+                            );
                           },
                         ),
                       ),
@@ -175,12 +174,19 @@ class _LoginScreenState extends State<LoginScreen> {
                       ),
                       child: Row(
                         children: [
-                          Icon(Icons.info_outline, color: AppColors.info, size: 20),
+                          Icon(
+                            Icons.info_outline,
+                            color: AppColors.info,
+                            size: 20,
+                          ),
                           const SizedBox(width: 8),
                           Expanded(
                             child: Text(
                               'Only Admin and Superadmin accounts can access this panel.',
-                              style: TextStyle(fontSize: 12, color: AppColors.info),
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: AppColors.info,
+                              ),
                             ),
                           ),
                         ],

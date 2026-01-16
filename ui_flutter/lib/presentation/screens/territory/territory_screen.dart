@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/constants/api_constants.dart';
 import '../../../core/network/api_client.dart';
@@ -88,10 +89,11 @@ class _TerritoryScreenState extends State<TerritoryScreen> with TickerProviderSt
               onChanged: _onSearchChanged,
             ),
           ),
-          // Tab Content
+          // Tab Content - disable swipe to allow map panning
           Expanded(
             child: TabBarView(
               controller: _tabController,
+              physics: const NeverScrollableScrollPhysics(),
               children: [
                 _MyAreasTab(isDark: isDark, tabController: _tabController),
                 _AvailableTab(isDark: isDark, tabController: _tabController),
@@ -777,18 +779,52 @@ class _MapTabState extends State<_MapTab> {
   GeoTerritory? _selectedTerritory;
   final List<VisitMarker> _visitMarkers = [];
   bool _isTeamLeader = false;
+  bool _showOnlyMyTerritories = true; // Default to showing assigned territories
+  double? _userLatitude;
+  double? _userLongitude;
 
   @override
   void initState() {
     super.initState();
     widget.tabController.addListener(_onTabChange);
     _checkUserRole();
+    _getUserLocation();
     // Load data immediately on init to prevent blank map on first load
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
         _loadMapData();
       }
     });
+  }
+
+  Future<void> _getUserLocation() async {
+    try {
+      // Check if location services are enabled
+      bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      if (!serviceEnabled) return;
+
+      // Check permission
+      LocationPermission permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+        if (permission == LocationPermission.denied) return;
+      }
+      if (permission == LocationPermission.deniedForever) return;
+
+      // Get current position
+      final position = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.medium,
+      );
+
+      if (mounted) {
+        setState(() {
+          _userLatitude = position.latitude;
+          _userLongitude = position.longitude;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error getting user location: $e');
+    }
   }
 
   void _checkUserRole() {
@@ -808,10 +844,28 @@ class _MapTabState extends State<_MapTab> {
         context.read<TerritoryBloc>().add(const TerritoryLoadMyAllocations());
       }
     } else {
-      // Workers see available territories
-      if (state is! TerritoryAvailableLoaded && state is! TerritoryLoading) {
-        context.read<TerritoryBloc>().add(const TerritoryLoadAvailable(limit: 50));
+      // Workers: load assigned territories first (default), or all available if toggled
+      if (_showOnlyMyTerritories) {
+        if (state is! TerritoryAssignmentsLoaded && state is! TerritoryLoading) {
+          context.read<TerritoryBloc>().add(const TerritoryLoadAssignments());
+        }
+      } else {
+        if (state is! TerritoryAvailableLoaded && state is! TerritoryLoading) {
+          context.read<TerritoryBloc>().add(const TerritoryLoadAvailable(limit: 50));
+        }
       }
+    }
+  }
+
+  void _toggleTerritoryView() {
+    setState(() {
+      _showOnlyMyTerritories = !_showOnlyMyTerritories;
+    });
+    // Force reload based on new toggle state
+    if (_showOnlyMyTerritories) {
+      context.read<TerritoryBloc>().add(const TerritoryLoadAssignments());
+    } else {
+      context.read<TerritoryBloc>().add(const TerritoryLoadAvailable(limit: 50));
     }
   }
 
@@ -941,56 +995,113 @@ class _MapTabState extends State<_MapTab> {
           visitMarkers: _visitMarkers,
           allowAddVisit: true,
           onAddVisit: (lat, lng) => _showAddVisitDialog(context, lat, lng),
-          fitToTerritories: isSearchResult, // Zoom to fit territories when searching
+          fitToTerritories: true, // Always fit to territories
+          userLatitude: _userLatitude,
+          userLongitude: _userLongitude,
         ),
         // Territory count badge with search indicator
         Positioned(
           left: AppSpacing.md,
           top: AppSpacing.md,
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.smd, vertical: AppSpacing.sm),
-            decoration: BoxDecoration(
-              color: isSearchResult ? AppColors.primary : Colors.white,
-              borderRadius: AppSpacing.borderRadiusFull,
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.12),
-                  blurRadius: 4,
-                  offset: const Offset(0, 2),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: AppSpacing.smd, vertical: AppSpacing.sm),
+                decoration: BoxDecoration(
+                  color: isSearchResult ? AppColors.primary : Colors.white,
+                  borderRadius: AppSpacing.borderRadiusFull,
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.12),
+                      blurRadius: 4,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
                 ),
-              ],
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(
-                  isSearchResult ? Icons.search : Icons.map_outlined,
-                  size: 16,
-                  color: isSearchResult ? Colors.white : AppColors.primary,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      isSearchResult ? Icons.search : Icons.map_outlined,
+                      size: 16,
+                      color: isSearchResult ? Colors.white : AppColors.primary,
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      isSearchResult
+                          ? '${territories.length} results for "$searchQuery"'
+                          : '${territories.length} ${_showOnlyMyTerritories ? 'assigned' : 'available'} territories',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: isSearchResult ? Colors.white : AppColors.textPrimaryLight,
+                      ),
+                    ),
+                    if (isSearchResult) ...[
+                      const SizedBox(width: 8),
+                      GestureDetector(
+                        onTap: () {
+                          // Clear search and reload based on toggle
+                          if (_showOnlyMyTerritories) {
+                            context.read<TerritoryBloc>().add(const TerritoryLoadAssignments());
+                          } else {
+                            context.read<TerritoryBloc>().add(const TerritoryLoadAvailable(limit: 50));
+                          }
+                        },
+                        child: const Icon(Icons.close, size: 16, color: Colors.white),
+                      ),
+                    ],
+                  ],
                 ),
-                const SizedBox(width: 6),
-                Text(
-                  isSearchResult
-                      ? '${territories.length} results for "$searchQuery"'
-                      : '${territories.length} territories',
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    color: isSearchResult ? Colors.white : AppColors.textPrimaryLight,
+              ),
+              // Toggle switch for workers (not team leaders)
+              if (!_isTeamLeader && !isSearchResult) ...[
+                const SizedBox(height: 8),
+                GestureDetector(
+                  onTap: _toggleTerritoryView,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: AppSpacing.smd, vertical: AppSpacing.sm),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: AppSpacing.borderRadiusFull,
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.12),
+                          blurRadius: 4,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          _showOnlyMyTerritories ? Icons.person : Icons.public,
+                          size: 16,
+                          color: _showOnlyMyTerritories ? AppColors.success : AppColors.info,
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          _showOnlyMyTerritories ? 'My Territories' : 'All Available',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: _showOnlyMyTerritories ? AppColors.success : AppColors.info,
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                        Icon(
+                          Icons.swap_horiz,
+                          size: 14,
+                          color: AppColors.textSecondaryLight,
+                        ),
+                      ],
+                    ),
                   ),
                 ),
-                if (isSearchResult) ...[
-                  const SizedBox(width: 8),
-                  GestureDetector(
-                    onTap: () {
-                      // Clear search and reload available
-                      context.read<TerritoryBloc>().add(const TerritoryLoadAvailable(limit: 50));
-                    },
-                    child: const Icon(Icons.close, size: 16, color: Colors.white),
-                  ),
-                ],
               ],
-            ),
+            ],
           ),
         ),
         // Long press hint
@@ -1282,7 +1393,7 @@ class _MapTabState extends State<_MapTab> {
                 value: '${territory.population}',
               ),
             const SizedBox(height: 20),
-            // Show different button based on role
+            // Show different button based on role and view mode
             if (_isTeamLeader)
               SizedBox(
                 width: double.infinity,
@@ -1295,7 +1406,49 @@ class _MapTabState extends State<_MapTab> {
                   },
                 ),
               )
+            else if (_showOnlyMyTerritories)
+              // Viewing assigned territories - show status and work button
+              Column(
+                children: [
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(AppSpacing.smd),
+                    decoration: BoxDecoration(
+                      color: AppColors.success.withValues(alpha: 0.1),
+                      borderRadius: AppSpacing.borderRadiusMd,
+                      border: Border.all(color: AppColors.success.withValues(alpha: 0.3)),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.check_circle, color: AppColors.success, size: 20),
+                        const SizedBox(width: 8),
+                        Text(
+                          'Assigned to you',
+                          style: TextStyle(
+                            color: AppColors.success,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  SizedBox(
+                    width: double.infinity,
+                    child: CustomButton(
+                      text: 'Start Working',
+                      icon: Icons.play_arrow,
+                      onPressed: () {
+                        Navigator.pop(sheetContext);
+                        // Navigate to territory detail or start work flow
+                        AppSnackbar.info(context, message: 'Starting work in ${territory.entityName}');
+                      },
+                    ),
+                  ),
+                ],
+              )
             else
+              // Viewing available territories - show request button
               SizedBox(
                 width: double.infinity,
                 child: CustomButton(

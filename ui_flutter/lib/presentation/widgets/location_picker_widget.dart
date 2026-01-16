@@ -1,9 +1,12 @@
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
-import 'package:flutter_map/flutter_map.dart';
-import 'package:geolocator/geolocator.dart';
-import 'package:latlong2/latlong.dart';
+import 'package:geolocator/geolocator.dart' as geo;
+import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/constants/map_constants.dart';
+
+// Type alias for clarity
+typedef MapPosition = Position;
 
 /// Territory boundary data for displaying on the map
 class TerritoryBoundary {
@@ -20,34 +23,15 @@ class TerritoryBoundary {
 
 /// A widget that allows users to pick a location on a map
 class LocationPickerWidget extends StatefulWidget {
-  /// Initial latitude (defaults to current location or US center if null)
   final double? initialLatitude;
-
-  /// Initial longitude (defaults to current location or US center if null)
   final double? initialLongitude;
-
-  /// Initial zoom level
   final double initialZoom;
-
-  /// Height of the map widget
   final double height;
-
-  /// Callback when location is selected
   final Function(double latitude, double longitude)? onLocationSelected;
-
-  /// Whether the picker is in compact mode (smaller size)
   final bool compact;
-
-  /// Show a confirmation button
   final bool showConfirmButton;
-
-  /// Label for the confirm button
   final String confirmButtonLabel;
-
-  /// Territory boundaries to display on the map
   final List<TerritoryBoundary> territories;
-
-  /// Whether to show a warning when selecting outside territory
   final bool warnOutsideTerritory;
 
   const LocationPickerWidget({
@@ -69,20 +53,22 @@ class LocationPickerWidget extends StatefulWidget {
 }
 
 class _LocationPickerWidgetState extends State<LocationPickerWidget> {
-  late MapController _mapController;
-  LatLng? _selectedLocation;
-  LatLng? _currentLocation;
+  MapboxMap? _mapboxMap;
+  PolygonAnnotationManager? _polygonManager;
+  CircleAnnotationManager? _circleManager;
+  Position? _selectedLocation;
+  Position? _currentLocation;
   bool _isExpanded = false;
   bool _isLoadingLocation = true;
   String? _locationError;
   bool _isOutsideTerritory = false;
+  bool _isMapReady = false;
 
   @override
   void initState() {
     super.initState();
-    _mapController = MapController();
     if (widget.initialLatitude != null && widget.initialLongitude != null) {
-      _selectedLocation = LatLng(widget.initialLatitude!, widget.initialLongitude!);
+      _selectedLocation = Position(widget.initialLongitude!, widget.initialLatitude!);
       _currentLocation = _selectedLocation;
       _isLoadingLocation = false;
     } else {
@@ -97,8 +83,7 @@ class _LocationPickerWidgetState extends State<LocationPickerWidget> {
     });
 
     try {
-      // Check if location services are enabled
-      bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      bool serviceEnabled = await geo.Geolocator.isLocationServiceEnabled();
       if (!serviceEnabled) {
         setState(() {
           _locationError = 'Location services disabled';
@@ -107,11 +92,10 @@ class _LocationPickerWidgetState extends State<LocationPickerWidget> {
         return;
       }
 
-      // Check permissions
-      LocationPermission permission = await Geolocator.checkPermission();
-      if (permission == LocationPermission.denied) {
-        permission = await Geolocator.requestPermission();
-        if (permission == LocationPermission.denied) {
+      geo.LocationPermission permission = await geo.Geolocator.checkPermission();
+      if (permission == geo.LocationPermission.denied) {
+        permission = await geo.Geolocator.requestPermission();
+        if (permission == geo.LocationPermission.denied) {
           setState(() {
             _locationError = 'Location permission denied';
             _isLoadingLocation = false;
@@ -120,7 +104,7 @@ class _LocationPickerWidgetState extends State<LocationPickerWidget> {
         }
       }
 
-      if (permission == LocationPermission.deniedForever) {
+      if (permission == geo.LocationPermission.deniedForever) {
         setState(() {
           _locationError = 'Location permanently denied';
           _isLoadingLocation = false;
@@ -128,20 +112,21 @@ class _LocationPickerWidgetState extends State<LocationPickerWidget> {
         return;
       }
 
-      // Get current position
-      final position = await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.high,
+      final position = await geo.Geolocator.getCurrentPosition(
+        desiredAccuracy: geo.LocationAccuracy.high,
         timeLimit: const Duration(seconds: 10),
       );
 
       setState(() {
-        _currentLocation = LatLng(position.latitude, position.longitude);
+        _currentLocation = Position(position.longitude, position.latitude);
         _isLoadingLocation = false;
       });
 
-      // Move map to current location
-      if (_mapController.camera.center.latitude != 0) {
-        _mapController.move(_currentLocation!, widget.initialZoom);
+      if (_mapboxMap != null && _isMapReady) {
+        _mapboxMap!.setCamera(CameraOptions(
+          center: Point(coordinates: _currentLocation!),
+          zoom: widget.initialZoom,
+        ));
       }
     } catch (e) {
       setState(() {
@@ -151,38 +136,90 @@ class _LocationPickerWidgetState extends State<LocationPickerWidget> {
     }
   }
 
-  LatLng get _center {
+  Point get _center {
     if (_selectedLocation != null) {
-      return _selectedLocation!;
+      return Point(coordinates: _selectedLocation!);
     }
     if (widget.initialLatitude != null && widget.initialLongitude != null) {
-      return LatLng(widget.initialLatitude!, widget.initialLongitude!);
+      return Point(coordinates: Position(widget.initialLongitude!, widget.initialLatitude!));
     }
-    // Prioritize territory center over current location so map shows territories
     final territoryCenter = _getTerritoryCenter();
     if (territoryCenter != null) {
       return territoryCenter;
     }
     if (_currentLocation != null) {
-      return _currentLocation!;
+      return Point(coordinates: _currentLocation!);
     }
-    // Default to US center if no location available
-    return const LatLng(39.8283, -98.5795);
+    return Point(coordinates: Position(MapConstants.defaultLongitude, MapConstants.defaultLatitude));
   }
 
   double get _initialZoom {
-    // If we have territories, use zoom that fits them
-    if (widget.territories.isNotEmpty) {
-      return 13.0;
-    }
-    if (_selectedLocation != null || _currentLocation != null) {
-      return widget.initialZoom;
-    }
-    return 4.0; // Zoomed out if no location
+    if (widget.territories.isNotEmpty) return 13.0;
+    if (_selectedLocation != null || _currentLocation != null) return widget.initialZoom;
+    return 4.0;
   }
 
-  /// Parse geometry from GeoJSON format to list of LatLng points
-  List<LatLng> _parseGeometry(Map<String, dynamic>? geometry) {
+  void _onMapCreated(MapboxMap mapboxMap) async {
+    _mapboxMap = mapboxMap;
+    _polygonManager = await mapboxMap.annotations.createPolygonAnnotationManager();
+    _circleManager = await mapboxMap.annotations.createCircleAnnotationManager();
+
+    setState(() => _isMapReady = true);
+
+    await _updateTerritoryPolygons();
+    await _updateLocationMarkers();
+  }
+
+  Future<void> _updateTerritoryPolygons() async {
+    if (_polygonManager == null) return;
+
+    await _polygonManager!.deleteAll();
+
+    for (final territory in widget.territories) {
+      final points = _parseGeometry(territory.geometry);
+      if (points.isEmpty) continue;
+
+      final color = territory.color ?? AppColors.primary;
+      final options = PolygonAnnotationOptions(
+        geometry: Polygon(coordinates: [points]),
+        fillColor: color.toARGB32(),
+        fillOpacity: 0.15,
+        fillOutlineColor: color.toARGB32(),
+      );
+
+      await _polygonManager!.create(options);
+    }
+  }
+
+  Future<void> _updateLocationMarkers() async {
+    if (_circleManager == null) return;
+
+    await _circleManager!.deleteAll();
+
+    // Current location marker (blue)
+    if (_currentLocation != null && _selectedLocation == null) {
+      await _circleManager!.create(CircleAnnotationOptions(
+        geometry: Point(coordinates: _currentLocation!),
+        circleColor: AppColors.primary.toARGB32(),
+        circleRadius: 10,
+        circleStrokeColor: Colors.white.toARGB32(),
+        circleStrokeWidth: 3,
+      ));
+    }
+
+    // Selected location marker (red)
+    if (_selectedLocation != null) {
+      await _circleManager!.create(CircleAnnotationOptions(
+        geometry: Point(coordinates: _selectedLocation!),
+        circleColor: AppColors.error.toARGB32(),
+        circleRadius: 12,
+        circleStrokeColor: Colors.white.toARGB32(),
+        circleStrokeWidth: 3,
+      ));
+    }
+  }
+
+  List<Position> _parseGeometry(Map<String, dynamic>? geometry) {
     if (geometry == null) return [];
 
     try {
@@ -195,15 +232,14 @@ class _LocationPickerWidgetState extends State<LocationPickerWidget> {
         final ring = coordinates[0] as List;
         return ring.map((coord) {
           final c = coord as List;
-          return LatLng(c[1].toDouble(), c[0].toDouble());
+          return Position(c[0].toDouble(), c[1].toDouble());
         }).toList();
       } else if (type == 'MultiPolygon') {
-        // For MultiPolygon, just use the first polygon
         final firstPolygon = coordinates[0] as List;
         final ring = firstPolygon[0] as List;
         return ring.map((coord) {
           final c = coord as List;
-          return LatLng(c[1].toDouble(), c[0].toDouble());
+          return Position(c[0].toDouble(), c[1].toDouble());
         }).toList();
       }
     } catch (e) {
@@ -213,30 +249,8 @@ class _LocationPickerWidgetState extends State<LocationPickerWidget> {
     return [];
   }
 
-  /// Build polygon layers for territories
-  List<Polygon> _buildTerritoryPolygons() {
-    final polygons = <Polygon>[];
-
-    for (final territory in widget.territories) {
-      final points = _parseGeometry(territory.geometry);
-      if (points.isEmpty) continue;
-
-      final color = territory.color ?? AppColors.primary;
-      polygons.add(Polygon(
-        points: points,
-        color: color.withAlpha(40),
-        borderColor: color,
-        borderStrokeWidth: 2.0,
-        isFilled: true,
-      ));
-    }
-
-    return polygons;
-  }
-
-  /// Check if a point is inside any of the territories using ray casting algorithm
-  bool _isPointInTerritories(LatLng point) {
-    if (widget.territories.isEmpty) return true; // No territories = always valid
+  bool _isPointInTerritories(Position point) {
+    if (widget.territories.isEmpty) return true;
 
     for (final territory in widget.territories) {
       final polygon = _parseGeometry(territory.geometry);
@@ -249,21 +263,20 @@ class _LocationPickerWidgetState extends State<LocationPickerWidget> {
     return false;
   }
 
-  /// Ray casting algorithm to check if point is inside polygon
-  bool _isPointInPolygon(LatLng point, List<LatLng> polygon) {
+  bool _isPointInPolygon(Position point, List<Position> polygon) {
     if (polygon.length < 3) return false;
 
     bool inside = false;
     int j = polygon.length - 1;
 
     for (int i = 0; i < polygon.length; i++) {
-      final xi = polygon[i].longitude;
-      final yi = polygon[i].latitude;
-      final xj = polygon[j].longitude;
-      final yj = polygon[j].latitude;
+      final xi = polygon[i].lng;
+      final yi = polygon[i].lat;
+      final xj = polygon[j].lng;
+      final yj = polygon[j].lat;
 
-      if (((yi > point.latitude) != (yj > point.latitude)) &&
-          (point.longitude < (xj - xi) * (point.latitude - yi) / (yj - yi) + xi)) {
+      if (((yi > point.lat) != (yj > point.lat)) &&
+          (point.lng < (xj - xi) * (point.lat - yi) / (yj - yi) + xi)) {
         inside = !inside;
       }
       j = i;
@@ -272,8 +285,7 @@ class _LocationPickerWidgetState extends State<LocationPickerWidget> {
     return inside;
   }
 
-  /// Get center of all territories for initial map position
-  LatLng? _getTerritoryCenter() {
+  Point? _getTerritoryCenter() {
     if (widget.territories.isEmpty) return null;
 
     double sumLat = 0;
@@ -283,19 +295,18 @@ class _LocationPickerWidgetState extends State<LocationPickerWidget> {
     for (final territory in widget.territories) {
       final points = _parseGeometry(territory.geometry);
       for (final point in points) {
-        sumLat += point.latitude;
-        sumLng += point.longitude;
+        sumLat += point.lat;
+        sumLng += point.lng;
         count++;
       }
     }
 
     if (count == 0) return null;
-    return LatLng(sumLat / count, sumLng / count);
+    return Point(coordinates: Position(sumLng / count, sumLat / count));
   }
 
-  /// Zoom to fit all territories in view
   void _zoomToFitTerritories() {
-    if (widget.territories.isEmpty) return;
+    if (widget.territories.isEmpty || _mapboxMap == null) return;
 
     double minLat = 90, maxLat = -90;
     double minLng = 180, maxLng = -180;
@@ -303,41 +314,61 @@ class _LocationPickerWidgetState extends State<LocationPickerWidget> {
     for (final territory in widget.territories) {
       final points = _parseGeometry(territory.geometry);
       for (final point in points) {
-        if (point.latitude < minLat) minLat = point.latitude;
-        if (point.latitude > maxLat) maxLat = point.latitude;
-        if (point.longitude < minLng) minLng = point.longitude;
-        if (point.longitude > maxLng) maxLng = point.longitude;
+        if (point.lat.toDouble() < minLat) minLat = point.lat.toDouble();
+        if (point.lat.toDouble() > maxLat) maxLat = point.lat.toDouble();
+        if (point.lng.toDouble() < minLng) minLng = point.lng.toDouble();
+        if (point.lng.toDouble() > maxLng) maxLng = point.lng.toDouble();
       }
     }
 
-    if (minLat == 90) return; // No valid points found
+    if (minLat == 90) return;
 
-    final center = LatLng((minLat + maxLat) / 2, (minLng + maxLng) / 2);
+    final bounds = CoordinateBounds(
+      southwest: Point(coordinates: Position(minLng, minLat)),
+      northeast: Point(coordinates: Position(maxLng, maxLat)),
+      infiniteBounds: false,
+    );
 
-    // Calculate zoom level to fit bounds (approximate)
-    final latDiff = maxLat - minLat;
-    final lngDiff = maxLng - minLng;
-    final maxDiff = latDiff > lngDiff ? latDiff : lngDiff;
+    _mapboxMap!.cameraForCoordinateBounds(
+      bounds,
+      MbxEdgeInsets(top: 50, left: 50, bottom: 50, right: 50),
+      null, // bearing
+      null, // pitch
+      null, // maxZoom
+      null, // offset
+    ).then((cameraOptions) {
+      _mapboxMap!.setCamera(cameraOptions);
+    });
+  }
 
-    double zoom = 14.0;
-    if (maxDiff > 0.5) zoom = 10.0;
-    else if (maxDiff > 0.2) zoom = 11.0;
-    else if (maxDiff > 0.1) zoom = 12.0;
-    else if (maxDiff > 0.05) zoom = 13.0;
-    else if (maxDiff > 0.02) zoom = 14.0;
-    else zoom = 15.0;
+  void _zoomIn() async {
+    final currentCamera = await _mapboxMap?.getCameraState();
+    if (currentCamera != null) {
+      _mapboxMap?.setCamera(CameraOptions(
+        center: currentCamera.center,
+        zoom: (currentCamera.zoom) + 1,
+      ));
+    }
+  }
 
-    _mapController.move(center, zoom);
+  void _zoomOut() async {
+    final currentCamera = await _mapboxMap?.getCameraState();
+    if (currentCamera != null) {
+      _mapboxMap?.setCamera(CameraOptions(
+        center: currentCamera.center,
+        zoom: math.max(1, (currentCamera.zoom) - 1),
+      ));
+    }
   }
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final mapHeight = _isExpanded ? 350.0 : widget.height;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Header with expand toggle
         if (widget.compact)
           GestureDetector(
             onTap: () => setState(() => _isExpanded = !_isExpanded),
@@ -354,7 +385,7 @@ class _LocationPickerWidgetState extends State<LocationPickerWidget> {
                   Expanded(
                     child: Text(
                       _selectedLocation != null
-                          ? 'Location: ${_selectedLocation!.latitude.toStringAsFixed(5)}, ${_selectedLocation!.longitude.toStringAsFixed(5)}'
+                          ? 'Location: ${_selectedLocation!.lat.toStringAsFixed(5)}, ${_selectedLocation!.lng.toStringAsFixed(5)}'
                           : 'Tap to select location on map',
                       style: const TextStyle(
                         color: AppColors.primary,
@@ -371,7 +402,6 @@ class _LocationPickerWidgetState extends State<LocationPickerWidget> {
             ),
           ),
 
-        // Map
         if (!widget.compact || _isExpanded)
           Padding(
             padding: EdgeInsets.only(top: widget.compact ? 8 : 0),
@@ -381,83 +411,40 @@ class _LocationPickerWidgetState extends State<LocationPickerWidget> {
                 height: mapHeight,
                 child: Stack(
                   children: [
-                    FlutterMap(
-                      mapController: _mapController,
-                      options: MapOptions(
-                        initialCenter: _center,
-                        initialZoom: _initialZoom,
-                        onMapReady: () {
-                          // Move to current location when map is ready
-                          if (_currentLocation != null) {
-                            Future.delayed(const Duration(milliseconds: 100), () {
-                              if (mounted) {
-                                _mapController.move(_currentLocation!, _initialZoom);
-                              }
-                            });
-                          }
-                        },
-                        onTap: (tapPosition, point) {
-                          final isInside = _isPointInTerritories(point);
-                          setState(() {
-                            _selectedLocation = point;
-                            _isOutsideTerritory = !isInside;
-                          });
-                          widget.onLocationSelected?.call(point.latitude, point.longitude);
-                        },
+                    MapWidget(
+                      key: const ValueKey('locationPickerMap'),
+                      styleUri: MapConstants.getThemedStyleUri(isDark),
+                      cameraOptions: CameraOptions(
+                        center: _center,
+                        zoom: _initialZoom,
                       ),
-                      children: [
-                        TileLayer(
-                          urlTemplate: MapConstants.getThemedTileUrl(
-                            Theme.of(context).brightness == Brightness.dark,
-                          ),
-                          userAgentPackageName: 'com.rallypoint.app',
-                          keepBuffer: 5,
-                          panBuffer: 1,
-                        ),
-                        // Territory polygon layer
-                        if (widget.territories.isNotEmpty)
-                          PolygonLayer(polygons: _buildTerritoryPolygons()),
-                        MarkerLayer(
-                          markers: [
-                            // Current location marker (blue)
-                            if (_currentLocation != null && _selectedLocation == null)
-                              Marker(
-                                point: _currentLocation!,
-                                width: 24,
-                                height: 24,
-                                child: Container(
-                                  decoration: BoxDecoration(
-                                    color: AppColors.primary,
-                                    shape: BoxShape.circle,
-                                    border: Border.all(color: Colors.white, width: 3),
-                                    boxShadow: [
-                                      BoxShadow(
-                                        color: AppColors.primary.withAlpha(100),
-                                        blurRadius: 8,
-                                        spreadRadius: 2,
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                            // Selected location marker (red pin)
-                            if (_selectedLocation != null)
-                              Marker(
-                                point: _selectedLocation!,
-                                width: 40,
-                                height: 40,
-                                child: const Icon(
-                                  Icons.location_pin,
-                                  color: AppColors.error,
-                                  size: 40,
-                                ),
-                              ),
-                          ],
-                        ),
-                      ],
+                      onMapCreated: (mapboxMap) async {
+                        // Enable all gestures
+                        await mapboxMap.gestures.updateSettings(GesturesSettings(
+                          scrollEnabled: true,
+                          rotateEnabled: true,
+                          pinchToZoomEnabled: true,
+                          doubleTapToZoomInEnabled: true,
+                          doubleTouchToZoomOutEnabled: true,
+                          quickZoomEnabled: true,
+                          pitchEnabled: true,
+                          simultaneousRotateAndPinchToZoomEnabled: true,
+                        ));
+                        _onMapCreated(mapboxMap);
+                      },
+                      onTapListener: (context) {
+                        final point = context.point;
+                        final position = point.coordinates;
+                        final isInside = _isPointInTerritories(position);
+                        setState(() {
+                          _selectedLocation = position;
+                          _isOutsideTerritory = !isInside;
+                        });
+                        _updateLocationMarkers();
+                        widget.onLocationSelected?.call(position.lat.toDouble(), position.lng.toDouble());
+                      },
                     ),
 
-                    // Loading overlay
                     if (_isLoadingLocation)
                       Positioned.fill(
                         child: Container(
@@ -481,7 +468,6 @@ class _LocationPickerWidgetState extends State<LocationPickerWidget> {
                         ),
                       ),
 
-                    // Hint overlay
                     if (_selectedLocation == null && !_isLoadingLocation)
                       Positioned(
                         left: 0,
@@ -509,7 +495,6 @@ class _LocationPickerWidgetState extends State<LocationPickerWidget> {
                         ),
                       ),
 
-                    // Selected location info
                     if (_selectedLocation != null)
                       Positioned(
                         left: 8,
@@ -533,7 +518,7 @@ class _LocationPickerWidgetState extends State<LocationPickerWidget> {
                               const Icon(Icons.check_circle, size: 14, color: AppColors.success),
                               const SizedBox(width: 6),
                               Text(
-                                '${_selectedLocation!.latitude.toStringAsFixed(5)}, ${_selectedLocation!.longitude.toStringAsFixed(5)}',
+                                '${_selectedLocation!.lat.toStringAsFixed(5)}, ${_selectedLocation!.lng.toStringAsFixed(5)}',
                                 style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w500),
                               ),
                             ],
@@ -541,34 +526,23 @@ class _LocationPickerWidgetState extends State<LocationPickerWidget> {
                         ),
                       ),
 
-                    // Zoom controls and My Location button
                     Positioned(
                       right: 8,
                       top: 8,
                       child: Column(
                         children: [
-                          _ZoomButton(
-                            icon: Icons.add,
-                            onPressed: () {
-                              final currentZoom = _mapController.camera.zoom;
-                              _mapController.move(_mapController.camera.center, currentZoom + 1);
-                            },
-                          ),
+                          _ZoomButton(icon: Icons.add, onPressed: _zoomIn),
                           const SizedBox(height: 4),
-                          _ZoomButton(
-                            icon: Icons.remove,
-                            onPressed: () {
-                              final currentZoom = _mapController.camera.zoom;
-                              _mapController.move(_mapController.camera.center, currentZoom - 1);
-                            },
-                          ),
+                          _ZoomButton(icon: Icons.remove, onPressed: _zoomOut),
                           const SizedBox(height: 8),
-                          // My Location button
                           _ZoomButton(
                             icon: Icons.my_location,
                             onPressed: () {
                               if (_currentLocation != null) {
-                                _mapController.move(_currentLocation!, widget.initialZoom);
+                                _mapboxMap?.setCamera(CameraOptions(
+                                  center: Point(coordinates: _currentLocation!),
+                                  zoom: widget.initialZoom,
+                                ));
                               } else {
                                 _getCurrentLocation();
                               }
@@ -578,7 +552,6 @@ class _LocationPickerWidgetState extends State<LocationPickerWidget> {
                       ),
                     ),
 
-                    // Clear button
                     if (_selectedLocation != null)
                       Positioned(
                         right: 8,
@@ -590,6 +563,7 @@ class _LocationPickerWidgetState extends State<LocationPickerWidget> {
                           child: InkWell(
                             onTap: () {
                               setState(() => _selectedLocation = null);
+                              _updateLocationMarkers();
                               widget.onLocationSelected?.call(0, 0);
                             },
                             borderRadius: BorderRadius.circular(8),
@@ -611,7 +585,6 @@ class _LocationPickerWidgetState extends State<LocationPickerWidget> {
                         ),
                       ),
 
-                    // Location error message
                     if (_locationError != null && !_isLoadingLocation)
                       Positioned(
                         left: 8,
@@ -636,7 +609,6 @@ class _LocationPickerWidgetState extends State<LocationPickerWidget> {
                         ),
                       ),
 
-                    // Outside territory warning
                     if (_isOutsideTerritory && widget.warnOutsideTerritory && _selectedLocation != null)
                       Positioned(
                         left: 8,
@@ -661,7 +633,6 @@ class _LocationPickerWidgetState extends State<LocationPickerWidget> {
                         ),
                       ),
 
-                    // Territory info badge - clickable to zoom to fit all territories
                     if (widget.territories.isNotEmpty)
                       Positioned(
                         left: 8,
@@ -696,7 +667,6 @@ class _LocationPickerWidgetState extends State<LocationPickerWidget> {
             ),
           ),
 
-        // Confirm button
         if (widget.showConfirmButton && _selectedLocation != null)
           Padding(
             padding: const EdgeInsets.only(top: 12),
@@ -705,8 +675,8 @@ class _LocationPickerWidgetState extends State<LocationPickerWidget> {
               child: ElevatedButton.icon(
                 onPressed: () {
                   widget.onLocationSelected?.call(
-                    _selectedLocation!.latitude,
-                    _selectedLocation!.longitude,
+                    _selectedLocation!.lat.toDouble(),
+                    _selectedLocation!.lng.toDouble(),
                   );
                 },
                 icon: const Icon(Icons.check),

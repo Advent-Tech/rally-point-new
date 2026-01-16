@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:flutter_map/flutter_map.dart';
-import 'package:latlong2/latlong.dart';
+import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart';
 import 'package:intl/intl.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/constants/map_constants.dart';
@@ -665,7 +664,7 @@ class _DeliveryCard extends StatelessWidget {
 }
 
 // Map Tab
-class _MapTab extends StatelessWidget {
+class _MapTab extends StatefulWidget {
   final List<WorkerVisit> visits;
   final List<WorkerDelivery> deliveries;
   final bool isDark;
@@ -677,56 +676,90 @@ class _MapTab extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
-    final markers = <Marker>[];
-    double avgLat = 0, avgLng = 0;
-    int count = 0;
+  State<_MapTab> createState() => _MapTabState();
+}
+
+class _MapTabState extends State<_MapTab> {
+  MapboxMap? _mapboxMap;
+  CircleAnnotationManager? _circleManager;
+
+  void _onMapCreated(MapboxMap mapboxMap) async {
+    _mapboxMap = mapboxMap;
+    _circleManager = await mapboxMap.annotations.createCircleAnnotationManager();
+    await _addMarkers();
+  }
+
+  Future<void> _addMarkers() async {
+    if (_circleManager == null) return;
 
     // Add visit markers
-    for (final visit in visits) {
+    for (final visit in widget.visits) {
       if (visit.latitude != null && visit.longitude != null) {
-        avgLat += visit.latitude!;
-        avgLng += visit.longitude!;
-        count++;
-        markers.add(Marker(
-          point: LatLng(visit.latitude!, visit.longitude!),
-          width: 30,
-          height: 30,
-          child: Container(
-            decoration: BoxDecoration(
-              color: AppColors.accent,
-              shape: BoxShape.circle,
-              border: Border.all(color: Colors.white, width: 2),
-            ),
-            child: const Icon(Icons.home, color: Colors.white, size: 16),
-          ),
+        await _circleManager!.create(CircleAnnotationOptions(
+          geometry: Point(coordinates: Position(visit.longitude!, visit.latitude!)),
+          circleColor: AppColors.accent.toARGB32(),
+          circleRadius: 10,
+          circleStrokeColor: Colors.white.toARGB32(),
+          circleStrokeWidth: 2,
         ));
       }
     }
 
     // Add delivery markers
-    for (final delivery in deliveries) {
+    for (final delivery in widget.deliveries) {
+      if (delivery.latitude != null && delivery.longitude != null) {
+        final color = delivery.status == 'delivered' ? AppColors.success : AppColors.warning;
+        await _circleManager!.create(CircleAnnotationOptions(
+          geometry: Point(coordinates: Position(delivery.longitude!, delivery.latitude!)),
+          circleColor: color.toARGB32(),
+          circleRadius: 10,
+          circleStrokeColor: Colors.white.toARGB32(),
+          circleStrokeWidth: 2,
+        ));
+      }
+    }
+  }
+
+  Point _calculateCenter() {
+    double avgLat = 0, avgLng = 0;
+    int count = 0;
+
+    for (final visit in widget.visits) {
+      if (visit.latitude != null && visit.longitude != null) {
+        avgLat += visit.latitude!;
+        avgLng += visit.longitude!;
+        count++;
+      }
+    }
+
+    for (final delivery in widget.deliveries) {
       if (delivery.latitude != null && delivery.longitude != null) {
         avgLat += delivery.latitude!;
         avgLng += delivery.longitude!;
         count++;
-        markers.add(Marker(
-          point: LatLng(delivery.latitude!, delivery.longitude!),
-          width: 30,
-          height: 30,
-          child: Container(
-            decoration: BoxDecoration(
-              color: delivery.status == 'delivered' ? AppColors.success : AppColors.warning,
-              shape: BoxShape.circle,
-              border: Border.all(color: Colors.white, width: 2),
-            ),
-            child: const Icon(Icons.local_shipping, color: Colors.white, size: 16),
-          ),
-        ));
       }
     }
 
-    if (markers.isEmpty) {
+    if (count == 0) {
+      return Point(coordinates: Position(MapConstants.defaultLongitude, MapConstants.defaultLatitude));
+    }
+
+    return Point(coordinates: Position(avgLng / count, avgLat / count));
+  }
+
+  bool _hasData() {
+    for (final visit in widget.visits) {
+      if (visit.latitude != null && visit.longitude != null) return true;
+    }
+    for (final delivery in widget.deliveries) {
+      if (delivery.latitude != null && delivery.longitude != null) return true;
+    }
+    return false;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (!_hasData()) {
       return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -734,13 +767,13 @@ class _MapTab extends StatelessWidget {
             Icon(
               Icons.map_outlined,
               size: 64,
-              color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+              color: widget.isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
             ),
             const SizedBox(height: 16),
             Text(
               'No location data available',
               style: TextStyle(
-                color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                color: widget.isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
               ),
             ),
           ],
@@ -748,25 +781,29 @@ class _MapTab extends StatelessWidget {
       );
     }
 
-    avgLat /= count;
-    avgLng /= count;
-
     return Stack(
       children: [
-        FlutterMap(
-          options: MapOptions(
-            initialCenter: LatLng(avgLat, avgLng),
-            initialZoom: 13,
+        MapWidget(
+          key: const ValueKey('workerActivityMap'),
+          styleUri: MapConstants.getThemedStyleUri(widget.isDark),
+          cameraOptions: CameraOptions(
+            center: _calculateCenter(),
+            zoom: 13,
           ),
-          children: [
-            TileLayer(
-              urlTemplate: MapConstants.getThemedTileUrl(isDark),
-              userAgentPackageName: 'com.rallypoint.app',
-              keepBuffer: 5,
-              panBuffer: 1,
-            ),
-            MarkerLayer(markers: markers),
-          ],
+          onMapCreated: (mapboxMap) async {
+            // Enable all gestures
+            await mapboxMap.gestures.updateSettings(GesturesSettings(
+              scrollEnabled: true,
+              rotateEnabled: true,
+              pinchToZoomEnabled: true,
+              doubleTapToZoomInEnabled: true,
+              doubleTouchToZoomOutEnabled: true,
+              quickZoomEnabled: true,
+              pitchEnabled: true,
+              simultaneousRotateAndPinchToZoomEnabled: true,
+            ));
+            _onMapCreated(mapboxMap);
+          },
         ),
         Positioned(
           right: 16,
@@ -787,9 +824,9 @@ class _MapTab extends StatelessWidget {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                _MapLegendItem(color: AppColors.accent, label: '${visits.length} Visits'),
+                _MapLegendItem(color: AppColors.accent, label: '${widget.visits.length} Visits'),
                 const SizedBox(height: 4),
-                _MapLegendItem(color: AppColors.success, label: '${deliveries.length} Deliveries'),
+                _MapLegendItem(color: AppColors.success, label: '${widget.deliveries.length} Deliveries'),
               ],
             ),
           ),

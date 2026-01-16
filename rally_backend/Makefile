@@ -166,6 +166,8 @@ migrate-up: ## Run database migrations
 	@docker-compose --env-file .env exec postgres psql -U $(DB_USER) -d $(DB_NAME) -f /docker-entrypoint-initdb.d/017_legacy_data_reconciliation.sql || true
 	@docker-compose --env-file .env exec postgres psql -U $(DB_USER) -d $(DB_NAME) -f /docker-entrypoint-initdb.d/018_survey_optional_team.sql || true
 	@docker-compose --env-file .env exec postgres psql -U $(DB_USER) -d $(DB_NAME) -f /docker-entrypoint-initdb.d/019_blogs_table.sql || true
+	@docker-compose --env-file .env exec postgres psql -U $(DB_USER) -d $(DB_NAME) -f /docker-entrypoint-initdb.d/020_prayer_requests.sql || true
+	@docker-compose --env-file .env exec postgres psql -U $(DB_USER) -d $(DB_NAME) -f /docker-entrypoint-initdb.d/021_survey_multi_team.sql || true
 	@echo "✅ Migrations completed"
 
 migrate-assignments: ## Run territory assignments migration only

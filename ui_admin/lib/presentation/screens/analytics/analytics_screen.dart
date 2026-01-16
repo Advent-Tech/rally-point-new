@@ -294,30 +294,30 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
       onRefresh: _loadAllData,
       child: SingleChildScrollView(
         physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Summary Stats Grid
-            Text(
-              'Summary Statistics',
-              style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
-            ),
-            const SizedBox(height: 16),
-            LayoutBuilder(
-              builder: (context, constraints) {
-                final crossAxisCount = constraints.maxWidth > 1200
-                    ? 4
-                    : (constraints.maxWidth > 800 ? 3 : 2);
-                return GridView.count(
-                  crossAxisCount: crossAxisCount,
+        padding: const EdgeInsets.all(16),
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final isMobile = constraints.maxWidth < 600;
+            final isTablet = constraints.maxWidth >= 600 && constraints.maxWidth < 900;
+
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Summary Stats Grid
+                Text(
+                  'Summary Statistics',
+                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
+                ),
+                const SizedBox(height: 16),
+                GridView.count(
+                  crossAxisCount: isMobile ? 2 : (isTablet ? 3 : 4),
                   shrinkWrap: true,
                   physics: const NeverScrollableScrollPhysics(),
-                  mainAxisSpacing: 16,
-                  crossAxisSpacing: 16,
-                  childAspectRatio: 1.8,
+                  mainAxisSpacing: 12,
+                  crossAxisSpacing: 12,
+                  childAspectRatio: isMobile ? 1.1 : 1.5,
                   children: [
                     _SummaryCard(
                       title: 'Total Workers',
@@ -325,12 +325,14 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
                       subtitle: '$_activeWorkers active now',
                       icon: Icons.people,
                       color: AppColors.primary,
+                      compact: isMobile,
                     ),
                     _SummaryCard(
                       title: 'Teams',
                       value: _totalTeams.toString(),
                       icon: Icons.groups,
                       color: AppColors.secondary,
+                      compact: isMobile,
                     ),
                     _SummaryCard(
                       title: 'Territories',
@@ -338,6 +340,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
                       subtitle: 'allocated',
                       icon: Icons.map,
                       color: AppColors.info,
+                      compact: isMobile,
                     ),
                     _SummaryCard(
                       title: 'Total Donations',
@@ -345,6 +348,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
                       subtitle: '${_donationStats?.totalDonations ?? 0} donations',
                       icon: Icons.volunteer_activism,
                       color: AppColors.success,
+                      compact: isMobile,
                     ),
                     _SummaryCard(
                       title: 'Prayer Requests',
@@ -352,6 +356,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
                       subtitle: '${_prayerStats?.pendingRequests ?? 0} pending',
                       icon: Icons.favorite,
                       color: AppColors.warning,
+                      compact: isMobile,
                     ),
                     _SummaryCard(
                       title: 'Deliveries',
@@ -359,67 +364,51 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
                       subtitle: '${(_deliveryStats?.completionRate ?? 0).toStringAsFixed(0)}% completion',
                       icon: Icons.local_shipping,
                       color: AppColors.info,
+                      compact: isMobile,
                     ),
                   ],
-                );
-              },
-            ),
-            const SizedBox(height: 32),
+                ),
+                const SizedBox(height: 24),
 
-            // Quick Charts Row
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Delivery Status Chart
-                Expanded(
-                  child: Card(
-                    child: Padding(
-                      padding: const EdgeInsets.all(20),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Delivery Status',
-                            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                                  fontWeight: FontWeight.bold,
-                                ),
-                          ),
-                          const SizedBox(height: 16),
-                          SizedBox(
-                            height: 200,
-                            child: _buildDeliveryPieChart(),
-                          ),
-                        ],
-                      ),
-                    ),
+                // Quick Charts - Stack vertically on mobile
+                if (isMobile) ...[
+                  _buildChartCard('Delivery Status', _buildDeliveryPieChart()),
+                  const SizedBox(height: 16),
+                  _buildChartCard('Prayer Request Status', _buildPrayerPieChart()),
+                ] else
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(child: _buildChartCard('Delivery Status', _buildDeliveryPieChart())),
+                      const SizedBox(width: 16),
+                      Expanded(child: _buildChartCard('Prayer Request Status', _buildPrayerPieChart())),
+                    ],
                   ),
-                ),
-                const SizedBox(width: 16),
-                // Prayer Status Chart
-                Expanded(
-                  child: Card(
-                    child: Padding(
-                      padding: const EdgeInsets.all(20),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Prayer Request Status',
-                            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                                  fontWeight: FontWeight.bold,
-                                ),
-                          ),
-                          const SizedBox(height: 16),
-                          SizedBox(
-                            height: 200,
-                            child: _buildPrayerPieChart(),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
               ],
+            );
+          },
+        ),
+      ),
+    );
+  }
+
+  Widget _buildChartCard(String title, Widget chart) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              title,
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+            ),
+            const SizedBox(height: 16),
+            SizedBox(
+              height: 180,
+              child: chart,
             ),
           ],
         ),
@@ -521,96 +510,112 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
       onRefresh: _loadDonationStats,
       child: SingleChildScrollView(
         physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Donation Summary Cards
-            Row(
-              children: [
-                _StatCard(
-                  title: 'Total Donations',
-                  value: _currencyFormat.format(_donationStats?.totalAmount ?? 0),
-                  subtitle: '${_donationStats?.totalDonations ?? 0} donations',
-                  icon: Icons.volunteer_activism,
-                  color: AppColors.success,
-                ),
-                const SizedBox(width: 16),
-                _StatCard(
-                  title: 'Average Donation',
-                  value: _currencyFormat.format(_donationStats?.averageDonation ?? 0),
-                  subtitle: 'per donation',
-                  icon: Icons.analytics,
-                  color: AppColors.primary,
-                ),
-                const SizedBox(width: 16),
-                _StatCard(
-                  title: 'Pending Deposit',
-                  value: _currencyFormat.format(_donationStats?.pendingDeposit ?? 0),
-                  subtitle: 'awaiting deposit',
-                  icon: Icons.pending_actions,
-                  color: AppColors.warning,
-                ),
-              ],
-            ),
-            const SizedBox(height: 32),
+        padding: const EdgeInsets.all(16),
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final isMobile = constraints.maxWidth < 600;
 
-            // Donation by Type Chart
-            Card(
-              child: Padding(
-                padding: const EdgeInsets.all(20),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Donation Summary Cards - Responsive Grid
+                GridView.count(
+                  crossAxisCount: isMobile ? 2 : 3,
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  mainAxisSpacing: 12,
+                  crossAxisSpacing: 12,
+                  childAspectRatio: isMobile ? 1.2 : 1.8,
                   children: [
-                    Text(
-                      'Donations by Type',
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.bold,
-                          ),
+                    _CompactStatCard(
+                      title: 'Total Donations',
+                      value: _currencyFormat.format(_donationStats?.totalAmount ?? 0),
+                      subtitle: '${_donationStats?.totalDonations ?? 0} donations',
+                      icon: Icons.volunteer_activism,
+                      color: AppColors.success,
                     ),
-                    const SizedBox(height: 16),
-                    SizedBox(
-                      height: 250,
-                      child: _buildDonationTypeChart(),
+                    _CompactStatCard(
+                      title: 'Average Donation',
+                      value: _currencyFormat.format(_donationStats?.averageDonation ?? 0),
+                      subtitle: 'per donation',
+                      icon: Icons.analytics,
+                      color: AppColors.primary,
+                    ),
+                    _CompactStatCard(
+                      title: 'Pending Deposit',
+                      value: _currencyFormat.format(_donationStats?.pendingDeposit ?? 0),
+                      subtitle: 'awaiting deposit',
+                      icon: Icons.pending_actions,
+                      color: AppColors.warning,
                     ),
                   ],
                 ),
-              ),
-            ),
-            const SizedBox(height: 24),
+                const SizedBox(height: 24),
 
-            // Recent Donations List
-            Text(
-              'Recent Donations',
-              style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
-            ),
-            const SizedBox(height: 16),
-            if (_recentDonations.isEmpty)
-              const Center(child: Text('No donations recorded'))
-            else
-              ...(_recentDonations.map((donation) => Card(
-                    margin: const EdgeInsets.only(bottom: 8),
-                    child: ListTile(
-                      leading: Container(
-                        width: 40,
-                        height: 40,
-                        decoration: BoxDecoration(
-                          color: AppColors.success.withAlpha(30),
-                          borderRadius: BorderRadius.circular(8),
+                // Donation by Type Chart
+                Card(
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Donations by Type',
+                          style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                                fontWeight: FontWeight.bold,
+                              ),
                         ),
-                        child: const Icon(Icons.volunteer_activism, color: AppColors.success),
-                      ),
-                      title: Text(donation.isAnonymous ? 'Anonymous' : donation.donorName),
-                      subtitle: Text('${donation.paymentMethod} • ${donation.donationType}'),
-                      trailing: Text(
-                        _currencyFormat.format(donation.amount),
-                        style: const TextStyle(fontWeight: FontWeight.bold),
-                      ),
+                        const SizedBox(height: 16),
+                        SizedBox(
+                          height: isMobile ? 200 : 250,
+                          child: _buildDonationTypeChart(),
+                        ),
+                      ],
                     ),
-                  ))),
-          ],
+                  ),
+                ),
+                const SizedBox(height: 24),
+
+                // Recent Donations List
+                Text(
+                  'Recent Donations',
+                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
+                ),
+                const SizedBox(height: 16),
+                if (_recentDonations.isEmpty)
+                  const Center(child: Text('No donations recorded'))
+                else
+                  ...(_recentDonations.map((donation) => Card(
+                        margin: const EdgeInsets.only(bottom: 8),
+                        child: ListTile(
+                          leading: Container(
+                            width: 40,
+                            height: 40,
+                            decoration: BoxDecoration(
+                              color: AppColors.success.withAlpha(30),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: const Icon(Icons.volunteer_activism, color: AppColors.success),
+                          ),
+                          title: Text(
+                            donation.isAnonymous ? 'Anonymous' : donation.donorName,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          subtitle: Text(
+                            '${donation.paymentMethod} • ${donation.donationType}',
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          trailing: Text(
+                            _currencyFormat.format(donation.amount),
+                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                          ),
+                        ),
+                      ))),
+              ],
+            );
+          },
         ),
       ),
     );
@@ -712,103 +717,115 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
       onRefresh: _loadPrayerStats,
       child: SingleChildScrollView(
         physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Prayer Request Summary Cards
-            Row(
-              children: [
-                _StatCard(
-                  title: 'Total Requests',
-                  value: (_prayerStats?.totalRequests ?? 0).toString(),
-                  icon: Icons.favorite,
-                  color: AppColors.primary,
-                ),
-                const SizedBox(width: 16),
-                _StatCard(
-                  title: 'Pending',
-                  value: (_prayerStats?.pendingRequests ?? 0).toString(),
-                  subtitle: 'awaiting action',
-                  icon: Icons.pending,
-                  color: AppColors.warning,
-                ),
-                const SizedBox(width: 16),
-                _StatCard(
-                  title: 'Completed',
-                  value: (_prayerStats?.completedRequests ?? 0).toString(),
-                  subtitle: 'prayed for',
-                  icon: Icons.check_circle,
-                  color: AppColors.success,
-                ),
-                const SizedBox(width: 16),
-                _StatCard(
-                  title: 'Home Visits',
-                  value: (_prayerStats?.homeVisitRequests ?? 0).toString(),
-                  subtitle: 'requested',
-                  icon: Icons.home,
-                  color: AppColors.info,
-                ),
-              ],
-            ),
-            const SizedBox(height: 32),
+        padding: const EdgeInsets.all(16),
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final isMobile = constraints.maxWidth < 600;
 
-            // Charts Row
-            Row(
+            return Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // By Category Chart
-                Expanded(
-                  child: Card(
-                    child: Padding(
-                      padding: const EdgeInsets.all(20),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'By Category',
-                            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                                  fontWeight: FontWeight.bold,
-                                ),
-                          ),
-                          const SizedBox(height: 16),
-                          SizedBox(
-                            height: 250,
-                            child: _buildCategoryChart(),
-                          ),
-                        ],
-                      ),
+                // Prayer Request Summary Cards - Responsive Grid
+                GridView.count(
+                  crossAxisCount: isMobile ? 2 : 4,
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  mainAxisSpacing: 12,
+                  crossAxisSpacing: 12,
+                  childAspectRatio: isMobile ? 1.2 : 1.6,
+                  children: [
+                    _CompactStatCard(
+                      title: 'Total Requests',
+                      value: (_prayerStats?.totalRequests ?? 0).toString(),
+                      icon: Icons.favorite,
+                      color: AppColors.primary,
                     ),
-                  ),
-                ),
-                const SizedBox(width: 16),
-                // By Urgency Chart
-                Expanded(
-                  child: Card(
-                    child: Padding(
-                      padding: const EdgeInsets.all(20),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'By Urgency',
-                            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                                  fontWeight: FontWeight.bold,
-                                ),
-                          ),
-                          const SizedBox(height: 16),
-                          SizedBox(
-                            height: 250,
-                            child: _buildUrgencyChart(),
-                          ),
-                        ],
-                      ),
+                    _CompactStatCard(
+                      title: 'Pending',
+                      value: (_prayerStats?.pendingRequests ?? 0).toString(),
+                      subtitle: 'awaiting action',
+                      icon: Icons.pending,
+                      color: AppColors.warning,
                     ),
-                  ),
+                    _CompactStatCard(
+                      title: 'Completed',
+                      value: (_prayerStats?.completedRequests ?? 0).toString(),
+                      subtitle: 'fulfilled',
+                      icon: Icons.check_circle,
+                      color: AppColors.success,
+                    ),
+                    _CompactStatCard(
+                      title: 'Home Visits',
+                      value: (_prayerStats?.homeVisitRequests ?? 0).toString(),
+                      subtitle: 'requested',
+                      icon: Icons.home,
+                      color: AppColors.info,
+                    ),
+                  ],
                 ),
+                const SizedBox(height: 24),
+
+                // Charts - Stack vertically on mobile
+                if (isMobile) ...[
+                  _buildChartCard('By Category', _buildCategoryChart()),
+                  const SizedBox(height: 16),
+                  _buildChartCard('By Urgency', _buildUrgencyChart()),
+                ] else
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        child: Card(
+                          child: Padding(
+                            padding: const EdgeInsets.all(16),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'By Category',
+                                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                ),
+                                const SizedBox(height: 16),
+                                SizedBox(
+                                  height: 250,
+                                  child: _buildCategoryChart(),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: Card(
+                          child: Padding(
+                            padding: const EdgeInsets.all(16),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'By Urgency',
+                                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                ),
+                                const SizedBox(height: 16),
+                                SizedBox(
+                                  height: 250,
+                                  child: _buildUrgencyChart(),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
               ],
-            ),
-          ],
+            );
+          },
         ),
       ),
     );
@@ -1139,6 +1156,7 @@ class _SummaryCard extends StatelessWidget {
   final String? subtitle;
   final IconData icon;
   final Color color;
+  final bool compact;
 
   const _SummaryCard({
     required this.title,
@@ -1146,44 +1164,53 @@ class _SummaryCard extends StatelessWidget {
     this.subtitle,
     required this.icon,
     required this.color,
+    this.compact = false,
   });
 
   @override
   Widget build(BuildContext context) {
     return Card(
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: EdgeInsets.all(compact ? 12 : 16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          mainAxisSize: MainAxisSize.min,
           children: [
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Container(
-                  padding: const EdgeInsets.all(8),
+                  padding: EdgeInsets.all(compact ? 6 : 8),
                   decoration: BoxDecoration(
                     color: color.withAlpha(30),
                     borderRadius: BorderRadius.circular(8),
                   ),
-                  child: Icon(icon, color: color, size: 20),
+                  child: Icon(icon, color: color, size: compact ? 16 : 20),
                 ),
-                const Icon(Icons.trending_up, color: AppColors.success, size: 16),
+                Icon(Icons.trending_up, color: AppColors.success, size: compact ? 12 : 16),
               ],
             ),
-            const Spacer(),
-            Text(
-              value,
-              style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
+            SizedBox(height: compact ? 8 : 12),
+            FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.centerLeft,
+              child: Text(
+                value,
+                style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.bold,
+                      fontSize: compact ? 18 : 22,
+                    ),
+              ),
             ),
             const SizedBox(height: 2),
             Text(
               title,
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
                     color: AppColors.textSecondary,
+                    fontSize: compact ? 10 : 12,
                   ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ),
             if (subtitle != null) ...[
               const SizedBox(height: 2),
@@ -1191,8 +1218,10 @@ class _SummaryCard extends StatelessWidget {
                 subtitle!,
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
                       color: color,
-                      fontSize: 11,
+                      fontSize: compact ? 9 : 11,
                     ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
               ),
             ],
           ],
@@ -1265,6 +1294,84 @@ class _StatCard extends StatelessWidget {
               ],
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class _CompactStatCard extends StatelessWidget {
+  final String title;
+  final String value;
+  final String? subtitle;
+  final IconData icon;
+  final Color color;
+
+  const _CompactStatCard({
+    required this.title,
+    required this.value,
+    this.subtitle,
+    required this.icon,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(6),
+                  decoration: BoxDecoration(
+                    color: color.withAlpha(30),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Icon(icon, color: color, size: 16),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    title,
+                    style: TextStyle(
+                      color: AppColors.textSecondary,
+                      fontSize: 11,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.centerLeft,
+              child: Text(
+                value,
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+              ),
+            ),
+            if (subtitle != null) ...[
+              const SizedBox(height: 2),
+              Text(
+                subtitle!,
+                style: TextStyle(
+                  color: AppColors.textSecondary,
+                  fontSize: 10,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ],
+          ],
         ),
       ),
     );

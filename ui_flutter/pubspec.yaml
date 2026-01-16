@@ -33,9 +33,8 @@ dependencies:
   hive_flutter: ^1.1.0
   flutter_secure_storage: ^9.0.0
 
-  # Maps & Location
-  flutter_map: ^6.1.0
-  latlong2: ^0.9.0
+  # Maps & Location - Native Mapbox SDK for best performance
+  mapbox_maps_flutter: ^2.4.0
   geolocator: ^11.0.0
 
   # UI Components

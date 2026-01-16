@@ -3,10 +3,9 @@ import 'dart:math';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:flutter_map/flutter_map.dart';
+import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart' as mapbox;
 import 'package:go_router/go_router.dart';
 import 'package:geolocator/geolocator.dart';
-import 'package:latlong2/latlong.dart';
 import 'package:intl/intl.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/constants/map_constants.dart';
@@ -417,42 +416,10 @@ class _DeliveryDetailSheet extends StatelessWidget {
                 borderRadius: BorderRadius.circular(12),
                 child: SizedBox(
                   height: 150,
-                  child: FlutterMap(
-                    options: MapOptions(
-                      initialCenter: LatLng(
-                        delivery.latitude!,
-                        delivery.longitude!,
-                      ),
-                      initialZoom: 15,
-                      interactionOptions: const InteractionOptions(
-                        flags: InteractiveFlag.none,
-                      ),
-                    ),
-                    children: [
-                      TileLayer(
-                        urlTemplate: MapConstants.getThemedTileUrl(isDark),
-                        userAgentPackageName: 'com.rallypoint.app',
-                        keepBuffer: 5,
-                        panBuffer: 1,
-                      ),
-                      MarkerLayer(
-                        markers: [
-                          Marker(
-                            point: LatLng(
-                              delivery.latitude!,
-                              delivery.longitude!,
-                            ),
-                            width: 40,
-                            height: 40,
-                            child: const Icon(
-                              Icons.location_pin,
-                              color: AppColors.success,
-                              size: 40,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
+                  child: _DeliveryLocationMap(
+                    latitude: delivery.latitude!,
+                    longitude: delivery.longitude!,
+                    isDark: isDark,
                   ),
                 ),
               ),
@@ -1937,6 +1904,67 @@ class _ReceiptRow extends StatelessWidget {
           Text(value, style: const TextStyle(fontWeight: FontWeight.w500)),
         ],
       ),
+    );
+  }
+}
+
+/// Small static map widget to show delivery location
+class _DeliveryLocationMap extends StatefulWidget {
+  final double latitude;
+  final double longitude;
+  final bool isDark;
+
+  const _DeliveryLocationMap({
+    required this.latitude,
+    required this.longitude,
+    required this.isDark,
+  });
+
+  @override
+  State<_DeliveryLocationMap> createState() => _DeliveryLocationMapState();
+}
+
+class _DeliveryLocationMapState extends State<_DeliveryLocationMap> {
+  mapbox.MapboxMap? _mapboxMap;
+  mapbox.CircleAnnotationManager? _circleManager;
+
+  void _onMapCreated(mapbox.MapboxMap mapboxMap) async {
+    _mapboxMap = mapboxMap;
+    _circleManager = await mapboxMap.annotations.createCircleAnnotationManager();
+
+    // Add location marker
+    await _circleManager!.create(mapbox.CircleAnnotationOptions(
+      geometry: mapbox.Point(coordinates: mapbox.Position(widget.longitude, widget.latitude)),
+      circleColor: AppColors.success.toARGB32(),
+      circleRadius: 12,
+      circleStrokeColor: Colors.white.toARGB32(),
+      circleStrokeWidth: 3,
+    ));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return mapbox.MapWidget(
+      key: ValueKey('deliveryMap_${widget.latitude}_${widget.longitude}'),
+      styleUri: MapConstants.getThemedStyleUri(widget.isDark),
+      cameraOptions: mapbox.CameraOptions(
+        center: mapbox.Point(coordinates: mapbox.Position(widget.longitude, widget.latitude)),
+        zoom: 15,
+      ),
+      onMapCreated: (mapboxMap) async {
+        // Enable all gestures
+        await mapboxMap.gestures.updateSettings(mapbox.GesturesSettings(
+          scrollEnabled: true,
+          rotateEnabled: true,
+          pinchToZoomEnabled: true,
+          doubleTapToZoomInEnabled: true,
+          doubleTouchToZoomOutEnabled: true,
+          quickZoomEnabled: true,
+          pitchEnabled: true,
+          simultaneousRotateAndPinchToZoomEnabled: true,
+        ));
+        _onMapCreated(mapboxMap);
+      },
     );
   }
 }

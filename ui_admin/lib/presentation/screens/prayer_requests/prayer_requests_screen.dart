@@ -188,53 +188,65 @@ class _PrayerRequestsScreenState extends State<PrayerRequestsScreen>
       child: SingleChildScrollView(
         physics: const AlwaysScrollableScrollPhysics(),
         padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Stats cards
-            Text(
-              'Statistics',
-              style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
-            ),
-            const SizedBox(height: 16),
-            Row(
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final isMobile = constraints.maxWidth < 600;
+            final isTablet = constraints.maxWidth >= 600 && constraints.maxWidth < 900;
+
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _StatCard(
-                  title: 'Total Requests',
-                  value: '${_stats?.totalRequests ?? 0}',
-                  subtitle: 'prayer requests',
-                  icon: Icons.volunteer_activism,
-                  color: AppColors.primary,
+                // Stats cards
+                Text(
+                  'Statistics',
+                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
                 ),
-                const SizedBox(width: 16),
-                _StatCard(
-                  title: 'Pending',
-                  value: '${_stats?.pendingRequests ?? 0}',
-                  subtitle: 'awaiting action',
-                  icon: Icons.pending_actions,
-                  color: AppColors.warning,
+                const SizedBox(height: 16),
+                GridView.count(
+                  crossAxisCount: isMobile ? 2 : (isTablet ? 2 : 4),
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  mainAxisSpacing: 12,
+                  crossAxisSpacing: 12,
+                  childAspectRatio: isMobile ? 1.1 : 1.4,
+                  children: [
+                    _ResponsiveStatCard(
+                      title: 'Total Requests',
+                      value: '${_stats?.totalRequests ?? 0}',
+                      subtitle: 'prayer requests',
+                      icon: Icons.volunteer_activism,
+                      color: AppColors.primary,
+                      compact: isMobile,
+                    ),
+                    _ResponsiveStatCard(
+                      title: 'Pending',
+                      value: '${_stats?.pendingRequests ?? 0}',
+                      subtitle: 'awaiting action',
+                      icon: Icons.pending_actions,
+                      color: AppColors.warning,
+                      compact: isMobile,
+                    ),
+                    _ResponsiveStatCard(
+                      title: 'Completed',
+                      value: '${_stats?.completedRequests ?? 0}',
+                      subtitle: 'fulfilled',
+                      icon: Icons.check_circle,
+                      color: AppColors.success,
+                      compact: isMobile,
+                    ),
+                    _ResponsiveStatCard(
+                      title: 'Home Visits',
+                      value: '${_stats?.homeVisitRequests ?? 0}',
+                      subtitle: 'requested',
+                      icon: Icons.home,
+                      color: AppColors.info,
+                      compact: isMobile,
+                    ),
+                  ],
                 ),
-                const SizedBox(width: 16),
-                _StatCard(
-                  title: 'Completed',
-                  value: '${_stats?.completedRequests ?? 0}',
-                  subtitle: 'fulfilled',
-                  icon: Icons.check_circle,
-                  color: AppColors.success,
-                ),
-                const SizedBox(width: 16),
-                _StatCard(
-                  title: 'Home Visits',
-                  value: '${_stats?.homeVisitRequests ?? 0}',
-                  subtitle: 'requested',
-                  icon: Icons.home,
-                  color: AppColors.info,
-                ),
-              ],
-            ),
-            const SizedBox(height: 32),
+                const SizedBox(height: 32),
 
             // By Category
             if (_stats?.byCategory != null && _stats!.byCategory!.isNotEmpty) ...[
@@ -278,7 +290,9 @@ class _PrayerRequestsScreenState extends State<PrayerRequestsScreen>
                 }).toList(),
               ),
             ],
-          ],
+              ],
+            );
+          },
         ),
       ),
     );
@@ -537,6 +551,97 @@ class _StatCard extends StatelessWidget {
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ResponsiveStatCard extends StatelessWidget {
+  final String title;
+  final String value;
+  final String subtitle;
+  final IconData icon;
+  final Color color;
+  final bool compact;
+
+  const _ResponsiveStatCard({
+    required this.title,
+    required this.value,
+    required this.subtitle,
+    required this.icon,
+    required this.color,
+    this.compact = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: Padding(
+        padding: EdgeInsets.all(compact ? 12 : 20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  padding: EdgeInsets.all(compact ? 6 : 8),
+                  decoration: BoxDecoration(
+                    color: color.withAlpha(30),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Icon(icon, color: color, size: compact ? 16 : 20),
+                ),
+                if (!compact) ...[
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      title,
+                      style: TextStyle(
+                        color: AppColors.textSecondary,
+                        fontSize: 13,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+            SizedBox(height: compact ? 8 : 16),
+            if (compact)
+              Text(
+                title,
+                style: TextStyle(
+                  color: AppColors.textSecondary,
+                  fontSize: 11,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            if (compact) const SizedBox(height: 4),
+            FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Text(
+                value,
+                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                      fontWeight: FontWeight.bold,
+                      fontSize: compact ? 20 : null,
+                    ),
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              subtitle,
+              style: TextStyle(
+                color: AppColors.textSecondary,
+                fontSize: compact ? 10 : 12,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ],
         ),
       ),
     );

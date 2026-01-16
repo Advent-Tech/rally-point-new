@@ -726,101 +726,147 @@ class _SurveysScreenState extends State<SurveysScreen> {
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
-          : Row(
-              children: [
-                // Survey List (Left Panel)
-                SizedBox(
-                  width: 400,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Padding(
-                        padding: const EdgeInsets.all(16),
-                        child: Text(
-                          'Surveys (${_surveys.length})',
-                          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                        ),
-                      ),
-                      Expanded(
-                        child: _surveys.isEmpty
-                            ? _buildEmptyState()
-                            : ListView.builder(
-                                padding: const EdgeInsets.symmetric(horizontal: 16),
-                                itemCount: _surveys.length,
-                                itemBuilder: (context, index) {
-                                  final survey = _surveys[index];
-                                  final isSelected = _selectedSurvey?.id == survey.id;
-                                  return Card(
-                                    color: isSelected ? AppColors.primary.withAlpha(20) : null,
-                                    child: ListTile(
-                                      leading: Container(
-                                        padding: const EdgeInsets.all(8),
-                                        decoration: BoxDecoration(
-                                          color: AppColors.primary.withAlpha(30),
-                                          borderRadius: BorderRadius.circular(8),
-                                        ),
-                                        child: const Icon(Icons.assignment, color: AppColors.primary),
-                                      ),
-                                      title: Text(survey.title, style: const TextStyle(fontWeight: FontWeight.w600)),
-                                      subtitle: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                        children: [
-                                          if (survey.description != null)
-                                            Text(survey.description!, maxLines: 1, overflow: TextOverflow.ellipsis),
-                                          const SizedBox(height: 4),
-                                          Row(
-                                            children: [
-                                              _StatBadge(icon: Icons.quiz_outlined, value: '${survey.questions?.length ?? 0}'),
-                                              const SizedBox(width: 8),
-                                              _StatBadge(icon: Icons.check_circle_outline, value: '${survey.responseCount}'),
-                                            ],
-                                          ),
-                                        ],
-                                      ),
-                                      trailing: PopupMenuButton(
-                                        itemBuilder: (context) => [
-                                          const PopupMenuItem(value: 'delete', child: Text('Delete')),
-                                        ],
-                                        onSelected: (value) {
-                                          if (value == 'delete') _deleteSurvey(survey);
-                                        },
-                                      ),
-                                      onTap: () => _loadSurveyDetails(survey),
-                                    ),
-                                  );
-                                },
-                              ),
-                      ),
-                    ],
-                  ),
-                ),
+          : LayoutBuilder(
+              builder: (context, constraints) {
+                final isMobile = constraints.maxWidth < 768;
 
-                // Divider
-                const VerticalDivider(width: 1),
-
-                // Survey Details (Right Panel)
-                Expanded(
-                  child: _selectedSurvey == null
-                      ? Center(
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(Icons.assignment_outlined, size: 64, color: Colors.grey.shade400),
-                              const SizedBox(height: 16),
-                              Text(
-                                'Select a survey to view details',
-                                style: TextStyle(color: Colors.grey.shade600, fontSize: 16),
+                // Mobile: Show either list or details
+                if (isMobile) {
+                  return _selectedSurvey == null
+                      ? _buildSurveyList(isMobile: true)
+                      : Column(
+                          children: [
+                            // Back button
+                            Container(
+                              padding: const EdgeInsets.all(8),
+                              child: Row(
+                                children: [
+                                  IconButton(
+                                    icon: const Icon(Icons.arrow_back),
+                                    onPressed: () => setState(() {
+                                      _selectedSurvey = null;
+                                      _selectedSurveyResponses = null;
+                                    }),
+                                  ),
+                                  const Text('Back to Surveys', style: TextStyle(fontWeight: FontWeight.w500)),
+                                ],
                               ),
-                            ],
-                          ),
-                        )
-                      : _SurveyDetailsPanel(
-                          survey: _selectedSurvey!,
-                          responses: _selectedSurveyResponses ?? [],
-                        ),
-                ),
-              ],
+                            ),
+                            const Divider(height: 1),
+                            Expanded(
+                              child: _SurveyDetailsPanel(
+                                survey: _selectedSurvey!,
+                                responses: _selectedSurveyResponses ?? [],
+                                isMobile: true,
+                              ),
+                            ),
+                          ],
+                        );
+                }
+
+                // Desktop/Tablet: Side-by-side layout
+                return Row(
+                  children: [
+                    // Survey List (Left Panel)
+                    SizedBox(
+                      width: constraints.maxWidth < 1024 ? 320 : 400,
+                      child: _buildSurveyList(isMobile: false),
+                    ),
+
+                    // Divider
+                    const VerticalDivider(width: 1),
+
+                    // Survey Details (Right Panel)
+                    Expanded(
+                      child: _selectedSurvey == null
+                          ? Center(
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(Icons.assignment_outlined, size: 64, color: Colors.grey.shade400),
+                                  const SizedBox(height: 16),
+                                  Text(
+                                    'Select a survey to view details',
+                                    style: TextStyle(color: Colors.grey.shade600, fontSize: 16),
+                                  ),
+                                ],
+                              ),
+                            )
+                          : _SurveyDetailsPanel(
+                              survey: _selectedSurvey!,
+                              responses: _selectedSurveyResponses ?? [],
+                              isMobile: false,
+                            ),
+                    ),
+                  ],
+                );
+              },
             ),
+    );
+  }
+
+  Widget _buildSurveyList({required bool isMobile}) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.all(16),
+          child: Text(
+            'Surveys (${_surveys.length})',
+            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+          ),
+        ),
+        Expanded(
+          child: _surveys.isEmpty
+              ? _buildEmptyState()
+              : ListView.builder(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  itemCount: _surveys.length,
+                  itemBuilder: (context, index) {
+                    final survey = _surveys[index];
+                    final isSelected = _selectedSurvey?.id == survey.id;
+                    return Card(
+                      color: isSelected ? AppColors.primary.withAlpha(20) : null,
+                      child: ListTile(
+                        leading: Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: AppColors.primary.withAlpha(30),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: const Icon(Icons.assignment, color: AppColors.primary),
+                        ),
+                        title: Text(survey.title, style: const TextStyle(fontWeight: FontWeight.w600)),
+                        subtitle: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            if (survey.description != null)
+                              Text(survey.description!, maxLines: 1, overflow: TextOverflow.ellipsis),
+                            const SizedBox(height: 4),
+                            Row(
+                              children: [
+                                _StatBadge(icon: Icons.quiz_outlined, value: '${survey.questions?.length ?? 0}'),
+                                const SizedBox(width: 8),
+                                _StatBadge(icon: Icons.check_circle_outline, value: '${survey.responseCount}'),
+                              ],
+                            ),
+                          ],
+                        ),
+                        trailing: PopupMenuButton(
+                          itemBuilder: (context) => [
+                            const PopupMenuItem(value: 'delete', child: Text('Delete')),
+                          ],
+                          onSelected: (value) {
+                            if (value == 'delete') _deleteSurvey(survey);
+                          },
+                        ),
+                        onTap: () => _loadSurveyDetails(survey),
+                      ),
+                    );
+                  },
+                ),
+        ),
+      ],
     );
   }
 
@@ -1082,8 +1128,13 @@ class _QuestionCardState extends State<_QuestionCard> {
 class _SurveyDetailsPanel extends StatelessWidget {
   final SurveyModel survey;
   final List<SurveyResponse> responses;
+  final bool isMobile;
 
-  const _SurveyDetailsPanel({required this.survey, required this.responses});
+  const _SurveyDetailsPanel({
+    required this.survey,
+    required this.responses,
+    this.isMobile = false,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -1093,21 +1144,35 @@ class _SurveyDetailsPanel extends StatelessWidget {
         children: [
           // Header
           Container(
-            padding: const EdgeInsets.all(16),
+            padding: EdgeInsets.all(isMobile ? 12 : 16),
             child: Row(
               children: [
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(survey.title, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+                      Text(
+                        survey.title,
+                        style: TextStyle(
+                          fontSize: isMobile ? 16 : 20,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
                       if (survey.description != null)
-                        Text(survey.description!, style: TextStyle(color: Colors.grey.shade600)),
+                        Text(
+                          survey.description!,
+                          style: TextStyle(color: Colors.grey.shade600, fontSize: isMobile ? 12 : 14),
+                          maxLines: isMobile ? 1 : 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
                     ],
                   ),
                 ),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  padding: EdgeInsets.symmetric(
+                    horizontal: isMobile ? 8 : 12,
+                    vertical: isMobile ? 4 : 6,
+                  ),
                   decoration: BoxDecoration(
                     color: survey.isActive ? AppColors.success.withAlpha(30) : Colors.grey.withAlpha(30),
                     borderRadius: BorderRadius.circular(16),
@@ -1117,6 +1182,7 @@ class _SurveyDetailsPanel extends StatelessWidget {
                     style: TextStyle(
                       color: survey.isActive ? AppColors.success : Colors.grey,
                       fontWeight: FontWeight.w600,
+                      fontSize: isMobile ? 11 : 14,
                     ),
                   ),
                 ),
@@ -1124,32 +1190,61 @@ class _SurveyDetailsPanel extends StatelessWidget {
             ),
           ),
 
-          // Stats Cards
+          // Stats Cards - Responsive grid
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: Row(
-              children: [
-                _StatCard(icon: Icons.quiz, label: 'Questions', value: '${survey.questions?.length ?? 0}'),
-                const SizedBox(width: 16),
-                _StatCard(icon: Icons.check_circle, label: 'Responses', value: '${responses.length}'),
-                const SizedBox(width: 16),
-                _StatCard(
-                  icon: Icons.location_on,
-                  label: 'Location',
-                  value: survey.requiresLocation ? 'Required' : 'Optional',
-                ),
-              ],
-            ),
+            padding: EdgeInsets.symmetric(horizontal: isMobile ? 12 : 16),
+            child: isMobile
+                ? GridView.count(
+                    crossAxisCount: 3,
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    mainAxisSpacing: 8,
+                    crossAxisSpacing: 8,
+                    childAspectRatio: 1.0,
+                    children: [
+                      _ResponsiveStatCard(
+                        icon: Icons.quiz,
+                        label: 'Questions',
+                        value: '${survey.questions?.length ?? 0}',
+                        compact: true,
+                      ),
+                      _ResponsiveStatCard(
+                        icon: Icons.check_circle,
+                        label: 'Responses',
+                        value: '${responses.length}',
+                        compact: true,
+                      ),
+                      _ResponsiveStatCard(
+                        icon: Icons.location_on,
+                        label: 'Location',
+                        value: survey.requiresLocation ? 'Required' : 'Optional',
+                        compact: true,
+                      ),
+                    ],
+                  )
+                : Row(
+                    children: [
+                      _StatCard(icon: Icons.quiz, label: 'Questions', value: '${survey.questions?.length ?? 0}'),
+                      const SizedBox(width: 16),
+                      _StatCard(icon: Icons.check_circle, label: 'Responses', value: '${responses.length}'),
+                      const SizedBox(width: 16),
+                      _StatCard(
+                        icon: Icons.location_on,
+                        label: 'Location',
+                        value: survey.requiresLocation ? 'Required' : 'Optional',
+                      ),
+                    ],
+                  ),
           ),
 
-          const SizedBox(height: 16),
+          SizedBox(height: isMobile ? 8 : 16),
 
           // Tabs
-          const TabBar(
+          TabBar(
             tabs: [
-              Tab(text: 'Questions'),
-              Tab(text: 'Responses'),
-              Tab(text: 'Analytics'),
+              Tab(text: isMobile ? 'Qs' : 'Questions'),
+              Tab(text: isMobile ? 'Res' : 'Responses'),
+              Tab(text: isMobile ? 'Stats' : 'Analytics'),
             ],
           ),
 
@@ -1198,6 +1293,60 @@ class _StatCard extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _ResponsiveStatCard extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String value;
+  final bool compact;
+
+  const _ResponsiveStatCard({
+    required this.icon,
+    required this.label,
+    required this.value,
+    this.compact = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: EdgeInsets.all(compact ? 8 : 16),
+      decoration: BoxDecoration(
+        color: Colors.grey.shade100,
+        borderRadius: BorderRadius.circular(compact ? 8 : 12),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(icon, color: AppColors.primary, size: compact ? 20 : 24),
+          SizedBox(height: compact ? 4 : 8),
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Text(
+              value,
+              style: TextStyle(
+                fontSize: compact ? 14 : 18,
+                fontWeight: FontWeight.bold,
+              ),
+              maxLines: 1,
+            ),
+          ),
+          SizedBox(height: compact ? 2 : 4),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: compact ? 10 : 12,
+              color: Colors.grey.shade600,
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ],
       ),
     );
   }

@@ -80,6 +80,7 @@ class _TerritoryAssignmentScreenState extends State<TerritoryAssignmentScreen>
         ),
         body: TabBarView(
           controller: _tabController,
+          physics: const NeverScrollableScrollPhysics(), // Disable swipe to allow map panning
           children: [
             _TerritoriesTab(
               isDark: isDark,

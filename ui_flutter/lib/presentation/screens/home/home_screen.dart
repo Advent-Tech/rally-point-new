@@ -445,6 +445,13 @@ class _HomeScreenState extends State<HomeScreen> {
                           color: AppColors.success,
                           onTap: () => context.go('/reports'),
                         ),
+                        _ManagementItem(
+                          icon: Icons.article,
+                          label: 'News & Updates',
+                          description: 'View organization news',
+                          color: AppColors.info,
+                          onTap: () => context.go('/leader/blogs'),
+                        ),
                       ],
                     ),
                   ],
@@ -681,8 +688,8 @@ class _HomeScreenState extends State<HomeScreen> {
                           onTap: () => context.go('/territory'),
                         ),
                         QuickActionTileData(
-                          icon: Icons.menu_book_outlined,
-                          label: 'Deliver Book',
+                          icon: Icons.volunteer_activism_outlined,
+                          label: 'Donation',
                           backgroundColor: QuickActionColors.delivery,
                           onTap: () => context.go('/delivery'),
                         ),
@@ -691,6 +698,12 @@ class _HomeScreenState extends State<HomeScreen> {
                           label: 'Survey Form',
                           backgroundColor: QuickActionColors.survey,
                           onTap: () => context.go('/survey'),
+                        ),
+                        QuickActionTileData(
+                          icon: Icons.volunteer_activism,
+                          label: 'Prayer Request',
+                          backgroundColor: QuickActionColors.prayer,
+                          onTap: () => context.go('/prayer-requests/new'),
                         ),
                         QuickActionTileData(
                           icon: Icons.groups_outlined,
@@ -709,6 +722,12 @@ class _HomeScreenState extends State<HomeScreen> {
                               _showTerritorySelectionSheet(context);
                             }
                           },
+                        ),
+                        QuickActionTileData(
+                          icon: Icons.article_outlined,
+                          label: 'News',
+                          backgroundColor: QuickActionColors.news,
+                          onTap: () => context.go('/blogs'),
                         ),
                         QuickActionTileData(
                           icon: Icons.emoji_events_outlined,

@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart';
 import 'core/theme/app_theme.dart';
+import 'core/constants/map_constants.dart';
 import 'presentation/blocs/auth/auth_bloc.dart';
 import 'presentation/blocs/theme/theme_bloc.dart';
 import 'presentation/blocs/territory/territory_bloc.dart';
@@ -31,6 +33,9 @@ void main() async {
       statusBarBrightness: Brightness.light,
     ),
   );
+
+  // Initialize Mapbox access token
+  MapboxOptions.setAccessToken(MapConstants.mapboxAccessToken);
 
   runApp(const RallyPointApp());
 }

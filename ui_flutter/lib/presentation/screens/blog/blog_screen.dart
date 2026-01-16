@@ -59,6 +59,10 @@ class _BlogScreenState extends State<BlogScreen> {
           backgroundColor: isDark ? AppColors.surfaceDark : Colors.white,
           foregroundColor: isDark ? Colors.white : AppColors.textPrimaryLight,
           elevation: 0,
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back),
+            onPressed: () => context.go('/home'),
+          ),
         ),
         body: BlocBuilder<BlogBloc, BlogState>(
           builder: (context, state) {

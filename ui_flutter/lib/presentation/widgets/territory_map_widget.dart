@@ -1,6 +1,6 @@
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
-import 'package:flutter_map/flutter_map.dart';
-import 'package:latlong2/latlong.dart';
+import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart';
 import '../../data/models/territory_model.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/constants/map_constants.dart';
@@ -32,18 +32,12 @@ class TerritoryMapWidget extends StatefulWidget {
   final Function(GeoTerritory)? onTerritoryTap;
   final bool showLabels;
   final bool showZoomControls;
-
-  /// List of visit markers to display on the map
   final List<VisitMarker> visitMarkers;
-
-  /// Whether to allow adding new visit markers via long-press
   final bool allowAddVisit;
-
-  /// Callback when user long-presses to add a visit location
   final Function(double latitude, double longitude)? onAddVisit;
-
-  /// Force fit camera to territories bounds (e.g., after search)
   final bool fitToTerritories;
+  final double? userLatitude;
+  final double? userLongitude;
 
   const TerritoryMapWidget({
     super.key,
@@ -56,6 +50,8 @@ class TerritoryMapWidget extends StatefulWidget {
     this.allowAddVisit = false,
     this.onAddVisit,
     this.fitToTerritories = false,
+    this.userLatitude,
+    this.userLongitude,
   });
 
   @override
@@ -63,66 +59,55 @@ class TerritoryMapWidget extends StatefulWidget {
 }
 
 class _TerritoryMapWidgetState extends State<TerritoryMapWidget> {
-  final MapController _mapController = MapController();
+  MapboxMap? _mapboxMap;
+  PolygonAnnotationManager? _polygonManager;
+  PolylineAnnotationManager? _polylineManager;
+  CircleAnnotationManager? _circleManager;
   bool _isMapReady = false;
-
-  // Color palette for different territories to make boundaries distinguishable
-  static const List<Color> _territoryColors = [
-    Color(0xFF2196F3), // Blue
-    Color(0xFF4CAF50), // Green
-    Color(0xFFFF9800), // Orange
-    Color(0xFF9C27B0), // Purple
-    Color(0xFFE91E63), // Pink
-    Color(0xFF00BCD4), // Cyan
-    Color(0xFFFF5722), // Deep Orange
-    Color(0xFF3F51B5), // Indigo
-    Color(0xFF009688), // Teal
-    Color(0xFFCDDC39), // Lime
-  ];
-
   bool _hasInitiallyFitTerritories = false;
 
-  // Cache parsed geometries to avoid repeated parsing
-  final Map<String, List<LatLng>> _geometryCache = {};
+  static const List<Color> _territoryColors = [
+    Color(0xFF2196F3),
+    Color(0xFF4CAF50),
+    Color(0xFFFF9800),
+    Color(0xFF9C27B0),
+    Color(0xFFE91E63),
+    Color(0xFF00BCD4),
+    Color(0xFFFF5722),
+    Color(0xFF3F51B5),
+    Color(0xFF009688),
+    Color(0xFFCDDC39),
+  ];
 
-  @override
-  void initState() {
-    super.initState();
-    // Fit to bounds after the first frame
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _fitToAllTerritories();
-    });
-  }
+  final Map<String, List<Position>> _geometryCache = {};
 
   @override
   void didUpdateWidget(TerritoryMapWidget oldWidget) {
     super.didUpdateWidget(oldWidget);
 
-    // Clear geometry cache if territories changed
     if (_territoriesChanged(oldWidget.territories, widget.territories)) {
       _geometryCache.clear();
     }
 
-    // Fit to territories when:
-    // 1. Territories were empty and now have data (initial load)
-    // 2. Territory IDs actually changed
-    // 3. fitToTerritories flag changed from false to true (search results)
     final wasEmpty = oldWidget.territories.isEmpty;
     final nowHasData = widget.territories.isNotEmpty;
     final fitRequested = widget.fitToTerritories && !oldWidget.fitToTerritories;
 
     if (_isMapReady) {
+      _updateAnnotations();
       if (fitRequested ||
           (wasEmpty && nowHasData) ||
           (!_hasInitiallyFitTerritories && nowHasData) ||
-          (widget.fitToTerritories && _territoriesChanged(oldWidget.territories, widget.territories))) {
+          (widget.fitToTerritories &&
+              _territoriesChanged(oldWidget.territories, widget.territories))) {
         _fitToAllTerritories();
         _hasInitiallyFitTerritories = true;
       }
     }
   }
 
-  bool _territoriesChanged(List<GeoTerritory> oldList, List<GeoTerritory> newList) {
+  bool _territoriesChanged(
+      List<GeoTerritory> oldList, List<GeoTerritory> newList) {
     if (oldList.isEmpty && newList.isEmpty) return false;
     if (oldList.length != newList.length) return true;
     final oldIds = oldList.map((t) => t.id).toSet();
@@ -130,49 +115,183 @@ class _TerritoryMapWidgetState extends State<TerritoryMapWidget> {
     return !oldIds.containsAll(newIds) || !newIds.containsAll(oldIds);
   }
 
+  void _onMapCreated(MapboxMap mapboxMap) async {
+    _mapboxMap = mapboxMap;
+
+    // Create annotation managers
+    _polygonManager = await mapboxMap.annotations.createPolygonAnnotationManager();
+    _polylineManager = await mapboxMap.annotations.createPolylineAnnotationManager();
+    _circleManager = await mapboxMap.annotations.createCircleAnnotationManager();
+
+    setState(() => _isMapReady = true);
+
+    // Add annotations and fit to bounds
+    await _updateAnnotations();
+    await Future.delayed(const Duration(milliseconds: 200));
+    _fitToAllTerritories();
+  }
+
+  Future<void> _updateAnnotations() async {
+    if (_polygonManager == null || _polylineManager == null || _circleManager == null) return;
+
+    // Clear ALL existing annotations at once
+    await _polygonManager!.deleteAll();
+    await _polylineManager!.deleteAll();
+    await _circleManager!.deleteAll();
+
+    debugPrint('TerritoryMapWidget: Updating ${widget.territories.length} territories');
+
+    // Add territory polygons and boundary lines
+    for (int i = 0; i < widget.territories.length; i++) {
+      final territory = widget.territories[i];
+      final coords = _parseGeometryForTerritory(territory);
+
+      debugPrint('TerritoryMapWidget: Territory ${territory.entityName} - coords: ${coords.length}, geometry: ${territory.geometry?.keys}');
+
+      if (coords.isEmpty) {
+        debugPrint('TerritoryMapWidget: Skipping territory ${territory.entityName} - no coordinates');
+        continue;
+      }
+
+      final isSelected = widget.selectedTerritory?.id == territory.id;
+      final colorIndex = i % _territoryColors.length;
+      final baseColor =
+          isSelected ? AppColors.primary : _territoryColors[colorIndex];
+
+      try {
+        // Add filled polygon with high visibility
+        final polygonOptions = PolygonAnnotationOptions(
+          geometry: Polygon(coordinates: [coords]),
+          fillColor: baseColor.toARGB32(),
+          fillOpacity: isSelected ? 0.5 : 0.4,
+        );
+        await _polygonManager!.create(polygonOptions);
+
+        debugPrint('TerritoryMapWidget: Created polygon for ${territory.entityName} with ${coords.length} coords');
+
+        // Add boundary line (polyline) for visibility - thicker line
+        final lineCoords = List<Position>.from(coords);
+        // Close the polygon line if not already closed
+        if (lineCoords.isNotEmpty && lineCoords.first != lineCoords.last) {
+          lineCoords.add(lineCoords.first);
+        }
+
+        // Use a darker border color for better contrast
+        final borderColor = Color.fromARGB(255,
+          (baseColor.r * 0.7).toInt(),
+          (baseColor.g * 0.7).toInt(),
+          (baseColor.b * 0.7).toInt()
+        );
+
+        final lineOptions = PolylineAnnotationOptions(
+          geometry: LineString(coordinates: lineCoords),
+          lineColor: borderColor.toARGB32(),
+          lineWidth: isSelected ? 6.0 : 4.0,
+          lineOpacity: 1.0,
+        );
+        await _polylineManager!.create(lineOptions);
+
+        debugPrint('TerritoryMapWidget: Created polyline for ${territory.entityName}');
+
+        // Also add a centroid marker for visibility at zoomed-out levels
+        if (coords.length > 2) {
+          final centroid = _calculateCentroid(coords);
+          await _circleManager?.create(CircleAnnotationOptions(
+            geometry: Point(coordinates: centroid),
+            circleColor: baseColor.toARGB32(),
+            circleRadius: isSelected ? 12.0 : 8.0,
+            circleStrokeColor: Colors.white.toARGB32(),
+            circleStrokeWidth: 2,
+            circleOpacity: 0.9,
+          ));
+        }
+      } catch (e) {
+        debugPrint('TerritoryMapWidget: Error creating annotations for ${territory.entityName}: $e');
+      }
+    }
+
+    // Update visit markers
+    await _updateVisitMarkers();
+  }
+
+  Future<void> _updateVisitMarkers() async {
+    if (_circleManager == null) return;
+
+    // NOTE: Don't delete circles here - they're deleted in _updateAnnotations()
+    // This preserves territory centroid markers
+
+    for (final visit in widget.visitMarkers) {
+      Color markerColor;
+      switch (visit.outcome.toLowerCase()) {
+        case 'interested':
+        case 'positive':
+          markerColor = AppColors.success;
+          break;
+        case 'not_home':
+        case 'not home':
+          markerColor = AppColors.warning;
+          break;
+        case 'not_interested':
+        case 'not interested':
+          markerColor = AppColors.error;
+          break;
+        case 'callback':
+        case 'follow_up':
+          markerColor = AppColors.info;
+          break;
+        default:
+          markerColor = AppColors.secondary;
+      }
+
+      // Use circle markers for visit markers (more visible than point annotations)
+      final options = CircleAnnotationOptions(
+        geometry: Point(coordinates: Position(visit.longitude, visit.latitude)),
+        circleColor: markerColor.toARGB32(),
+        circleRadius: 10,
+        circleStrokeColor: Colors.white.toARGB32(),
+        circleStrokeWidth: 2,
+      );
+
+      await _circleManager!.create(options);
+    }
+  }
+
   void _fitToAllTerritories() {
+    if (_mapboxMap == null) return;
+
+    if (widget.territories.isEmpty) {
+      // Use user location if available, otherwise default to US center
+      final lat = widget.userLatitude ?? MapConstants.defaultLatitude;
+      final lng = widget.userLongitude ?? MapConstants.defaultLongitude;
+      final zoom = widget.userLatitude != null ? 12.0 : MapConstants.defaultZoom;
+
+      _mapboxMap?.setCamera(CameraOptions(
+        center: Point(coordinates: Position(lng, lat)),
+        zoom: zoom,
+      ));
+      return;
+    }
+
     final bounds = _calculateBounds();
-    if (bounds != null && _isMapReady) {
-      _mapController.fitCamera(
-        CameraFit.bounds(
-          bounds: bounds,
-          padding: const EdgeInsets.all(50),
-        ),
-      );
-      _hasInitiallyFitTerritories = true;
-    } else if (_isMapReady && !_hasInitiallyFitTerritories) {
-      // No valid bounds, ensure we show US center
-      _mapController.move(const LatLng(39.8283, -98.5795), 4);
-      _hasInitiallyFitTerritories = true;
-    }
-  }
-
-  void _focusOnTerritory(GeoTerritory territory) {
-    final coords = _parseGeometryForTerritory(territory);
-    if (coords.isEmpty) return;
-
-    final bounds = _calculateBoundsFromCoords(coords);
     if (bounds != null) {
-      _mapController.fitCamera(
-        CameraFit.bounds(
-          bounds: bounds,
-          padding: const EdgeInsets.all(30),
-        ),
-      );
+      debugPrint('TerritoryMapWidget: Fitting to bounds - SW: ${bounds.southwest.coordinates}, NE: ${bounds.northeast.coordinates}');
+
+      _mapboxMap?.cameraForCoordinateBounds(
+        bounds,
+        MbxEdgeInsets(top: 60, left: 60, bottom: 60, right: 60),
+        null, // bearing
+        null, // pitch
+        18.0, // maxZoom - limit how far it zooms in for small territories
+        null, // offset
+      ).then((cameraOptions) {
+        debugPrint('TerritoryMapWidget: Camera zoom: ${cameraOptions.zoom}');
+        _mapboxMap?.setCamera(cameraOptions);
+      });
+      _hasInitiallyFitTerritories = true;
     }
   }
 
-  void _zoomIn() {
-    final currentZoom = _mapController.camera.zoom;
-    _mapController.move(_mapController.camera.center, currentZoom + 1);
-  }
-
-  void _zoomOut() {
-    final currentZoom = _mapController.camera.zoom;
-    _mapController.move(_mapController.camera.center, currentZoom - 1);
-  }
-
-  LatLngBounds? _calculateBounds() {
+  CoordinateBounds? _calculateBounds() {
     if (widget.territories.isEmpty) return null;
 
     double? minLat, maxLat, minLng, maxLng;
@@ -181,13 +300,12 @@ class _TerritoryMapWidgetState extends State<TerritoryMapWidget> {
       final coords = _parseGeometryForTerritory(territory);
 
       for (final coord in coords) {
-        // Skip invalid coordinates (0, 0 or very close)
-        if (coord.latitude.abs() < 0.1 && coord.longitude.abs() < 0.1) continue;
+        if (coord.lat.abs() < 0.1 && coord.lng.abs() < 0.1) continue;
 
-        if (minLat == null || coord.latitude < minLat) minLat = coord.latitude;
-        if (maxLat == null || coord.latitude > maxLat) maxLat = coord.latitude;
-        if (minLng == null || coord.longitude < minLng) minLng = coord.longitude;
-        if (maxLng == null || coord.longitude > maxLng) maxLng = coord.longitude;
+        if (minLat == null || coord.lat < minLat) minLat = coord.lat.toDouble();
+        if (maxLat == null || coord.lat > maxLat) maxLat = coord.lat.toDouble();
+        if (minLng == null || coord.lng < minLng) minLng = coord.lng.toDouble();
+        if (maxLng == null || coord.lng > maxLng) maxLng = coord.lng.toDouble();
       }
     }
 
@@ -195,86 +313,90 @@ class _TerritoryMapWidgetState extends State<TerritoryMapWidget> {
       return null;
     }
 
-    return LatLngBounds(
-      LatLng(minLat, minLng),
-      LatLng(maxLat, maxLng),
+    return CoordinateBounds(
+      southwest: Point(coordinates: Position(minLng, minLat)),
+      northeast: Point(coordinates: Position(maxLng, maxLat)),
+      infiniteBounds: false,
     );
   }
 
-  LatLngBounds? _calculateBoundsFromCoords(List<LatLng> coords) {
-    if (coords.isEmpty) return null;
-
-    double minLat = coords[0].latitude;
-    double maxLat = coords[0].latitude;
-    double minLng = coords[0].longitude;
-    double maxLng = coords[0].longitude;
-
-    for (final coord in coords) {
-      if (coord.latitude < minLat) minLat = coord.latitude;
-      if (coord.latitude > maxLat) maxLat = coord.latitude;
-      if (coord.longitude < minLng) minLng = coord.longitude;
-      if (coord.longitude > maxLng) maxLng = coord.longitude;
+  void _zoomIn() async {
+    final currentCamera = await _mapboxMap?.getCameraState();
+    if (currentCamera != null) {
+      _mapboxMap?.setCamera(CameraOptions(
+        center: currentCamera.center,
+        zoom: (currentCamera.zoom) + 1,
+      ));
     }
+  }
 
-    return LatLngBounds(
-      LatLng(minLat, minLng),
-      LatLng(maxLat, maxLng),
-    );
+  void _zoomOut() async {
+    final currentCamera = await _mapboxMap?.getCameraState();
+    if (currentCamera != null) {
+      _mapboxMap?.setCamera(CameraOptions(
+        center: currentCamera.center,
+        zoom: math.max(1, (currentCamera.zoom) - 1),
+      ));
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    final polygons = _buildPolygons();
-    final markers = widget.showLabels ? _buildMarkers() : <Marker>[];
-
-    // Default center (US center) - will be overridden by fitBounds
-    const defaultCenter = LatLng(39.8283, -98.5795);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Stack(
       children: [
-        FlutterMap(
-          mapController: _mapController,
-          options: MapOptions(
-            initialCenter: defaultCenter,
-            initialZoom: 4,
-            minZoom: 3,
-            maxZoom: 18,
-            onMapReady: () {
-              setState(() => _isMapReady = true);
-              // Fit to territories after a short delay to ensure tiles are loaded
-              Future.delayed(const Duration(milliseconds: 100), () {
-                if (mounted) {
-                  _fitToAllTerritories();
-                }
-              });
-            },
-            onTap: (tapPosition, point) {
-              // Check if tapped on any territory
+        MapWidget(
+          key: const ValueKey('mapWidget'),
+          styleUri: MapConstants.getThemedStyleUri(isDark),
+          cameraOptions: CameraOptions(
+            center: Point(
+                coordinates: Position(MapConstants.defaultLongitude,
+                    MapConstants.defaultLatitude)),
+            zoom: MapConstants.defaultZoom,
+          ),
+          onMapCreated: (mapboxMap) async {
+            // Enable all gestures
+            await mapboxMap.gestures.updateSettings(GesturesSettings(
+              scrollEnabled: true,
+              rotateEnabled: true,
+              pinchToZoomEnabled: true,
+              doubleTapToZoomInEnabled: true,
+              doubleTouchToZoomOutEnabled: true,
+              quickZoomEnabled: true,
+              pitchEnabled: true,
+              simultaneousRotateAndPinchToZoomEnabled: true,
+            ));
+            _onMapCreated(mapboxMap);
+          },
+          onTapListener: (context) async {
+            // Handle tap on territories
+            final point = context.point;
+
+            // First, check if tap is near any centroid marker (for zoomed-out views)
+            GeoTerritory? tappedTerritory = _findTerritoryNearPoint(point);
+
+            // If not near centroid, check if inside polygon boundary
+            if (tappedTerritory == null) {
               for (final territory in widget.territories) {
                 if (_isPointInTerritory(point, territory)) {
-                  widget.onTerritoryTap?.call(territory);
+                  tappedTerritory = territory;
                   break;
                 }
               }
-            },
-            onLongPress: widget.allowAddVisit
-                ? (tapPosition, point) {
-                    widget.onAddVisit?.call(point.latitude, point.longitude);
-                  }
-                : null,
-          ),
-          children: [
-            TileLayer(
-              urlTemplate: MapConstants.getThemedTileUrl(
-                Theme.of(context).brightness == Brightness.dark,
-              ),
-              userAgentPackageName: 'com.rallypoint.app',
-              keepBuffer: 5,
-              panBuffer: 1,
-            ),
-            PolygonLayer(polygons: polygons),
-            MarkerLayer(markers: [...markers, ..._buildVisitMarkers()]),
-          ],
+            }
+
+            if (tappedTerritory != null) {
+              widget.onTerritoryTap?.call(tappedTerritory);
+            }
+          },
+          onLongTapListener: widget.allowAddVisit
+              ? (context) {
+                  final point = context.point;
+                  widget.onAddVisit
+                      ?.call(point.coordinates.lat.toDouble(), point.coordinates.lng.toDouble());
+                }
+              : null,
         ),
 
         // Zoom Controls
@@ -284,15 +406,9 @@ class _TerritoryMapWidgetState extends State<TerritoryMapWidget> {
             top: 16,
             child: Column(
               children: [
-                _ZoomButton(
-                  icon: Icons.add,
-                  onPressed: _zoomIn,
-                ),
+                _ZoomButton(icon: Icons.add, onPressed: _zoomIn),
                 const SizedBox(height: 8),
-                _ZoomButton(
-                  icon: Icons.remove,
-                  onPressed: _zoomOut,
-                ),
+                _ZoomButton(icon: Icons.remove, onPressed: _zoomOut),
                 const SizedBox(height: 8),
                 _ZoomButton(
                   icon: Icons.fit_screen,
@@ -306,153 +422,7 @@ class _TerritoryMapWidgetState extends State<TerritoryMapWidget> {
     );
   }
 
-  List<Polygon> _buildPolygons() {
-    final polygons = <Polygon>[];
-
-    for (int i = 0; i < widget.territories.length; i++) {
-      final territory = widget.territories[i];
-      final coords = _parseGeometryForTerritory(territory);
-      if (coords.isEmpty) continue;
-
-      final isSelected = widget.selectedTerritory?.id == territory.id;
-      final colorIndex = i % _territoryColors.length;
-      final baseColor = isSelected ? AppColors.primary : _territoryColors[colorIndex];
-
-      polygons.add(Polygon(
-        points: coords,
-        color: baseColor.withAlpha(isSelected ? 100 : 50),
-        borderColor: baseColor,
-        borderStrokeWidth: isSelected ? 4.0 : 2.5,
-        isFilled: true,
-      ));
-    }
-
-    return polygons;
-  }
-
-  List<Marker> _buildMarkers() {
-    final markers = <Marker>[];
-
-    for (final territory in widget.territories) {
-      final center = _getTerritoryCenter(territory);
-      if (center == null) continue;
-
-      final isSelected = widget.selectedTerritory?.id == territory.id;
-
-      markers.add(Marker(
-        point: center,
-        width: 120,
-        height: 32,
-        child: GestureDetector(
-          onTap: () {
-            widget.onTerritoryTap?.call(territory);
-            _focusOnTerritory(territory);
-          },
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-            decoration: BoxDecoration(
-              color: isSelected ? AppColors.primary : Colors.white,
-              borderRadius: BorderRadius.circular(6),
-              border: Border.all(
-                color: isSelected ? AppColors.primary : AppColors.secondary,
-                width: 1.5,
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withAlpha(50),
-                  blurRadius: 4,
-                  offset: const Offset(0, 2),
-                ),
-              ],
-            ),
-            child: Text(
-              territory.solid,
-              textAlign: TextAlign.center,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                fontSize: 10,
-                fontWeight: FontWeight.bold,
-                color: isSelected ? Colors.white : AppColors.textPrimaryLight,
-              ),
-            ),
-          ),
-        ),
-      ));
-    }
-
-    return markers;
-  }
-
-  List<Marker> _buildVisitMarkers() {
-    final markers = <Marker>[];
-
-    for (final visit in widget.visitMarkers) {
-      Color markerColor;
-      IconData markerIcon;
-
-      // Color code by outcome
-      switch (visit.outcome.toLowerCase()) {
-        case 'interested':
-        case 'positive':
-          markerColor = AppColors.success;
-          markerIcon = Icons.check_circle;
-          break;
-        case 'not_home':
-        case 'not home':
-          markerColor = AppColors.warning;
-          markerIcon = Icons.home_outlined;
-          break;
-        case 'not_interested':
-        case 'not interested':
-          markerColor = AppColors.error;
-          markerIcon = Icons.cancel;
-          break;
-        case 'callback':
-        case 'follow_up':
-          markerColor = AppColors.info;
-          markerIcon = Icons.schedule;
-          break;
-        default:
-          markerColor = AppColors.secondary;
-          markerIcon = Icons.location_on;
-      }
-
-      markers.add(Marker(
-        point: LatLng(visit.latitude, visit.longitude),
-        width: 36,
-        height: 36,
-        child: Tooltip(
-          message: '${visit.address ?? "Visit"}\n${visit.outcome}',
-          child: Container(
-            decoration: BoxDecoration(
-              color: markerColor,
-              shape: BoxShape.circle,
-              border: Border.all(color: Colors.white, width: 2),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withAlpha(60),
-                  blurRadius: 4,
-                  offset: const Offset(0, 2),
-                ),
-              ],
-            ),
-            child: Icon(
-              markerIcon,
-              color: Colors.white,
-              size: 20,
-            ),
-          ),
-        ),
-      ));
-    }
-
-    return markers;
-  }
-
-  /// Parse geometry with caching to avoid repeated parsing
-  List<LatLng> _parseGeometryForTerritory(GeoTerritory territory) {
-    // Check cache first
+  List<Position> _parseGeometryForTerritory(GeoTerritory territory) {
     if (_geometryCache.containsKey(territory.id)) {
       return _geometryCache[territory.id]!;
     }
@@ -462,7 +432,56 @@ class _TerritoryMapWidgetState extends State<TerritoryMapWidget> {
     return coords;
   }
 
-  List<LatLng> _parseGeometryRaw(Map<String, dynamic>? geometry) {
+  Position _calculateCentroid(List<Position> coords) {
+    if (coords.isEmpty) {
+      return Position(MapConstants.defaultLongitude, MapConstants.defaultLatitude);
+    }
+
+    double sumLat = 0, sumLng = 0;
+    for (final coord in coords) {
+      sumLat += coord.lat.toDouble();
+      sumLng += coord.lng.toDouble();
+    }
+    return Position(sumLng / coords.length, sumLat / coords.length);
+  }
+
+  /// Find territory whose centroid is near the tapped point
+  /// Uses a threshold that scales with zoom level
+  GeoTerritory? _findTerritoryNearPoint(Point point) {
+    const double thresholdDegrees = 2.0; // ~200km at equator, good for zoomed-out view
+
+    double closestDistance = double.infinity;
+    GeoTerritory? closestTerritory;
+
+    for (final territory in widget.territories) {
+      final coords = _parseGeometryForTerritory(territory);
+      if (coords.isEmpty) continue;
+
+      final centroid = _calculateCentroid(coords);
+      final distance = _calculateDistance(
+        point.coordinates.lat.toDouble(),
+        point.coordinates.lng.toDouble(),
+        centroid.lat.toDouble(),
+        centroid.lng.toDouble(),
+      );
+
+      if (distance < thresholdDegrees && distance < closestDistance) {
+        closestDistance = distance;
+        closestTerritory = territory;
+      }
+    }
+
+    return closestTerritory;
+  }
+
+  /// Calculate simple Euclidean distance in degrees (good enough for proximity check)
+  double _calculateDistance(double lat1, double lng1, double lat2, double lng2) {
+    final dLat = lat2 - lat1;
+    final dLng = lng2 - lng1;
+    return math.sqrt(dLat * dLat + dLng * dLng);
+  }
+
+  List<Position> _parseGeometryRaw(Map<String, dynamic>? geometry) {
     if (geometry == null) return [];
 
     try {
@@ -473,16 +492,16 @@ class _TerritoryMapWidgetState extends State<TerritoryMapWidget> {
 
       if (type == 'Polygon') {
         final ring = coordinates[0] as List;
-        return ring.map<LatLng>((coord) {
+        return ring.map<Position>((coord) {
           final c = coord as List;
-          return LatLng(c[1].toDouble(), c[0].toDouble());
+          return Position(c[0].toDouble(), c[1].toDouble());
         }).toList();
       } else if (type == 'MultiPolygon') {
         final firstPolygon = coordinates[0] as List;
         final ring = firstPolygon[0] as List;
-        return ring.map<LatLng>((coord) {
+        return ring.map<Position>((coord) {
           final c = coord as List;
-          return LatLng(c[1].toDouble(), c[0].toDouble());
+          return Position(c[0].toDouble(), c[1].toDouble());
         }).toList();
       }
     } catch (e) {
@@ -492,20 +511,7 @@ class _TerritoryMapWidgetState extends State<TerritoryMapWidget> {
     return [];
   }
 
-  LatLng? _getTerritoryCenter(GeoTerritory territory) {
-    final coords = _parseGeometryForTerritory(territory);
-    if (coords.isEmpty) return null;
-
-    double sumLat = 0, sumLng = 0;
-    for (final coord in coords) {
-      sumLat += coord.latitude;
-      sumLng += coord.longitude;
-    }
-
-    return LatLng(sumLat / coords.length, sumLng / coords.length);
-  }
-
-  bool _isPointInTerritory(LatLng point, GeoTerritory territory) {
+  bool _isPointInTerritory(Point point, GeoTerritory territory) {
     final coords = _parseGeometryForTerritory(territory);
     if (coords.isEmpty) return false;
 
@@ -513,13 +519,14 @@ class _TerritoryMapWidgetState extends State<TerritoryMapWidget> {
     int j = coords.length - 1;
 
     for (int i = 0; i < coords.length; j = i++) {
-      final xi = coords[i].longitude;
-      final yi = coords[i].latitude;
-      final xj = coords[j].longitude;
-      final yj = coords[j].latitude;
+      final xi = coords[i].lng;
+      final yi = coords[i].lat;
+      final xj = coords[j].lng;
+      final yj = coords[j].lat;
 
-      if (((yi > point.latitude) != (yj > point.latitude)) &&
-          (point.longitude < (xj - xi) * (point.latitude - yi) / (yj - yi) + xi)) {
+      if (((yi > point.coordinates.lat) != (yj > point.coordinates.lat)) &&
+          (point.coordinates.lng <
+              (xj - xi) * (point.coordinates.lat - yi) / (yj - yi) + xi)) {
         inside = !inside;
       }
     }
@@ -584,65 +591,121 @@ class TerritoryDetailMapWidget extends StatefulWidget {
   });
 
   @override
-  State<TerritoryDetailMapWidget> createState() => _TerritoryDetailMapWidgetState();
+  State<TerritoryDetailMapWidget> createState() =>
+      _TerritoryDetailMapWidgetState();
 }
 
 class _TerritoryDetailMapWidgetState extends State<TerritoryDetailMapWidget> {
-  final MapController _mapController = MapController();
-  bool _isMapReady = false;
+  MapboxMap? _mapboxMap;
+  PolygonAnnotationManager? _polygonManager;
+  PolylineAnnotationManager? _polylineManager;
 
-  @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _fitToTerritory();
-    });
+  void _onMapCreated(MapboxMap mapboxMap) async {
+    _mapboxMap = mapboxMap;
+    _polygonManager = await mapboxMap.annotations.createPolygonAnnotationManager();
+    _polylineManager = await mapboxMap.annotations.createPolylineAnnotationManager();
+
+    await _addTerritoryPolygon();
+    await Future.delayed(const Duration(milliseconds: 200));
+    _fitToTerritory();
+  }
+
+  Future<void> _addTerritoryPolygon() async {
+    if (_polygonManager == null || _polylineManager == null) return;
+
+    final coords = _parseGeometry(widget.territory.geometry);
+    if (coords.isEmpty) return;
+
+    // Add filled polygon
+    final polygonOptions = PolygonAnnotationOptions(
+      geometry: Polygon(coordinates: [coords]),
+      fillColor: AppColors.primary.toARGB32(),
+      fillOpacity: 0.25,
+    );
+    await _polygonManager!.create(polygonOptions);
+
+    // Add boundary line for visibility
+    final lineCoords = List<Position>.from(coords);
+    if (lineCoords.isNotEmpty && lineCoords.first != lineCoords.last) {
+      lineCoords.add(lineCoords.first);
+    }
+
+    final lineOptions = PolylineAnnotationOptions(
+      geometry: LineString(coordinates: lineCoords),
+      lineColor: AppColors.primary.toARGB32(),
+      lineWidth: 3.0,
+      lineOpacity: 0.9,
+    );
+    await _polylineManager!.create(lineOptions);
   }
 
   void _fitToTerritory() {
     final coords = _parseGeometry(widget.territory.geometry);
-    if (coords.isEmpty || !_isMapReady) return;
+    if (coords.isEmpty || _mapboxMap == null) return;
 
     final bounds = _calculateBoundsFromCoords(coords);
     if (bounds != null) {
-      _mapController.fitCamera(
-        CameraFit.bounds(
-          bounds: bounds,
-          padding: const EdgeInsets.all(40),
-        ),
-      );
+      _mapboxMap!
+          .cameraForCoordinateBounds(
+        bounds,
+        MbxEdgeInsets(top: 40, left: 40, bottom: 40, right: 40),
+        null, // bearing
+        null, // pitch
+        null, // maxZoom
+        null, // offset
+      )
+          .then((cameraOptions) {
+        _mapboxMap!.setCamera(cameraOptions);
+      });
     }
   }
 
-  LatLngBounds? _calculateBoundsFromCoords(List<LatLng> coords) {
+  CoordinateBounds? _calculateBoundsFromCoords(List<Position> coords) {
     if (coords.isEmpty) return null;
 
-    double minLat = coords[0].latitude;
-    double maxLat = coords[0].latitude;
-    double minLng = coords[0].longitude;
-    double maxLng = coords[0].longitude;
+    double minLat = coords[0].lat.toDouble();
+    double maxLat = coords[0].lat.toDouble();
+    double minLng = coords[0].lng.toDouble();
+    double maxLng = coords[0].lng.toDouble();
 
     for (final coord in coords) {
-      if (coord.latitude < minLat) minLat = coord.latitude;
-      if (coord.latitude > maxLat) maxLat = coord.latitude;
-      if (coord.longitude < minLng) minLng = coord.longitude;
-      if (coord.longitude > maxLng) maxLng = coord.longitude;
+      if (coord.lat < minLat) minLat = coord.lat.toDouble();
+      if (coord.lat > maxLat) maxLat = coord.lat.toDouble();
+      if (coord.lng < minLng) minLng = coord.lng.toDouble();
+      if (coord.lng > maxLng) maxLng = coord.lng.toDouble();
     }
 
-    // Add some padding to the bounds
-    final latPadding = (maxLat - minLat) * 0.1;
-    final lngPadding = (maxLng - minLng) * 0.1;
-
-    return LatLngBounds(
-      LatLng(minLat - latPadding, minLng - lngPadding),
-      LatLng(maxLat + latPadding, maxLng + lngPadding),
+    return CoordinateBounds(
+      southwest: Point(coordinates: Position(minLng, minLat)),
+      northeast: Point(coordinates: Position(maxLng, maxLat)),
+      infiniteBounds: false,
     );
+  }
+
+  void _zoomIn() async {
+    final currentCamera = await _mapboxMap?.getCameraState();
+    if (currentCamera != null) {
+      _mapboxMap?.setCamera(CameraOptions(
+        center: currentCamera.center,
+        zoom: (currentCamera.zoom) + 1,
+      ));
+    }
+  }
+
+  void _zoomOut() async {
+    final currentCamera = await _mapboxMap?.getCameraState();
+    if (currentCamera != null) {
+      _mapboxMap?.setCamera(CameraOptions(
+        center: currentCamera.center,
+        zoom: math.max(1, (currentCamera.zoom) - 1),
+      ));
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    final coords = _parseGeometry(widget.territory.geometry);
-    final center = _getTerritoryCenter(coords);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final center = _getTerritoryCenter(_parseGeometry(widget.territory.geometry));
 
     return SizedBox(
       height: widget.height,
@@ -650,106 +713,37 @@ class _TerritoryDetailMapWidgetState extends State<TerritoryDetailMapWidget> {
         borderRadius: BorderRadius.circular(16),
         child: Stack(
           children: [
-            FlutterMap(
-              mapController: _mapController,
-              options: MapOptions(
-                initialCenter: center,
-                initialZoom: 12,
-                minZoom: 5,
-                maxZoom: 18,
-                onMapReady: () {
-                  setState(() => _isMapReady = true);
-                  _fitToTerritory();
-                },
+            MapWidget(
+              key: ValueKey('detailMap_${widget.territory.id}'),
+              styleUri: MapConstants.getThemedStyleUri(isDark),
+              cameraOptions: CameraOptions(
+                center: center,
+                zoom: 12,
               ),
-              children: [
-                TileLayer(
-                  urlTemplate: MapConstants.getThemedTileUrl(
-                    Theme.of(context).brightness == Brightness.dark,
-                  ),
-                  userAgentPackageName: 'com.rallypoint.app',
-                ),
-                if (coords.isNotEmpty)
-                  PolygonLayer(
-                    polygons: [
-                      Polygon(
-                        points: coords,
-                        color: AppColors.primary.withAlpha(80),
-                        borderColor: AppColors.primary,
-                        borderStrokeWidth: 3.0,
-                        isFilled: true,
-                      ),
-                    ],
-                  ),
-                MarkerLayer(
-                  markers: [
-                    Marker(
-                      point: center,
-                      width: 180,
-                      height: 45,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: AppColors.primary,
-                          borderRadius: BorderRadius.circular(8),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withAlpha(50),
-                              blurRadius: 6,
-                              offset: const Offset(0, 3),
-                            ),
-                          ],
-                        ),
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(
-                              widget.territory.entityName,
-                              textAlign: TextAlign.center,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.white,
-                              ),
-                            ),
-                            Text(
-                              'ID: ${widget.territory.solid}',
-                              style: TextStyle(
-                                fontSize: 9,
-                                color: Colors.white.withAlpha(200),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
+              onMapCreated: (mapboxMap) async {
+                // Enable all gestures
+                await mapboxMap.gestures.updateSettings(GesturesSettings(
+                  scrollEnabled: true,
+                  rotateEnabled: true,
+                  pinchToZoomEnabled: true,
+                  doubleTapToZoomInEnabled: true,
+                  doubleTouchToZoomOutEnabled: true,
+                  quickZoomEnabled: true,
+                  pitchEnabled: true,
+                  simultaneousRotateAndPinchToZoomEnabled: true,
+                ));
+                _onMapCreated(mapboxMap);
+              },
             ),
-            // Zoom controls for detail view
+            // Zoom controls
             Positioned(
               right: 8,
               bottom: 8,
               child: Row(
                 children: [
-                  _SmallZoomButton(
-                    icon: Icons.remove,
-                    onPressed: () {
-                      final currentZoom = _mapController.camera.zoom;
-                      _mapController.move(_mapController.camera.center, currentZoom - 1);
-                    },
-                  ),
+                  _SmallZoomButton(icon: Icons.remove, onPressed: _zoomOut),
                   const SizedBox(width: 4),
-                  _SmallZoomButton(
-                    icon: Icons.add,
-                    onPressed: () {
-                      final currentZoom = _mapController.camera.zoom;
-                      _mapController.move(_mapController.camera.center, currentZoom + 1);
-                    },
-                  ),
+                  _SmallZoomButton(icon: Icons.add, onPressed: _zoomIn),
                   const SizedBox(width: 4),
                   _SmallZoomButton(
                     icon: Icons.center_focus_strong,
@@ -764,7 +758,7 @@ class _TerritoryDetailMapWidgetState extends State<TerritoryDetailMapWidget> {
     );
   }
 
-  List<LatLng> _parseGeometry(Map<String, dynamic>? geometry) {
+  List<Position> _parseGeometry(Map<String, dynamic>? geometry) {
     if (geometry == null) return [];
 
     try {
@@ -775,16 +769,16 @@ class _TerritoryDetailMapWidgetState extends State<TerritoryDetailMapWidget> {
 
       if (type == 'Polygon') {
         final ring = coordinates[0] as List;
-        return ring.map<LatLng>((coord) {
+        return ring.map<Position>((coord) {
           final c = coord as List;
-          return LatLng(c[1].toDouble(), c[0].toDouble());
+          return Position(c[0].toDouble(), c[1].toDouble());
         }).toList();
       } else if (type == 'MultiPolygon') {
         final firstPolygon = coordinates[0] as List;
         final ring = firstPolygon[0] as List;
-        return ring.map<LatLng>((coord) {
+        return ring.map<Position>((coord) {
           final c = coord as List;
-          return LatLng(c[1].toDouble(), c[0].toDouble());
+          return Position(c[0].toDouble(), c[1].toDouble());
         }).toList();
       }
     } catch (e) {
@@ -794,18 +788,21 @@ class _TerritoryDetailMapWidgetState extends State<TerritoryDetailMapWidget> {
     return [];
   }
 
-  LatLng _getTerritoryCenter(List<LatLng> coords) {
+  Point _getTerritoryCenter(List<Position> coords) {
     if (coords.isEmpty) {
-      return const LatLng(39.8283, -98.5795);
+      return Point(
+          coordinates: Position(
+              MapConstants.defaultLongitude, MapConstants.defaultLatitude));
     }
 
     double sumLat = 0, sumLng = 0;
     for (final coord in coords) {
-      sumLat += coord.latitude;
-      sumLng += coord.longitude;
+      sumLat += coord.lat;
+      sumLng += coord.lng;
     }
 
-    return LatLng(sumLat / coords.length, sumLng / coords.length);
+    return Point(
+        coordinates: Position(sumLng / coords.length, sumLat / coords.length));
   }
 }
 

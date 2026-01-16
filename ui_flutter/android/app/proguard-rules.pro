@@ -28,3 +28,24 @@
 -keepclassmembers class * {
     @com.google.gson.annotations.SerializedName <fields>;
 }
+
+# OkHttp & Okio - Required for HTTP tile fetching in flutter_map
+-dontwarn okhttp3.**
+-dontwarn okio.**
+-keep class okhttp3.** { *; }
+-keep interface okhttp3.** { *; }
+
+-keep class okio.** { *; }
+
+# Keep HTTP/Network classes
+-keep class java.net.** { *; }
+-keep class javax.net.ssl.** { *; }
+-dontwarn java.nio.file.**
+-dontwarn org.codehaus.mojo.animal_sniffer.**
+
+# Keep flutter_map related classes
+-dontwarn flutter_map.**
+
+# Prevent stripping of network-related annotations
+-keepattributes InnerClasses
+-keepattributes EnclosingMethod

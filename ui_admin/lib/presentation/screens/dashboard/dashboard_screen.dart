@@ -40,8 +40,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
       // Fetch team leaders stats
       try {
-        final leadersResponse =
-            await apiClient.get(ApiConstants.adminTeamLeaders);
+        final leadersResponse = await apiClient.get(
+          ApiConstants.adminTeamLeaders,
+        );
         if (leadersResponse.data != null) {
           _totalUsers = leadersResponse.data['total'] ?? 0;
           _pendingLeaders = leadersResponse.data['pending'] ?? 0;
@@ -62,8 +63,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
       // Fetch territory allocations
       try {
-        final allocationsResponse =
-            await apiClient.get(ApiConstants.adminTerritoryAllocations);
+        final allocationsResponse = await apiClient.get(
+          ApiConstants.adminTerritoryAllocations,
+        );
         if (allocationsResponse.data != null) {
           _allocatedTerritories = allocationsResponse.data['total'] ?? 0;
         }
@@ -78,7 +80,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
             territoryResponse.data['unions'] != null) {
           final unions = territoryResponse.data['unions'] as List;
           _totalTerritories = unions.fold<int>(
-              0, (sum, u) => sum + ((u['territory_count'] ?? 0) as int));
+            0,
+            (sum, u) => sum + ((u['territory_count'] ?? 0) as int),
+          );
         }
       } catch (e) {
         debugPrint('Failed to load territory stats: $e');
@@ -153,28 +157,28 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     // Welcome Message
                     Text(
                       'Welcome back${user != null ? '!' : ', Admin!'}',
-                      style:
-                          Theme.of(context).textTheme.headlineSmall?.copyWith(
-                                fontWeight: FontWeight.bold,
-                                fontSize: isMobile ? 20 : null,
-                              ),
+                      style: Theme.of(context).textTheme.headlineSmall
+                          ?.copyWith(
+                            fontWeight: FontWeight.bold,
+                            fontSize: isMobile ? 20 : null,
+                          ),
                     ),
                     if (isMobile && user != null) ...[
                       const SizedBox(height: 4),
                       Text(
                         user.email,
                         style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                              color: AppColors.textSecondary,
-                            ),
+                          color: AppColors.textSecondary,
+                        ),
                       ),
                     ],
                     const SizedBox(height: 8),
                     Text(
                       'Here\'s an overview of your Rally Point system.',
                       style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                            color: AppColors.textSecondary,
-                            fontSize: isMobile ? 14 : null,
-                          ),
+                        color: AppColors.textSecondary,
+                        fontSize: isMobile ? 14 : null,
+                      ),
                     ),
                     SizedBox(height: isMobile ? 20 : 32),
 
@@ -188,8 +192,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         ),
                         child: Row(
                           children: [
-                            const Icon(Icons.error_outline,
-                                color: AppColors.error),
+                            const Icon(
+                              Icons.error_outline,
+                              color: AppColors.error,
+                            ),
                             const SizedBox(width: 12),
                             Expanded(
                               child: Text(
@@ -269,9 +275,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     Text(
                       'Quick Actions',
                       style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                            fontWeight: FontWeight.bold,
-                            fontSize: isMobile ? 18 : null,
-                          ),
+                        fontWeight: FontWeight.bold,
+                        fontSize: isMobile ? 18 : null,
+                      ),
                     ),
                     SizedBox(height: isMobile ? 12 : 16),
 
@@ -281,16 +287,17 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         final cardWidth = isMobile
                             ? constraints.maxWidth
                             : (isTablet
-                                ? (constraints.maxWidth - 16) / 2
-                                : 280.0);
+                                  ? (constraints.maxWidth - 16) / 2
+                                  : 280.0);
 
                         return Wrap(
-                          spacing: 16,
-                          runSpacing: 16,
+                          spacing: 8,
+                          runSpacing: 8,
                           children: [
                             _QuickActionCard(
                               title: 'Verify Team Leaders',
-                              description: 'Review pending team leader accounts',
+                              description:
+                                  'Review pending team leader accounts',
                               icon: Icons.verified_user,
                               color: AppColors.success,
                               badge: _pendingLeaders > 0
@@ -387,17 +394,17 @@ class _StatCard extends StatelessWidget {
             Text(
               value,
               style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                    fontWeight: FontWeight.bold,
-                    fontSize: isMobile ? 20 : null,
-                  ),
+                fontWeight: FontWeight.bold,
+                fontSize: isMobile ? 20 : null,
+              ),
             ),
             const SizedBox(height: 2),
             Text(
               title,
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: AppColors.textSecondary,
-                    fontSize: isMobile ? 11 : null,
-                  ),
+                color: AppColors.textSecondary,
+                fontSize: isMobile ? 11 : null,
+              ),
               overflow: TextOverflow.ellipsis,
             ),
             if (subtitle != null) ...[
@@ -405,9 +412,9 @@ class _StatCard extends StatelessWidget {
               Text(
                 subtitle!,
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: color,
-                      fontSize: isMobile ? 10 : 11,
-                    ),
+                  color: color,
+                  fontSize: isMobile ? 10 : 11,
+                ),
                 overflow: TextOverflow.ellipsis,
               ),
             ],
@@ -468,7 +475,9 @@ class _QuickActionCard extends StatelessWidget {
                         right: -6,
                         child: Container(
                           padding: const EdgeInsets.symmetric(
-                              horizontal: 6, vertical: 2),
+                            horizontal: 6,
+                            vertical: 2,
+                          ),
                           decoration: BoxDecoration(
                             color: AppColors.error,
                             borderRadius: BorderRadius.circular(10),
@@ -502,9 +511,9 @@ class _QuickActionCard extends StatelessWidget {
                       Text(
                         description,
                         style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                              color: AppColors.textSecondary,
-                              fontSize: isMobile ? 12 : null,
-                            ),
+                          color: AppColors.textSecondary,
+                          fontSize: isMobile ? 12 : null,
+                        ),
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                       ),
