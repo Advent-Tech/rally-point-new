@@ -92,6 +92,13 @@ class _RallyAdminAppState extends State<RallyAdminApp> {
             return ForgotPasswordScreen(initialEmail: email);
           },
         ),
+        GoRoute(
+          path: '/verify-email',
+          builder: (context, state) {
+            final token = state.uri.queryParameters['token'];
+            return VerifyEmailScreen(token: token);
+          },
+        ),
         ShellRoute(
           builder: (context, state, child) => AdminLayout(
             currentPath: state.matchedLocation,
