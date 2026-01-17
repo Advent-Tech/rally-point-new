@@ -196,7 +196,8 @@ func setupRouter(cfg *config.Config, jwtManager *auth.JWTManager, rateLimiter mi
 		public.POST("/auth/refresh", serviceProxy.ProxyRequest("user"))
 		public.POST("/auth/forgot-password", serviceProxy.ProxyRequest("user"))
 		public.POST("/auth/reset-password", serviceProxy.ProxyRequest("user"))
-		public.GET("/auth/verify-email", serviceProxy.ProxyRequest("user"))
+		public.POST("/auth/verify-email", serviceProxy.ProxyRequest("user"))
+		public.POST("/auth/resend-verification", serviceProxy.ProxyRequest("user"))
 
 		// Public team routes (for workers to find teams during signup)
 		public.GET("/teams/search", serviceProxy.ProxyRequest("user"))
