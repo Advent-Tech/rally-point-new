@@ -295,6 +295,87 @@ class _RegisterScreenState extends State<RegisterScreen> {
         listener: (context, state) {
           if (state is AuthError) {
             AppSnackbar.error(context, message: state.message);
+          } else if (state is AuthRegistrationSuccess) {
+            // Show email verification dialog
+            showDialog(
+              context: context,
+              barrierDismissible: false,
+              builder: (context) => AlertDialog(
+                title: Row(
+                  children: [
+                    Icon(
+                      Icons.mark_email_read,
+                      color: AppColors.success,
+                    ),
+                    const SizedBox(width: 12),
+                    const Expanded(
+                      child: Text('Verify Your Email'),
+                    ),
+                  ],
+                ),
+                content: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(state.message),
+                    const SizedBox(height: 16),
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: AppColors.info.withValues(alpha: 0.08),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Icon(Icons.info_outline, color: AppColors.info, size: 20),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              'A verification link has been sent to ${state.email}. '
+                              'Please check your inbox and click the link to verify your email.',
+                              style: TextStyle(fontSize: 13, color: AppColors.info),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: AppColors.warning.withValues(alpha: 0.08),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Icon(Icons.schedule, color: AppColors.warning, size: 20),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              state.role == 'team_leader'
+                                  ? 'After verifying your email, an admin will review your account.'
+                                  : 'After verifying your email, the team leader will review your join request.',
+                              style: TextStyle(fontSize: 13, color: AppColors.warning),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                actions: [
+                  TextButton(
+                    onPressed: () {
+                      Navigator.of(context).pop();
+                      context.go('/login');
+                    },
+                    child: const Text('Go to Login'),
+                  ),
+                ],
+              ),
+            );
           } else if (state is AuthPendingVerification) {
             // Show pending verification dialog and navigate to login
             showDialog(

@@ -285,9 +285,24 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
         // verification_status can be at top level or inside user object
         final verificationStatus = data['verification_status'] ??
             (data['user'] as Map<String, dynamic>?)?['verification_status'];
+        // Check if email verification is required
+        final emailVerified = data['email_verified'] ??
+            (data['user'] as Map<String, dynamic>?)?['email_verified'] ?? false;
 
         if (accessToken.isEmpty || verificationStatus == 'pending') {
-          // User registered but needs verification before they can login
+          // Check if email verification is needed first
+          if (emailVerified == false) {
+            // User registered but needs to verify email first
+            emit(AuthRegistrationSuccess(
+              message: data['message'] ??
+                  'Registration successful! Please check your email to verify your account.',
+              email: event.email,
+              role: event.role,
+            ));
+            return;
+          }
+
+          // Email is verified but still pending approval
           String message;
           if (event.role == 'team_leader') {
             message = 'Your account has been created and is pending verification by an admin. '

@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"log"
 	"net/http"
 	"strconv"
 
@@ -45,13 +46,28 @@ func (h *UserHandler) Register(c *gin.Context) {
 	// Send verification email for workers and team leaders (roles that require verification)
 	if response.User != nil && domain.RequiresVerification(response.User.Role) && h.verificationService != nil {
 		// Send verification email asynchronously (don't block registration)
-		go func(userID uuid.UUID) {
+		go func(userID uuid.UUID, email string) {
+			log.Printf("📧 Sending verification email to %s...\n", email)
 			if err := h.verificationService.SendVerificationEmail(userID); err != nil {
 				// Log the error but don't fail registration
 				// The user can request a resend later
-				println("Warning: failed to send verification email:", err.Error())
+				log.Printf("⚠️ Failed to send verification email to %s: %v\n", email, err)
+			} else {
+				log.Printf("✅ Verification email process completed for %s\n", email)
 			}
-		}(response.User.ID)
+		}(response.User.ID, response.User.Email)
+
+		// Return custom response with message for email verification
+		c.JSON(http.StatusCreated, gin.H{
+			"user":               response.User,
+			"access_token":       response.AccessToken,
+			"refresh_token":      response.RefreshToken,
+			"expires_in":         response.ExpiresIn,
+			"verification_status": response.User.VerificationStatus,
+			"email_verified":     response.User.EmailVerified,
+			"message":            "Registration successful! Please check your email to verify your account.",
+		})
+		return
 	}
 
 	c.JSON(http.StatusCreated, response)

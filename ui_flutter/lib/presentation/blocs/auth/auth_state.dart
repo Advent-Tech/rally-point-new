@@ -125,3 +125,19 @@ class AuthResendVerificationSuccess extends AuthState {
   @override
   List<Object?> get props => [message];
 }
+
+/// State when registration is successful and verification email was sent
+class AuthRegistrationSuccess extends AuthState {
+  final String message;
+  final String email;
+  final String role;
+
+  const AuthRegistrationSuccess({
+    required this.message,
+    required this.email,
+    required this.role,
+  });
+
+  @override
+  List<Object?> get props => [message, email, role];
+}
