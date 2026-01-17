@@ -6,6 +6,8 @@ class ApiConstants {
   // Auth endpoints
   static const String login = '/api/auth/login';
   static const String refreshToken = '/api/auth/refresh';
+  static const String forgotPassword = '/api/auth/forgot-password';
+  static const String resetPassword = '/api/auth/reset-password';
 
   // Superadmin endpoints
   static const String superadminAdmins = '/api/superadmin/admins';

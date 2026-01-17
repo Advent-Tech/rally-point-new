@@ -51,3 +51,77 @@ class AuthPendingVerification extends AuthState {
   @override
   List<Object?> get props => [message, role, email];
 }
+
+/// State when user needs to verify email before logging in
+class AuthEmailVerificationRequired extends AuthState {
+  final String message;
+  final String email;
+
+  const AuthEmailVerificationRequired({
+    required this.message,
+    required this.email,
+  });
+
+  @override
+  List<Object?> get props => [message, email];
+}
+
+/// State when account has been rejected
+class AuthAccountRejected extends AuthState {
+  final String message;
+  final String? reason;
+  final String? email;
+
+  const AuthAccountRejected({
+    required this.message,
+    this.reason,
+    this.email,
+  });
+
+  @override
+  List<Object?> get props => [message, reason, email];
+}
+
+/// State for forgot password flow
+class AuthForgotPasswordSuccess extends AuthState {
+  final String message;
+  final String email;
+
+  const AuthForgotPasswordSuccess({
+    required this.message,
+    required this.email,
+  });
+
+  @override
+  List<Object?> get props => [message, email];
+}
+
+/// State when email verification is successful
+class AuthEmailVerified extends AuthState {
+  final String message;
+
+  const AuthEmailVerified({required this.message});
+
+  @override
+  List<Object?> get props => [message];
+}
+
+/// State when password reset is successful
+class AuthPasswordResetSuccess extends AuthState {
+  final String message;
+
+  const AuthPasswordResetSuccess({required this.message});
+
+  @override
+  List<Object?> get props => [message];
+}
+
+/// State for resend verification email success
+class AuthResendVerificationSuccess extends AuthState {
+  final String message;
+
+  const AuthResendVerificationSuccess({required this.message});
+
+  @override
+  List<Object?> get props => [message];
+}

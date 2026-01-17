@@ -20,6 +20,7 @@ class TeamBloc extends Bloc<TeamEvent, TeamState> {
     on<TeamLoadJoinRequests>(_onLoadJoinRequests);
     on<TeamApproveJoinRequest>(_onApproveJoinRequest);
     on<TeamRejectJoinRequest>(_onRejectJoinRequest);
+    on<TeamSendInvitation>(_onSendInvitation);
   }
 
   Future<void> _onLoadMembers(TeamLoadMembers event, Emitter<TeamState> emit) async {
@@ -105,6 +106,31 @@ class TeamBloc extends Bloc<TeamEvent, TeamState> {
         ));
         // Reload join requests to refresh the list
         add(TeamLoadJoinRequests(teamId: event.teamId));
+      },
+      failure: (message, statusCode) {
+        emit(TeamError(message: message));
+      },
+    );
+  }
+
+  /// Send an invitation to join a team
+  Future<void> _onSendInvitation(TeamSendInvitation event, Emitter<TeamState> emit) async {
+    emit(TeamLoading());
+
+    final result = await _teamRepository.sendInvitation(
+      teamId: event.teamId,
+      email: event.email,
+    );
+
+    result.when(
+      success: (response) {
+        debugPrint('TeamBloc: Successfully sent invitation to ${event.email}');
+        final message = response['message'] ?? 'Invitation sent successfully';
+        emit(TeamInvitationSent(
+          message: message,
+          email: event.email,
+          teamId: event.teamId,
+        ));
       },
       failure: (message, statusCode) {
         emit(TeamError(message: message));

@@ -299,6 +299,77 @@ class TeamRepository {
     }
   }
 
+  // ============ Team Invitation Methods ============
+
+  /// Send an invitation to join a team (team leader only)
+  Future<ApiResult<Map<String, dynamic>>> sendInvitation({
+    required String teamId,
+    required String email,
+  }) async {
+    try {
+      final response = await _apiClient.dio.post(
+        '${ApiConstants.teamInvitations}/$teamId/invitations',
+        data: {'email': email},
+      );
+      return ApiResult.success(response.data as Map<String, dynamic>);
+    } on DioException catch (e) {
+      return ApiResult.failure(_handleDioError(e));
+    } catch (e) {
+      return ApiResult.failure('Failed to send invitation: $e');
+    }
+  }
+
+  /// Get all invitations for a team (team leader only)
+  Future<ApiResult<List<Map<String, dynamic>>>> getTeamInvitations(String teamId) async {
+    try {
+      final response = await _apiClient.dio.get(
+        '${ApiConstants.teamInvitations}/$teamId/invitations',
+      );
+
+      final List<dynamic> data = response.data['invitations'] ?? [];
+      final invitations = data.cast<Map<String, dynamic>>();
+      return ApiResult.success(invitations);
+    } on DioException catch (e) {
+      return ApiResult.failure(_handleDioError(e));
+    } catch (e) {
+      return ApiResult.failure('Failed to get invitations: $e');
+    }
+  }
+
+  /// Cancel a pending invitation (team leader only)
+  Future<ApiResult<void>> cancelInvitation({
+    required String teamId,
+    required String invitationId,
+  }) async {
+    try {
+      await _apiClient.dio.delete(
+        '${ApiConstants.teamInvitations}/$teamId/invitations/$invitationId',
+      );
+      return const ApiResult.success(null);
+    } on DioException catch (e) {
+      return ApiResult.failure(_handleDioError(e));
+    } catch (e) {
+      return ApiResult.failure('Failed to cancel invitation: $e');
+    }
+  }
+
+  /// Resend an invitation email (team leader only)
+  Future<ApiResult<void>> resendInvitation({
+    required String teamId,
+    required String invitationId,
+  }) async {
+    try {
+      await _apiClient.dio.post(
+        '${ApiConstants.teamInvitations}/$teamId/invitations/$invitationId/resend',
+      );
+      return const ApiResult.success(null);
+    } on DioException catch (e) {
+      return ApiResult.failure(_handleDioError(e));
+    } catch (e) {
+      return ApiResult.failure('Failed to resend invitation: $e');
+    }
+  }
+
   String _handleDioError(DioException e) {
     switch (e.type) {
       case DioExceptionType.connectionTimeout:

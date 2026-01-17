@@ -57,3 +57,14 @@ class TeamRejectJoinRequest extends TeamEvent {
   @override
   List<Object?> get props => [requestId, teamId, reason];
 }
+
+/// Send an invitation to join a team
+class TeamSendInvitation extends TeamEvent {
+  final String teamId;
+  final String email;
+
+  const TeamSendInvitation({required this.teamId, required this.email});
+
+  @override
+  List<Object?> get props => [teamId, email];
+}

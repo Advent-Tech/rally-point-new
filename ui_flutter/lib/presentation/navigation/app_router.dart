@@ -7,6 +7,7 @@ import '../blocs/prayer_request/prayer_request_bloc.dart';
 import '../screens/splash_screen.dart';
 import '../screens/auth/login_screen.dart';
 import '../screens/auth/register_screen.dart';
+import '../screens/auth/forgot_password_screen.dart';
 import '../screens/home/home_screen.dart';
 import '../screens/territory/territory_screen.dart';
 import '../screens/delivery/delivery_screen.dart';
@@ -46,7 +47,8 @@ class AppRouter {
       redirect: (context, state) {
         final authState = authBloc.state;
         final isLoggingIn = state.matchedLocation == '/login' ||
-            state.matchedLocation == '/register';
+            state.matchedLocation == '/register' ||
+            state.matchedLocation == '/forgot-password';
         final isSplash = state.matchedLocation == '/splash';
 
         // If still checking auth status, stay on splash
@@ -54,7 +56,7 @@ class AppRouter {
           return isSplash ? null : '/splash';
         }
 
-        // If not authenticated and not on login/register, redirect to login
+        // If not authenticated and not on login/register/forgot-password, redirect to login
         if (authState is AuthUnauthenticated) {
           return isLoggingIn ? null : '/login';
         }
@@ -107,6 +109,13 @@ class AppRouter {
         GoRoute(
           path: '/register',
           builder: (context, state) => const RegisterScreen(),
+        ),
+        GoRoute(
+          path: '/forgot-password',
+          builder: (context, state) {
+            final email = state.uri.queryParameters['email'];
+            return ForgotPasswordScreen(initialEmail: email);
+          },
         ),
 
         // Worker Routes - Main App Shell with Bottom Navigation

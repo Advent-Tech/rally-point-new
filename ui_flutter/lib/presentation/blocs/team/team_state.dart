@@ -65,3 +65,19 @@ class TeamJoinRequestActionSuccess extends TeamState {
   @override
   List<Object?> get props => [message, teamId];
 }
+
+/// State when an invitation is sent successfully
+class TeamInvitationSent extends TeamState {
+  final String message;
+  final String email;
+  final String teamId;
+
+  const TeamInvitationSent({
+    required this.message,
+    required this.email,
+    required this.teamId,
+  });
+
+  @override
+  List<Object?> get props => [message, email, teamId];
+}

@@ -139,7 +139,17 @@ class _LoginScreenState extends State<LoginScreen> {
                       },
                       onFieldSubmitted: (_) => _handleLogin(),
                     ),
-                    const SizedBox(height: 32),
+                    const SizedBox(height: 12),
+
+                    // Forgot Password Link
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: TextButton(
+                        onPressed: () => context.go('/forgot-password'),
+                        child: const Text('Forgot Password?'),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
 
                     // Login Button
                     BlocBuilder<AuthBloc, AuthState>(

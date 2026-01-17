@@ -25,6 +25,7 @@ class ApiConstants {
   static const String forgotPassword = '/api/auth/forgot-password';
   static const String resetPassword = '/api/auth/reset-password';
   static const String verifyEmail = '/api/auth/verify-email';
+  static const String resendVerification = '/api/auth/resend-verification';
 
   // User Endpoints
   static const String userMe = '/api/users/me';
@@ -52,6 +53,12 @@ class ApiConstants {
       '/api/teams/join-requests'; // + /{id}/approve
   static const String rejectJoinRequest =
       '/api/teams/join-requests'; // + /{id}/reject
+
+  // Team Invitation Endpoints
+  static const String teamInvitations = '/api/teams'; // + /{id}/invitations
+  static const String invitationInfo = '/api/invitations/info'; // + ?token=xxx
+  static const String acceptInvitation = '/api/invitations/accept';
+  static const String declineInvitation = '/api/invitations/decline';
 
   // Work Session Endpoints
   static const String workSessions = '/api/geofence';

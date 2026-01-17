@@ -27,3 +27,32 @@ class AuthLogin extends AuthEvent {
 class AuthLogout extends AuthEvent {
   const AuthLogout();
 }
+
+/// Event to request a forgot password email
+class AuthForgotPassword extends AuthEvent {
+  final String email;
+
+  const AuthForgotPassword({required this.email});
+
+  @override
+  List<Object?> get props => [email];
+}
+
+/// Event to reset password with token
+class AuthResetPassword extends AuthEvent {
+  final String token;
+  final String newPassword;
+
+  const AuthResetPassword({
+    required this.token,
+    required this.newPassword,
+  });
+
+  @override
+  List<Object?> get props => [token, newPassword];
+}
+
+/// Event to clear error state
+class AuthClearError extends AuthEvent {
+  const AuthClearError();
+}

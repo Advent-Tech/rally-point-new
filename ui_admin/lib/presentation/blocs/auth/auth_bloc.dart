@@ -17,6 +17,9 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     on<AuthCheckStatus>(_onCheckStatus);
     on<AuthLogin>(_onLogin);
     on<AuthLogout>(_onLogout);
+    on<AuthForgotPassword>(_onForgotPassword);
+    on<AuthResetPassword>(_onResetPassword);
+    on<AuthClearError>(_onClearError);
   }
 
   Future<void> _initialize() async {
@@ -148,5 +151,73 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
       await _secure.clearAll();
       emit(AuthUnauthenticated());
     }
+  }
+
+  Future<void> _onForgotPassword(AuthForgotPassword event, Emitter<AuthState> emit) async {
+    emit(AuthLoading());
+
+    try {
+      await _initialize();
+
+      final response = await _api.post(
+        ApiConstants.forgotPassword,
+        data: {'email': event.email},
+      );
+
+      if (response.statusCode == 200) {
+        final data = response.data as Map<String, dynamic>;
+        emit(AuthForgotPasswordSuccess(
+          message: data['message'] ?? 'If an account exists with this email, a password reset link has been sent.',
+          email: event.email,
+        ));
+      } else {
+        // Still show success to prevent email enumeration
+        emit(AuthForgotPasswordSuccess(
+          message: 'If an account exists with this email, a password reset link has been sent.',
+          email: event.email,
+        ));
+      }
+    } catch (e) {
+      // Still show success to prevent email enumeration
+      emit(AuthForgotPasswordSuccess(
+        message: 'If an account exists with this email, a password reset link has been sent.',
+        email: event.email,
+      ));
+    }
+  }
+
+  Future<void> _onResetPassword(AuthResetPassword event, Emitter<AuthState> emit) async {
+    emit(AuthLoading());
+
+    try {
+      await _initialize();
+
+      final response = await _api.post(
+        ApiConstants.resetPassword,
+        data: {
+          'token': event.token,
+          'new_password': event.newPassword,
+        },
+      );
+
+      if (response.statusCode == 200) {
+        final data = response.data as Map<String, dynamic>;
+        emit(AuthPasswordResetSuccess(
+          message: data['message'] ?? 'Password reset successfully. Please login with your new password.',
+        ));
+      } else {
+        emit(const AuthError(message: 'Failed to reset password. Please try again.'));
+      }
+    } catch (e) {
+      String message = 'Failed to reset password';
+      if (e.toString().contains('invalid') || e.toString().contains('expired')) {
+        message = 'Invalid or expired reset link. Please request a new one.';
+      }
+      emit(AuthError(message: message));
+    }
+  }
+
+  Future<void> _onClearError(AuthClearError event, Emitter<AuthState> emit) async {
+    emit(AuthUnauthenticated());
   }
 }

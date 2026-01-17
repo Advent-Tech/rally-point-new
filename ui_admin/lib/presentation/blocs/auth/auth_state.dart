@@ -33,3 +33,27 @@ class AuthError extends AuthState {
   @override
   List<Object?> get props => [message];
 }
+
+/// State for forgot password flow success
+class AuthForgotPasswordSuccess extends AuthState {
+  final String message;
+  final String email;
+
+  const AuthForgotPasswordSuccess({
+    required this.message,
+    required this.email,
+  });
+
+  @override
+  List<Object?> get props => [message, email];
+}
+
+/// State when password reset is successful
+class AuthPasswordResetSuccess extends AuthState {
+  final String message;
+
+  const AuthPasswordResetSuccess({required this.message});
+
+  @override
+  List<Object?> get props => [message];
+}

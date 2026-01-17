@@ -58,6 +58,7 @@ func main() {
 	joinRequestRepo := postgres.NewJoinRequestRepository(db.DB)
 	blogRepo := postgres.NewBlogRepository(db.DB)
 	verificationTokenRepo := postgres.NewVerificationTokenRepository(db.DB)
+	teamInvitationRepo := postgres.NewTeamInvitationRepository(db.DB)
 
 	// Storage path for blog images
 	storagePath := getEnv("STORAGE_PATH", "./uploads")
@@ -71,6 +72,7 @@ func main() {
 	joinRequestService := service.NewJoinRequestService(joinRequestRepo, userRepo, teamRepo)
 	blogService := service.NewBlogService(blogRepo, storagePath, baseURL)
 	verificationService := service.NewVerificationService(userRepo, verificationTokenRepo, sessionRepo)
+	teamInvitationService := service.NewTeamInvitationService(teamInvitationRepo, teamRepo, userRepo)
 
 	// Initialize handlers
 	userHandler := handler.NewUserHandler(userService, teamService, verificationService, jwtManager)
@@ -79,9 +81,10 @@ func main() {
 	joinRequestHandler := handler.NewJoinRequestHandler(joinRequestService, teamService)
 	blogHandler := handler.NewBlogHandler(blogService)
 	verificationHandler := handler.NewVerificationHandler(verificationService)
+	teamInvitationHandler := handler.NewTeamInvitationHandler(teamInvitationService)
 
 	// Setup router
-	router := setupRouter(userHandler, adminHandler, superAdminHandler, joinRequestHandler, blogHandler, verificationHandler, storagePath)
+	router := setupRouter(userHandler, adminHandler, superAdminHandler, joinRequestHandler, blogHandler, verificationHandler, teamInvitationHandler, storagePath)
 
 	// Server configuration
 	port := getEnv("PORT", "8081")
@@ -123,6 +126,7 @@ func setupRouter(
 	joinRequestHandler *handler.JoinRequestHandler,
 	blogHandler *handler.BlogHandler,
 	verificationHandler *handler.VerificationHandler,
+	teamInvitationHandler *handler.TeamInvitationHandler,
 	storagePath string,
 ) *gin.Engine {
 	// Set Gin mode
@@ -178,6 +182,13 @@ func setupRouter(
 			blogs.GET("/", blogHandler.ListBlogs)
 			blogs.GET("/:id", blogHandler.GetBlog)
 		}
+
+		// Public invitation routes (get invitation info)
+		invitations := api.Group("/invitations")
+		{
+			invitations.GET("/info", teamInvitationHandler.GetInvitationInfo)
+			invitations.POST("/decline", teamInvitationHandler.DeclineInvitation)
+		}
 	}
 
 	// Protected routes (authentication required)
@@ -213,6 +224,18 @@ func setupRouter(
 			teams.GET("/:id/join-requests", joinRequestHandler.GetTeamJoinRequests)
 			teams.PUT("/join-requests/:id/approve", joinRequestHandler.ApproveJoinRequest)
 			teams.PUT("/join-requests/:id/reject", joinRequestHandler.RejectJoinRequest)
+
+			// Team invitation routes (team leaders)
+			teams.POST("/:id/invitations", teamInvitationHandler.SendInvitation)
+			teams.GET("/:id/invitations", teamInvitationHandler.GetTeamInvitations)
+			teams.DELETE("/:id/invitations/:invitationId", teamInvitationHandler.CancelInvitation)
+			teams.POST("/:id/invitations/:invitationId/resend", teamInvitationHandler.ResendInvitation)
+		}
+
+		// Protected invitation routes (accepting invitations)
+		invitations := protected.Group("/api/invitations")
+		{
+			invitations.POST("/accept", teamInvitationHandler.AcceptInvitation)
 		}
 
 		// Blog routes (protected - create/update/delete requires admin)

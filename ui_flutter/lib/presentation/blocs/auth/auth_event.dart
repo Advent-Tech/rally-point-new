@@ -69,3 +69,52 @@ class AuthRefreshToken extends AuthEvent {
 class AuthTokenExpired extends AuthEvent {
   const AuthTokenExpired();
 }
+
+/// Event to request a forgot password email
+class AuthForgotPassword extends AuthEvent {
+  final String email;
+
+  const AuthForgotPassword({required this.email});
+
+  @override
+  List<Object?> get props => [email];
+}
+
+/// Event to reset password with token
+class AuthResetPassword extends AuthEvent {
+  final String token;
+  final String newPassword;
+
+  const AuthResetPassword({
+    required this.token,
+    required this.newPassword,
+  });
+
+  @override
+  List<Object?> get props => [token, newPassword];
+}
+
+/// Event to verify email with token
+class AuthVerifyEmail extends AuthEvent {
+  final String token;
+
+  const AuthVerifyEmail({required this.token});
+
+  @override
+  List<Object?> get props => [token];
+}
+
+/// Event to resend verification email
+class AuthResendVerification extends AuthEvent {
+  final String email;
+
+  const AuthResendVerification({required this.email});
+
+  @override
+  List<Object?> get props => [email];
+}
+
+/// Event to clear any error state and return to unauthenticated
+class AuthClearError extends AuthEvent {
+  const AuthClearError();
+}

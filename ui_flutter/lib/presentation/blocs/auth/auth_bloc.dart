@@ -54,6 +54,11 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     on<AuthUpdateUser>(_onUpdateUser);
     on<AuthRefreshToken>(_onRefreshToken);
     on<AuthTokenExpired>(_onTokenExpired);
+    on<AuthForgotPassword>(_onForgotPassword);
+    on<AuthResetPassword>(_onResetPassword);
+    on<AuthVerifyEmail>(_onVerifyEmail);
+    on<AuthResendVerification>(_onResendVerification);
+    on<AuthClearError>(_onClearError);
   }
 
   Future<void> _initialize() async {
@@ -202,21 +207,50 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
         emit(AuthError(message: 'Login failed. Please check your credentials.'));
       }
     } catch (e) {
-      // Check if this is a pending verification error
+      // Check if this is a specific error type
       final errorMessage = _extractErrorMessage(e);
       final errorLower = errorMessage.toLowerCase();
-      if (errorLower.contains('pending verification') ||
+
+      // Check for email verification required
+      if (errorLower.contains('verify your email') ||
+          errorLower.contains('email verification') ||
+          errorLower.contains('verification link')) {
+        emit(AuthEmailVerificationRequired(
+          message: errorMessage,
+          email: event.email,
+        ));
+      }
+      // Check for pending approval (after email verification)
+      else if (errorLower.contains('pending verification') ||
           errorLower.contains('pending admin approval') ||
           errorLower.contains('wait for admin approval') ||
-          errorLower.contains('wait for approval')) {
+          errorLower.contains('wait for approval') ||
+          errorLower.contains('await approval')) {
         // Determine role from error message
-        final isTeamLeader = errorLower.contains('admin approval');
+        final isTeamLeader = errorLower.contains('admin approval') ||
+                             errorLower.contains('administrator');
         emit(AuthPendingVerification(
-          message: 'Your account is pending verification. Please wait for approval before logging in.',
+          message: errorMessage,
           role: isTeamLeader ? 'team_leader' : 'worker',
           email: event.email,
         ));
-      } else {
+      }
+      // Check for account rejected
+      else if (errorLower.contains('rejected') ||
+               errorLower.contains('account has been rejected')) {
+        // Try to extract rejection reason
+        String? reason;
+        final reasonMatch = RegExp(r'reason[:\s]+(.+)', caseSensitive: false).firstMatch(errorMessage);
+        if (reasonMatch != null) {
+          reason = reasonMatch.group(1)?.trim();
+        }
+        emit(AuthAccountRejected(
+          message: errorMessage,
+          reason: reason,
+          email: event.email,
+        ));
+      }
+      else {
         emit(AuthError(message: errorMessage));
       }
     }
@@ -354,6 +388,124 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     _stopRefreshTimer();
     await _secure.clearTokens();
     await _local.clearUserData();
+    emit(AuthUnauthenticated());
+  }
+
+  Future<void> _onForgotPassword(AuthForgotPassword event, Emitter<AuthState> emit) async {
+    emit(AuthLoading());
+
+    try {
+      await _initialize();
+
+      final response = await _api.post(
+        ApiConstants.forgotPassword,
+        data: {'email': event.email},
+      );
+
+      if (response.statusCode == 200) {
+        final data = response.data as Map<String, dynamic>;
+        emit(AuthForgotPasswordSuccess(
+          message: data['message'] ?? 'If an account exists with this email, a password reset link has been sent.',
+          email: event.email,
+        ));
+      } else {
+        // Still show success to prevent email enumeration
+        emit(AuthForgotPasswordSuccess(
+          message: 'If an account exists with this email, a password reset link has been sent.',
+          email: event.email,
+        ));
+      }
+    } catch (e) {
+      // Still show success to prevent email enumeration
+      emit(AuthForgotPasswordSuccess(
+        message: 'If an account exists with this email, a password reset link has been sent.',
+        email: event.email,
+      ));
+    }
+  }
+
+  Future<void> _onResetPassword(AuthResetPassword event, Emitter<AuthState> emit) async {
+    emit(AuthLoading());
+
+    try {
+      await _initialize();
+
+      final response = await _api.post(
+        ApiConstants.resetPassword,
+        data: {
+          'token': event.token,
+          'new_password': event.newPassword,
+        },
+      );
+
+      if (response.statusCode == 200) {
+        final data = response.data as Map<String, dynamic>;
+        emit(AuthPasswordResetSuccess(
+          message: data['message'] ?? 'Password reset successfully. Please login with your new password.',
+        ));
+      } else {
+        emit(AuthError(message: 'Failed to reset password. Please try again.'));
+      }
+    } catch (e) {
+      emit(AuthError(message: _extractErrorMessage(e)));
+    }
+  }
+
+  Future<void> _onVerifyEmail(AuthVerifyEmail event, Emitter<AuthState> emit) async {
+    emit(AuthLoading());
+
+    try {
+      await _initialize();
+
+      final response = await _api.post(
+        ApiConstants.verifyEmail,
+        data: {'token': event.token},
+      );
+
+      if (response.statusCode == 200) {
+        final data = response.data as Map<String, dynamic>;
+        emit(AuthEmailVerified(
+          message: data['message'] ?? 'Email verified successfully. You can now await approval from the administrator.',
+        ));
+      } else {
+        emit(AuthError(message: 'Failed to verify email. The link may be invalid or expired.'));
+      }
+    } catch (e) {
+      emit(AuthError(message: _extractErrorMessage(e)));
+    }
+  }
+
+  Future<void> _onResendVerification(AuthResendVerification event, Emitter<AuthState> emit) async {
+    emit(AuthLoading());
+
+    try {
+      await _initialize();
+
+      final response = await _api.post(
+        ApiConstants.resendVerification,
+        data: {'email': event.email},
+      );
+
+      if (response.statusCode == 200) {
+        final data = response.data as Map<String, dynamic>;
+        emit(AuthResendVerificationSuccess(
+          message: data['message'] ?? 'If an account exists with this email and is not yet verified, a verification email has been sent.',
+        ));
+      } else {
+        // Still show success to prevent email enumeration
+        emit(AuthResendVerificationSuccess(
+          message: 'If an account exists with this email and is not yet verified, a verification email has been sent.',
+        ));
+      }
+    } catch (e) {
+      // Still show success to prevent email enumeration
+      emit(AuthResendVerificationSuccess(
+        message: 'If an account exists with this email and is not yet verified, a verification email has been sent.',
+      ));
+    }
+  }
+
+  Future<void> _onClearError(AuthClearError event, Emitter<AuthState> emit) async {
     emit(AuthUnauthenticated());
   }
 

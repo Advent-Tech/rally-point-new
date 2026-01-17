@@ -7,6 +7,7 @@ import 'core/storage/secure_storage.dart';
 import 'core/network/api_client.dart';
 import 'presentation/blocs/auth/auth_bloc.dart';
 import 'presentation/screens/auth/login_screen.dart';
+import 'presentation/screens/auth/forgot_password_screen.dart';
 import 'presentation/screens/dashboard/admin_layout.dart';
 import 'presentation/screens/dashboard/dashboard_screen.dart';
 import 'presentation/screens/users/users_screen.dart';
@@ -64,13 +65,14 @@ class _RallyAdminAppState extends State<RallyAdminApp> {
       redirect: (context, state) {
         final authState = _authBloc.state;
         final isAuthenticated = authState is AuthAuthenticated;
-        final isLoggingIn = state.matchedLocation == '/login';
+        final isAuthPage = state.matchedLocation == '/login' ||
+            state.matchedLocation == '/forgot-password';
 
-        if (!isAuthenticated && !isLoggingIn) {
+        if (!isAuthenticated && !isAuthPage) {
           return '/login';
         }
 
-        if (isAuthenticated && isLoggingIn) {
+        if (isAuthenticated && isAuthPage) {
           return '/dashboard';
         }
 
@@ -80,6 +82,13 @@ class _RallyAdminAppState extends State<RallyAdminApp> {
         GoRoute(
           path: '/login',
           builder: (context, state) => const LoginScreen(),
+        ),
+        GoRoute(
+          path: '/forgot-password',
+          builder: (context, state) {
+            final email = state.uri.queryParameters['email'];
+            return ForgotPasswordScreen(initialEmail: email);
+          },
         ),
         ShellRoute(
           builder: (context, state, child) => AdminLayout(

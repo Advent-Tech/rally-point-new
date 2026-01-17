@@ -206,6 +206,10 @@ func setupRouter(cfg *config.Config, jwtManager *auth.JWTManager, rateLimiter mi
 		// Public blog routes (read-only)
 		public.GET("/blogs", serviceProxy.ProxyRequest("user"))
 		public.GET("/blogs/:id", serviceProxy.ProxyRequest("user"))
+
+		// Public invitation routes (get invitation info, decline)
+		public.GET("/invitations/info", serviceProxy.ProxyRequest("user"))
+		public.POST("/invitations/decline", serviceProxy.ProxyRequest("user"))
 	}
 
 	// Protected routes (authentication required)
@@ -549,6 +553,12 @@ func setupRouter(cfg *config.Config, jwtManager *auth.JWTManager, rateLimiter mi
 			blogs.POST("/:id/image", serviceProxy.ProxyRequest("user"))
 			blogs.POST("/upload-image", serviceProxy.ProxyRequest("user"))
 		}
+
+		// Protected invitation routes (accept invitations)
+		invitations := protected.Group("/invitations")
+		{
+			invitations.POST("/accept", serviceProxy.ProxyRequest("user"))
+		}
 	}
 
 	// =====================================================
@@ -632,6 +642,12 @@ func setupRouter(cfg *config.Config, jwtManager *auth.JWTManager, rateLimiter mi
 		teamLeaderRoutes.GET("/:id/join-requests", serviceProxy.ProxyRequest("user"))
 		teamLeaderRoutes.PUT("/join-requests/:id/approve", serviceProxy.ProxyRequest("user"))
 		teamLeaderRoutes.PUT("/join-requests/:id/reject", serviceProxy.ProxyRequest("user"))
+
+		// Team invitation management
+		teamLeaderRoutes.POST("/:id/invitations", serviceProxy.ProxyRequest("user"))
+		teamLeaderRoutes.GET("/:id/invitations", serviceProxy.ProxyRequest("user"))
+		teamLeaderRoutes.DELETE("/:id/invitations/:invitationId", serviceProxy.ProxyRequest("user"))
+		teamLeaderRoutes.POST("/:id/invitations/:invitationId/resend", serviceProxy.ProxyRequest("user"))
 	}
 
 	// =====================================================
