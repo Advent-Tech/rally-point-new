@@ -38,24 +38,21 @@ class TeamMapBloc extends Bloc<TeamMapEvent, TeamMapState> {
       // Fetch all data in parallel
       final results = await Future.wait([
         _fetchActiveWorkers(event.teamId),
-        _fetchDeliveries(event.teamId),
-        _fetchReceipts(event.teamId),
+        _fetchPrayerRequests(event.teamId),
         _fetchDonations(event.teamId),
         _fetchTerritoryBoundaries(event.teamId),
       ]);
 
       final workers = results[0] as List<ActiveWorkerLocation>;
-      final deliveries = results[1] as List<MapDeliveryMarker>;
-      final receipts = results[2] as List<MapReceiptMarker>;
-      final donations = results[3] as List<MapDonationMarker>;
-      final territories = results[4] as List<TerritoryBoundary>;
+      final prayers = results[1] as List<MapPrayerMarker>;
+      final donations = results[2] as List<MapDonationMarker>;
+      final territories = results[3] as List<TerritoryBoundary>;
 
-      debugPrint('TeamMapBloc: Loaded - Workers: ${workers.length}, Deliveries: ${deliveries.length}, Receipts: ${receipts.length}, Donations: ${donations.length}, Territories: ${territories.length}');
+      debugPrint('TeamMapBloc: Loaded - Workers: ${workers.length}, Prayers: ${prayers.length}, Donations: ${donations.length}, Territories: ${territories.length}');
 
       emit(TeamMapLoaded(
         activeWorkers: workers,
-        deliveries: deliveries,
-        receipts: receipts,
+        prayerRequests: prayers,
         donations: donations,
         territoryBoundaries: territories,
         teamId: event.teamId,
@@ -88,57 +85,26 @@ class TeamMapBloc extends Bloc<TeamMapEvent, TeamMapState> {
     return [];
   }
 
-  Future<List<MapDeliveryMarker>> _fetchDeliveries(String teamId) async {
+  Future<List<MapPrayerMarker>> _fetchPrayerRequests(String teamId) async {
     try {
-      debugPrint('TeamMapBloc: Fetching deliveries for team $teamId');
-      // Use team deliveries endpoint: /api/teams/{teamId}/deliveries
+      debugPrint('TeamMapBloc: Fetching prayer requests for team $teamId');
       final response = await _apiClient!.get(
-        '/api/teams/$teamId/deliveries',
+        '${ApiConstants.prayerRequestsTeam}/$teamId',
       );
 
-      debugPrint('TeamMapBloc: Deliveries response: ${response.statusCode}');
+      debugPrint('TeamMapBloc: Prayers response: ${response.statusCode}');
       if (response.statusCode == 200) {
         final List<dynamic> data = response.data is List
             ? response.data
-            : response.data['deliveries'] ?? [];
-
-        debugPrint('TeamMapBloc: Found ${data.length} deliveries');
-        // API returns nested structure: { "delivery": {...}, "items": [...] }
-        // Extract the delivery object from each item
-        return data.map((json) {
-          final deliveryData = json is Map && json.containsKey('delivery')
-              ? json['delivery'] as Map<String, dynamic>
-              : json as Map<String, dynamic>;
-          return MapDeliveryMarker.fromJson(deliveryData);
-        }).where((d) => d.latitude != 0 && d.longitude != 0).toList();
-      }
-    } catch (e) {
-      debugPrint('TeamMapBloc: Error fetching deliveries: $e');
-    }
-    return [];
-  }
-
-  Future<List<MapReceiptMarker>> _fetchReceipts(String teamId) async {
-    try {
-      debugPrint('TeamMapBloc: Fetching receipts for team $teamId');
-      // Use team receipts endpoint: /api/receipts/team/{teamId}
-      final response = await _apiClient!.get(
-        '/api/receipts/team/$teamId',
-      );
-
-      debugPrint('TeamMapBloc: Receipts response: ${response.statusCode}');
-      if (response.statusCode == 200) {
-        final List<dynamic> data = response.data is List
-            ? response.data
-            : response.data['receipts'] ?? [];
-        debugPrint('TeamMapBloc: Found ${data.length} receipts');
+            : response.data['prayer_requests'] ?? response.data['prayers'] ?? [];
+        debugPrint('TeamMapBloc: Found ${data.length} prayer requests');
         return data
-            .map((json) => MapReceiptMarker.fromJson(json))
-            .where((r) => r.latitude != 0 && r.longitude != 0)
+            .map((json) => MapPrayerMarker.fromJson(json))
+            .where((p) => p.latitude != 0 && p.longitude != 0)
             .toList();
       }
     } catch (e) {
-      debugPrint('TeamMapBloc: Error fetching receipts: $e');
+      debugPrint('TeamMapBloc: Error fetching prayer requests: $e');
     }
     return [];
   }
@@ -229,7 +195,7 @@ class TeamMapBloc extends Bloc<TeamMapEvent, TeamMapState> {
     }
   }
 
-  /// Lightweight refresh that only updates dynamic markers (workers, deliveries, receipts, donations)
+  /// Lightweight refresh that only updates dynamic markers (workers, prayers, donations)
   /// without reloading territory boundaries
   Future<void> _onRefreshMarkers(TeamMapRefreshMarkers event, Emitter<TeamMapState> emit) async {
     final currentState = state;
@@ -241,16 +207,14 @@ class TeamMapBloc extends Bloc<TeamMapEvent, TeamMapState> {
       // Only fetch dynamic data, keep existing territories
       final results = await Future.wait([
         _fetchActiveWorkers(_currentTeamId!),
-        _fetchDeliveries(_currentTeamId!),
-        _fetchReceipts(_currentTeamId!),
+        _fetchPrayerRequests(_currentTeamId!),
         _fetchDonations(_currentTeamId!),
       ]);
 
       emit(currentState.copyWith(
         activeWorkers: results[0] as List<ActiveWorkerLocation>,
-        deliveries: results[1] as List<MapDeliveryMarker>,
-        receipts: results[2] as List<MapReceiptMarker>,
-        donations: results[3] as List<MapDonationMarker>,
+        prayerRequests: results[1] as List<MapPrayerMarker>,
+        donations: results[2] as List<MapDonationMarker>,
       ));
     } catch (e) {
       // On error, keep existing state - don't disrupt the map
@@ -262,8 +226,7 @@ class TeamMapBloc extends Bloc<TeamMapEvent, TeamMapState> {
     if (currentState is TeamMapLoaded) {
       emit(currentState.copyWith(
         showWorkers: event.showWorkers,
-        showDeliveries: event.showDeliveries,
-        showReceipts: event.showReceipts,
+        showPrayers: event.showPrayers,
         showDonations: event.showDonations,
         showTerritories: event.showTerritories,
       ));

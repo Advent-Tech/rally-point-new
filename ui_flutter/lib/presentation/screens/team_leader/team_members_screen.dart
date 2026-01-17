@@ -101,13 +101,16 @@ class _TeamMembersScreenState extends State<TeamMembersScreen> {
             return _buildEmptyState(context, isDark);
           },
         ),
-        floatingActionButton: FloatingActionButton.extended(
-          onPressed: () => _showInviteDialog(context),
-          backgroundColor: AppColors.secondary,
-          icon: const Icon(Icons.person_add, color: Colors.white),
-          label: const Text(
-            'Invite Member',
-            style: TextStyle(color: Colors.white),
+        floatingActionButton: Padding(
+          padding: const EdgeInsets.only(bottom: 80),
+          child: FloatingActionButton.extended(
+            onPressed: () => _showInviteDialog(context),
+            backgroundColor: AppColors.secondary,
+            icon: const Icon(Icons.person_add, color: Colors.white),
+            label: const Text(
+              'Invite Member',
+              style: TextStyle(color: Colors.white),
+            ),
           ),
         ),
       ),

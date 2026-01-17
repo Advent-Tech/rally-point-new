@@ -285,7 +285,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     LayoutBuilder(
                       builder: (context, constraints) {
                         final cardWidth = isMobile
-                            ? constraints.maxWidth
+                            ? constraints.minWidth
                             : (isTablet
                                   ? (constraints.maxWidth - 16) / 2
                                   : 280.0);

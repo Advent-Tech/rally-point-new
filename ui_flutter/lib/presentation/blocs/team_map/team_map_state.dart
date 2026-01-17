@@ -13,26 +13,22 @@ class TeamMapLoading extends TeamMapState {}
 
 class TeamMapLoaded extends TeamMapState {
   final List<ActiveWorkerLocation> activeWorkers;
-  final List<MapDeliveryMarker> deliveries;
-  final List<MapReceiptMarker> receipts;
+  final List<MapPrayerMarker> prayerRequests;
   final List<MapDonationMarker> donations;
   final List<TerritoryBoundary> territoryBoundaries;
   final bool showWorkers;
-  final bool showDeliveries;
-  final bool showReceipts;
+  final bool showPrayers;
   final bool showDonations;
   final bool showTerritories;
   final String teamId;
 
   const TeamMapLoaded({
     required this.activeWorkers,
-    required this.deliveries,
-    required this.receipts,
+    required this.prayerRequests,
     required this.donations,
     this.territoryBoundaries = const [],
     this.showWorkers = true,
-    this.showDeliveries = true,
-    this.showReceipts = true,
+    this.showPrayers = true,
     this.showDonations = true,
     this.showTerritories = true,
     required this.teamId,
@@ -40,26 +36,22 @@ class TeamMapLoaded extends TeamMapState {
 
   TeamMapLoaded copyWith({
     List<ActiveWorkerLocation>? activeWorkers,
-    List<MapDeliveryMarker>? deliveries,
-    List<MapReceiptMarker>? receipts,
+    List<MapPrayerMarker>? prayerRequests,
     List<MapDonationMarker>? donations,
     List<TerritoryBoundary>? territoryBoundaries,
     bool? showWorkers,
-    bool? showDeliveries,
-    bool? showReceipts,
+    bool? showPrayers,
     bool? showDonations,
     bool? showTerritories,
     String? teamId,
   }) {
     return TeamMapLoaded(
       activeWorkers: activeWorkers ?? this.activeWorkers,
-      deliveries: deliveries ?? this.deliveries,
-      receipts: receipts ?? this.receipts,
+      prayerRequests: prayerRequests ?? this.prayerRequests,
       donations: donations ?? this.donations,
       territoryBoundaries: territoryBoundaries ?? this.territoryBoundaries,
       showWorkers: showWorkers ?? this.showWorkers,
-      showDeliveries: showDeliveries ?? this.showDeliveries,
-      showReceipts: showReceipts ?? this.showReceipts,
+      showPrayers: showPrayers ?? this.showPrayers,
       showDonations: showDonations ?? this.showDonations,
       showTerritories: showTerritories ?? this.showTerritories,
       teamId: teamId ?? this.teamId,
@@ -69,13 +61,11 @@ class TeamMapLoaded extends TeamMapState {
   @override
   List<Object?> get props => [
         activeWorkers,
-        deliveries,
-        receipts,
+        prayerRequests,
         donations,
         territoryBoundaries,
         showWorkers,
-        showDeliveries,
-        showReceipts,
+        showPrayers,
         showDonations,
         showTerritories,
         teamId,
@@ -126,64 +116,6 @@ class ActiveWorkerLocation {
   }
 }
 
-class MapDeliveryMarker {
-  final String id;
-  final double latitude;
-  final double longitude;
-  final String status;
-  final String recipientName;
-  final String? workerName;
-
-  const MapDeliveryMarker({
-    required this.id,
-    required this.latitude,
-    required this.longitude,
-    required this.status,
-    required this.recipientName,
-    this.workerName,
-  });
-
-  factory MapDeliveryMarker.fromJson(Map<String, dynamic> json) {
-    return MapDeliveryMarker(
-      id: json['id']?.toString() ?? '',
-      latitude: (json['latitude'] ?? json['recipient_latitude'] ?? 0.0).toDouble(),
-      longitude: (json['longitude'] ?? json['recipient_longitude'] ?? 0.0).toDouble(),
-      status: json['status'] ?? 'pending',
-      recipientName: json['recipient_name'] ?? 'Unknown',
-      workerName: json['assigned_worker_name'] ?? json['worker_name'],
-    );
-  }
-}
-
-class MapReceiptMarker {
-  final String id;
-  final double latitude;
-  final double longitude;
-  final double amount;
-  final String receiptType;
-  final String workerName;
-
-  const MapReceiptMarker({
-    required this.id,
-    required this.latitude,
-    required this.longitude,
-    required this.amount,
-    required this.receiptType,
-    required this.workerName,
-  });
-
-  factory MapReceiptMarker.fromJson(Map<String, dynamic> json) {
-    return MapReceiptMarker(
-      id: json['id']?.toString() ?? '',
-      latitude: (json['latitude'] ?? 0.0).toDouble(),
-      longitude: (json['longitude'] ?? 0.0).toDouble(),
-      amount: (json['amount'] ?? json['total_amount'] ?? 0.0).toDouble(),
-      receiptType: json['receipt_type'] ?? json['type'] ?? 'sale',
-      workerName: json['worker_name'] ?? json['collector_name'] ?? 'Unknown',
-    );
-  }
-}
-
 class MapDonationMarker {
   final String id;
   final double latitude;
@@ -209,6 +141,46 @@ class MapDonationMarker {
       amount: (json['amount'] ?? 0.0).toDouble(),
       donorName: json['donor_name'] ?? 'Anonymous',
       workerName: json['worker_name'] ?? json['collector_name'] ?? 'Unknown',
+    );
+  }
+}
+
+class MapPrayerMarker {
+  final String id;
+  final double latitude;
+  final double longitude;
+  final String title;
+  final String? description;
+  final String workerName;
+  final String workerId;
+  final String status;
+  final DateTime createdAt;
+
+  const MapPrayerMarker({
+    required this.id,
+    required this.latitude,
+    required this.longitude,
+    required this.title,
+    this.description,
+    required this.workerName,
+    required this.workerId,
+    required this.status,
+    required this.createdAt,
+  });
+
+  factory MapPrayerMarker.fromJson(Map<String, dynamic> json) {
+    return MapPrayerMarker(
+      id: json['id']?.toString() ?? '',
+      latitude: (json['latitude'] ?? 0.0).toDouble(),
+      longitude: (json['longitude'] ?? 0.0).toDouble(),
+      title: json['title'] ?? 'Prayer Request',
+      description: json['description'],
+      workerName: json['worker_name'] ?? json['submitted_by_name'] ?? 'Unknown',
+      workerId: json['worker_id']?.toString() ?? json['submitted_by']?.toString() ?? '',
+      status: json['status'] ?? 'pending',
+      createdAt: json['created_at'] != null
+          ? DateTime.tryParse(json['created_at'].toString()) ?? DateTime.now()
+          : DateTime.now(),
     );
   }
 }

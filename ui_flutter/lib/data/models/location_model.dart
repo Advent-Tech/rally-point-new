@@ -167,33 +167,39 @@ class WorkerLocation {
 
 @JsonSerializable()
 class LocationStats {
-  @JsonKey(name: 'total_sessions')
+  @JsonKey(name: 'session_count', defaultValue: 0)
   final int totalSessions;
-  @JsonKey(name: 'total_distance_meters')
-  final double totalDistanceMeters;
-  @JsonKey(name: 'total_duration_seconds')
+  @JsonKey(name: 'total_distance', defaultValue: 0.0)
+  final double totalDistanceKm;
+  @JsonKey(name: 'total_time_seconds', defaultValue: 0)
   final int totalDurationSeconds;
-  @JsonKey(name: 'average_session_distance')
-  final double averageSessionDistance;
-  @JsonKey(name: 'average_session_duration')
-  final int averageSessionDuration;
+  @JsonKey(name: 'average_speed', defaultValue: 0.0)
+  final double averageSpeed;
+  @JsonKey(name: 'max_speed', defaultValue: 0.0)
+  final double maxSpeed;
+  @JsonKey(name: 'location_count', defaultValue: 0)
+  final int locationCount;
 
   const LocationStats({
     required this.totalSessions,
-    required this.totalDistanceMeters,
+    required this.totalDistanceKm,
     required this.totalDurationSeconds,
-    required this.averageSessionDistance,
-    required this.averageSessionDuration,
+    required this.averageSpeed,
+    required this.maxSpeed,
+    required this.locationCount,
   });
 
   factory LocationStats.fromJson(Map<String, dynamic> json) => _$LocationStatsFromJson(json);
   Map<String, dynamic> toJson() => _$LocationStatsToJson(this);
 
+  // Convert km to meters for backwards compatibility
+  double get totalDistanceMeters => totalDistanceKm * 1000;
+
   String get formattedTotalDistance {
-    if (totalDistanceMeters >= 1000) {
-      return '${(totalDistanceMeters / 1000).toStringAsFixed(2)} km';
+    if (totalDistanceKm >= 1) {
+      return '${totalDistanceKm.toStringAsFixed(2)} km';
     }
-    return '${totalDistanceMeters.toStringAsFixed(0)} m';
+    return '${(totalDistanceKm * 1000).toStringAsFixed(0)} m';
   }
 
   String get formattedTotalDuration {

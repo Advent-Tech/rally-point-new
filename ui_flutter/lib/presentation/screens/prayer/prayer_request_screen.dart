@@ -93,10 +93,13 @@ class _PrayerRequestScreenState extends State<PrayerRequestScreen>
           return _buildEmptyState();
         },
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => context.push('/prayer-requests/new'),
-        icon: const Icon(Icons.add),
-        label: const Text('New Request'),
+      floatingActionButton: Padding(
+        padding: const EdgeInsets.only(bottom: 80),
+        child: FloatingActionButton.extended(
+          onPressed: () => context.push('/prayer-requests/new'),
+          icon: const Icon(Icons.add),
+          label: const Text('New Request'),
+        ),
       ),
     );
   }

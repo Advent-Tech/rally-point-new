@@ -22,6 +22,8 @@ type User struct {
 	VerifiedBy         *uuid.UUID `json:"verified_by,omitempty" db:"verified_by"`
 	VerifiedAt         *time.Time `json:"verified_at,omitempty" db:"verified_at"`
 	RejectionReason    *string    `json:"rejection_reason,omitempty" db:"rejection_reason"`
+	EmailVerified      bool       `json:"email_verified" db:"email_verified"`
+	EmailVerifiedAt    *time.Time `json:"email_verified_at,omitempty" db:"email_verified_at"`
 	CreatedAt          time.Time  `json:"created_at" db:"created_at"`
 	UpdatedAt          time.Time  `json:"updated_at" db:"updated_at"`
 }
@@ -166,6 +168,8 @@ type UserRepository interface {
 	GetByRoleAndStatus(role, status string) ([]*User, error)
 	UpdateVerificationStatus(userID uuid.UUID, status string, verifiedBy *uuid.UUID, reason *string) error
 	UpdatePassword(userID uuid.UUID, passwordHash string) error
+	// Email verification
+	UpdateEmailVerified(userID uuid.UUID, verified bool) error
 }
 
 // TeamRepository defines the interface for team data access

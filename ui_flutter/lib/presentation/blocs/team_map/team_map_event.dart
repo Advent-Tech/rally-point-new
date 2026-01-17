@@ -20,7 +20,7 @@ class TeamMapRefresh extends TeamMapEvent {
   const TeamMapRefresh();
 }
 
-/// Lightweight refresh that only updates dynamic data (workers, deliveries, receipts, donations)
+/// Lightweight refresh that only updates dynamic data (workers, prayers, donations)
 /// without reloading static data (territory boundaries)
 class TeamMapRefreshMarkers extends TeamMapEvent {
   const TeamMapRefreshMarkers();
@@ -28,19 +28,17 @@ class TeamMapRefreshMarkers extends TeamMapEvent {
 
 class TeamMapUpdateFilters extends TeamMapEvent {
   final bool? showWorkers;
-  final bool? showDeliveries;
-  final bool? showReceipts;
+  final bool? showPrayers;
   final bool? showDonations;
   final bool? showTerritories;
 
   const TeamMapUpdateFilters({
     this.showWorkers,
-    this.showDeliveries,
-    this.showReceipts,
+    this.showPrayers,
     this.showDonations,
     this.showTerritories,
   });
 
   @override
-  List<Object?> get props => [showWorkers, showDeliveries, showReceipts, showDonations, showTerritories];
+  List<Object?> get props => [showWorkers, showPrayers, showDonations, showTerritories];
 }

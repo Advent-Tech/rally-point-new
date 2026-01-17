@@ -26,6 +26,9 @@ class _TeamMapScreenState extends State<TeamMapScreen> {
   bool _isMapReady = false;
   Timer? _refreshTimer;
 
+  // Store marker data for click handling
+  List<_MarkerData> _markerDataList = [];
+
   @override
   void initState() {
     super.initState();
@@ -90,6 +93,15 @@ class _TeamMapScreenState extends State<TeamMapScreen> {
     _polylineManager = await mapboxMap.annotations.createPolylineAnnotationManager();
     _circleManager = await mapboxMap.annotations.createCircleAnnotationManager();
 
+    // Add click listener for circle annotations
+    _circleManager!.addOnCircleAnnotationClickListener(
+      _CircleClickListener(
+        onCircleClicked: (annotation) {
+          _handleMarkerClick(annotation);
+        },
+      ),
+    );
+
     setState(() => _isMapReady = true);
 
     // Update annotations when map is ready
@@ -100,13 +112,58 @@ class _TeamMapScreenState extends State<TeamMapScreen> {
     }
   }
 
+  void _handleMarkerClick(CircleAnnotation annotation) {
+    // Find the marker data that matches this annotation's coordinates
+    final annotationPoint = annotation.geometry;
+    final lng = annotationPoint.coordinates.lng.toDouble();
+    final lat = annotationPoint.coordinates.lat.toDouble();
+
+    // Find closest marker (within small tolerance for floating point comparison)
+    _MarkerData? matchedMarker;
+    for (final marker in _markerDataList) {
+      if ((marker.longitude - lng).abs() < 0.0001 && (marker.latitude - lat).abs() < 0.0001) {
+        matchedMarker = marker;
+        break;
+      }
+    }
+
+    if (matchedMarker != null) {
+      _showMarkerDetails(matchedMarker);
+    }
+  }
+
+  void _showMarkerDetails(_MarkerData marker) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) {
+        switch (marker.type) {
+          case _MarkerType.worker:
+            final worker = marker.data as ActiveWorkerLocation;
+            return _WorkerDetailSheet(worker: worker, isDark: isDark);
+          case _MarkerType.prayer:
+            final prayer = marker.data as MapPrayerMarker;
+            return _PrayerDetailSheet(prayer: prayer, isDark: isDark);
+          case _MarkerType.donation:
+            final donation = marker.data as MapDonationMarker;
+            return _DonationDetailSheet(donation: donation, isDark: isDark);
+        }
+      },
+    );
+  }
+
   Future<void> _updateAnnotations(TeamMapLoaded state) async {
     if (_polygonManager == null || _circleManager == null || _polylineManager == null) return;
 
-    // Clear existing annotations
+    // Clear existing annotations and marker data
     await _polygonManager!.deleteAll();
     await _polylineManager!.deleteAll();
     await _circleManager!.deleteAll();
+    _markerDataList = [];
 
     // Add territory polygons and boundary lines
     if (state.showTerritories) {
@@ -140,75 +197,65 @@ class _TeamMapScreenState extends State<TeamMapScreen> {
       }
     }
 
-    // Add worker markers
+    // Add worker markers (blue)
     if (state.showWorkers) {
       for (final worker in state.activeWorkers) {
         if (worker.latitude.abs() < 0.1 && worker.longitude.abs() < 0.1) continue;
 
-        final statusColor = worker.status == 'working' ? AppColors.success : AppColors.warning;
         await _circleManager!.create(CircleAnnotationOptions(
           geometry: Point(coordinates: Position(worker.longitude, worker.latitude)),
-          circleColor: statusColor.toARGB32(),
+          circleColor: AppColors.primary.toARGB32(),
           circleRadius: 12,
           circleStrokeColor: Colors.white.toARGB32(),
           circleStrokeWidth: 3,
         ));
+        _markerDataList.add(_MarkerData(
+          type: _MarkerType.worker,
+          latitude: worker.latitude,
+          longitude: worker.longitude,
+          data: worker,
+        ));
       }
     }
 
-    // Add delivery markers
-    if (state.showDeliveries) {
-      for (final delivery in state.deliveries) {
-        if (delivery.latitude.abs() < 0.1 && delivery.longitude.abs() < 0.1) continue;
-
-        Color color;
-        switch (delivery.status) {
-          case 'pending':
-            color = AppColors.warning;
-          case 'in_transit':
-            color = AppColors.primary;
-          case 'delivered':
-            color = AppColors.success;
-          default:
-            color = AppColors.error;
-        }
+    // Add prayer markers (purple/accent)
+    if (state.showPrayers) {
+      for (final prayer in state.prayerRequests) {
+        if (prayer.latitude.abs() < 0.1 && prayer.longitude.abs() < 0.1) continue;
 
         await _circleManager!.create(CircleAnnotationOptions(
-          geometry: Point(coordinates: Position(delivery.longitude, delivery.latitude)),
-          circleColor: color.toARGB32(),
+          geometry: Point(coordinates: Position(prayer.longitude, prayer.latitude)),
+          circleColor: AppColors.accent.toARGB32(),
           circleRadius: 10,
           circleStrokeColor: Colors.white.toARGB32(),
           circleStrokeWidth: 2,
         ));
-      }
-    }
-
-    // Add receipt markers
-    if (state.showReceipts) {
-      for (final receipt in state.receipts) {
-        if (receipt.latitude.abs() < 0.1 && receipt.longitude.abs() < 0.1) continue;
-
-        await _circleManager!.create(CircleAnnotationOptions(
-          geometry: Point(coordinates: Position(receipt.longitude, receipt.latitude)),
-          circleColor: AppColors.accent.toARGB32(),
-          circleRadius: 8,
-          circleStrokeColor: Colors.white.toARGB32(),
-          circleStrokeWidth: 2,
+        _markerDataList.add(_MarkerData(
+          type: _MarkerType.prayer,
+          latitude: prayer.latitude,
+          longitude: prayer.longitude,
+          data: prayer,
         ));
       }
     }
 
-    // Add donation markers
+    // Add donation markers (green/secondary)
     if (state.showDonations) {
       for (final donation in state.donations) {
         if (donation.latitude.abs() < 0.1 && donation.longitude.abs() < 0.1) continue;
 
         await _circleManager!.create(CircleAnnotationOptions(
           geometry: Point(coordinates: Position(donation.longitude, donation.latitude)),
-          circleColor: AppColors.secondary.toARGB32(),
-          circleRadius: 8,
+          circleColor: AppColors.success.toARGB32(),
+          circleRadius: 10,
           circleStrokeColor: Colors.white.toARGB32(),
           circleStrokeWidth: 2,
+        ));
+        _markerDataList.add(_MarkerData(
+          type: _MarkerType.donation,
+          latitude: donation.latitude,
+          longitude: donation.longitude,
+          data: donation,
         ));
       }
     }
@@ -251,15 +298,10 @@ class _TeamMapScreenState extends State<TeamMapScreen> {
           .where((w) => isValidCoord(w.latitude, w.longitude))
           .map((w) => Position(w.longitude, w.latitude)));
     }
-    if (state.showDeliveries) {
-      allPoints.addAll(state.deliveries
-          .where((d) => isValidCoord(d.latitude, d.longitude))
-          .map((d) => Position(d.longitude, d.latitude)));
-    }
-    if (state.showReceipts) {
-      allPoints.addAll(state.receipts
-          .where((r) => isValidCoord(r.latitude, r.longitude))
-          .map((r) => Position(r.longitude, r.latitude)));
+    if (state.showPrayers) {
+      allPoints.addAll(state.prayerRequests
+          .where((p) => isValidCoord(p.latitude, p.longitude))
+          .map((p) => Position(p.longitude, p.latitude)));
     }
     if (state.showDonations) {
       allPoints.addAll(state.donations
@@ -403,8 +445,7 @@ class _TeamMapScreenState extends State<TeamMapScreen> {
           if (state is TeamMapLoaded) {
             final hasData = state.territoryBoundaries.isNotEmpty ||
                 state.activeWorkers.isNotEmpty ||
-                state.deliveries.isNotEmpty ||
-                state.receipts.isNotEmpty ||
+                state.prayerRequests.isNotEmpty ||
                 state.donations.isNotEmpty;
 
             return Stack(
@@ -501,9 +542,8 @@ class _TeamMapScreenState extends State<TeamMapScreen> {
                     child: _StatsOverlay(
                       totalTerritories: state.territoryBoundaries.length,
                       activeWorkers: state.activeWorkers.length,
-                      pendingDeliveries: state.deliveries.where((d) => d.status == 'pending').length,
-                      inTransitDeliveries: state.deliveries.where((d) => d.status == 'in_transit').length,
-                      completedDeliveries: state.deliveries.where((d) => d.status == 'delivered').length,
+                      prayerRequests: state.prayerRequests.length,
+                      donations: state.donations.length,
                       activeTerritoriesCount: state.activeWorkers.map((w) => w.territoryName).toSet().length,
                       isDark: isDark,
                     ),
@@ -539,7 +579,7 @@ class _TeamMapScreenState extends State<TeamMapScreen> {
         builder: (context, currentState) {
           if (currentState is! TeamMapLoaded) return const SizedBox.shrink();
           return Container(
-            padding: const EdgeInsets.all(20),
+            padding: const EdgeInsets.only(left: 20, right: 20, top: 20, bottom: 80),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -557,20 +597,14 @@ class _TeamMapScreenState extends State<TeamMapScreen> {
                   onChanged: (value) => bloc.add(TeamMapUpdateFilters(showWorkers: value)),
                 ),
                 SwitchListTile(
-                  title: const Text('Deliveries'),
-                  secondary: const Icon(Icons.local_shipping, color: AppColors.warning),
-                  value: currentState.showDeliveries,
-                  onChanged: (value) => bloc.add(TeamMapUpdateFilters(showDeliveries: value)),
-                ),
-                SwitchListTile(
-                  title: const Text('Receipts'),
-                  secondary: const Icon(Icons.receipt_long, color: AppColors.accent),
-                  value: currentState.showReceipts,
-                  onChanged: (value) => bloc.add(TeamMapUpdateFilters(showReceipts: value)),
+                  title: const Text('Prayer Requests'),
+                  secondary: const Icon(Icons.favorite, color: AppColors.accent),
+                  value: currentState.showPrayers,
+                  onChanged: (value) => bloc.add(TeamMapUpdateFilters(showPrayers: value)),
                 ),
                 SwitchListTile(
                   title: const Text('Donations'),
-                  secondary: const Icon(Icons.volunteer_activism, color: AppColors.secondary),
+                  secondary: const Icon(Icons.volunteer_activism, color: AppColors.success),
                   value: currentState.showDonations,
                   onChanged: (value) => bloc.add(TeamMapUpdateFilters(showDonations: value)),
                 ),
@@ -611,18 +645,16 @@ class _StatsOverlay extends StatelessWidget {
   final int totalTerritories;
   final int activeTerritoriesCount;
   final int activeWorkers;
-  final int pendingDeliveries;
-  final int inTransitDeliveries;
-  final int completedDeliveries;
+  final int prayerRequests;
+  final int donations;
   final bool isDark;
 
   const _StatsOverlay({
     required this.totalTerritories,
     required this.activeTerritoriesCount,
     required this.activeWorkers,
-    required this.pendingDeliveries,
-    required this.inTransitDeliveries,
-    required this.completedDeliveries,
+    required this.prayerRequests,
+    required this.donations,
     required this.isDark,
   });
 
@@ -637,13 +669,11 @@ class _StatsOverlay extends StatelessWidget {
         children: [
           _StatRow(icon: Icons.map, color: AppColors.primary, label: 'Territories', value: '$activeTerritoriesCount/$totalTerritories active'),
           const SizedBox(height: 8),
-          _StatRow(icon: Icons.person, color: AppColors.success, label: 'Workers', value: '$activeWorkers'),
+          _StatRow(icon: Icons.person, color: AppColors.primary, label: 'Workers', value: '$activeWorkers'),
           const SizedBox(height: 8),
-          _StatRow(icon: Icons.pending, color: AppColors.warning, label: 'Pending', value: '$pendingDeliveries'),
+          _StatRow(icon: Icons.favorite, color: AppColors.accent, label: 'Prayers', value: '$prayerRequests'),
           const SizedBox(height: 8),
-          _StatRow(icon: Icons.local_shipping, color: AppColors.primary, label: 'In Transit', value: '$inTransitDeliveries'),
-          const SizedBox(height: 8),
-          _StatRow(icon: Icons.check_circle, color: AppColors.success, label: 'Delivered', value: '$completedDeliveries'),
+          _StatRow(icon: Icons.volunteer_activism, color: AppColors.success, label: 'Donations', value: '$donations'),
         ],
       ),
     );
@@ -677,7 +707,13 @@ class _MapLegend extends StatelessWidget {
       child: const Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
-        children: [_LegendItem(color: AppColors.primary, label: 'Worker'), SizedBox(height: 4), _LegendItem(color: AppColors.warning, label: 'Pending'), SizedBox(height: 4), _LegendItem(color: AppColors.success, label: 'Delivered'), SizedBox(height: 4), _LegendItem(color: AppColors.accent, label: 'Receipt'), SizedBox(height: 4), _LegendItem(color: AppColors.secondary, label: 'Donation')],
+        children: [
+          _LegendItem(color: AppColors.primary, label: 'Worker'),
+          SizedBox(height: 4),
+          _LegendItem(color: AppColors.accent, label: 'Prayer'),
+          SizedBox(height: 4),
+          _LegendItem(color: AppColors.success, label: 'Donation'),
+        ],
       ),
     );
   }
@@ -692,5 +728,305 @@ class _LegendItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Row(mainAxisSize: MainAxisSize.min, children: [Container(width: 12, height: 12, decoration: BoxDecoration(color: color, shape: BoxShape.circle)), const SizedBox(width: 6), Text(label, style: const TextStyle(fontSize: 10))]);
+  }
+}
+
+enum _MarkerType { worker, prayer, donation }
+
+class _MarkerData {
+  final _MarkerType type;
+  final double latitude;
+  final double longitude;
+  final dynamic data;
+
+  const _MarkerData({
+    required this.type,
+    required this.latitude,
+    required this.longitude,
+    required this.data,
+  });
+}
+
+class _CircleClickListener extends OnCircleAnnotationClickListener {
+  final void Function(CircleAnnotation) onCircleClicked;
+
+  _CircleClickListener({required this.onCircleClicked});
+
+  @override
+  void onCircleAnnotationClick(CircleAnnotation annotation) {
+    onCircleClicked(annotation);
+  }
+}
+
+class _WorkerDetailSheet extends StatelessWidget {
+  final ActiveWorkerLocation worker;
+  final bool isDark;
+
+  const _WorkerDetailSheet({required this.worker, required this.isDark});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.only(left: 20, right: 20, top: 20, bottom: 80),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Center(
+            child: Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: Colors.grey[300],
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+          ),
+          const SizedBox(height: 20),
+          Row(
+            children: [
+              CircleAvatar(
+                backgroundColor: AppColors.primary,
+                radius: 24,
+                child: Text(
+                  worker.name.isNotEmpty ? worker.name[0].toUpperCase() : 'W',
+                  style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      worker.name,
+                      style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(height: 4),
+                    Row(
+                      children: [
+                        Container(
+                          width: 8,
+                          height: 8,
+                          decoration: BoxDecoration(
+                            color: worker.status == 'working' ? AppColors.success : AppColors.warning,
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          worker.status == 'working' ? 'Active' : 'Idle',
+                          style: TextStyle(
+                            color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 20),
+          _DetailRow(icon: Icons.map, label: 'Territory', value: worker.territoryName),
+          const SizedBox(height: 12),
+          _DetailRow(
+            icon: Icons.access_time,
+            label: 'Last Update',
+            value: _formatTime(worker.lastUpdate),
+          ),
+          const SizedBox(height: 20),
+        ],
+      ),
+    );
+  }
+
+  String _formatTime(DateTime time) {
+    final now = DateTime.now();
+    final diff = now.difference(time);
+    if (diff.inMinutes < 1) return 'Just now';
+    if (diff.inMinutes < 60) return '${diff.inMinutes}m ago';
+    if (diff.inHours < 24) return '${diff.inHours}h ago';
+    return '${diff.inDays}d ago';
+  }
+}
+
+class _PrayerDetailSheet extends StatelessWidget {
+  final MapPrayerMarker prayer;
+  final bool isDark;
+
+  const _PrayerDetailSheet({required this.prayer, required this.isDark});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.only(left: 20, right: 20, top: 20, bottom: 80),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Center(
+            child: Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: Colors.grey[300],
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+          ),
+          const SizedBox(height: 20),
+          Row(
+            children: [
+              CircleAvatar(
+                backgroundColor: AppColors.accent,
+                radius: 24,
+                child: const Icon(Icons.favorite, color: Colors.white, size: 24),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Prayer Request',
+                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      prayer.title,
+                      style: TextStyle(
+                        color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 20),
+          if (prayer.description != null && prayer.description!.isNotEmpty) ...[
+            Text(
+              prayer.description!,
+              style: TextStyle(
+                color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight,
+              ),
+              maxLines: 4,
+              overflow: TextOverflow.ellipsis,
+            ),
+            const SizedBox(height: 16),
+          ],
+          _DetailRow(icon: Icons.person, label: 'Recorded by', value: prayer.workerName),
+          const SizedBox(height: 12),
+          _DetailRow(
+            icon: Icons.access_time,
+            label: 'Date',
+            value: _formatDate(prayer.createdAt),
+          ),
+          const SizedBox(height: 20),
+        ],
+      ),
+    );
+  }
+
+  String _formatDate(DateTime date) {
+    return '${date.day}/${date.month}/${date.year}';
+  }
+}
+
+class _DonationDetailSheet extends StatelessWidget {
+  final MapDonationMarker donation;
+  final bool isDark;
+
+  const _DonationDetailSheet({required this.donation, required this.isDark});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.only(left: 20, right: 20, top: 20, bottom: 80),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Center(
+            child: Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: Colors.grey[300],
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+          ),
+          const SizedBox(height: 20),
+          Row(
+            children: [
+              CircleAvatar(
+                backgroundColor: AppColors.success,
+                radius: 24,
+                child: const Icon(Icons.volunteer_activism, color: Colors.white, size: 24),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Donation',
+                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      '\$${donation.amount.toStringAsFixed(2)}',
+                      style: const TextStyle(
+                        fontSize: 24,
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.success,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 20),
+          _DetailRow(icon: Icons.person_outline, label: 'Donor', value: donation.donorName),
+          const SizedBox(height: 12),
+          _DetailRow(icon: Icons.person, label: 'Collected by', value: donation.workerName),
+          const SizedBox(height: 20),
+        ],
+      ),
+    );
+  }
+}
+
+class _DetailRow extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String value;
+
+  const _DetailRow({required this.icon, required this.label, required this.value});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Icon(icon, size: 20, color: AppColors.textSecondaryLight),
+        const SizedBox(width: 12),
+        Text(
+          '$label: ',
+          style: const TextStyle(color: AppColors.textSecondaryLight),
+        ),
+        Expanded(
+          child: Text(
+            value,
+            style: const TextStyle(fontWeight: FontWeight.w500),
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+      ],
+    );
   }
 }

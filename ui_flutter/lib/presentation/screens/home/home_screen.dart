@@ -8,6 +8,8 @@ import '../../blocs/territory/territory_bloc.dart';
 import '../../blocs/worker_schedule/worker_schedule_bloc.dart';
 import '../../blocs/schedule/schedule_bloc.dart';
 import '../../blocs/delivery/delivery_bloc.dart';
+import '../../blocs/prayer_request/prayer_request_bloc.dart';
+import '../../blocs/location/location_bloc.dart';
 import '../../../core/theme/theme.dart';
 import '../../widgets/widgets.dart';
 
@@ -21,6 +23,8 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   late WorkSessionBloc _workSessionBloc;
   late WorkerScheduleBloc _scheduleBloc;
+  late PrayerRequestBloc _prayerRequestBloc;
+  late LocationBloc _locationBloc;
 
   @override
   void initState() {
@@ -30,6 +34,12 @@ class _HomeScreenState extends State<HomeScreen> {
 
     _scheduleBloc = WorkerScheduleBloc();
     _scheduleBloc.add(WorkerScheduleLoad(date: DateTime.now()));
+
+    _prayerRequestBloc = PrayerRequestBloc();
+    _prayerRequestBloc.add(const PrayerRequestLoadMy());
+
+    _locationBloc = LocationBloc();
+    _locationBloc.add(const LocationLoadStats());
 
     // Load assignments for territory selection (for workers)
     // For team leaders, we'll load allocations in build() after checking the role
@@ -54,6 +64,8 @@ class _HomeScreenState extends State<HomeScreen> {
   void dispose() {
     _workSessionBloc.close();
     _scheduleBloc.close();
+    _prayerRequestBloc.close();
+    _locationBloc.close();
     super.dispose();
   }
 
@@ -143,6 +155,8 @@ class _HomeScreenState extends State<HomeScreen> {
       providers: [
         BlocProvider.value(value: _workSessionBloc),
         BlocProvider.value(value: _scheduleBloc),
+        BlocProvider.value(value: _prayerRequestBloc),
+        BlocProvider.value(value: _locationBloc),
       ],
       child: BlocBuilder<AuthBloc, AuthState>(
         // Only rebuild when auth type changes or user role changes
@@ -783,14 +797,15 @@ class _HomeScreenState extends State<HomeScreen> {
 
             // Ministry Stats Grid
             SliverToBoxAdapter(
-              child: BlocBuilder<WorkSessionBloc, WorkSessionState>(
-                builder: (context, sessionState) {
-                  String hoursActive = '0.0';
+              child: BlocBuilder<LocationBloc, LocationState>(
+                builder: (context, locationState) {
+                  // Get stats from LocationBloc
+                  double distanceKm = 0.0;
+                  double hoursActive = 0.0;
 
-                  if (sessionState is WorkSessionActive) {
-                    // Convert duration to hours
-                    final duration = sessionState.session.duration;
-                    hoursActive = (duration.inMinutes / 60).toStringAsFixed(1);
+                  if (locationState is LocationStatsLoaded) {
+                    distanceKm = locationState.stats.totalDistanceMeters / 1000;
+                    hoursActive = locationState.stats.totalDurationSeconds / 3600;
                   }
 
                   return Padding(
@@ -804,30 +819,30 @@ class _HomeScreenState extends State<HomeScreen> {
                                 icon: Icons.route_outlined,
                                 iconBackgroundColor: AppColors.primary,
                                 title: 'Distance Covered',
-                                value: '0.0',
+                                value: distanceKm.toStringAsFixed(1),
                                 unit: 'km',
                                 description: 'Total distance',
-                                trendText: 'No data',
-                                trendColor: AppColors.error,
+                                trendText: distanceKm > 0 ? '${distanceKm.toStringAsFixed(2)} km total' : 'No data',
+                                trendColor: distanceKm > 0 ? AppColors.success : AppColors.error,
                               ),
                             ),
                             const SizedBox(width: 12),
                             Expanded(
-                              child: BlocBuilder<DeliveryBloc, DeliveryState>(
-                                builder: (context, deliveryState) {
-                                  int deliveryCount = 0;
-                                  if (deliveryState is DeliveryListLoaded) {
-                                    deliveryCount = deliveryState.deliveries.length;
+                              child: BlocBuilder<PrayerRequestBloc, PrayerRequestState>(
+                                builder: (context, prayerState) {
+                                  int prayerCount = 0;
+                                  if (prayerState is PrayerRequestLoaded) {
+                                    prayerCount = prayerState.prayerRequests.length;
                                   }
                                   return OverviewStatCard(
-                                    icon: Icons.menu_book_outlined,
+                                    icon: Icons.volunteer_activism,
                                     iconBackgroundColor: AppColors.secondary,
-                                    title: 'Books Delivered',
-                                    value: '$deliveryCount',
-                                    unit: 'books',
-                                    description: 'Total deliveries',
-                                    trendText: deliveryCount > 0 ? '$deliveryCount total' : 'No activity',
-                                    trendColor: deliveryCount > 0 ? AppColors.success : AppColors.error,
+                                    title: 'Prayer Requests',
+                                    value: '$prayerCount',
+                                    unit: 'prayers',
+                                    description: 'Submitted prayers',
+                                    trendText: prayerCount > 0 ? '$prayerCount total' : 'No activity',
+                                    trendColor: prayerCount > 0 ? AppColors.success : AppColors.error,
                                   );
                                 },
                               ),
@@ -842,23 +857,33 @@ class _HomeScreenState extends State<HomeScreen> {
                                 icon: Icons.schedule_outlined,
                                 iconBackgroundColor: AppColors.accent,
                                 title: 'Hours Active',
-                                value: hoursActive,
+                                value: hoursActive.toStringAsFixed(1),
                                 unit: 'hours',
                                 description: 'Total ministry time',
-                                trendText: 'No surveys',
-                                trendColor: AppColors.error,
+                                trendText: hoursActive > 0 ? '${hoursActive.toStringAsFixed(1)}h total' : 'No activity',
+                                trendColor: hoursActive > 0 ? AppColors.success : AppColors.error,
                               ),
                             ),
                             const SizedBox(width: 12),
                             Expanded(
-                              child: OverviewStatCard(
-                                icon: Icons.attach_money,
-                                iconBackgroundColor: AppColors.success,
-                                title: 'Donations Collected',
-                                value: '\$0',
-                                description: 'Total donations',
-                                trendText: 'No donations',
-                                trendColor: AppColors.error,
+                              child: BlocBuilder<DeliveryBloc, DeliveryState>(
+                                builder: (context, deliveryState) {
+                                  double totalDonations = 0;
+                                  if (deliveryState is DeliveryListLoaded) {
+                                    for (final delivery in deliveryState.deliveries) {
+                                      totalDonations += delivery.donationAmount ?? 0;
+                                    }
+                                  }
+                                  return OverviewStatCard(
+                                    icon: Icons.attach_money,
+                                    iconBackgroundColor: AppColors.success,
+                                    title: 'Donations Collected',
+                                    value: '\$${totalDonations.toStringAsFixed(0)}',
+                                    description: 'Total donations',
+                                    trendText: totalDonations > 0 ? '\$${totalDonations.toStringAsFixed(2)} total' : 'No donations',
+                                    trendColor: totalDonations > 0 ? AppColors.success : AppColors.error,
+                                  );
+                                },
                               ),
                             ),
                           ],

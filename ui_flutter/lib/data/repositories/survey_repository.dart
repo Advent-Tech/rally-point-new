@@ -27,19 +27,26 @@ class SurveyRepository {
 
       // Extract surveys from assignments
       final surveys = <SurveyModel>[];
+      final surveyIdsToFetch = <String>[];
+
+      // First pass: collect embedded surveys and IDs that need fetching
       for (final assignment in data) {
         if (assignment['survey'] != null) {
           surveys.add(SurveyModel.fromJson(assignment['survey']));
         } else if (assignment['survey_id'] != null) {
-          // If only survey_id is provided, create a placeholder that will be fetched later
-          // Or try to fetch the survey details
-          try {
-            final surveyResult = await getSurveyById(assignment['survey_id'].toString());
-            if (surveyResult is ApiSuccess<SurveyModel>) {
-              surveys.add(surveyResult.data);
-            }
-          } catch (_) {
-            // Skip if we can't fetch the survey
+          surveyIdsToFetch.add(assignment['survey_id'].toString());
+        }
+      }
+
+      // Fetch missing surveys in parallel if needed
+      if (surveyIdsToFetch.isNotEmpty) {
+        debugPrint('SurveyRepository: Fetching ${surveyIdsToFetch.length} surveys in parallel...');
+        final fetchFutures = surveyIdsToFetch.map((id) => getSurveyById(id));
+        final results = await Future.wait(fetchFutures);
+
+        for (final result in results) {
+          if (result is ApiSuccess<SurveyModel>) {
+            surveys.add(result.data);
           }
         }
       }

@@ -125,19 +125,20 @@ Map<String, dynamic> _$WorkerLocationToJson(WorkerLocation instance) =>
 
 LocationStats _$LocationStatsFromJson(Map<String, dynamic> json) =>
     LocationStats(
-      totalSessions: (json['total_sessions'] as num).toInt(),
-      totalDistanceMeters: (json['total_distance_meters'] as num).toDouble(),
-      totalDurationSeconds: (json['total_duration_seconds'] as num).toInt(),
-      averageSessionDistance:
-          (json['average_session_distance'] as num).toDouble(),
-      averageSessionDuration: (json['average_session_duration'] as num).toInt(),
+      totalSessions: (json['session_count'] as num?)?.toInt() ?? 0,
+      totalDistanceKm: (json['total_distance'] as num?)?.toDouble() ?? 0.0,
+      totalDurationSeconds: (json['total_time_seconds'] as num?)?.toInt() ?? 0,
+      averageSpeed: (json['average_speed'] as num?)?.toDouble() ?? 0.0,
+      maxSpeed: (json['max_speed'] as num?)?.toDouble() ?? 0.0,
+      locationCount: (json['location_count'] as num?)?.toInt() ?? 0,
     );
 
 Map<String, dynamic> _$LocationStatsToJson(LocationStats instance) =>
     <String, dynamic>{
-      'total_sessions': instance.totalSessions,
-      'total_distance_meters': instance.totalDistanceMeters,
-      'total_duration_seconds': instance.totalDurationSeconds,
-      'average_session_distance': instance.averageSessionDistance,
-      'average_session_duration': instance.averageSessionDuration,
+      'session_count': instance.totalSessions,
+      'total_distance': instance.totalDistanceKm,
+      'total_time_seconds': instance.totalDurationSeconds,
+      'average_speed': instance.averageSpeed,
+      'max_speed': instance.maxSpeed,
+      'location_count': instance.locationCount,
     };

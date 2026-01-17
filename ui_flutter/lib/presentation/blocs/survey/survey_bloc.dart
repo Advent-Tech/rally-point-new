@@ -144,9 +144,17 @@ class SurveyBloc extends Bloc<SurveyEvent, SurveyState> {
         },
       );
     } else {
-      // Workers fetch their assigned surveys
-      debugPrint('SurveyBloc: Fetching available surveys for worker...');
-      final surveysResult = await _surveyRepository.getAvailableSurveys();
+      // Workers: fetch assigned surveys AND responses in parallel
+      debugPrint('SurveyBloc: Fetching surveys and responses in parallel for worker...');
+
+      final results = await Future.wait([
+        _surveyRepository.getAvailableSurveys(),
+        _surveyRepository.getMyResponses(),
+      ]);
+
+      final surveysResult = results[0] as ApiResult<List<SurveyModel>>;
+      final responsesResult = results[1] as ApiResult<List<SurveyResponse>>;
+
       surveysResult.when(
         success: (data) {
           surveys = data;
@@ -154,7 +162,16 @@ class SurveyBloc extends Bloc<SurveyEvent, SurveyState> {
         },
         failure: (msg, _) {
           debugPrint('SurveyBloc: Worker - failed to fetch available surveys: $msg');
-          // For workers, also try fetching all surveys as fallback
+        },
+      );
+
+      responsesResult.when(
+        success: (data) {
+          responses = data;
+          debugPrint('SurveyBloc: Worker - loaded ${responses.length} responses');
+        },
+        failure: (msg, _) {
+          debugPrint('SurveyBloc: Worker - failed to fetch responses: $msg');
         },
       );
 
@@ -173,21 +190,6 @@ class SurveyBloc extends Bloc<SurveyEvent, SurveyState> {
           },
         );
       }
-    }
-
-    // Workers also load their responses (leaders don't need this)
-    if (!event.isLeader) {
-      debugPrint('SurveyBloc: Fetching worker responses...');
-      final responsesResult = await _surveyRepository.getMyResponses();
-      responsesResult.when(
-        success: (data) {
-          responses = data;
-          debugPrint('SurveyBloc: Worker - loaded ${responses.length} responses');
-        },
-        failure: (msg, _) {
-          debugPrint('SurveyBloc: Worker - failed to fetch responses: $msg');
-        },
-      );
     }
 
     debugPrint('SurveyBloc: Emitting SurveyLoaded with ${surveys.length} surveys, ${responses.length} responses');

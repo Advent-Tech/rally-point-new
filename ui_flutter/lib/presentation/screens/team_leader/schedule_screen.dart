@@ -95,19 +95,22 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
           return const Center(child: Text('Loading...'));
         },
       ),
-      floatingActionButton: BlocBuilder<ScheduleBloc, ScheduleState>(
-        builder: (context, state) {
-          if (state is ScheduleLoaded) {
-            return FloatingActionButton(
-              onPressed: () => _showAddScheduleDialog(context),
-              backgroundColor: AppColors.primary,
-              foregroundColor: Colors.white,
-              tooltip: 'Add Schedule',
-              child: const Icon(Icons.add),
-            );
-          }
-          return const SizedBox.shrink();
-        },
+      floatingActionButton: Padding(
+        padding: const EdgeInsets.only(bottom: 80),
+        child: BlocBuilder<ScheduleBloc, ScheduleState>(
+          builder: (context, state) {
+            if (state is ScheduleLoaded) {
+              return FloatingActionButton(
+                onPressed: () => _showAddScheduleDialog(context),
+                backgroundColor: AppColors.primary,
+                foregroundColor: Colors.white,
+                tooltip: 'Add Schedule',
+                child: const Icon(Icons.add),
+              );
+            }
+            return const SizedBox.shrink();
+          },
+        ),
       ),
     );
   }

@@ -57,7 +57,7 @@ func (r *userRepository) GetByID(id uuid.UUID) (*domain.User, error) {
 	query := `
 		SELECT id, email, password_hash, display_name, role, phone, profile_photo_url, team_id,
 		       is_online, last_active_at, verification_status, verified_by, verified_at,
-		       rejection_reason, created_at, updated_at
+		       rejection_reason, email_verified, email_verified_at, created_at, updated_at
 		FROM users
 		WHERE id = $1
 	`
@@ -78,6 +78,8 @@ func (r *userRepository) GetByID(id uuid.UUID) (*domain.User, error) {
 		&user.VerifiedBy,
 		&user.VerifiedAt,
 		&user.RejectionReason,
+		&user.EmailVerified,
+		&user.EmailVerifiedAt,
 		&user.CreatedAt,
 		&user.UpdatedAt,
 	)
@@ -97,7 +99,7 @@ func (r *userRepository) GetByEmail(email string) (*domain.User, error) {
 	query := `
 		SELECT id, email, password_hash, display_name, role, phone, profile_photo_url, team_id,
 		       is_online, last_active_at, verification_status, verified_by, verified_at,
-		       rejection_reason, created_at, updated_at
+		       rejection_reason, email_verified, email_verified_at, created_at, updated_at
 		FROM users
 		WHERE email = $1
 	`
@@ -118,6 +120,8 @@ func (r *userRepository) GetByEmail(email string) (*domain.User, error) {
 		&user.VerifiedBy,
 		&user.VerifiedAt,
 		&user.RejectionReason,
+		&user.EmailVerified,
+		&user.EmailVerifiedAt,
 		&user.CreatedAt,
 		&user.UpdatedAt,
 	)
@@ -187,7 +191,7 @@ func (r *userRepository) GetByTeamID(teamID uuid.UUID) ([]*domain.User, error) {
 	query := `
 		SELECT id, email, password_hash, display_name, role, phone, profile_photo_url, team_id,
 		       is_online, last_active_at, verification_status, verified_by, verified_at,
-		       rejection_reason, created_at, updated_at
+		       rejection_reason, email_verified, email_verified_at, created_at, updated_at
 		FROM users
 		WHERE team_id = $1
 		ORDER BY display_name
@@ -217,6 +221,8 @@ func (r *userRepository) GetByTeamID(teamID uuid.UUID) ([]*domain.User, error) {
 			&user.VerifiedBy,
 			&user.VerifiedAt,
 			&user.RejectionReason,
+			&user.EmailVerified,
+			&user.EmailVerifiedAt,
 			&user.CreatedAt,
 			&user.UpdatedAt,
 		)
@@ -264,7 +270,7 @@ func (r *userRepository) GetByRole(role string) ([]*domain.User, error) {
 	query := `
 		SELECT id, email, password_hash, display_name, role, phone, profile_photo_url, team_id,
 		       is_online, last_active_at, verification_status, verified_by, verified_at,
-		       rejection_reason, created_at, updated_at
+		       rejection_reason, email_verified, email_verified_at, created_at, updated_at
 		FROM users
 		WHERE role = $1
 		ORDER BY created_at DESC
@@ -294,6 +300,8 @@ func (r *userRepository) GetByRole(role string) ([]*domain.User, error) {
 			&user.VerifiedBy,
 			&user.VerifiedAt,
 			&user.RejectionReason,
+			&user.EmailVerified,
+			&user.EmailVerifiedAt,
 			&user.CreatedAt,
 			&user.UpdatedAt,
 		)
@@ -311,7 +319,7 @@ func (r *userRepository) GetByRoleAndStatus(role, status string) ([]*domain.User
 	query := `
 		SELECT id, email, password_hash, display_name, role, phone, profile_photo_url, team_id,
 		       is_online, last_active_at, verification_status, verified_by, verified_at,
-		       rejection_reason, created_at, updated_at
+		       rejection_reason, email_verified, email_verified_at, created_at, updated_at
 		FROM users
 		WHERE role = $1 AND verification_status = $2
 		ORDER BY created_at DESC
@@ -341,6 +349,8 @@ func (r *userRepository) GetByRoleAndStatus(role, status string) ([]*domain.User
 			&user.VerifiedBy,
 			&user.VerifiedAt,
 			&user.RejectionReason,
+			&user.EmailVerified,
+			&user.EmailVerifiedAt,
 			&user.CreatedAt,
 			&user.UpdatedAt,
 		)
@@ -387,6 +397,30 @@ func (r *userRepository) UpdatePassword(userID uuid.UUID, passwordHash string) e
 	result, err := r.db.Exec(query, userID, passwordHash, time.Now())
 	if err != nil {
 		return fmt.Errorf("failed to update password: %w", err)
+	}
+
+	rowsAffected, _ := result.RowsAffected()
+	if rowsAffected == 0 {
+		return fmt.Errorf("user not found")
+	}
+
+	return nil
+}
+
+// UpdateEmailVerified updates a user's email verification status
+func (r *userRepository) UpdateEmailVerified(userID uuid.UUID, verified bool) error {
+	now := time.Now()
+
+	var emailVerifiedAt interface{}
+	if verified {
+		emailVerifiedAt = now
+	}
+
+	query := `UPDATE users SET email_verified = $2, email_verified_at = $3, updated_at = $4 WHERE id = $1`
+
+	result, err := r.db.Exec(query, userID, verified, emailVerifiedAt, now)
+	if err != nil {
+		return fmt.Errorf("failed to update email verified: %w", err)
 	}
 
 	rowsAffected, _ := result.RowsAffected()

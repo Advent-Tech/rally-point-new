@@ -13,7 +13,9 @@ class BottomNavShell extends StatelessWidget {
     final authState = context.watch<AuthBloc>().state;
     if (authState is AuthAuthenticated) {
       final isLeader = authState.user.isTeamLeader || authState.user.isAdmin;
-      debugPrint('BottomNav - role: "${authState.user.role}", isLeader: $isLeader');
+      debugPrint(
+        'BottomNav - role: "${authState.user.role}", isLeader: $isLeader',
+      );
       return isLeader;
     }
     debugPrint('BottomNav - Not authenticated');
@@ -98,121 +100,91 @@ class BottomNavShell extends StatelessWidget {
 
     return Scaffold(
       body: child,
+      extendBody: true,
       bottomNavigationBar: Container(
+        margin: const EdgeInsets.only(left: 16, right: 16, bottom: 16),
+        height: 56,
         decoration: BoxDecoration(
+          color: isDark ? AppColors.surfaceDark : Colors.white,
+          borderRadius: BorderRadius.circular(28),
           boxShadow: [
             BoxShadow(
               color: Colors.black.withAlpha(25),
-              blurRadius: 20,
-              offset: const Offset(0, -5),
+              blurRadius: 12,
+              spreadRadius: 0,
+              offset: const Offset(0, 2),
             ),
           ],
         ),
-        child: ClipRRect(
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
-          child: NavigationBar(
-            selectedIndex: currentIndex,
-            onDestinationSelected: (index) => _onItemTapped(context, index, isLeader),
-            backgroundColor: isDark ? AppColors.surfaceDark : AppColors.surfaceLight,
-            indicatorColor: AppColors.primary.withAlpha(38),
-            labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
-            height: 70,
-            destinations: isLeader
-                ? _buildLeaderDestinations(currentIndex, isDark)
-                : _buildWorkerDestinations(currentIndex, isDark),
-          ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceAround,
+          children: isLeader
+              ? _buildLeaderNavItems(context, currentIndex, isDark)
+              : _buildWorkerNavItems(context, currentIndex, isDark),
         ),
       ),
     );
   }
 
-  List<NavigationDestination> _buildLeaderDestinations(int currentIndex, bool isDark) {
-    return [
-      NavigationDestination(
-        icon: Icon(
-          Icons.dashboard_outlined,
-          color: currentIndex == 0
-              ? AppColors.primary
-              : (isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight),
-        ),
-        selectedIcon: const Icon(Icons.dashboard, color: AppColors.primary),
-        label: 'Dashboard',
-      ),
-      NavigationDestination(
-        icon: Icon(
-          Icons.people_outline,
-          color: currentIndex == 1
-              ? AppColors.primary
-              : (isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight),
-        ),
-        selectedIcon: const Icon(Icons.people, color: AppColors.primary),
-        label: 'Team',
-      ),
-      NavigationDestination(
-        icon: Icon(
-          Icons.assignment_outlined,
-          color: currentIndex == 2
-              ? AppColors.primary
-              : (isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight),
-        ),
-        selectedIcon: const Icon(Icons.assignment, color: AppColors.primary),
-        label: 'Surveys',
-      ),
-      NavigationDestination(
-        icon: Icon(
-          Icons.bar_chart_outlined,
-          color: currentIndex == 3
-              ? AppColors.primary
-              : (isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight),
-        ),
-        selectedIcon: const Icon(Icons.bar_chart, color: AppColors.primary),
-        label: 'Reports',
-      ),
+  List<Widget> _buildLeaderNavItems(BuildContext context, int currentIndex, bool isDark) {
+    final items = [
+      _NavItemData(Icons.dashboard_outlined, Icons.dashboard, 'Dashboard', 0),
+      _NavItemData(Icons.people_outline, Icons.people, 'Team', 1),
+      _NavItemData(Icons.assignment_outlined, Icons.assignment, 'Surveys', 2),
+      _NavItemData(Icons.bar_chart_outlined, Icons.bar_chart, 'Reports', 3),
     ];
+    return items.map((item) => _buildNavItem(context, item, currentIndex, isDark, true)).toList();
   }
 
-  List<NavigationDestination> _buildWorkerDestinations(int currentIndex, bool isDark) {
-    return [
-      NavigationDestination(
-        icon: Icon(
-          Icons.home_outlined,
-          color: currentIndex == 0
-              ? AppColors.primary
-              : (isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight),
-        ),
-        selectedIcon: const Icon(Icons.home, color: AppColors.primary),
-        label: 'Home',
-      ),
-      NavigationDestination(
-        icon: Icon(
-          Icons.map_outlined,
-          color: currentIndex == 1
-              ? AppColors.primary
-              : (isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight),
-        ),
-        selectedIcon: const Icon(Icons.map, color: AppColors.primary),
-        label: 'Territory',
-      ),
-      NavigationDestination(
-        icon: Icon(
-          Icons.local_shipping_outlined,
-          color: currentIndex == 2
-              ? AppColors.primary
-              : (isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight),
-        ),
-        selectedIcon: const Icon(Icons.local_shipping, color: AppColors.primary),
-        label: 'Delivery',
-      ),
-      NavigationDestination(
-        icon: Icon(
-          Icons.assignment_outlined,
-          color: currentIndex == 3
-              ? AppColors.primary
-              : (isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight),
-        ),
-        selectedIcon: const Icon(Icons.assignment, color: AppColors.primary),
-        label: 'Survey',
-      ),
+  List<Widget> _buildWorkerNavItems(BuildContext context, int currentIndex, bool isDark) {
+    final items = [
+      _NavItemData(Icons.home_outlined, Icons.home, 'Home', 0),
+      _NavItemData(Icons.map_outlined, Icons.map, 'Territory', 1),
+      _NavItemData(Icons.volunteer_activism_outlined, Icons.volunteer_activism, 'Donations', 2),
+      _NavItemData(Icons.assignment_outlined, Icons.assignment, 'Survey', 3),
     ];
+    return items.map((item) => _buildNavItem(context, item, currentIndex, isDark, false)).toList();
   }
+
+  Widget _buildNavItem(BuildContext context, _NavItemData item, int currentIndex, bool isDark, bool isLeader) {
+    final isSelected = currentIndex == item.index;
+    final color = isSelected
+        ? AppColors.primary
+        : (isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight);
+
+    return Expanded(
+      child: GestureDetector(
+        onTap: () => _onItemTapped(context, item.index, isLeader),
+        behavior: HitTestBehavior.opaque,
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              isSelected ? item.selectedIcon : item.icon,
+              color: color,
+              size: 22,
+            ),
+            const SizedBox(height: 2),
+            Text(
+              item.label,
+              style: TextStyle(
+                fontSize: 10,
+                fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
+                color: color,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _NavItemData {
+  final IconData icon;
+  final IconData selectedIcon;
+  final String label;
+  final int index;
+
+  const _NavItemData(this.icon, this.selectedIcon, this.label, this.index);
 }

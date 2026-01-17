@@ -116,9 +116,12 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
             return const SizedBox.shrink();
           },
         ),
-        floatingActionButton: FloatingActionButton(
-          onPressed: () => _showNewChatDialog(context),
-          child: const Icon(Icons.chat),
+        floatingActionButton: Padding(
+          padding: const EdgeInsets.only(bottom: 80),
+          child: FloatingActionButton(
+            onPressed: () => _showNewChatDialog(context),
+            child: const Icon(Icons.chat),
+          ),
         ),
       ),
     );

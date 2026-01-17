@@ -57,6 +57,7 @@ func main() {
 	sessionRepo := postgres.NewSessionRepository(db.DB)
 	joinRequestRepo := postgres.NewJoinRequestRepository(db.DB)
 	blogRepo := postgres.NewBlogRepository(db.DB)
+	verificationTokenRepo := postgres.NewVerificationTokenRepository(db.DB)
 
 	// Storage path for blog images
 	storagePath := getEnv("STORAGE_PATH", "./uploads")
@@ -69,16 +70,18 @@ func main() {
 	superAdminService := service.NewSuperAdminService(userRepo, db.DB)
 	joinRequestService := service.NewJoinRequestService(joinRequestRepo, userRepo, teamRepo)
 	blogService := service.NewBlogService(blogRepo, storagePath, baseURL)
+	verificationService := service.NewVerificationService(userRepo, verificationTokenRepo, sessionRepo)
 
 	// Initialize handlers
-	userHandler := handler.NewUserHandler(userService, teamService, jwtManager)
+	userHandler := handler.NewUserHandler(userService, teamService, verificationService, jwtManager)
 	adminHandler := handler.NewAdminHandler(adminService)
 	superAdminHandler := handler.NewSuperAdminHandler(superAdminService)
 	joinRequestHandler := handler.NewJoinRequestHandler(joinRequestService, teamService)
 	blogHandler := handler.NewBlogHandler(blogService)
+	verificationHandler := handler.NewVerificationHandler(verificationService)
 
 	// Setup router
-	router := setupRouter(userHandler, adminHandler, superAdminHandler, joinRequestHandler, blogHandler, storagePath)
+	router := setupRouter(userHandler, adminHandler, superAdminHandler, joinRequestHandler, blogHandler, verificationHandler, storagePath)
 
 	// Server configuration
 	port := getEnv("PORT", "8081")
@@ -119,6 +122,7 @@ func setupRouter(
 	superAdminHandler *handler.SuperAdminHandler,
 	joinRequestHandler *handler.JoinRequestHandler,
 	blogHandler *handler.BlogHandler,
+	verificationHandler *handler.VerificationHandler,
 	storagePath string,
 ) *gin.Engine {
 	// Set Gin mode
@@ -161,6 +165,11 @@ func setupRouter(
 			auth.POST("/register", userHandler.Register)
 			auth.POST("/login", userHandler.Login)
 			auth.POST("/refresh", userHandler.RefreshToken)
+			// Email verification and password reset routes
+			auth.POST("/resend-verification", verificationHandler.ResendVerificationEmail)
+			auth.POST("/verify-email", verificationHandler.VerifyEmail)
+			auth.POST("/forgot-password", verificationHandler.ForgotPassword)
+			auth.POST("/reset-password", verificationHandler.ResetPassword)
 		}
 
 		// Public blog routes (read-only, no authentication required)

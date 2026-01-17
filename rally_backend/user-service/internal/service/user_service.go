@@ -162,6 +162,11 @@ func (s *userService) Login(req *domain.LoginRequest) (*domain.AuthResponse, err
 		return nil, fmt.Errorf("invalid credentials")
 	}
 
+	// Check email verification - team leaders and workers must verify email first
+	if domain.RequiresVerification(user.Role) && !user.EmailVerified {
+		return nil, fmt.Errorf("please verify your email address before logging in. Check your inbox for the verification link")
+	}
+
 	// Check verification status - only verified users can login
 	// Superadmin and admin are always verified (created through proper channels)
 	if domain.RequiresVerification(user.Role) {

@@ -12,17 +12,19 @@ import (
 )
 
 type UserHandler struct {
-	userService domain.UserService
-	teamService domain.TeamService
-	jwtManager  *auth.JWTManager
+	userService         domain.UserService
+	teamService         domain.TeamService
+	verificationService domain.VerificationService
+	jwtManager          *auth.JWTManager
 }
 
 // NewUserHandler creates a new user handler
-func NewUserHandler(userService domain.UserService, teamService domain.TeamService, jwtManager *auth.JWTManager) *UserHandler {
+func NewUserHandler(userService domain.UserService, teamService domain.TeamService, verificationService domain.VerificationService, jwtManager *auth.JWTManager) *UserHandler {
 	return &UserHandler{
-		userService: userService,
-		teamService: teamService,
-		jwtManager:  jwtManager,
+		userService:         userService,
+		teamService:         teamService,
+		verificationService: verificationService,
+		jwtManager:          jwtManager,
 	}
 }
 
@@ -38,6 +40,18 @@ func (h *UserHandler) Register(c *gin.Context) {
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
+	}
+
+	// Send verification email for workers and team leaders (roles that require verification)
+	if response.User != nil && domain.RequiresVerification(response.User.Role) && h.verificationService != nil {
+		// Send verification email asynchronously (don't block registration)
+		go func(userID uuid.UUID) {
+			if err := h.verificationService.SendVerificationEmail(userID); err != nil {
+				// Log the error but don't fail registration
+				// The user can request a resend later
+				println("Warning: failed to send verification email:", err.Error())
+			}
+		}(response.User.ID)
 	}
 
 	c.JSON(http.StatusCreated, response)
