@@ -146,9 +146,9 @@ services:
       # Email configuration
       - SMTP_HOST=smtp.gmail.com
       - SMTP_PORT=587
-      - SMTP_USERNAME=abhishek.brichhaliya.min13@iitbhu.ac.in
-      - SMTP_PASSWORD=essvgtjwtqyhnjvr
-      - SMTP_FROM=abhishek.brichhaliya.min13@iitbhu.ac.in
+      - SMTP_USERNAME=brichhaliya@gmail.com
+      - SMTP_PASSWORD=ehehkcforlbrjcld
+      - SMTP_FROM=brichhaliya@gmail.com
       - SMTP_FROM_NAME=Rally Point
       - FRONTEND_URL=http://18.188.1.122:3000
       - GO_ENV=production

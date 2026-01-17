@@ -93,6 +93,16 @@ func (s *verificationService) SendVerificationEmail(userID uuid.UUID) error {
 	}
 
 	if err = s.emailClient.SendEmail(user.Email, "Verify Your Email - Rally Point", htmlContent, textContent); err != nil {
+		// Check if auto-verify bypass is enabled
+		if os.Getenv("AUTO_VERIFY_EMAIL") == "true" {
+			log.Printf("⚠️ Email failed, AUTO_VERIFY_EMAIL enabled - auto-verifying user %s\n", utils.MaskEmail(user.Email))
+			if verifyErr := s.userRepo.UpdateEmailVerified(userID, true); verifyErr != nil {
+				log.Printf("❌ Failed to auto-verify: %v\n", verifyErr)
+			} else {
+				log.Printf("✅ User %s auto-verified (email bypass)\n", utils.MaskEmail(user.Email))
+				return nil
+			}
+		}
 		return fmt.Errorf("failed to send email: %w", err)
 	}
 
