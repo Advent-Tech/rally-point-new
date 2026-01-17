@@ -8,6 +8,7 @@ import 'core/network/api_client.dart';
 import 'presentation/blocs/auth/auth_bloc.dart';
 import 'presentation/screens/auth/login_screen.dart';
 import 'presentation/screens/auth/forgot_password_screen.dart';
+import 'presentation/screens/auth/verify_email_screen.dart';
 import 'presentation/screens/dashboard/admin_layout.dart';
 import 'presentation/screens/dashboard/dashboard_screen.dart';
 import 'presentation/screens/users/users_screen.dart';
@@ -66,7 +67,8 @@ class _RallyAdminAppState extends State<RallyAdminApp> {
         final authState = _authBloc.state;
         final isAuthenticated = authState is AuthAuthenticated;
         final isAuthPage = state.matchedLocation == '/login' ||
-            state.matchedLocation == '/forgot-password';
+            state.matchedLocation == '/forgot-password' ||
+            state.matchedLocation == '/verify-email';
 
         if (!isAuthenticated && !isAuthPage) {
           return '/login';

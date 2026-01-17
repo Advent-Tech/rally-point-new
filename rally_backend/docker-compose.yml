@@ -150,7 +150,7 @@ services:
       - SMTP_PASSWORD=qsuyursoyihfqynk
       - SMTP_FROM=abhishek.brichhaliya.min13@iitbhu.ac.in
       - SMTP_FROM_NAME=Rally Point
-      - FRONTEND_URL=http://localhost:3000
+      - FRONTEND_URL=http://18.188.1.122:3000
       - GO_ENV=production
     volumes:
       - blog_uploads:/app/uploads
