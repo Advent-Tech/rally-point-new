@@ -39,9 +39,6 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
   // Worker stats
   List<WorkerPerformanceStats> _workerStats = [];
 
-  // Delivery stats
-  DeliveryStats? _deliveryStats;
-
   final _currencyFormat = NumberFormat.currency(symbol: '\$', decimalDigits: 2);
 
   @override
@@ -68,9 +65,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
         setState(() {
           _teams = (data as List).map((json) => TeamModel.fromJson(json)).toList();
           _totalTeams = _teams.length;
-          if (_teams.isNotEmpty) {
-            _selectedTeamId = _teams.first.id;
-          }
+          _selectedTeamId = 'all';
         });
         _loadAllData();
       }
@@ -88,7 +83,6 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
       _loadDonationStats(),
       _loadPrayerStats(),
       _loadWorkerStats(),
-      _loadDeliveryStats(),
     ]);
 
     setState(() => _isLoading = false);
@@ -144,23 +138,25 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
   }
 
   Future<void> _loadDonationStats() async {
-    if (_selectedTeamId == null) return;
-
     try {
       final api = await ApiClient.getInstance();
 
+      final isAll = _selectedTeamId == null || _selectedTeamId == 'all';
+      final statsPath = isAll
+          ? ApiConstants.donationStats
+          : '${ApiConstants.donationStats}/team/$_selectedTeamId';
+      final donationsPath = isAll
+          ? ApiConstants.donationsAll
+          : '${ApiConstants.donations}/team/$_selectedTeamId';
+
       // Load donation stats
-      final statsResponse = await api.get(
-        '${ApiConstants.donationStats}/team/$_selectedTeamId',
-      );
+      final statsResponse = await api.get(statsPath);
       if (statsResponse.statusCode == 200) {
         _donationStats = DonationStats.fromJson(statsResponse.data);
       }
 
       // Load recent donations
-      final donationsResponse = await api.get(
-        '${ApiConstants.donations}/team/$_selectedTeamId',
-      );
+      final donationsResponse = await api.get(donationsPath);
       if (donationsResponse.statusCode == 200) {
         final data = donationsResponse.data is List
             ? donationsResponse.data
@@ -191,7 +187,10 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
   }
 
   Future<void> _loadWorkerStats() async {
-    if (_selectedTeamId == null) return;
+    if (_selectedTeamId == null || _selectedTeamId == 'all') {
+      _workerStats = [];
+      return;
+    }
 
     try {
       final api = await ApiClient.getInstance();
@@ -212,23 +211,6 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
     }
   }
 
-  Future<void> _loadDeliveryStats() async {
-    if (_selectedTeamId == null) return;
-
-    try {
-      final api = await ApiClient.getInstance();
-      final response = await api.get(
-        '${ApiConstants.teamDeliveryStats}/$_selectedTeamId/stats',
-      );
-      if (response.statusCode == 200) {
-        _deliveryStats = DeliveryStats.fromJson(response.data);
-      }
-      if (mounted) setState(() {});
-    } catch (e) {
-      debugPrint('Failed to load delivery stats: $e');
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -241,10 +223,9 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
               child: DropdownButton<String>(
                 value: _selectedTeamId,
                 underline: const SizedBox(),
-                hint: const Text('Select Team'),
                 items: [
                   const DropdownMenuItem(
-                    value: null,
+                    value: 'all',
                     child: Text('All Teams'),
                   ),
                   ..._teams.map((t) => DropdownMenuItem(
@@ -359,10 +340,10 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
                       compact: isMobile,
                     ),
                     _SummaryCard(
-                      title: 'Deliveries',
-                      value: (_deliveryStats?.totalDeliveries ?? 0).toString(),
-                      subtitle: '${(_deliveryStats?.completionRate ?? 0).toStringAsFixed(0)}% completion',
-                      icon: Icons.local_shipping,
+                      title: 'Avg Donation',
+                      value: _currencyFormat.format(_donationStats?.averageDonation ?? 0),
+                      subtitle: 'per donation',
+                      icon: Icons.analytics,
                       color: AppColors.info,
                       compact: isMobile,
                     ),
@@ -372,14 +353,14 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
 
                 // Quick Charts - Stack vertically on mobile
                 if (isMobile) ...[
-                  _buildChartCard('Delivery Status', _buildDeliveryPieChart()),
+                  _buildChartCard('Donation Breakdown', _buildDonationBreakdownChart()),
                   const SizedBox(height: 16),
                   _buildChartCard('Prayer Request Status', _buildPrayerPieChart()),
                 ] else
                   Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Expanded(child: _buildChartCard('Delivery Status', _buildDeliveryPieChart())),
+                      Expanded(child: _buildChartCard('Donation Breakdown', _buildDonationBreakdownChart())),
                       const SizedBox(width: 16),
                       Expanded(child: _buildChartCard('Prayer Request Status', _buildPrayerPieChart())),
                     ],
@@ -416,51 +397,86 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
     );
   }
 
-  Widget _buildDeliveryPieChart() {
-    if (_deliveryStats == null) {
-      return const Center(child: Text('No delivery data available'));
+  Widget _buildDonationBreakdownChart() {
+    if (_recentDonations.isEmpty) {
+      return const Center(child: Text('No donation data available'));
     }
 
-    final total = _deliveryStats!.totalDeliveries;
-    if (total == 0) {
-      return const Center(child: Text('No deliveries recorded'));
+    // Group donations by payment method
+    final Map<String, double> byMethod = {};
+    for (final d in _recentDonations) {
+      final method = d.paymentMethod.isNotEmpty ? d.paymentMethod : 'unknown';
+      byMethod[method] = (byMethod[method] ?? 0) + d.amount;
     }
 
-    return PieChart(
-      PieChartData(
-        sectionsSpace: 2,
-        centerSpaceRadius: 40,
-        sections: [
-          PieChartSectionData(
-            color: AppColors.success,
-            value: _deliveryStats!.completedDeliveries.toDouble(),
-            title: '${_deliveryStats!.completedDeliveries}',
-            titleStyle: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
-            radius: 50,
+    if (byMethod.isEmpty) {
+      return const Center(child: Text('No donation data available'));
+    }
+
+    final methodColors = {
+      'cash': AppColors.success,
+      'online': AppColors.primary,
+      'card': AppColors.info,
+      'check': AppColors.warning,
+      'other': AppColors.secondary,
+      'unknown': AppColors.textSecondary,
+    };
+
+    final entries = byMethod.entries.toList();
+
+    return Row(
+      children: [
+        Expanded(
+          flex: 2,
+          child: PieChart(
+            PieChartData(
+              sectionsSpace: 2,
+              centerSpaceRadius: 40,
+              sections: entries.map((entry) {
+                return PieChartSectionData(
+                  color: methodColors[entry.key.toLowerCase()] ?? AppColors.primary,
+                  value: entry.value,
+                  title: _currencyFormat.format(entry.value),
+                  titleStyle: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
+                  radius: 50,
+                );
+              }).toList(),
+            ),
           ),
-          PieChartSectionData(
-            color: AppColors.warning,
-            value: _deliveryStats!.pendingDeliveries.toDouble(),
-            title: '${_deliveryStats!.pendingDeliveries}',
-            titleStyle: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
-            radius: 50,
+        ),
+        const SizedBox(width: 16),
+        Expanded(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: entries.map((entry) {
+              final color = methodColors[entry.key.toLowerCase()] ?? AppColors.primary;
+              return Padding(
+                padding: const EdgeInsets.symmetric(vertical: 6),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 14,
+                      height: 14,
+                      decoration: BoxDecoration(
+                        color: color,
+                        borderRadius: BorderRadius.circular(3),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        entry.key[0].toUpperCase() + entry.key.substring(1),
+                        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            }).toList(),
           ),
-          PieChartSectionData(
-            color: AppColors.info,
-            value: _deliveryStats!.inProgressDeliveries.toDouble(),
-            title: '${_deliveryStats!.inProgressDeliveries}',
-            titleStyle: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
-            radius: 50,
-          ),
-          PieChartSectionData(
-            color: AppColors.error,
-            value: _deliveryStats!.failedDeliveries.toDouble(),
-            title: '${_deliveryStats!.failedDeliveries}',
-            titleStyle: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
-            radius: 50,
-          ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 
@@ -542,9 +558,9 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
                       color: AppColors.primary,
                     ),
                     _CompactStatCard(
-                      title: 'Pending Deposit',
+                      title: 'Online Pending',
                       value: _currencyFormat.format(_donationStats?.pendingDeposit ?? 0),
-                      subtitle: 'awaiting deposit',
+                      subtitle: 'unverified online',
                       icon: Icons.pending_actions,
                       color: AppColors.warning,
                     ),
