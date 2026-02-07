@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -18,6 +19,7 @@ class ConversationsScreen extends StatefulWidget {
 
 class _ConversationsScreenState extends State<ConversationsScreen> {
   late ChatBloc _chatBloc;
+  Timer? _refreshTimer;
 
   @override
   void initState() {
@@ -31,10 +33,16 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
     }
 
     _chatBloc.add(const ChatLoadConversations());
+
+    // Auto-refresh conversations every 30 seconds
+    _refreshTimer = Timer.periodic(const Duration(seconds: 30), (_) {
+      _chatBloc.add(const ChatLoadConversations());
+    });
   }
 
   @override
   void dispose() {
+    _refreshTimer?.cancel();
     _chatBloc.close();
     super.dispose();
   }
@@ -61,7 +69,7 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
         body: BlocBuilder<ChatBloc, ChatState>(
           builder: (context, state) {
             if (state is ChatLoading) {
-              return const Center(child: CircularProgressIndicator());
+              return _buildConversationShimmer(isDark);
             }
 
             if (state is ChatError) {
@@ -106,7 +114,10 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
                       conversation: conversation,
                       currentUserId: currentUserId,
                       isDark: isDark,
-                      onTap: () => context.push('/chat/${conversation.id}'),
+                      onTap: () async {
+                        await context.push('/chat/${conversation.id}');
+                        _chatBloc.add(const ChatLoadConversations());
+                      },
                     );
                   },
                 ),
@@ -124,6 +135,77 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildConversationShimmer(bool isDark) {
+    final shimmerBase = isDark ? Colors.grey[800]! : Colors.grey[200]!;
+    final shimmerHighlight = isDark ? Colors.grey[700]! : Colors.grey[300]!;
+
+    return ListView.builder(
+      itemCount: 8,
+      itemBuilder: (context, index) {
+        return Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+          child: Row(
+            children: [
+              // Avatar circle
+              Container(
+                width: 56,
+                height: 56,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: LinearGradient(
+                    colors: [shimmerBase, shimmerHighlight, shimmerBase],
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Name
+                    Container(
+                      width: 120 + (index % 3) * 30,
+                      height: 14,
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(7),
+                        gradient: LinearGradient(
+                          colors: [shimmerBase, shimmerHighlight, shimmerBase],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    // Message preview
+                    Container(
+                      width: 180 + (index % 2) * 40,
+                      height: 12,
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(6),
+                        gradient: LinearGradient(
+                          colors: [shimmerBase, shimmerHighlight, shimmerBase],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              // Time
+              Container(
+                width: 48,
+                height: 12,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(6),
+                  gradient: LinearGradient(
+                    colors: [shimmerBase, shimmerHighlight, shimmerBase],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 

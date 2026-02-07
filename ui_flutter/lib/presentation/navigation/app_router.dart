@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import '../blocs/auth/auth_bloc.dart';
 import '../blocs/team_map/team_map_bloc.dart';
+import '../blocs/worker_tracking/worker_tracking_bloc.dart';
 import '../blocs/prayer_request/prayer_request_bloc.dart';
 import '../screens/splash_screen.dart';
 import '../screens/auth/login_screen.dart';
@@ -21,6 +22,8 @@ import '../screens/team_leader/schedule_screen.dart';
 import '../screens/team_leader/team_map_screen.dart';
 import '../screens/team_leader/worker_activity_screen.dart';
 import '../screens/team_leader/worker_verification_screen.dart';
+import '../screens/team_leader/worker_tracking_screen.dart';
+import '../screens/team_leader/worker_trail_screen.dart';
 import '../screens/home/log_visit_screen.dart';
 import '../screens/walkie/walkie_screen.dart';
 import '../screens/worker/my_schedule_screen.dart';
@@ -46,7 +49,7 @@ class AppRouter {
       refreshListenable: GoRouterRefreshStream(authBloc.stream),
       redirect: (context, state) {
         final authState = authBloc.state;
-        final isLoggingIn = state.matchedLocation == '/login' ||
+        final isAuthPage = state.matchedLocation == '/login' ||
             state.matchedLocation == '/register' ||
             state.matchedLocation == '/forgot-password';
         final isSplash = state.matchedLocation == '/splash';
@@ -56,14 +59,29 @@ class AppRouter {
           return isSplash ? null : '/splash';
         }
 
-        // If not authenticated and not on login/register/forgot-password, redirect to login
+        // Handle intermediate auth states - don't redirect, let the page handle it
+        // These states are handled by BlocListeners on the auth pages
+        if (authState is AuthRegistrationSuccess ||
+            authState is AuthPendingVerification ||
+            authState is AuthEmailVerificationRequired ||
+            authState is AuthAccountRejected ||
+            authState is AuthForgotPasswordSuccess ||
+            authState is AuthEmailVerified ||
+            authState is AuthPasswordResetSuccess ||
+            authState is AuthResendVerificationSuccess ||
+            authState is AuthError) {
+          // Stay on current auth page to show dialog/message
+          return isAuthPage ? null : '/login';
+        }
+
+        // If not authenticated and not on auth pages, redirect to login
         if (authState is AuthUnauthenticated) {
-          return isLoggingIn ? null : '/login';
+          return isAuthPage ? null : '/login';
         }
 
         // If authenticated, handle role-based routing
         if (authState is AuthAuthenticated) {
-          if (isLoggingIn || isSplash) {
+          if (isAuthPage || isSplash) {
             // Redirect based on user role
             if (authState.user.isTeamLeader) {
               return '/leader/dashboard';
@@ -289,6 +307,24 @@ class AppRouter {
             );
           },
         ),
+        GoRoute(
+          path: '/leader/worker-tracking',
+          builder: (context, state) => BlocProvider(
+            create: (_) => WorkerTrackingBloc(),
+            child: const WorkerTrackingScreen(),
+          ),
+        ),
+        GoRoute(
+          path: '/leader/worker-trail/:workerId',
+          builder: (context, state) {
+            final workerId = state.pathParameters['workerId'] ?? '';
+            final workerName = state.uri.queryParameters['name'] ?? 'Worker';
+            return BlocProvider(
+              create: (_) => WorkerTrackingBloc(),
+              child: WorkerTrailScreen(workerId: workerId, workerName: workerName),
+            );
+          },
+        ),
         // Worker assignments - shows territory assignments for a specific worker
         GoRoute(
           path: '/leader/worker-assignments/:workerId',
@@ -332,6 +368,11 @@ class AppRouter {
             return ChatScreen(conversationId: conversationId);
           },
         ),
+        // Team Leader Walkie Talkie Route
+        GoRoute(
+          path: '/leader/walkie',
+          builder: (context, state) => const WalkieScreen(),
+        ),
         // Team Leader Blog Route
         GoRoute(
           path: '/leader/blogs',
@@ -364,10 +405,24 @@ class AppRouter {
 }
 
 // Helper class to listen to BLoC stream for GoRouter refresh
+// Only notifies on actual authentication state changes, not intermediate states
 class GoRouterRefreshStream extends ChangeNotifier {
-  GoRouterRefreshStream(Stream stream) {
+  GoRouterRefreshStream(Stream<AuthState> stream) {
     notifyListeners();
-    stream.listen((_) => notifyListeners());
+    stream.listen((state) {
+      // Only refresh router for these states - NOT for intermediate states like
+      // AuthRegistrationSuccess, AuthPendingVerification, etc.
+      // Those states are handled by listeners on the pages themselves
+      if (state is AuthInitial ||
+          state is AuthLoading ||
+          state is AuthAuthenticated ||
+          state is AuthUnauthenticated) {
+        print('🔄 GoRouter refresh for state: ${state.runtimeType}');
+        notifyListeners();
+      } else {
+        print('⏭️ GoRouter skipping refresh for state: ${state.runtimeType}');
+      }
+    });
   }
 }
 

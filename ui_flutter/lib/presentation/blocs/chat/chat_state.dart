@@ -29,28 +29,32 @@ class ChatInConversation extends ChatState {
   final List<ChatMessage> messages;
   final List<TypingIndicator> typingUsers;
   final bool isLoadingMore;
+  final bool isLoadingMessages;
 
   const ChatInConversation({
     required this.conversation,
     required this.messages,
     this.typingUsers = const [],
     this.isLoadingMore = false,
+    this.isLoadingMessages = false,
   });
 
   @override
-  List<Object?> get props => [conversation, messages, typingUsers, isLoadingMore];
+  List<Object?> get props => [conversation, messages, typingUsers, isLoadingMore, isLoadingMessages];
 
   ChatInConversation copyWith({
     ChatConversation? conversation,
     List<ChatMessage>? messages,
     List<TypingIndicator>? typingUsers,
     bool? isLoadingMore,
+    bool? isLoadingMessages,
   }) {
     return ChatInConversation(
       conversation: conversation ?? this.conversation,
       messages: messages ?? this.messages,
       typingUsers: typingUsers ?? this.typingUsers,
       isLoadingMore: isLoadingMore ?? this.isLoadingMore,
+      isLoadingMessages: isLoadingMessages ?? this.isLoadingMessages,
     );
   }
 

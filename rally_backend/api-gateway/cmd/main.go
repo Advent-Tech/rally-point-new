@@ -183,6 +183,9 @@ func setupRouter(cfg *config.Config, jwtManager *auth.JWTManager, rateLimiter mi
 	// WebSocket proxy to walkie-talkie service
 	router.GET("/ws/walkie", middleware.OptionalAuthMiddleware(jwtManager), serviceProxy.ProxyWebSocket("walkie", "/ws/walkie"))
 
+	// WebSocket proxy to chat service (handled by walkie-service)
+	router.GET("/ws/chat", middleware.OptionalAuthMiddleware(jwtManager), serviceProxy.ProxyWebSocket("walkie", "/ws/chat"))
+
 	// API routes
 	api := router.Group("/api")
 	api.Use(middleware.RateLimitMiddleware(rateLimiter))

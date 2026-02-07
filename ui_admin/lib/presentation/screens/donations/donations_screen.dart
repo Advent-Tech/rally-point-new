@@ -48,12 +48,9 @@ class _DonationsScreenState extends State<DonationsScreen> with SingleTickerProv
             : response.data['teams'] ?? [];
         setState(() {
           _teams = (data as List).map((json) => TeamModel.fromJson(json)).toList();
-          if (_teams.isNotEmpty) {
-            _selectedTeamId = _teams.first.id;
-            _loadData();
-          } else {
-            _isLoading = false;
-          }
+          // Default to "All" donations
+          _selectedTeamId = 'all';
+          _loadData();
         });
       }
     } catch (e) {
@@ -68,10 +65,20 @@ class _DonationsScreenState extends State<DonationsScreen> with SingleTickerProv
     try {
       final api = await ApiClient.getInstance();
 
+      // Determine API path based on selection
+      final isAll = _selectedTeamId == 'all';
+      final donationsPath = isAll
+          ? ApiConstants.donations
+          : '${ApiConstants.donations}/team/$_selectedTeamId';
+      final statsPath = isAll
+          ? ApiConstants.donationStats
+          : '${ApiConstants.donationStats}/team/$_selectedTeamId';
+      final receiptsPath = isAll
+          ? ApiConstants.receipts
+          : '${ApiConstants.receipts}/team/$_selectedTeamId';
+
       // Load donations
-      final donationsResponse = await api.get(
-        '${ApiConstants.donations}/team/$_selectedTeamId',
-      );
+      final donationsResponse = await api.get(donationsPath);
       if (donationsResponse.statusCode == 200) {
         final data = donationsResponse.data is List
             ? donationsResponse.data
@@ -80,30 +87,18 @@ class _DonationsScreenState extends State<DonationsScreen> with SingleTickerProv
       }
 
       // Load donation stats
-      final statsResponse = await api.get(
-        '${ApiConstants.donationStats}/team/$_selectedTeamId',
-      );
+      final statsResponse = await api.get(statsPath);
       if (statsResponse.statusCode == 200) {
         _donationStats = DonationStats.fromJson(statsResponse.data);
       }
 
       // Load receipts
-      final receiptsResponse = await api.get(
-        '${ApiConstants.receipts}/team/$_selectedTeamId',
-      );
+      final receiptsResponse = await api.get(receiptsPath);
       if (receiptsResponse.statusCode == 200) {
         final data = receiptsResponse.data is List
             ? receiptsResponse.data
             : receiptsResponse.data['receipts'] ?? [];
         _receipts = (data as List).map((json) => ReceiptModel.fromJson(json)).toList();
-      }
-
-      // Load receipt stats
-      final receiptStatsResponse = await api.get(
-        '${ApiConstants.receiptStats}/team/$_selectedTeamId',
-      );
-      if (receiptStatsResponse.statusCode == 200) {
-        _receiptStats = ReceiptStats.fromJson(receiptStatsResponse.data);
       }
 
       setState(() => _isLoading = false);
@@ -176,69 +171,76 @@ class _DonationsScreenState extends State<DonationsScreen> with SingleTickerProv
                   ),
             ),
             const SizedBox(height: 16),
-            Row(
-              children: [
-                _StatCard(
-                  title: 'Total Donations',
-                  value: _currencyFormat.format(_donationStats?.totalAmount ?? 0),
-                  subtitle: '${_donationStats?.totalDonations ?? 0} donations',
-                  icon: Icons.volunteer_activism,
-                  color: AppColors.success,
-                ),
-                const SizedBox(width: 16),
-                _StatCard(
-                  title: 'Average',
-                  value: _currencyFormat.format(_donationStats?.averageDonation ?? 0),
-                  subtitle: 'per donation',
-                  icon: Icons.analytics,
-                  color: AppColors.primary,
-                ),
-                const SizedBox(width: 16),
-                _StatCard(
-                  title: 'Pending Deposit',
-                  value: _currencyFormat.format(_donationStats?.pendingDeposit ?? 0),
-                  subtitle: 'awaiting deposit',
-                  icon: Icons.pending_actions,
-                  color: AppColors.warning,
-                ),
-              ],
-            ),
-            const SizedBox(height: 32),
-
-            // Receipt Stats
-            Text(
-              'Receipt Statistics',
-              style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
-            ),
-            const SizedBox(height: 16),
-            Row(
-              children: [
-                _StatCard(
-                  title: 'Total Receipts',
-                  value: _currencyFormat.format(_receiptStats?.totalAmount ?? 0),
-                  subtitle: '${_receiptStats?.totalReceipts ?? 0} receipts',
-                  icon: Icons.receipt_long,
-                  color: AppColors.info,
-                ),
-                const SizedBox(width: 16),
-                _StatCard(
-                  title: 'Book Sales',
-                  value: _currencyFormat.format(_receiptStats?.bookSalesAmount ?? 0),
-                  subtitle: '${_receiptStats?.bookSalesCount ?? 0} sales',
-                  icon: Icons.menu_book,
-                  color: AppColors.secondary,
-                ),
-                const SizedBox(width: 16),
-                _StatCard(
-                  title: 'Literature',
-                  value: _currencyFormat.format(_receiptStats?.literatureAmount ?? 0),
-                  subtitle: '${_receiptStats?.literatureCount ?? 0} items',
-                  icon: Icons.article,
-                  color: AppColors.primary,
-                ),
-              ],
+            LayoutBuilder(
+              builder: (context, constraints) {
+                // Use wrap layout for mobile
+                if (constraints.maxWidth < 600) {
+                  return Wrap(
+                    spacing: 12,
+                    runSpacing: 12,
+                    children: [
+                      SizedBox(
+                        width: (constraints.maxWidth - 12) / 2,
+                        child: _StatCardCompact(
+                          title: 'Total Donations',
+                          value: _currencyFormat.format(_donationStats?.totalAmount ?? 0),
+                          subtitle: '${_donationStats?.totalDonations ?? 0} donations',
+                          icon: Icons.volunteer_activism,
+                          color: AppColors.success,
+                        ),
+                      ),
+                      SizedBox(
+                        width: (constraints.maxWidth - 12) / 2,
+                        child: _StatCardCompact(
+                          title: 'Average',
+                          value: _currencyFormat.format(_donationStats?.averageDonation ?? 0),
+                          subtitle: 'per donation',
+                          icon: Icons.analytics,
+                          color: AppColors.primary,
+                        ),
+                      ),
+                      SizedBox(
+                        width: (constraints.maxWidth - 12) / 2,
+                        child: _StatCardCompact(
+                          title: 'Pending Deposit',
+                          value: _currencyFormat.format(_donationStats?.pendingDeposit ?? 0),
+                          subtitle: 'awaiting deposit',
+                          icon: Icons.pending_actions,
+                          color: AppColors.warning,
+                        ),
+                      ),
+                    ],
+                  );
+                }
+                // Row layout for larger screens
+                return Row(
+                  children: [
+                    _StatCard(
+                      title: 'Total Donations',
+                      value: _currencyFormat.format(_donationStats?.totalAmount ?? 0),
+                      subtitle: '${_donationStats?.totalDonations ?? 0} donations',
+                      icon: Icons.volunteer_activism,
+                      color: AppColors.success,
+                    ),
+                    const SizedBox(width: 16),
+                    _StatCard(
+                      title: 'Average',
+                      value: _currencyFormat.format(_donationStats?.averageDonation ?? 0),
+                      subtitle: 'per donation',
+                      icon: Icons.analytics,
+                      color: AppColors.primary,
+                    ),
+                    const SizedBox(width: 16),
+                    _StatCard(
+                      title: 'Pending Deposit',
+                      value: _currencyFormat.format(_donationStats?.pendingDeposit ?? 0),
+                      subtitle: 'awaiting deposit',
+                      icon: Icons.pending_actions,
+                      color: AppColors.warning,
+                    ),
+                  ],
+                );
+              },
             ),
           ],
         ),
@@ -485,6 +487,73 @@ class _StatCard extends StatelessWidget {
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class _StatCardCompact extends StatelessWidget {
+  final String title;
+  final String value;
+  final String subtitle;
+  final IconData icon;
+  final Color color;
+
+  const _StatCardCompact({
+    required this.title,
+    required this.value,
+    required this.subtitle,
+    required this.icon,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(6),
+                  decoration: BoxDecoration(
+                    color: color.withAlpha(30),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Icon(icon, color: color, size: 16),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    title,
+                    style: TextStyle(
+                      color: AppColors.textSecondary,
+                      fontSize: 11,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Text(
+              value,
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+            ),
+            Text(
+              subtitle,
+              style: TextStyle(
+                color: AppColors.textSecondary,
+                fontSize: 10,
+              ),
+            ),
+          ],
         ),
       ),
     );

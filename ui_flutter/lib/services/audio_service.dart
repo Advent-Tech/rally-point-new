@@ -2,7 +2,6 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
-import 'package:just_audio/just_audio.dart';
 import 'package:record/record.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:path_provider/path_provider.dart';
@@ -23,11 +22,15 @@ class AudioService {
 
   // Primary recorder (record package)
   final AudioRecorder _recorder = AudioRecorder();
-  final AudioPlayer _player = AudioPlayer();
 
-  // Alternative recorder (flutter_sound) - used if record package fails
+  // Playback via flutter_sound (uses Android MediaPlayer — works on OnePlus and similar devices
+  // where ExoPlayer/just_audio produces no audible output)
+  fs.FlutterSoundPlayer? _fsPlayer;
+  String? _currentPlaybackId;
+
+  // Alternative recorder (flutter_sound) - used as fallback
   fs.FlutterSoundRecorder? _flutterSoundRecorder;
-  static bool useFlutterSound = true; // Using flutter_sound - record package has issues on some devices
+  static bool useFlutterSound = false; // Use record package first — flutter_sound has silent recording issues
   StreamSubscription? _flutterSoundSubscription;
 
   bool _isInitialized = false;
@@ -62,17 +65,16 @@ class AudioService {
 
   Future<void> _initialize() async {
     if (_isInitialized) return;
-
-    // Listen to player state changes
-    _player.playerStateStream.listen((state) {
-      if (state.processingState == ProcessingState.completed) {
-        _isPlaying = false;
-        onPlaybackCompleted?.call('');
-      }
-    });
-
     _isInitialized = true;
-    debugPrint('AudioService: Initialized');
+  }
+
+  /// Lazily init flutter_sound player for playback
+  Future<fs.FlutterSoundPlayer> _ensureFsPlayer() async {
+    if (_fsPlayer == null) {
+      _fsPlayer = fs.FlutterSoundPlayer();
+      await _fsPlayer!.openPlayer();
+    }
+    return _fsPlayer!;
   }
 
   /// Check if recording is in progress
@@ -121,44 +123,29 @@ class AudioService {
       final tempDir = await getTemporaryDirectory();
       final timestamp = DateTime.now().millisecondsSinceEpoch;
 
-      // Use WAV format for better Android compatibility
-      // Some devices have issues with AAC encoder not capturing audio
-      _currentRecordingPath = '${tempDir.path}/walkie_$timestamp.wav';
+      // Use AAC-LC in M4A container (record package uses MediaRecorder with MPEG_4 output)
+      // This is a different native path from flutter_sound's AAC_ADTS
+      _currentRecordingPath = '${tempDir.path}/walkie_$timestamp.m4a';
 
-      debugPrint('AudioService: Starting recording to: $_currentRecordingPath');
-      debugPrint('AudioService: Using record package (set useFlutterSound=true to use flutter_sound)');
-
-      // Check available input devices
-      try {
-        final devices = await _recorder.listInputDevices();
-        debugPrint('AudioService: Available input devices: ${devices.length}');
-        for (final device in devices) {
-          debugPrint('  - Device: ${device.label} (id: ${device.id})');
-        }
-      } catch (e) {
-        debugPrint('AudioService: Could not list input devices: $e');
-      }
-
-      // Try different audio sources - the record package has issues on some devices
-      // List of sources to try in order of preference
+      // Try different audio sources with AAC-LC encoder
+      // Each source uses a different Android MediaRecorder.AudioSource constant
       final audioSources = [
+        ('default', AndroidAudioSource.defaultSource),
+        ('mic', AndroidAudioSource.mic),
         ('voiceRecognition', AndroidAudioSource.voiceRecognition),
         ('camcorder', AndroidAudioSource.camcorder),
-        ('mic', AndroidAudioSource.mic),
-        ('default', AndroidAudioSource.defaultSource),
       ];
 
       bool started = false;
-      String usedSource = 'none';
 
-      for (final (name, source) in audioSources) {
+      for (final (_, source) in audioSources) {
         try {
-          debugPrint('AudioService: Trying audio source: $name');
           await _recorder.start(
             RecordConfig(
-              encoder: AudioEncoder.wav,
+              encoder: AudioEncoder.aacLc,
               numChannels: 1,
               sampleRate: 44100,
+              bitRate: 64000,
               androidConfig: AndroidRecordConfig(
                 audioSource: source,
               ),
@@ -166,30 +153,24 @@ class AudioService {
             path: _currentRecordingPath!,
           );
           started = true;
-          usedSource = name;
-          debugPrint('AudioService: Successfully started with source: $name');
           break;
         } catch (e) {
-          debugPrint('AudioService: Failed with source $name: $e');
-          // Try next source
         }
       }
 
       if (!started) {
-        // Last resort: try without any Android config
-        debugPrint('AudioService: Trying without Android config...');
+        // Fallback: try without Android config
         await _recorder.start(
           const RecordConfig(
-            encoder: AudioEncoder.wav,
+            encoder: AudioEncoder.aacLc,
             numChannels: 1,
             sampleRate: 44100,
+            bitRate: 64000,
           ),
           path: _currentRecordingPath!,
         );
-        usedSource = 'default (no android config)';
+        // fallback succeeded
       }
-
-      debugPrint('AudioService: Recorder started with source: $usedSource');
 
       _isRecording = true;
       _recordingStartTime = DateTime.now();
@@ -198,10 +179,8 @@ class AudioService {
       _startLevelMonitoring();
 
       onRecordingStarted?.call();
-      debugPrint('AudioService: Recording started');
       return true;
     } catch (e) {
-      debugPrint('AudioService: Error starting recording: $e');
       onRecordingError?.call(e.toString());
       return false;
     }
@@ -219,7 +198,6 @@ class AudioService {
     try {
       _stopLevelMonitoring();
 
-      debugPrint('AudioService: Stopping recording...');
       final path = await _recorder.stop();
       _isRecording = false;
 
@@ -234,7 +212,6 @@ class AudioService {
 
       if (path != null && path.isNotEmpty) {
         onRecordingStopped?.call(path, durationMs);
-        debugPrint('AudioService: Recording stopped, duration: ${durationMs}ms');
 
         return RecordingResult(
           path: path,
@@ -244,7 +221,6 @@ class AudioService {
 
       return null;
     } catch (e) {
-      debugPrint('AudioService: Error stopping recording: $e');
       _isRecording = false;
       onRecordingError?.call(e.toString());
       return null;
@@ -260,7 +236,6 @@ class AudioService {
     _flutterSoundRecorder = fs.FlutterSoundRecorder();
     await _flutterSoundRecorder!.openRecorder();
     await _flutterSoundRecorder!.setSubscriptionDuration(const Duration(milliseconds: 100));
-    debugPrint('AudioService: flutter_sound initialized');
   }
 
   /// Start recording with flutter_sound
@@ -271,57 +246,57 @@ class AudioService {
       final tempDir = await getTemporaryDirectory();
       final timestamp = DateTime.now().millisecondsSinceEpoch;
 
-      // Use WAV format for better compatibility and easier debugging
-      _currentRecordingPath = '${tempDir.path}/walkie_fs_$timestamp.wav';
+      // Use AAC ADTS format — it uses Android's MediaRecorder API which is
+      // far more reliable than AudioRecord (used by pcm16WAV). AudioRecord
+      // produces all-zero buffers on many devices (OnePlus, emulators, etc.)
+      _currentRecordingPath = '${tempDir.path}/walkie_fs_$timestamp.aac';
 
-      debugPrint('AudioService: Starting recording with flutter_sound');
-      debugPrint('AudioService: Path: $_currentRecordingPath');
-
-      // Try voice_communication audio source - works better for VoIP-style apps
-      // This enables acoustic echo cancellation and noise suppression
-      debugPrint('AudioService: Trying voice_communication audio source...');
+      // Try AAC ADTS first (uses MediaRecorder - reliable), fall back to WAV
       try {
         await _flutterSoundRecorder!.startRecorder(
           toFile: _currentRecordingPath,
-          codec: fs.Codec.pcm16WAV,
-          sampleRate: 16000, // Lower sample rate often works better for voice
+          codec: fs.Codec.aacADTS,
+          sampleRate: 16000,
           numChannels: 1,
-          audioSource: fs.AudioSource.voice_communication,
+          bitRate: 64000,
+          audioSource: fs.AudioSource.microphone,
         );
-        debugPrint('AudioService: Started with voice_communication source');
       } catch (e) {
-        debugPrint('AudioService: voice_communication failed: $e, trying default...');
-        // Fallback to default audio source
+        // Fallback to WAV if AAC is not supported
+        _currentRecordingPath = '${tempDir.path}/walkie_fs_$timestamp.wav';
         await _flutterSoundRecorder!.startRecorder(
           toFile: _currentRecordingPath,
           codec: fs.Codec.pcm16WAV,
           sampleRate: 16000,
           numChannels: 1,
+          audioSource: fs.AudioSource.microphone,
         );
-        debugPrint('AudioService: Started with default source');
       }
 
       // Listen to audio levels with detailed logging
-      int levelCount = 0;
-      double maxDbSeen = -160.0;
+      // Note: flutter_sound dB metering does NOT work with MediaRecorder/AAC codec.
+      // It always reports 0.0 dB. For AAC, we simulate a gentle pulsing level so
+      // the UI doesn't look dead during recording.
+      final bool isAacCodec = _currentRecordingPath!.endsWith('.aac');
       _flutterSoundSubscription = _flutterSoundRecorder!.onProgress?.listen((e) {
-        levelCount++;
         if (e.decibels != null) {
           final db = e.decibels!;
-          if (db > maxDbSeen) maxDbSeen = db;
 
-          // Convert decibels to 0-1 range
-          // flutter_sound typically reports -160 to 0 dB
-          final level = ((db + 160) / 160).clamp(0.0, 1.0);
-
-          // Log every 10th sample for diagnostics
-          if (levelCount % 10 == 0) {
-            debugPrint('AudioService: flutter_sound dB: ${db.toStringAsFixed(1)}, level: ${level.toStringAsFixed(3)}, maxDb: ${maxDbSeen.toStringAsFixed(1)}');
+          double level;
+          if (isAacCodec && db >= -1.0 && db <= 0.0) {
+            // AAC/MediaRecorder: dB metering is broken (always 0.0)
+            // Simulate a gentle pulse so the recording indicator looks alive
+            final t = DateTime.now().millisecondsSinceEpoch / 500.0;
+            level = 0.3 + 0.2 * (0.5 + 0.5 * (t - t.floorToDouble()));
+          } else if (db < -160.0 || db.isNaN) {
+            level = 0.0;
+          } else {
+            // Real dB values (works with PCM/WAV codec)
+            level = ((db + 160) / 160).clamp(0.0, 1.0);
           }
 
+          // Log every 10th sample for diagnostics
           onAudioLevelChanged?.call(level);
-        } else {
-          debugPrint('AudioService: flutter_sound progress - no decibels data');
         }
       });
 
@@ -329,10 +304,8 @@ class AudioService {
       _recordingStartTime = DateTime.now();
       onRecordingStarted?.call();
 
-      debugPrint('AudioService: flutter_sound recording started with PCM16/WAV codec');
       return true;
     } catch (e) {
-      debugPrint('AudioService: flutter_sound start error: $e');
       onRecordingError?.call(e.toString());
       return false;
     }
@@ -344,7 +317,6 @@ class AudioService {
       _flutterSoundSubscription?.cancel();
       _flutterSoundSubscription = null;
 
-      debugPrint('AudioService: Stopping flutter_sound recording...');
       final path = await _flutterSoundRecorder!.stopRecorder();
       _isRecording = false;
 
@@ -356,12 +328,6 @@ class AudioService {
       if (path != null && path.isNotEmpty) {
         final file = File(path);
         if (await file.exists()) {
-          final size = await file.length();
-          debugPrint('AudioService: flutter_sound recording stopped');
-          debugPrint('  - Path: $path');
-          debugPrint('  - Duration: ${durationMs}ms');
-          debugPrint('  - Size: $size bytes');
-
           onRecordingStopped?.call(path, durationMs);
 
           return RecordingResult(
@@ -373,7 +339,6 @@ class AudioService {
 
       return null;
     } catch (e) {
-      debugPrint('AudioService: flutter_sound stop error: $e');
       _isRecording = false;
       onRecordingError?.call(e.toString());
       return null;
@@ -400,9 +365,7 @@ class AudioService {
         }
       }
 
-      debugPrint('AudioService: Recording cancelled');
     } catch (e) {
-      debugPrint('AudioService: Error cancelling recording: $e');
     }
   }
 
@@ -423,44 +386,42 @@ class AudioService {
     _levelTimer = null;
   }
 
-  /// Play audio from URL
-  Future<bool> playFromUrl(String url, {String? audioId}) async {
+  /// Play audio from URL or file path using flutter_sound (MediaPlayer)
+  Future<bool> _playUri(String uri, {String? audioId}) async {
     if (_isPlaying) {
       await stopPlayback();
     }
 
     try {
-      await _player.setUrl(url);
+      final player = await _ensureFsPlayer();
       _isPlaying = true;
-      onPlaybackStarted?.call(audioId ?? url);
-      await _player.play();
-      debugPrint('AudioService: Playing from URL');
+      _currentPlaybackId = audioId ?? uri;
+      onPlaybackStarted?.call(_currentPlaybackId!);
+
+      await player.startPlayer(
+        fromURI: uri,
+        whenFinished: () {
+          _isPlaying = false;
+          onPlaybackCompleted?.call(_currentPlaybackId ?? '');
+          _currentPlaybackId = null;
+        },
+      );
       return true;
     } catch (e) {
-      debugPrint('AudioService: Error playing from URL: $e');
       _isPlaying = false;
+      _currentPlaybackId = null;
       return false;
     }
   }
 
+  /// Play audio from URL
+  Future<bool> playFromUrl(String url, {String? audioId}) async {
+    return _playUri(url, audioId: audioId);
+  }
+
   /// Play audio from file path
   Future<bool> playFromFile(String path, {String? audioId}) async {
-    if (_isPlaying) {
-      await stopPlayback();
-    }
-
-    try {
-      await _player.setFilePath(path);
-      _isPlaying = true;
-      onPlaybackStarted?.call(audioId ?? path);
-      await _player.play();
-      debugPrint('AudioService: Playing from file');
-      return true;
-    } catch (e) {
-      debugPrint('AudioService: Error playing from file: $e');
-      _isPlaying = false;
-      return false;
-    }
+    return _playUri(path, audioId: audioId);
   }
 
   /// Play audio from base64 encoded data
@@ -473,7 +434,6 @@ class AudioService {
 
       return await playFromFile(tempFile.path, audioId: audioId);
     } catch (e) {
-      debugPrint('AudioService: Error playing from base64: $e');
       return false;
     }
   }
@@ -483,11 +443,10 @@ class AudioService {
     if (!_isPlaying) return;
 
     try {
-      await _player.stop();
+      await _fsPlayer?.stopPlayer();
       _isPlaying = false;
-      debugPrint('AudioService: Playback stopped');
+      _currentPlaybackId = null;
     } catch (e) {
-      debugPrint('AudioService: Error stopping playback: $e');
     }
   }
 
@@ -496,20 +455,16 @@ class AudioService {
     if (!_isPlaying) return;
 
     try {
-      await _player.pause();
-      debugPrint('AudioService: Playback paused');
+      await _fsPlayer?.pausePlayer();
     } catch (e) {
-      debugPrint('AudioService: Error pausing playback: $e');
     }
   }
 
   /// Resume playback
   Future<void> resumePlayback() async {
     try {
-      await _player.play();
-      debugPrint('AudioService: Playback resumed');
+      await _fsPlayer?.resumePlayer();
     } catch (e) {
-      debugPrint('AudioService: Error resuming playback: $e');
     }
   }
 
@@ -522,7 +477,6 @@ class AudioService {
         return base64Encode(bytes);
       }
     } catch (e) {
-      debugPrint('AudioService: Error reading file as base64: $e');
     }
     return null;
   }
@@ -535,7 +489,6 @@ class AudioService {
         return await file.readAsBytes();
       }
     } catch (e) {
-      debugPrint('AudioService: Error reading file: $e');
     }
     return null;
   }
@@ -550,9 +503,7 @@ class AudioService {
           await file.delete();
         }
       }
-      debugPrint('AudioService: Temp files cleaned up');
     } catch (e) {
-      debugPrint('AudioService: Error cleaning up: $e');
     }
   }
 
@@ -605,13 +556,6 @@ class AudioService {
       // Max amplitude in 16-bit is 32767
       final normalizedMax = maxAmplitude / 32767.0;
 
-      debugPrint('AudioService: WAV Analysis:');
-      debugPrint('  - File size: ${bytes.length} bytes');
-      debugPrint('  - Audio data: ${audioData.length} bytes');
-      debugPrint('  - Sample count: $sampleCount');
-      debugPrint('  - Max amplitude: $maxAmplitude (${(normalizedMax * 100).toStringAsFixed(1)}%)');
-      debugPrint('  - Non-silent samples: ${percentNonSilent.toStringAsFixed(1)}%');
-
       final hasAudio = maxAmplitude > 1000 && percentNonSilent > 1.0;
 
       return AudioAnalysisResult(
@@ -621,7 +565,6 @@ class AudioService {
         sampleCount: sampleCount,
       );
     } catch (e) {
-      debugPrint('AudioService: Error analyzing WAV: $e');
       return AudioAnalysisResult(hasAudio: false, error: e.toString());
     }
   }
@@ -631,7 +574,10 @@ class AudioService {
     await cancelRecording();
     await stopPlayback();
     await _recorder.dispose();
-    await _player.dispose();
+    if (_fsPlayer != null) {
+      await _fsPlayer!.closePlayer();
+      _fsPlayer = null;
+    }
     _instance = null;
   }
 }

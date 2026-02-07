@@ -2,7 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:just_audio/just_audio.dart';
+import 'package:flutter_sound/flutter_sound.dart';
 import '../../core/theme/app_colors.dart';
 import '../blocs/walkie/walkie_bloc.dart';
 import '../blocs/auth/auth_bloc.dart';
@@ -87,7 +87,9 @@ class _WalkieBottomSheetState extends State<WalkieBottomSheet> {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final bottomPadding = MediaQuery.of(context).viewInsets.bottom;
+    final keyboardHeight = MediaQuery.of(context).viewInsets.bottom;
+    final safeBottom = MediaQuery.of(context).padding.bottom;
+    final bottomPadding = keyboardHeight > 0 ? keyboardHeight : safeBottom;
 
     return BlocProvider.value(
       value: _walkieBloc,
@@ -346,14 +348,12 @@ class _WalkieBottomSheetState extends State<WalkieBottomSheet> {
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                   itemCount: state.messages.length,
                   itemBuilder: (context, index) {
-                    // With reverse: true, index 0 = bottom of list, so use direct index for newest at bottom
-                    final message = state.messages[index];
+                    // With reverse: true, index 0 = bottom of screen.
+                    // Messages are stored oldest-first, so reverse the index to show newest at bottom.
+                    final message = state.messages[state.messages.length - 1 - index];
                     return _CompactMessageTile(
                       message: message,
                       isDark: isDark,
-                      onPlay: (message.messageType == 'voice' || message.messageType == 'audio') && message.audioUrl != null
-                          ? () => _walkieBloc.add(WalkiePlayMessage(messageId: message.id))
-                          : null,
                       onReply: _setReplyingTo,
                     );
                   },
@@ -581,13 +581,11 @@ class _ParticipantChip extends StatelessWidget {
 class _CompactMessageTile extends StatefulWidget {
   final WalkieMessage message;
   final bool isDark;
-  final VoidCallback? onPlay;
   final void Function(WalkieMessage)? onReply;
 
   const _CompactMessageTile({
     required this.message,
     required this.isDark,
-    this.onPlay,
     this.onReply,
   });
 
@@ -596,92 +594,77 @@ class _CompactMessageTile extends StatefulWidget {
 }
 
 class _CompactMessageTileState extends State<_CompactMessageTile> {
-  final AudioPlayer _player = AudioPlayer();
+  FlutterSoundPlayer? _player;
   bool _isPlaying = false;
+  bool _hasError = false;
   Duration _position = Duration.zero;
   Duration _duration = Duration.zero;
-  StreamSubscription? _positionSub;
-  StreamSubscription? _durationSub;
-  StreamSubscription? _stateSub;
-
-  @override
-  void initState() {
-    super.initState();
-    _setupPlayerListeners();
-  }
-
-  void _setupPlayerListeners() {
-    _positionSub = _player.positionStream.listen((pos) {
-      if (mounted) setState(() => _position = pos);
-    });
-    _durationSub = _player.durationStream.listen((dur) {
-      if (dur != null && mounted) setState(() => _duration = dur);
-    });
-    _stateSub = _player.playerStateStream.listen((state) {
-      if (mounted) {
-        setState(() {
-          _isPlaying = state.playing;
-          if (state.processingState == ProcessingState.completed) {
-            _isPlaying = false;
-            _position = Duration.zero;
-          }
-        });
-      }
-    });
-  }
+  StreamSubscription? _progressSub;
 
   @override
   void dispose() {
-    _positionSub?.cancel();
-    _durationSub?.cancel();
-    _stateSub?.cancel();
-    _player.dispose();
+    _progressSub?.cancel();
+    if (_player != null) {
+      _player!.closePlayer();
+      _player = null;
+    }
     super.dispose();
+  }
+
+  /// Lazily open the player only when user taps play — avoids
+  /// grabbing AudioFocus/AudioSession while recording is active
+  Future<FlutterSoundPlayer> _ensurePlayer() async {
+    if (_player == null) {
+      _player = FlutterSoundPlayer();
+      await _player!.openPlayer();
+      await _player!.setSubscriptionDuration(const Duration(milliseconds: 100));
+      _progressSub = _player!.onProgress!.listen((e) {
+        if (mounted) {
+          setState(() {
+            _position = e.position;
+            _duration = e.duration;
+          });
+        }
+      });
+    }
+    return _player!;
   }
 
   Future<void> _togglePlayback() async {
     if (_isPlaying) {
-      await _player.pause();
-    } else {
-      if (_position == Duration.zero || _position >= _duration) {
-        // Start from beginning
-        final audioUrl = widget.message.audioUrl;
-        debugPrint('WalkiePlayback: Attempting to play: $audioUrl');
-        if (audioUrl != null && audioUrl.isNotEmpty) {
-          try {
-            // Check if it's a local file path or a URL
-            if (audioUrl.startsWith('/') || audioUrl.startsWith('file://')) {
-              // Local file path
-              final filePath = audioUrl.startsWith('file://')
-                  ? audioUrl.substring(7)
-                  : audioUrl;
-              debugPrint('WalkiePlayback: Playing local file: $filePath');
-              await _player.setFilePath(filePath);
-            } else if (audioUrl.startsWith('http://') || audioUrl.startsWith('https://')) {
-              // Web URL (Supabase)
-              debugPrint('WalkiePlayback: Playing from URL: $audioUrl');
-              await _player.setUrl(audioUrl);
-            } else {
-              // Assume it's a local path
-              debugPrint('WalkiePlayback: Playing as local path: $audioUrl');
-              await _player.setFilePath(audioUrl);
-            }
-            debugPrint('WalkiePlayback: Duration loaded: ${_player.duration}');
-            await _player.play();
-            debugPrint('WalkiePlayback: Playback started');
-          } catch (e, stackTrace) {
-            debugPrint('WalkiePlayback: Error playing audio: $e');
-            debugPrint('WalkiePlayback: Stack trace: $stackTrace');
-          }
-        } else {
-          debugPrint('WalkiePlayback: No audio URL available');
-        }
-      } else {
-        await _player.play();
-      }
+      await _player?.pausePlayer();
+      if (mounted) setState(() => _isPlaying = false);
+      return;
     }
-    // Also call parent callback for global state
-    widget.onPlay?.call();
+
+    // If player exists and is paused, resume
+    if (_player != null && _player!.isPaused) {
+      await _player!.resumePlayer();
+      if (mounted) setState(() => _isPlaying = true);
+      return;
+    }
+
+    final audioUrl = widget.message.audioUrl;
+    if (audioUrl != null && audioUrl.isNotEmpty) {
+      try {
+        final player = await _ensurePlayer();
+        await player.startPlayer(
+          fromURI: audioUrl,
+          whenFinished: () {
+            if (mounted) {
+              setState(() {
+                _isPlaying = false;
+                _position = Duration.zero;
+              });
+            }
+          },
+        );
+        if (mounted) setState(() => _isPlaying = true);
+      } catch (e) {
+        if (mounted) setState(() => _hasError = true);
+      }
+    } else {
+    }
   }
 
   String _formatDuration(Duration duration) {
@@ -792,13 +775,17 @@ class _CompactMessageTileState extends State<_CompactMessageTile> {
                     width: 32,
                     height: 32,
                     decoration: BoxDecoration(
-                      color: _isPlaying
-                          ? AppColors.primary
-                          : AppColors.primary.withAlpha(150),
+                      color: _hasError
+                          ? AppColors.error
+                          : (_isPlaying
+                              ? AppColors.primary
+                              : AppColors.primary.withAlpha(150)),
                       shape: BoxShape.circle,
                     ),
                     child: Icon(
-                      _isPlaying ? Icons.pause : Icons.play_arrow,
+                      _hasError
+                          ? Icons.error_outline
+                          : (_isPlaying ? Icons.pause : Icons.play_arrow),
                       size: 18,
                       color: Colors.white,
                     ),

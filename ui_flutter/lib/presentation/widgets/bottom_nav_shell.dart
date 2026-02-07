@@ -140,7 +140,7 @@ class BottomNavShell extends StatelessWidget {
     final items = [
       _NavItemData(Icons.home_outlined, Icons.home, 'Home', 0),
       _NavItemData(Icons.map_outlined, Icons.map, 'Territory', 1),
-      _NavItemData(Icons.volunteer_activism_outlined, Icons.volunteer_activism, 'Donations', 2),
+      _NavItemData(Icons.directions_walk_outlined, Icons.directions_walk, 'Activity', 2),
       _NavItemData(Icons.assignment_outlined, Icons.assignment, 'Survey', 3),
     ];
     return items.map((item) => _buildNavItem(context, item, currentIndex, isDark, false)).toList();

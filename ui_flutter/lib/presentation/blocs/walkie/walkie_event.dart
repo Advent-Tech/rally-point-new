@@ -140,3 +140,8 @@ class WalkieAudioLevelChanged extends WalkieEvent {
   @override
   List<Object?> get props => [level];
 }
+
+/// Internal: poll for new messages (WebSocket fallback)
+class _WalkiePollMessages extends WalkieEvent {
+  const _WalkiePollMessages();
+}

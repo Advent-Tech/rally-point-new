@@ -1,11 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
-import '../../blocs/auth/auth_bloc.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/network/api_client.dart';
 import '../../widgets/custom_text_field.dart';
 import '../../widgets/custom_button.dart';
-import '../../widgets/app_logo.dart';
 
 class ForgotPasswordScreen extends StatefulWidget {
   final String? initialEmail;
@@ -20,6 +18,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
   bool _emailSent = false;
+  bool _isLoading = false;
 
   @override
   void initState() {
@@ -35,11 +34,31 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
     super.dispose();
   }
 
-  void _handleSubmit() {
+  Future<void> _handleSubmit() async {
     if (_formKey.currentState?.validate() ?? false) {
-      context.read<AuthBloc>().add(AuthForgotPassword(
-        email: _emailController.text.trim(),
-      ));
+      setState(() => _isLoading = true);
+
+      try {
+        final apiClient = await ApiClient.getInstance();
+        await apiClient.post(
+          '/api/auth/forgot-password',
+          data: {'email': _emailController.text.trim()},
+        );
+
+        if (!mounted) return;
+        // Always show success (prevents email enumeration)
+        setState(() {
+          _emailSent = true;
+          _isLoading = false;
+        });
+      } catch (e) {
+        if (!mounted) return;
+        // Still show success to prevent email enumeration
+        setState(() {
+          _emailSent = true;
+          _isLoading = false;
+        });
+      }
     }
   }
 
@@ -57,24 +76,10 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
         backgroundColor: Colors.transparent,
         elevation: 0,
       ),
-      body: BlocListener<AuthBloc, AuthState>(
-        listener: (context, state) {
-          if (state is AuthForgotPasswordSuccess) {
-            setState(() => _emailSent = true);
-          } else if (state is AuthError) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(state.message),
-                backgroundColor: AppColors.error,
-              ),
-            );
-          }
-        },
-        child: SafeArea(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(24),
-            child: _emailSent ? _buildSuccessView() : _buildFormView(isDark),
-          ),
+      body: SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(24),
+          child: _emailSent ? _buildSuccessView() : _buildFormView(isDark),
         ),
       ),
     );
@@ -164,20 +169,16 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
         ),
         const SizedBox(height: 32),
         // Resend button
-        BlocBuilder<AuthBloc, AuthState>(
-          builder: (context, state) {
-            return TextButton.icon(
-              onPressed: state is AuthLoading ? null : _handleSubmit,
-              icon: state is AuthLoading
-                  ? const SizedBox(
-                      width: 16,
-                      height: 16,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : const Icon(Icons.refresh_rounded),
-              label: Text(state is AuthLoading ? 'Sending...' : 'Resend Email'),
-            );
-          },
+        TextButton.icon(
+          onPressed: _isLoading ? null : _handleSubmit,
+          icon: _isLoading
+              ? const SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : const Icon(Icons.refresh_rounded),
+          label: Text(_isLoading ? 'Sending...' : 'Resend Email'),
         ),
         const SizedBox(height: 16),
         // Back to login
@@ -264,14 +265,10 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
           ),
           const SizedBox(height: 32),
           // Submit Button
-          BlocBuilder<AuthBloc, AuthState>(
-            builder: (context, state) {
-              return CustomButton(
-                text: 'Send Reset Link',
-                onPressed: _handleSubmit,
-                isLoading: state is AuthLoading,
-              );
-            },
+          CustomButton(
+            text: 'Send Reset Link',
+            onPressed: _isLoading ? null : _handleSubmit,
+            isLoading: _isLoading,
           ),
           const SizedBox(height: 24),
           // Back to login link

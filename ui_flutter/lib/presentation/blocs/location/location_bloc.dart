@@ -208,7 +208,7 @@ class LocationBloc extends Bloc<LocationEvent, LocationState> {
       if (_currentSessionId != null) {
         final position = await Geolocator.getCurrentPosition();
 
-        await _apiClient.post(
+        await _apiClient.put(
           '${ApiConstants.locationSessions}/$_currentSessionId/end',
           data: {
             'end_lat': position.latitude,
@@ -386,11 +386,16 @@ class LocationBloc extends Bloc<LocationEvent, LocationState> {
     final updates = List<LocationUpdate>.from(_pendingUpdates);
     _pendingUpdates.clear();
 
-    await _apiClient.post(
-      ApiConstants.locationBatch,
-      data: {
-        'locations': updates.map((u) => u.toJson()).toList(),
-      },
-    );
+    // Send each update individually since /api/location/batch doesn't exist
+    for (final update in updates) {
+      try {
+        await _apiClient.post(
+          ApiConstants.locationUpdate,
+          data: update.toJson(),
+        );
+      } catch (_) {
+        // If one fails, continue with the rest
+      }
+    }
   }
 }

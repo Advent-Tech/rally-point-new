@@ -284,11 +284,23 @@ func (sp *ServiceProxy) ProxyWebSocket(serviceName string, targetPath string) gi
 		if targetURL.Scheme == "https" {
 			wsScheme = "wss"
 		}
-		wsURL := fmt.Sprintf("%s://%s%s", wsScheme, targetURL.Host, targetPath)
 
-		// Append query parameters
-		if c.Request.URL.RawQuery != "" {
-			wsURL += "?" + c.Request.URL.RawQuery
+		// Build query params: start with client's original params, then inject auth context
+		query := c.Request.URL.Query()
+		if userID, exists := c.Get("user_id"); exists {
+			if query.Get("user_id") == "" {
+				query.Set("user_id", userID.(string))
+			}
+		}
+		if teamID, exists := c.Get("team_id"); exists {
+			if query.Get("team_id") == "" {
+				query.Set("team_id", teamID.(string))
+			}
+		}
+
+		wsURL := fmt.Sprintf("%s://%s%s", wsScheme, targetURL.Host, targetPath)
+		if encoded := query.Encode(); encoded != "" {
+			wsURL += "?" + encoded
 		}
 
 		// Connect to backend WebSocket
@@ -296,10 +308,6 @@ func (sp *ServiceProxy) ProxyWebSocket(serviceName string, targetPath string) gi
 		// Forward authorization header
 		if auth := c.GetHeader("Authorization"); auth != "" {
 			backendHeaders.Set("Authorization", auth)
-		}
-		// Forward user context
-		if userID, exists := c.Get("user_id"); exists {
-			backendHeaders.Set("X-User-ID", userID.(string))
 		}
 
 		backendConn, _, err := websocket.DefaultDialer.Dial(wsURL, backendHeaders)

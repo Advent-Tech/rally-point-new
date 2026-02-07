@@ -22,6 +22,9 @@ class ChatBloc extends Bloc<ChatEvent, ChatState> {
   // Typing indicator timers
   final Map<String, Timer> _typingTimers = {};
 
+  // Polling timer (WebSocket fallback)
+  Timer? _pollTimer;
+
   ChatBloc() : super(ChatInitial()) {
     on<ChatLoadConversations>(_onLoadConversations);
     on<ChatSelectConversation>(_onSelectConversation);
@@ -39,6 +42,7 @@ class ChatBloc extends Bloc<ChatEvent, ChatState> {
     on<ChatClearCurrentConversation>(_onClearCurrentConversation);
     on<ChatConnectWebSocket>(_onConnectWebSocket);
     on<ChatDisconnectWebSocket>(_onDisconnectWebSocket);
+    on<_ChatPollMessages>(_onPollMessages);
   }
 
   Future<void> _initialize() async {
@@ -116,6 +120,7 @@ class ChatBloc extends Bloc<ChatEvent, ChatState> {
           conversation: conversation,
           messages: [],
           typingUsers: [],
+          isLoadingMessages: true,
         ));
 
         // Load messages
@@ -156,10 +161,24 @@ class ChatBloc extends Bloc<ChatEvent, ChatState> {
             .map<ChatMessage>((json) => ChatMessage.fromJson(json))
             .toList();
 
-        emit(currentState.copyWith(messages: messages));
+        emit(currentState.copyWith(messages: messages, isLoadingMessages: false));
+
+        // Mark messages as read to clear unread count
+        if (messages.isNotEmpty) {
+          add(ChatMarkAsRead(
+            conversationId: event.conversationId,
+            messageId: messages.last.id,
+          ));
+        }
+      } else {
+        emit(currentState.copyWith(isLoadingMessages: false));
       }
     } catch (e) {
       debugPrint('ChatBloc: Error loading messages: $e');
+      final latestState = state;
+      if (latestState is ChatInConversation) {
+        emit(latestState.copyWith(isLoadingMessages: false));
+      }
     }
   }
 
@@ -277,6 +296,7 @@ class ChatBloc extends Bloc<ChatEvent, ChatState> {
           conversation: conversation,
           messages: [],
           typingUsers: [],
+          isLoadingMessages: true,
         ));
 
         // Load messages if any exist
@@ -315,6 +335,7 @@ class ChatBloc extends Bloc<ChatEvent, ChatState> {
           conversation: conversation,
           messages: [],
           typingUsers: [],
+          isLoadingMessages: true,
         ));
 
         add(ChatLoadMessages(conversationId: conversation.id));
@@ -523,9 +544,12 @@ class ChatBloc extends Bloc<ChatEvent, ChatState> {
   ) async {
     // Disconnect existing socket if any
     await _disconnectChatSocket();
+    _stopPolling();
 
     if (event.conversationId == null || _currentUserId == null) {
       debugPrint('ChatBloc: Cannot connect WebSocket - missing conversationId or userId');
+      // Still start polling as fallback
+      _startPolling();
       return;
     }
 
@@ -533,10 +557,8 @@ class ChatBloc extends Bloc<ChatEvent, ChatState> {
 
     try {
       final wsUrl = _getChatWsUrl(event.conversationId!);
-      debugPrint('ChatBloc: Connecting to chat WebSocket: $wsUrl');
 
       _chatSocket = await WebSocket.connect(wsUrl);
-      debugPrint('ChatBloc: Chat WebSocket connected');
 
       // Listen for messages
       _socketSubscription = _chatSocket!.listen(
@@ -545,7 +567,6 @@ class ChatBloc extends Bloc<ChatEvent, ChatState> {
           debugPrint('ChatBloc: WebSocket error: $error');
         },
         onDone: () {
-          debugPrint('ChatBloc: WebSocket connection closed');
           _chatSocket = null;
         },
         cancelOnError: false,
@@ -553,6 +574,9 @@ class ChatBloc extends Bloc<ChatEvent, ChatState> {
     } catch (e) {
       debugPrint('ChatBloc: Failed to connect WebSocket: $e');
     }
+
+    // Always start polling as fallback (WebSocket may silently fail)
+    _startPolling();
   }
 
   void _handleWebSocketMessage(dynamic data) {
@@ -588,8 +612,8 @@ class ChatBloc extends Bloc<ChatEvent, ChatState> {
     ChatDisconnectWebSocket event,
     Emitter<ChatState> emit,
   ) async {
+    _stopPolling();
     await _disconnectChatSocket();
-    debugPrint('ChatBloc: WebSocket disconnected');
   }
 
   Future<void> _disconnectChatSocket() async {
@@ -607,8 +631,72 @@ class ChatBloc extends Bloc<ChatEvent, ChatState> {
     _typingTimers.clear();
   }
 
+  void _startPolling() {
+    _pollTimer?.cancel();
+    _pollTimer = Timer.periodic(const Duration(seconds: 5), (_) {
+      add(const _ChatPollMessages());
+    });
+  }
+
+  void _stopPolling() {
+    _pollTimer?.cancel();
+    _pollTimer = null;
+  }
+
+  Future<void> _onPollMessages(
+    _ChatPollMessages event,
+    Emitter<ChatState> emit,
+  ) async {
+    final currentState = state;
+    if (currentState is! ChatInConversation) return;
+
+    try {
+      await _initialize();
+
+      final response = await _api.get(
+        '/api/chat/conversations/${currentState.conversation.id}/messages',
+        queryParameters: {'limit': 50},
+      );
+
+      if (response.statusCode == 200) {
+        final data = response.data['messages'] ?? [];
+        final serverMessages = (data as List)
+            .map<ChatMessage>((json) => ChatMessage.fromJson(json))
+            .toList();
+
+        // Check if there are new messages not in our current list
+        final existingIds = currentState.messages.map((m) => m.id).toSet();
+        final hasNew = serverMessages.any((m) => !existingIds.contains(m.id));
+
+        if (hasNew) {
+          // Merge: keep existing messages, add new ones
+          final merged = <ChatMessage>[];
+          final mergedIds = <String>{};
+          for (final m in currentState.messages) {
+            // Skip temp/sending messages that now have real versions
+            if (!m.isSending) {
+              merged.add(m);
+              mergedIds.add(m.id);
+            }
+          }
+          for (final m in serverMessages) {
+            if (!mergedIds.contains(m.id)) {
+              merged.add(m);
+              mergedIds.add(m.id);
+            }
+          }
+          merged.sort((a, b) => (a.createdAt ?? DateTime(0)).compareTo(b.createdAt ?? DateTime(0)));
+          emit(currentState.copyWith(messages: merged));
+        }
+      }
+    } catch (_) {
+      // Silent failure — polling will retry
+    }
+  }
+
   @override
   Future<void> close() {
+    _stopPolling();
     _disconnectChatSocket();
     return super.close();
   }

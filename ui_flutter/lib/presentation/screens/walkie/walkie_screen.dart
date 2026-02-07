@@ -1,5 +1,7 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:flutter_sound/flutter_sound.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../blocs/walkie/walkie_bloc.dart';
 import '../../blocs/auth/auth_bloc.dart';
@@ -315,8 +317,9 @@ class _WalkieScreenState extends State<WalkieScreen> {
             padding: const EdgeInsets.all(16),
             itemCount: state.messages.length,
             itemBuilder: (context, index) {
-              // With reverse: true, index 0 = bottom of list, so use direct index for newest at bottom
-              final message = state.messages[index];
+              // With reverse: true, index 0 = bottom of screen.
+              // Messages are stored oldest-first, so reverse the index to show newest at bottom.
+              final message = state.messages[state.messages.length - 1 - index];
               return _MessageBubble(message: message);
             },
           ),
@@ -377,15 +380,18 @@ class _WalkieScreenState extends State<WalkieScreen> {
         ),
 
         // Push-to-talk button
-        _PushToTalkButton(
-          isSpeaking: state.isSpeaking,
-          isMuted: state.isMuted,
-          onStartSpeaking: () {
-            _walkieBloc.add(const WalkieStartSpeaking());
-          },
-          onStopSpeaking: () {
-            _walkieBloc.add(const WalkieStopSpeaking());
-          },
+        Padding(
+          padding: EdgeInsets.only(bottom: MediaQuery.of(context).padding.bottom),
+          child: _PushToTalkButton(
+            isSpeaking: state.isSpeaking,
+            isMuted: state.isMuted,
+            onStartSpeaking: () {
+              _walkieBloc.add(const WalkieStartSpeaking());
+            },
+            onStopSpeaking: () {
+              _walkieBloc.add(const WalkieStopSpeaking());
+            },
+          ),
         ),
       ],
     );
@@ -557,10 +563,97 @@ class _ParticipantAvatar extends StatelessWidget {
   }
 }
 
-class _MessageBubble extends StatelessWidget {
+class _MessageBubble extends StatefulWidget {
   final WalkieMessage message;
 
   const _MessageBubble({required this.message});
+
+  @override
+  State<_MessageBubble> createState() => _MessageBubbleState();
+}
+
+class _MessageBubbleState extends State<_MessageBubble> {
+  FlutterSoundPlayer? _player;
+  bool _isPlaying = false;
+  bool _hasError = false;
+  Duration _position = Duration.zero;
+  Duration _duration = Duration.zero;
+  StreamSubscription? _progressSub;
+
+  bool get _isVoice =>
+      widget.message.messageType == 'voice' ||
+      widget.message.messageType == 'audio';
+
+  @override
+  void dispose() {
+    _progressSub?.cancel();
+    if (_player != null) {
+      _player!.closePlayer();
+      _player = null;
+    }
+    super.dispose();
+  }
+
+  /// Lazily open player only on tap — avoids AudioFocus conflicts with recording
+  Future<FlutterSoundPlayer> _ensurePlayer() async {
+    if (_player == null) {
+      _player = FlutterSoundPlayer();
+      await _player!.openPlayer();
+      await _player!.setSubscriptionDuration(const Duration(milliseconds: 100));
+      _progressSub = _player!.onProgress!.listen((e) {
+        if (mounted) {
+          setState(() {
+            _position = e.position;
+            _duration = e.duration;
+          });
+        }
+      });
+    }
+    return _player!;
+  }
+
+  Future<void> _togglePlayback() async {
+    if (_hasError) return;
+
+    if (_isPlaying) {
+      await _player?.pausePlayer();
+      if (mounted) setState(() => _isPlaying = false);
+      return;
+    }
+
+    if (_player != null && _player!.isPaused) {
+      await _player!.resumePlayer();
+      if (mounted) setState(() => _isPlaying = true);
+      return;
+    }
+
+    final audioUrl = widget.message.audioUrl;
+    if (audioUrl != null && audioUrl.isNotEmpty) {
+      try {
+        final player = await _ensurePlayer();
+        await player.startPlayer(
+          fromURI: audioUrl,
+          whenFinished: () {
+            if (mounted) {
+              setState(() {
+                _isPlaying = false;
+                _position = Duration.zero;
+              });
+            }
+          },
+        );
+        if (mounted) setState(() => _isPlaying = true);
+      } catch (e) {
+        if (mounted) setState(() => _hasError = true);
+      }
+    }
+  }
+
+  String _formatDuration(Duration duration) {
+    final minutes = duration.inMinutes;
+    final seconds = duration.inSeconds % 60;
+    return '${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -572,13 +665,13 @@ class _MessageBubble extends StatelessWidget {
           CircleAvatar(
             radius: 16,
             backgroundColor: AppColors.primary.withAlpha(50),
-            backgroundImage: message.senderAvatar != null
-                ? NetworkImage(message.senderAvatar!)
+            backgroundImage: widget.message.senderAvatar != null
+                ? NetworkImage(widget.message.senderAvatar!)
                 : null,
-            child: message.senderAvatar == null
+            child: widget.message.senderAvatar == null
                 ? Text(
-                    message.senderName.isNotEmpty
-                        ? message.senderName[0].toUpperCase()
+                    widget.message.senderName.isNotEmpty
+                        ? widget.message.senderName[0].toUpperCase()
                         : '?',
                     style: const TextStyle(
                       fontSize: 12,
@@ -596,14 +689,14 @@ class _MessageBubble extends StatelessWidget {
                 Row(
                   children: [
                     Text(
-                      message.senderName,
+                      widget.message.senderName,
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
                         fontWeight: FontWeight.bold,
                       ),
                     ),
                     const SizedBox(width: 8),
                     Text(
-                      _formatTime(message.createdAt),
+                      _formatTime(widget.message.createdAt),
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
                         color: Theme.of(context).colorScheme.onSurfaceVariant,
                       ),
@@ -621,31 +714,98 @@ class _MessageBubble extends StatelessWidget {
   }
 
   Widget _buildMessageContent(BuildContext context) {
-    if (message.messageType == 'voice') {
-      return Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        decoration: BoxDecoration(
-          color: AppColors.primary.withAlpha(30),
-          borderRadius: BorderRadius.circular(16),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(Icons.play_arrow, color: AppColors.primary),
-            const SizedBox(width: 8),
-            Text(
-              message.formattedDuration,
-              style: const TextStyle(
-                color: AppColors.primary,
-                fontWeight: FontWeight.w500,
+    if (_isVoice) {
+      final totalDuration = _duration.inMilliseconds > 0
+          ? _duration
+          : Duration(milliseconds: widget.message.audioDurationMs ?? 0);
+      final progress = totalDuration.inMilliseconds > 0
+          ? (_position.inMilliseconds / totalDuration.inMilliseconds)
+              .clamp(0.0, 1.0)
+          : 0.0;
+
+      return GestureDetector(
+        onTap: _togglePlayback,
+        child: Container(
+          padding: const EdgeInsets.all(10),
+          decoration: BoxDecoration(
+            color: _isPlaying
+                ? AppColors.primary.withAlpha(40)
+                : AppColors.primary.withAlpha(20),
+            borderRadius: BorderRadius.circular(14),
+            border: _isPlaying
+                ? Border.all(color: AppColors.primary.withAlpha(100))
+                : null,
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 32,
+                height: 32,
+                decoration: BoxDecoration(
+                  color: _hasError
+                      ? AppColors.error
+                      : (_isPlaying
+                          ? AppColors.primary
+                          : AppColors.primary.withAlpha(150)),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  _hasError
+                      ? Icons.error_outline
+                      : (_isPlaying ? Icons.pause : Icons.play_arrow),
+                  size: 18,
+                  color: Colors.white,
+                ),
               ),
-            ),
-          ],
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(2),
+                      child: LinearProgressIndicator(
+                        value: progress,
+                        backgroundColor: Colors.grey.withAlpha(50),
+                        valueColor: const AlwaysStoppedAnimation<Color>(
+                          AppColors.primary,
+                        ),
+                        minHeight: 4,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          _isPlaying || _position > Duration.zero
+                              ? _formatDuration(_position)
+                              : '00:00',
+                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            fontSize: 10,
+                            color: Theme.of(context).colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                        Text(
+                          widget.message.formattedDuration,
+                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            fontSize: 10,
+                            color: Theme.of(context).colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
         ),
       );
     }
 
-    if (message.messageType == 'alert') {
+    if (widget.message.messageType == 'alert') {
       return Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         decoration: BoxDecoration(
@@ -659,7 +819,7 @@ class _MessageBubble extends StatelessWidget {
             const Icon(Icons.warning_amber, color: Colors.orange),
             const SizedBox(width: 8),
             Text(
-              message.text ?? 'Alert',
+              widget.message.text ?? 'Alert',
               style: const TextStyle(
                 color: Colors.orange,
                 fontWeight: FontWeight.w500,
@@ -671,7 +831,7 @@ class _MessageBubble extends StatelessWidget {
     }
 
     return Text(
-      message.text ?? '',
+      widget.message.text ?? '',
       style: Theme.of(context).textTheme.bodyMedium,
     );
   }

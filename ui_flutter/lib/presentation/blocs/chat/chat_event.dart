@@ -187,3 +187,8 @@ class ChatConnectWebSocket extends ChatEvent {
 class ChatDisconnectWebSocket extends ChatEvent {
   const ChatDisconnectWebSocket();
 }
+
+/// Internal: poll for new messages (WebSocket fallback)
+class _ChatPollMessages extends ChatEvent {
+  const _ChatPollMessages();
+}

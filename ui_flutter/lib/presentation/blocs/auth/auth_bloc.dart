@@ -286,19 +286,23 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
         final verificationStatus = data['verification_status'] ??
             (data['user'] as Map<String, dynamic>?)?['verification_status'];
         // Check if email verification is required
-        final emailVerified = data['email_verified'] ??
-            (data['user'] as Map<String, dynamic>?)?['email_verified'] ?? false;
+        // Handle both boolean and potential string values from API
+        final rawEmailVerified = data['email_verified'] ??
+            (data['user'] as Map<String, dynamic>?)?['email_verified'];
+        final emailVerified = rawEmailVerified == true || rawEmailVerified == 'true';
 
         if (accessToken.isEmpty || verificationStatus == 'pending') {
-          // Check if email verification is needed first
-          if (emailVerified == false) {
+          // Check if email verification is needed first (email NOT verified yet)
+          if (!emailVerified) {
             // User registered but needs to verify email first
+            print('📧 Emitting AuthRegistrationSuccess for ${event.email}');
             emit(AuthRegistrationSuccess(
               message: data['message'] ??
                   'Registration successful! Please check your email to verify your account.',
               email: event.email,
               role: event.role,
             ));
+            print('📧 AuthRegistrationSuccess emitted');
             return;
           }
 

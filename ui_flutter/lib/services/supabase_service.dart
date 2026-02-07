@@ -31,17 +31,13 @@ class SupabaseService {
     if (_client != null) return;
 
     try {
-      debugPrint('SupabaseService: Starting initialization...');
-
       // Check if already initialized by trying to access the instance
       bool alreadyInitialized = false;
       try {
         _client = Supabase.instance.client;
         alreadyInitialized = true;
-        debugPrint('SupabaseService: Already initialized, reusing client');
       } catch (_) {
         // Not initialized yet, continue with initialization
-        debugPrint('SupabaseService: Not initialized, will initialize now');
       }
 
       if (!alreadyInitialized) {
@@ -50,13 +46,9 @@ class SupabaseService {
           anonKey: _supabaseAnonKey,
         );
         _client = Supabase.instance.client;
-        debugPrint('SupabaseService: Initialized successfully');
       }
 
-      debugPrint('SupabaseService: Client ready, URL: $_supabaseUrl');
-    } catch (e, stackTrace) {
-      debugPrint('SupabaseService: Initialization error: $e');
-      debugPrint('SupabaseService: Stack trace: $stackTrace');
+    } catch (e) {
       rethrow;
     }
   }
@@ -76,12 +68,9 @@ class SupabaseService {
     required String teamId,
     String? fileName,
   }) async {
-    debugPrint('SupabaseService.uploadAudioFile: ENTRY - filePath=$filePath, teamId=$teamId');
     try {
-      debugPrint('SupabaseService.uploadAudioFile: Checking if file exists...');
       final file = File(filePath);
       if (!await file.exists()) {
-        debugPrint('SupabaseService: File not found: $filePath');
         return null;
       }
 
@@ -90,11 +79,8 @@ class SupabaseService {
 
       // Validate file has content
       if (bytes.isEmpty) {
-        debugPrint('SupabaseService: File is empty: $filePath');
         return null;
       }
-
-      debugPrint('SupabaseService: File size: ${bytes.length} bytes');
 
       // Generate unique file name - detect extension from source file
       final timestamp = DateTime.now().millisecondsSinceEpoch;
@@ -108,6 +94,9 @@ class SupabaseService {
         case 'wav':
           contentType = 'audio/wav';
           break;
+        case 'aac':
+          contentType = 'audio/aac';
+          break;
         case 'm4a':
         case 'mp4':
           contentType = 'audio/mp4';
@@ -119,11 +108,8 @@ class SupabaseService {
           contentType = 'audio/mpeg';
       }
 
-      debugPrint('SupabaseService: Uploading to bucket: $audioBucket, path: $storagePath');
-      debugPrint('SupabaseService: Content type: $contentType');
-
       // Upload to Supabase Storage
-      final response = await client.storage
+      await client.storage
           .from(audioBucket)
           .uploadBinary(
             storagePath,
@@ -134,18 +120,13 @@ class SupabaseService {
             ),
           );
 
-      debugPrint('SupabaseService: Upload response: $response');
-
       // Get public URL
       final publicUrl = client.storage
           .from(audioBucket)
           .getPublicUrl(storagePath);
 
-      debugPrint('SupabaseService: Public URL: $publicUrl');
       return publicUrl;
-    } catch (e, stackTrace) {
-      debugPrint('SupabaseService: Upload error: $e');
-      debugPrint('SupabaseService: Stack trace: $stackTrace');
+    } catch (e) {
       return null;
     }
   }
@@ -180,10 +161,8 @@ class SupabaseService {
           .from(audioBucket)
           .getPublicUrl(storagePath);
 
-      debugPrint('SupabaseService: Uploaded, URL: $publicUrl');
       return publicUrl;
     } catch (e) {
-      debugPrint('SupabaseService: Upload bytes error: $e');
       return null;
     }
   }
@@ -192,10 +171,8 @@ class SupabaseService {
   Future<bool> deleteAudioFile(String storagePath) async {
     try {
       await client.storage.from(audioBucket).remove([storagePath]);
-      debugPrint('SupabaseService: Deleted: $storagePath');
       return true;
     } catch (e) {
-      debugPrint('SupabaseService: Delete error: $e');
       return false;
     }
   }

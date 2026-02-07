@@ -348,12 +348,12 @@ This is an automated message, please do not reply.`
 
 // GetVerificationURL constructs the full verification URL
 func (t *EmailTemplates) GetVerificationURL(token string) string {
-	return t.frontendURL + "/verify-email?token=" + token
+	return t.frontendURL + "/verify-email/" + token
 }
 
 // GetPasswordResetURL constructs the full password reset URL
 func (t *EmailTemplates) GetPasswordResetURL(token string) string {
-	return t.frontendURL + "/reset-password?token=" + token
+	return t.frontendURL + "/reset-password/" + token
 }
 
 // SetFrontendURL allows updating the frontend URL (useful for testing)

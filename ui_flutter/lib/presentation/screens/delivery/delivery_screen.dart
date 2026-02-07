@@ -32,7 +32,7 @@ class DeliveryScreen extends StatefulWidget {
 }
 
 class _DeliveryScreenState extends State<DeliveryScreen> {
-  DateFilter _selectedFilter = DateFilter.today;
+  DateFilter _selectedFilter = DateFilter.all;
 
   @override
   void initState() {

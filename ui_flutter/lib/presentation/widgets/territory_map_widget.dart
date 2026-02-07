@@ -38,6 +38,7 @@ class TerritoryMapWidget extends StatefulWidget {
   final bool fitToTerritories;
   final double? userLatitude;
   final double? userLongitude;
+  final bool dotOnly;
 
   const TerritoryMapWidget({
     super.key,
@@ -52,6 +53,7 @@ class TerritoryMapWidget extends StatefulWidget {
     this.fitToTerritories = false,
     this.userLatitude,
     this.userLongitude,
+    this.dotOnly = false,
   });
 
   @override
@@ -141,7 +143,47 @@ class _TerritoryMapWidgetState extends State<TerritoryMapWidget> {
 
     debugPrint('TerritoryMapWidget: Updating ${widget.territories.length} territories');
 
-    // Add territory polygons and boundary lines
+    // Pre-compute centroids and offset overlapping ones for dot-only mode
+    final Map<int, Position> offsetCentroids = {};
+    if (widget.dotOnly) {
+      final centroids = <int, Position>{};
+      for (int i = 0; i < widget.territories.length; i++) {
+        final coords = _parseGeometryForTerritory(widget.territories[i]);
+        if (coords.length > 2) {
+          centroids[i] = _calculateCentroid(coords);
+        }
+      }
+      // Detect overlapping centroids (within 0.01 degrees ~1km) and offset them
+      final indices = centroids.keys.toList();
+      for (int a = 0; a < indices.length; a++) {
+        final idxA = indices[a];
+        final cA = centroids[idxA]!;
+        final overlapping = <int>[idxA];
+        for (int b = a + 1; b < indices.length; b++) {
+          final idxB = indices[b];
+          final cB = centroids[idxB]!;
+          final dist = ((cA.lat.toDouble() - cB.lat.toDouble()).abs() +
+              (cA.lng.toDouble() - cB.lng.toDouble()).abs());
+          if (dist < 0.01) {
+            overlapping.add(idxB);
+          }
+        }
+        if (overlapping.length > 1) {
+          const offsetDeg = 0.8; // ~80km offset for visibility at zoomed-out level
+          for (int j = 0; j < overlapping.length; j++) {
+            final idx = overlapping[j];
+            final c = centroids[idx]!;
+            final angle = (2 * math.pi * j) / overlapping.length;
+            offsetCentroids[idx] = Position(
+              c.lng.toDouble() + offsetDeg * math.cos(angle),
+              c.lat.toDouble() + offsetDeg * math.sin(angle),
+            );
+          }
+        }
+      }
+    }
+
+    // Add territory annotations
     for (int i = 0; i < widget.territories.length; i++) {
       final territory = widget.territories[i];
       final coords = _parseGeometryForTerritory(territory);
@@ -159,51 +201,64 @@ class _TerritoryMapWidgetState extends State<TerritoryMapWidget> {
           isSelected ? AppColors.primary : _territoryColors[colorIndex];
 
       try {
-        // Add filled polygon with high visibility
-        final polygonOptions = PolygonAnnotationOptions(
-          geometry: Polygon(coordinates: [coords]),
-          fillColor: baseColor.toARGB32(),
-          fillOpacity: isSelected ? 0.5 : 0.4,
-        );
-        await _polygonManager!.create(polygonOptions);
+        if (widget.dotOnly) {
+          // Dot-only mode: show only circle markers at centroids
+          if (coords.length > 2) {
+            final centroid = offsetCentroids[i] ?? _calculateCentroid(coords);
+            await _circleManager?.create(CircleAnnotationOptions(
+              geometry: Point(coordinates: centroid),
+              circleColor: baseColor.toARGB32(),
+              circleRadius: isSelected ? 16.0 : 12.0,
+              circleStrokeColor: Colors.white.toARGB32(),
+              circleStrokeWidth: 3,
+              circleOpacity: 0.9,
+            ));
+          }
+        } else {
+          // Full mode: show polygons, boundary lines, and centroid markers
+          final polygonOptions = PolygonAnnotationOptions(
+            geometry: Polygon(coordinates: [coords]),
+            fillColor: baseColor.toARGB32(),
+            fillOpacity: isSelected ? 0.5 : 0.4,
+          );
+          await _polygonManager!.create(polygonOptions);
 
-        debugPrint('TerritoryMapWidget: Created polygon for ${territory.entityName} with ${coords.length} coords');
+          debugPrint('TerritoryMapWidget: Created polygon for ${territory.entityName} with ${coords.length} coords');
 
-        // Add boundary line (polyline) for visibility - thicker line
-        final lineCoords = List<Position>.from(coords);
-        // Close the polygon line if not already closed
-        if (lineCoords.isNotEmpty && lineCoords.first != lineCoords.last) {
-          lineCoords.add(lineCoords.first);
-        }
+          // Add boundary line (polyline) for visibility - thicker line
+          final lineCoords = List<Position>.from(coords);
+          if (lineCoords.isNotEmpty && lineCoords.first != lineCoords.last) {
+            lineCoords.add(lineCoords.first);
+          }
 
-        // Use a darker border color for better contrast
-        final borderColor = Color.fromARGB(255,
-          (baseColor.r * 0.7).toInt(),
-          (baseColor.g * 0.7).toInt(),
-          (baseColor.b * 0.7).toInt()
-        );
+          final borderColor = Color.fromARGB(255,
+            (baseColor.r * 0.7).toInt(),
+            (baseColor.g * 0.7).toInt(),
+            (baseColor.b * 0.7).toInt()
+          );
 
-        final lineOptions = PolylineAnnotationOptions(
-          geometry: LineString(coordinates: lineCoords),
-          lineColor: borderColor.toARGB32(),
-          lineWidth: isSelected ? 6.0 : 4.0,
-          lineOpacity: 1.0,
-        );
-        await _polylineManager!.create(lineOptions);
+          final lineOptions = PolylineAnnotationOptions(
+            geometry: LineString(coordinates: lineCoords),
+            lineColor: borderColor.toARGB32(),
+            lineWidth: isSelected ? 6.0 : 4.0,
+            lineOpacity: 1.0,
+          );
+          await _polylineManager!.create(lineOptions);
 
-        debugPrint('TerritoryMapWidget: Created polyline for ${territory.entityName}');
+          debugPrint('TerritoryMapWidget: Created polyline for ${territory.entityName}');
 
-        // Also add a centroid marker for visibility at zoomed-out levels
-        if (coords.length > 2) {
-          final centroid = _calculateCentroid(coords);
-          await _circleManager?.create(CircleAnnotationOptions(
-            geometry: Point(coordinates: centroid),
-            circleColor: baseColor.toARGB32(),
-            circleRadius: isSelected ? 12.0 : 8.0,
-            circleStrokeColor: Colors.white.toARGB32(),
-            circleStrokeWidth: 2,
-            circleOpacity: 0.9,
-          ));
+          // Also add a centroid marker for visibility at zoomed-out levels
+          if (coords.length > 2) {
+            final centroid = _calculateCentroid(coords);
+            await _circleManager?.create(CircleAnnotationOptions(
+              geometry: Point(coordinates: centroid),
+              circleColor: baseColor.toARGB32(),
+              circleRadius: isSelected ? 12.0 : 8.0,
+              circleStrokeColor: Colors.white.toARGB32(),
+              circleStrokeWidth: 2,
+              circleOpacity: 0.9,
+            ));
+          }
         }
       } catch (e) {
         debugPrint('TerritoryMapWidget: Error creating annotations for ${territory.entityName}: $e');

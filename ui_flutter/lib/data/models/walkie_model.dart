@@ -109,7 +109,7 @@ class WalkieMessage {
   Map<String, dynamic> toJson() => _$WalkieMessageToJson(this);
 
   String get formattedDuration {
-    if (audioDurationMs == null) return '0s';
+    if (audioDurationMs == null || audioDurationMs == 0) return '';
     final seconds = audioDurationMs! ~/ 1000;
     if (seconds < 60) return '${seconds}s';
     final minutes = seconds ~/ 60;

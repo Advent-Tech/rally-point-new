@@ -1,16 +1,21 @@
 import 'dart:async';
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import '../../blocs/auth/auth_bloc.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/network/api_client.dart';
 import '../../../core/network/api_result.dart';
 import '../../../data/models/team_model.dart';
 import '../../../data/repositories/team_repository.dart';
 import '../../widgets/custom_text_field.dart';
 import '../../widgets/custom_button.dart';
 import '../../widgets/feedback/app_snackbar.dart';
+
+// Global navigator key for showing dialogs from stream subscription
+final _registerNavigatorKey = GlobalKey<NavigatorState>();
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
@@ -36,10 +41,18 @@ class _RegisterScreenState extends State<RegisterScreen> {
   List<TeamModel> _teamSearchResults = [];
   TeamModel? _selectedTeam;
   bool _isSearchingTeams = false;
+  bool _isSelectingTeam = false; // Flag to prevent re-search after selection
   Timer? _searchDebounce;
   final FocusNode _teamSearchFocusNode = FocusNode();
   final LayerLink _teamSearchLayerLink = LayerLink();
   OverlayEntry? _overlayEntry;
+
+  // Auth state subscription
+  StreamSubscription<AuthState>? _authSubscription;
+  bool _dialogShown = false;
+  bool _isLoading = false;
+
+  late final AuthBloc _authBloc;
 
   @override
   void initState() {
@@ -49,7 +62,44 @@ class _RegisterScreenState extends State<RegisterScreen> {
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Set up subscription only once when context is available
+    if (_authSubscription == null) {
+      _authBloc = context.read<AuthBloc>();
+      _authSubscription = _authBloc.stream.listen(_handleAuthState);
+      print('📱 Stream subscription set up');
+    }
+  }
+
+  void _handleAuthState(AuthState state) {
+    print('📱 Stream received state: ${state.runtimeType}');
+    if (!mounted) {
+      print('📱 Widget not mounted, ignoring');
+      return;
+    }
+    if (_dialogShown) {
+      print('📱 Dialog already shown, ignoring');
+      return;
+    }
+
+    if (state is AuthRegistrationSuccess) {
+      _dialogShown = true;
+      print('📱 Showing registration success dialog');
+      _showRegistrationSuccessDialog(state);
+    } else if (state is AuthPendingVerification) {
+      _dialogShown = true;
+      print('📱 Showing pending verification dialog');
+      _showPendingVerificationDialog(state);
+    } else if (state is AuthError) {
+      print('📱 Showing error snackbar');
+      AppSnackbar.error(context, message: state.message);
+    }
+  }
+
+  @override
   void dispose() {
+    _authSubscription?.cancel();
     _nameController.dispose();
     _emailController.dispose();
     _passwordController.dispose();
@@ -73,6 +123,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   void _onTeamSearchChanged() {
     if (!mounted) return;
+
+    // Skip search if we're programmatically setting text after selection
+    if (_isSelectingTeam) {
+      _isSelectingTeam = false;
+      return;
+    }
+
     final query = _teamSearchController.text;
 
     _searchDebounce?.cancel();
@@ -92,6 +149,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   Future<void> _searchTeams(String query) async {
     if (!mounted) return;
+    // Don't search if team already selected
+    if (_selectedTeam != null) return;
 
     setState(() => _isSearchingTeams = true);
 
@@ -129,15 +188,21 @@ class _RegisterScreenState extends State<RegisterScreen> {
   }
 
   void _selectTeam(TeamModel team) {
+    _isSelectingTeam = true; // Prevent re-search when setting text
+    _searchDebounce?.cancel(); // Cancel any pending search
     setState(() {
       _selectedTeam = team;
       _teamSearchController.text = team.name;
+      _teamSearchResults = []; // Clear search results
     });
     _removeOverlay();
     _teamSearchFocusNode.unfocus();
   }
 
   void _showOverlay() {
+    // Don't show overlay if a team is already selected
+    if (_selectedTeam != null) return;
+
     _removeOverlay();
 
     final overlay = Overlay.of(context);
@@ -259,7 +324,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
     }
   }
 
-  void _handleRegister() {
+  Future<void> _handleRegister() async {
     if (_formKey.currentState?.validate() ?? false) {
       // Validate team requirements for workers
       if (_selectedRole == 'worker' && _selectedTeam == null) {
@@ -267,17 +332,263 @@ class _RegisterScreenState extends State<RegisterScreen> {
         return;
       }
 
-      context.read<AuthBloc>().add(AuthRegister(
-        email: _emailController.text.trim(),
-        password: _passwordController.text,
-        displayName: _nameController.text.trim(),
-        role: _selectedRole,
-        // Workers select a team to request joining
-        teamId: _selectedRole == 'worker' && _selectedTeam != null
-            ? _selectedTeam!.id
-            : null,
-      ));
+      // Show loading
+      setState(() => _isLoading = true);
+
+      try {
+        final apiClient = await ApiClient.getInstance();
+        final response = await apiClient.post(
+          '/api/auth/register',
+          data: {
+            'email': _emailController.text.trim(),
+            'password': _passwordController.text,
+            'display_name': _nameController.text.trim(),
+            'role': _selectedRole,
+            if (_selectedRole == 'worker' && _selectedTeam != null)
+              'team_id': _selectedTeam!.id,
+          },
+        );
+
+        if (!mounted) return;
+
+        if (response.statusCode == 200 || response.statusCode == 201) {
+          // Show success dialog immediately
+          _showVerificationEmailSentDialog();
+        }
+      } catch (e) {
+        if (!mounted) return;
+        // Extract error message
+        String errorMessage = 'Registration failed. Please try again.';
+        if (e is DioException && e.response?.data is Map) {
+          errorMessage = e.response?.data['error'] ??
+                        e.response?.data['message'] ??
+                        errorMessage;
+        }
+        AppSnackbar.error(context, message: errorMessage);
+      } finally {
+        if (mounted) {
+          setState(() => _isLoading = false);
+        }
+      }
     }
+  }
+
+  void _showVerificationEmailSentDialog() {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) => AlertDialog(
+        title: Row(
+          children: [
+            Icon(Icons.mark_email_read, color: AppColors.success),
+            const SizedBox(width: 12),
+            const Expanded(child: Text('Verify Your Email')),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Registration successful! Please check your email to verify your account.'),
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: AppColors.info.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(Icons.info_outline, color: AppColors.info, size: 20),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'A verification link has been sent to ${_emailController.text.trim()}. '
+                      'Please check your inbox and click the link to verify your email.',
+                      style: TextStyle(fontSize: 13, color: AppColors.info),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: AppColors.warning.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(Icons.schedule, color: AppColors.warning, size: 20),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      _selectedRole == 'team_leader'
+                          ? 'After verifying your email, an admin will review your account.'
+                          : 'After verifying your email, the team leader will review your join request.',
+                      style: TextStyle(fontSize: 13, color: AppColors.warning),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.of(dialogContext).pop();
+              context.go('/login');
+            },
+            child: const Text('OK'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showRegistrationSuccessDialog(AuthRegistrationSuccess state) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) => AlertDialog(
+        title: Row(
+          children: [
+            Icon(
+              Icons.mark_email_read,
+              color: AppColors.success,
+            ),
+            const SizedBox(width: 12),
+            const Expanded(
+              child: Text('Verify Your Email'),
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(state.message),
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: AppColors.info.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(Icons.info_outline, color: AppColors.info, size: 20),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'A verification link has been sent to ${state.email}. '
+                      'Please check your inbox and click the link to verify your email.',
+                      style: TextStyle(fontSize: 13, color: AppColors.info),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: AppColors.warning.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(Icons.schedule, color: AppColors.warning, size: 20),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      state.role == 'team_leader'
+                          ? 'After verifying your email, an admin will review your account.'
+                          : 'After verifying your email, the team leader will review your join request.',
+                      style: TextStyle(fontSize: 13, color: AppColors.warning),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.of(dialogContext).pop();
+              context.go('/login');
+            },
+            child: const Text('Go to Login'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showPendingVerificationDialog(AuthPendingVerification state) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) => AlertDialog(
+        title: Row(
+          children: [
+            Icon(
+              state.role == 'team_leader' ? Icons.hourglass_empty : Icons.send,
+              color: AppColors.primary,
+            ),
+            const SizedBox(width: 12),
+            Text(state.role == 'team_leader'
+                ? 'Pending Verification'
+                : 'Request Sent'),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(state.message),
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: AppColors.info.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.info_outline, color: AppColors.info, size: 20),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      state.role == 'team_leader'
+                          ? 'An admin will review your account.'
+                          : 'The team leader will review your request.',
+                      style: TextStyle(fontSize: 13, color: AppColors.info),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.of(dialogContext).pop();
+              context.go('/login');
+            },
+            child: const Text('Go to Login'),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -285,158 +596,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
-      appBar: AppBar(
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => context.go('/login'),
+        appBar: AppBar(
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back),
+            onPressed: () => context.go('/login'),
+          ),
         ),
-      ),
-      body: BlocListener<AuthBloc, AuthState>(
-        listener: (context, state) {
-          if (state is AuthError) {
-            AppSnackbar.error(context, message: state.message);
-          } else if (state is AuthRegistrationSuccess) {
-            // Show email verification dialog
-            showDialog(
-              context: context,
-              barrierDismissible: false,
-              builder: (context) => AlertDialog(
-                title: Row(
-                  children: [
-                    Icon(
-                      Icons.mark_email_read,
-                      color: AppColors.success,
-                    ),
-                    const SizedBox(width: 12),
-                    const Expanded(
-                      child: Text('Verify Your Email'),
-                    ),
-                  ],
-                ),
-                content: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(state.message),
-                    const SizedBox(height: 16),
-                    Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: AppColors.info.withValues(alpha: 0.08),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Icon(Icons.info_outline, color: AppColors.info, size: 20),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Text(
-                              'A verification link has been sent to ${state.email}. '
-                              'Please check your inbox and click the link to verify your email.',
-                              style: TextStyle(fontSize: 13, color: AppColors.info),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: AppColors.warning.withValues(alpha: 0.08),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Icon(Icons.schedule, color: AppColors.warning, size: 20),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Text(
-                              state.role == 'team_leader'
-                                  ? 'After verifying your email, an admin will review your account.'
-                                  : 'After verifying your email, the team leader will review your join request.',
-                              style: TextStyle(fontSize: 13, color: AppColors.warning),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-                actions: [
-                  TextButton(
-                    onPressed: () {
-                      Navigator.of(context).pop();
-                      context.go('/login');
-                    },
-                    child: const Text('Go to Login'),
-                  ),
-                ],
-              ),
-            );
-          } else if (state is AuthPendingVerification) {
-            // Show pending verification dialog and navigate to login
-            showDialog(
-              context: context,
-              barrierDismissible: false,
-              builder: (context) => AlertDialog(
-                title: Row(
-                  children: [
-                    Icon(
-                      state.role == 'team_leader' ? Icons.hourglass_empty : Icons.send,
-                      color: AppColors.primary,
-                    ),
-                    const SizedBox(width: 12),
-                    Text(state.role == 'team_leader'
-                        ? 'Pending Verification'
-                        : 'Request Sent'),
-                  ],
-                ),
-                content: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(state.message),
-                    const SizedBox(height: 16),
-                    Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: AppColors.info.withValues(alpha: 0.08),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Row(
-                        children: [
-                          Icon(Icons.info_outline, color: AppColors.info, size: 20),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Text(
-                              state.role == 'team_leader'
-                                  ? 'An admin will review your account.'
-                                  : 'The team leader will review your request.',
-                              style: TextStyle(fontSize: 13, color: AppColors.info),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-                actions: [
-                  TextButton(
-                    onPressed: () {
-                      Navigator.of(context).pop();
-                      context.go('/login');
-                    },
-                    child: const Text('Go to Login'),
-                  ),
-                ],
-              ),
-            );
-          }
-        },
-        child: SafeArea(
+        body: SafeArea(
           child: SingleChildScrollView(
             padding: const EdgeInsets.all(24),
             child: Form(
@@ -741,16 +907,12 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   const SizedBox(height: 32),
 
                   // Register Button
-                  BlocBuilder<AuthBloc, AuthState>(
-                    builder: (context, state) {
-                      return CustomButton(
-                        text: _selectedRole == 'team_leader'
-                            ? 'Register as Team Leader'
-                            : 'Request to Join Team',
-                        onPressed: _handleRegister,
-                        isLoading: state is AuthLoading,
-                      );
-                    },
+                  CustomButton(
+                    text: _selectedRole == 'team_leader'
+                        ? 'Register as Team Leader'
+                        : 'Request to Join Team',
+                    onPressed: _isLoading ? null : _handleRegister,
+                    isLoading: _isLoading,
                   ),
                   const SizedBox(height: 24),
 
@@ -773,7 +935,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
             ),
           ),
         ),
-      ),
     );
   }
 }

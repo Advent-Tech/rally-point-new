@@ -150,8 +150,8 @@ class _ChatScreenState extends State<ChatScreen> {
               children: [
                 // Messages list
                 Expanded(
-                  child: state is ChatLoading
-                      ? const Center(child: CircularProgressIndicator())
+                  child: (state is ChatLoading || state is ChatInitial || (state is ChatInConversation && state.isLoadingMessages))
+                      ? _buildMessageShimmer(isDark)
                       : messages.isEmpty
                           ? _buildEmptyMessages(context, isDark)
                           : _buildMessagesList(messages, isDark),
@@ -179,6 +179,34 @@ class _ChatScreenState extends State<ChatScreen> {
           );
         },
       ),
+    );
+  }
+
+  Widget _buildMessageShimmer(bool isDark) {
+    final shimmerBase = isDark ? Colors.grey[800]! : Colors.grey[200]!;
+    final shimmerHighlight = isDark ? Colors.grey[700]! : Colors.grey[300]!;
+
+    return ListView.builder(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      itemCount: 6,
+      itemBuilder: (context, index) {
+        final isRight = index % 3 == 0;
+        final width = (index % 2 == 0) ? 0.6 : 0.45;
+        return Align(
+          alignment: isRight ? Alignment.centerRight : Alignment.centerLeft,
+          child: Container(
+            margin: const EdgeInsets.symmetric(vertical: 4),
+            width: MediaQuery.of(context).size.width * width,
+            height: 44,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(18),
+              gradient: LinearGradient(
+                colors: [shimmerBase, shimmerHighlight, shimmerBase],
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 

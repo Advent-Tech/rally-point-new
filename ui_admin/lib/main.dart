@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:flutter_web_plugins/url_strategy.dart';
 import 'package:go_router/go_router.dart';
 
 import 'core/theme/app_theme.dart';
@@ -9,6 +10,7 @@ import 'presentation/blocs/auth/auth_bloc.dart';
 import 'presentation/screens/auth/login_screen.dart';
 import 'presentation/screens/auth/forgot_password_screen.dart';
 import 'presentation/screens/auth/verify_email_screen.dart';
+import 'presentation/screens/auth/reset_password_screen.dart';
 import 'presentation/screens/dashboard/admin_layout.dart';
 import 'presentation/screens/dashboard/dashboard_screen.dart';
 import 'presentation/screens/users/users_screen.dart';
@@ -24,6 +26,7 @@ import 'presentation/screens/map/admin_map_screen.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
+  usePathUrlStrategy(); // Use path-based URLs instead of hash-based
   runApp(const RallyAdminApp());
 }
 
@@ -68,7 +71,8 @@ class _RallyAdminAppState extends State<RallyAdminApp> {
         final isAuthenticated = authState is AuthAuthenticated;
         final isAuthPage = state.matchedLocation == '/login' ||
             state.matchedLocation == '/forgot-password' ||
-            state.matchedLocation == '/verify-email';
+            state.matchedLocation.startsWith('/verify-email') ||
+            state.matchedLocation.startsWith('/reset-password');
 
         if (!isAuthenticated && !isAuthPage) {
           return '/login';
@@ -93,10 +97,17 @@ class _RallyAdminAppState extends State<RallyAdminApp> {
           },
         ),
         GoRoute(
-          path: '/verify-email',
+          path: '/verify-email/:token',
           builder: (context, state) {
-            final token = state.uri.queryParameters['token'];
+            final token = state.pathParameters['token'];
             return VerifyEmailScreen(token: token);
+          },
+        ),
+        GoRoute(
+          path: '/reset-password/:token',
+          builder: (context, state) {
+            final token = state.pathParameters['token'];
+            return ResetPasswordScreen(token: token);
           },
         ),
         ShellRoute(

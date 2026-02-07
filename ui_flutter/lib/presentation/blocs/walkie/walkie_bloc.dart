@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -7,7 +8,6 @@ import '../../../core/network/api_client.dart';
 import '../../../core/constants/api_constants.dart';
 import '../../../data/models/walkie_model.dart';
 import '../../../services/audio_service.dart';
-import '../../../services/websocket_service.dart';
 import '../../../services/supabase_service.dart';
 
 part 'walkie_event.dart';
@@ -16,18 +16,19 @@ part 'walkie_state.dart';
 class WalkieBloc extends Bloc<WalkieEvent, WalkieState> {
   ApiClient? _apiClient;
   AudioService? _audioService;
-  WebSocketService? _wsService;
   bool _isInitialized = false;
   String? _currentUserId;
   String? _currentUserName;
 
-  // WebSocket subscriptions
-  StreamSubscription? _wsMessageSubscription;
-  StreamSubscription? _wsSpeakingStartSubscription;
-  StreamSubscription? _wsSpeakingEndSubscription;
+  // Direct WebSocket connection to /ws/walkie
+  WebSocket? _walkieSocket;
+  StreamSubscription? _socketSubscription;
 
   // Audio recording state
   Timer? _speakingTimer;
+
+  // Polling timer for new messages (WebSocket fallback)
+  Timer? _pollTimer;
 
   // Audio level tracking for diagnostics
   List<double> _recordingAudioLevels = [];
@@ -47,13 +48,13 @@ class WalkieBloc extends Bloc<WalkieEvent, WalkieState> {
     on<WalkieSendAlert>(_onSendAlert);
     on<WalkiePlayMessage>(_onPlayMessage);
     on<WalkieAudioLevelChanged>(_onAudioLevelChanged);
+    on<_WalkiePollMessages>(_onPollMessages);
   }
 
   Future<void> _initialize() async {
     if (_isInitialized) return;
     _apiClient = await ApiClient.getInstance();
     _audioService = await AudioService.getInstance();
-    _wsService = WebSocketService();
 
     // Setup audio callbacks
     _audioService!.onAudioLevelChanged = (level) {
@@ -61,7 +62,6 @@ class WalkieBloc extends Bloc<WalkieEvent, WalkieState> {
     };
 
     _audioService!.onPlaybackCompleted = (audioId) {
-      debugPrint('WalkieBloc: Playback completed for $audioId');
       if (state is WalkieInChannel) {
         final currentState = state as WalkieInChannel;
         // Clear current speaker when playback ends
@@ -75,53 +75,95 @@ class WalkieBloc extends Bloc<WalkieEvent, WalkieState> {
     _isInitialized = true;
   }
 
+  /// Get the walkie WebSocket URL
+  String _getWalkieWsUrl(String teamId) {
+    String baseUrl;
+    if (kReleaseMode) {
+      baseUrl = 'wss://api.rallypoint.app';
+    } else {
+      final httpBase = ApiConstants.prodBaseUrl;
+      baseUrl = httpBase.replaceFirst('http://', 'ws://').replaceFirst('https://', 'wss://');
+    }
+    return '$baseUrl${ApiConstants.wsWalkie}?user_id=$_currentUserId&team_id=$teamId';
+  }
+
   ApiClient get _api => _apiClient!;
   AudioService get _audio => _audioService!;
 
-  /// Connect to WebSocket and listen for messages
-  void _connectWebSocket(String channelId) {
-    _cancelWebSocketSubscriptions();
+  /// Connect directly to /ws/walkie for real-time updates
+  Future<void> _connectWebSocket(String teamId) async {
+    await _disconnectWalkieSocket();
 
-    _wsService?.connect();
-    _wsService?.joinWalkieChannel(channelId);
+    if (_currentUserId == null) return;
 
-    // Listen for walkie messages
-    _wsMessageSubscription = _wsService?.messagesOfType(WsMessageType.walkieMessage).listen((wsMessage) {
-      debugPrint('WalkieBloc: Received WebSocket message: ${wsMessage.data}');
-      add(WalkieMessageReceived(messageData: wsMessage.data));
-    });
+    try {
+      final wsUrl = _getWalkieWsUrl(teamId);
 
-    // Listen for participant updates
-    _wsSpeakingStartSubscription = _wsService?.messagesOfType(WsMessageType.walkieSpeakingStart).listen((wsMessage) {
-      add(WalkieParticipantUpdated(
-        participantId: wsMessage.data['user_id']?.toString() ?? '',
-        isSpeaking: true,
-      ));
-    });
+      _walkieSocket = await WebSocket.connect(wsUrl);
 
-    _wsSpeakingEndSubscription = _wsService?.messagesOfType(WsMessageType.walkieSpeakingEnd).listen((wsMessage) {
-      add(WalkieParticipantUpdated(
-        participantId: wsMessage.data['user_id']?.toString() ?? '',
-        isSpeaking: false,
-      ));
-    });
-
-    debugPrint('WalkieBloc: WebSocket connected for channel $channelId');
+      _socketSubscription = _walkieSocket!.listen(
+        (data) => _handleWebSocketMessage(data),
+        onError: (error) {
+          debugPrint('WalkieBloc: WebSocket error: $error');
+        },
+        onDone: () {
+          _walkieSocket = null;
+        },
+        cancelOnError: false,
+      );
+    } catch (e) {
+      debugPrint('WalkieBloc: Failed to connect WebSocket: $e');
+    }
   }
 
-  void _cancelWebSocketSubscriptions() {
-    _wsMessageSubscription?.cancel();
-    _wsMessageSubscription = null;
-    _wsSpeakingStartSubscription?.cancel();
-    _wsSpeakingStartSubscription = null;
-    _wsSpeakingEndSubscription?.cancel();
-    _wsSpeakingEndSubscription = null;
+  void _handleWebSocketMessage(dynamic data) {
+    try {
+      final json = jsonDecode(data.toString()) as Map<String, dynamic>;
+      final type = json['type']?.toString();
+
+      if (type == 'walkie_message' || type == 'new_message') {
+        final msgData = json['data'] ?? json;
+        if (msgData is Map<String, dynamic>) {
+          add(WalkieMessageReceived(messageData: msgData));
+        }
+      } else if (type == 'speaking_start') {
+        final msgData = json['data'] ?? json;
+        add(WalkieParticipantUpdated(
+          participantId: msgData['user_id']?.toString() ?? '',
+          isSpeaking: true,
+        ));
+      } else if (type == 'speaking_end') {
+        final msgData = json['data'] ?? json;
+        add(WalkieParticipantUpdated(
+          participantId: msgData['user_id']?.toString() ?? '',
+          isSpeaking: false,
+        ));
+      }
+    } catch (e) {
+      debugPrint('WalkieBloc: Error parsing WebSocket message: $e');
+    }
   }
 
-  void _disconnectWebSocket(String channelId) {
-    _cancelWebSocketSubscriptions();
-    _wsService?.leaveWalkieChannel(channelId);
-    debugPrint('WalkieBloc: WebSocket disconnected');
+  Future<void> _disconnectWalkieSocket() async {
+    _socketSubscription?.cancel();
+    _socketSubscription = null;
+
+    if (_walkieSocket != null) {
+      await _walkieSocket!.close();
+      _walkieSocket = null;
+    }
+  }
+
+  void _startPolling() {
+    _pollTimer?.cancel();
+    _pollTimer = Timer.periodic(const Duration(seconds: 5), (_) {
+      add(const _WalkiePollMessages());
+    });
+  }
+
+  void _stopPolling() {
+    _pollTimer?.cancel();
+    _pollTimer = null;
   }
 
   Future<void> _onLoadChannels(
@@ -225,6 +267,9 @@ class WalkieBloc extends Bloc<WalkieEvent, WalkieState> {
 
         // Load message history
         add(WalkieLoadHistory(channelId: event.channelId));
+
+        // Start polling as WebSocket fallback
+        _startPolling();
       } else {
         emit(const WalkieError(message: 'Failed to join channel'));
       }
@@ -244,7 +289,12 @@ class WalkieBloc extends Bloc<WalkieEvent, WalkieState> {
       ));
 
       _connectWebSocket(event.channelId);
-      debugPrint('WalkieBloc: Joined channel with fallback: $e');
+
+      // Load message history even in fallback path
+      add(WalkieLoadHistory(channelId: event.channelId));
+
+      // Start polling as WebSocket fallback
+      _startPolling();
     }
   }
 
@@ -258,8 +308,9 @@ class WalkieBloc extends Bloc<WalkieEvent, WalkieState> {
     try {
       await _initialize();
 
-      // Disconnect WebSocket first
-      _disconnectWebSocket(currentState.channel.id);
+      // Stop polling and disconnect WebSocket
+      _stopPolling();
+      _disconnectWalkieSocket();
 
       await _api.post(
         ApiConstants.walkieEnd,
@@ -270,7 +321,8 @@ class WalkieBloc extends Bloc<WalkieEvent, WalkieState> {
 
       emit(WalkieInitial());
     } catch (e) {
-      _disconnectWebSocket(currentState.channel.id);
+      _stopPolling();
+      _disconnectWalkieSocket();
       emit(WalkieInitial());
     }
   }
@@ -293,7 +345,6 @@ class WalkieBloc extends Bloc<WalkieEvent, WalkieState> {
       // Start actual audio recording
       final started = await _audio.startRecording();
       if (!started) {
-        debugPrint('WalkieBloc: Failed to start recording');
         return;
       }
 
@@ -302,14 +353,14 @@ class WalkieBloc extends Bloc<WalkieEvent, WalkieState> {
         audioLevel: 0.0,
       ));
 
-      debugPrint('WalkieBloc: Audio level tracking started - watch for levels during recording');
-
       // Notify others via WebSocket
-      _wsService?.startSpeaking(currentState.channel.id);
+      _walkieSocket?.add(jsonEncode({
+        'type': 'speaking_start',
+        'data': {'user_id': _currentUserId, 'team_id': currentState.channel.id},
+      }));
 
-      debugPrint('WalkieBloc: Started speaking with audio recording');
     } catch (e) {
-      debugPrint('WalkieBloc: Error starting recording: $e');
+      // Error starting recording
     }
   }
 
@@ -326,7 +377,10 @@ class WalkieBloc extends Bloc<WalkieEvent, WalkieState> {
     emit(currentState.copyWith(isSpeaking: false, audioLevel: 0.0));
 
     // Notify others via WebSocket
-    _wsService?.stopSpeaking(currentState.channel.id);
+    _walkieSocket?.add(jsonEncode({
+      'type': 'speaking_end',
+      'data': {'user_id': _currentUserId, 'team_id': currentState.channel.id},
+    }));
 
     try {
       await _initialize();
@@ -335,95 +389,37 @@ class WalkieBloc extends Bloc<WalkieEvent, WalkieState> {
       final result = await _audio.stopRecording();
 
       if (result == null) {
-        debugPrint('WalkieBloc: No recording result');
         return;
-      }
-
-      debugPrint('WalkieBloc: Recording stopped, duration: ${result.durationMs}ms, path: ${result.path}');
-
-      // Log audio level summary for diagnostics
-      if (_recordingAudioLevels.isNotEmpty) {
-        final avgLevel = _recordingAudioLevels.reduce((a, b) => a + b) / _recordingAudioLevels.length;
-        final nonZeroLevels = _recordingAudioLevels.where((l) => l > 0.05).length;
-        debugPrint('WalkieBloc: AUDIO DIAGNOSTIC SUMMARY:');
-        debugPrint('  - Samples collected: ${_recordingAudioLevels.length}');
-        debugPrint('  - Max level: ${_maxAudioLevel.toStringAsFixed(3)}');
-        debugPrint('  - Average level: ${avgLevel.toStringAsFixed(3)}');
-        debugPrint('  - Samples > 0.05: $nonZeroLevels (${(nonZeroLevels / _recordingAudioLevels.length * 100).toStringAsFixed(1)}%)');
-        if (_maxAudioLevel < 0.1) {
-          debugPrint('  - WARNING: Very low audio levels detected! Microphone may not be capturing sound.');
-          debugPrint('  - Try: 1) Speak louder, 2) Check mic permission, 3) Check if another app is using mic');
-        }
-      } else {
-        debugPrint('WalkieBloc: WARNING - No audio level samples collected during recording!');
       }
 
       // Verify file exists and has content
       final audioFile = File(result.path);
       if (!await audioFile.exists()) {
-        debugPrint('WalkieBloc: Audio file does not exist!');
         return;
       }
       final fileSize = await audioFile.length();
-      debugPrint('WalkieBloc: Audio file size: $fileSize bytes');
-
-      // Log first bytes to verify file header
-      try {
-        final bytes = await audioFile.readAsBytes();
-        if (bytes.length >= 12) {
-          final header = bytes.sublist(0, 12);
-          debugPrint('WalkieBloc: File header (first 12 bytes): $header');
-          // WAV files start with "RIFF"
-          final headerStr = String.fromCharCodes(header.sublist(0, 4));
-          debugPrint('WalkieBloc: Header string: $headerStr');
-        }
-      } catch (e) {
-        debugPrint('WalkieBloc: Error reading file header: $e');
-      }
-
-      // Analyze WAV file content to check for actual audio
-      // This is more reliable than getAmplitude() which doesn't work on some devices
-      debugPrint('WalkieBloc: Analyzing WAV file for audio content...');
-      final analysis = await AudioService.analyzeWavFile(result.path);
-      if (analysis.hasAudio) {
-        debugPrint('WalkieBloc: ✓ WAV file contains audio!');
-        debugPrint('  - Max amplitude: ${(analysis.maxAmplitude * 100).toStringAsFixed(1)}%');
-        debugPrint('  - Non-silent: ${analysis.percentNonSilent.toStringAsFixed(1)}%');
-      } else {
-        debugPrint('WalkieBloc: ✗ WAV file appears to be silent or empty');
-        if (analysis.error != null) {
-          debugPrint('  - Error: ${analysis.error}');
-        }
-        debugPrint('  - Max amplitude: ${(analysis.maxAmplitude * 100).toStringAsFixed(1)}%');
-        debugPrint('  - This confirms microphone is NOT capturing audio on this device');
-      }
 
       if (fileSize < 1000) {
-        debugPrint('WalkieBloc: Audio file too small ($fileSize bytes), likely empty');
         return;
       }
 
       // Only send if > 500ms
       if (result.durationMs < 500) {
-        debugPrint('WalkieBloc: Recording too short, discarding');
         return;
       }
 
+      // Recording verified working with record package + AAC-LC
+
       // Upload to Supabase
       String? audioUrl;
-      debugPrint('WalkieBloc: Starting Supabase upload process...');
       try {
-        debugPrint('WalkieBloc: Calling _uploadAudioToSupabase with path: ${result.path}, channelId: ${currentState.channel.id}');
         audioUrl = await _uploadAudioToSupabase(result.path, currentState.channel.id);
-        if (audioUrl != null) {
-          debugPrint('WalkieBloc: Audio uploaded successfully to: $audioUrl');
-        } else {
-          debugPrint('WalkieBloc: Upload returned null - will use local path as fallback');
-        }
-      } catch (e, stackTrace) {
-        debugPrint('WalkieBloc: Failed to upload to Supabase: $e');
-        debugPrint('WalkieBloc: Stack trace: $stackTrace');
-        // Continue with local file as fallback
+      } catch (e) {
+        // Failed to upload to Supabase
+      }
+
+      if (audioUrl == null) {
+        return;
       }
 
       // Send the audio message to backend
@@ -431,15 +427,13 @@ class WalkieBloc extends Bloc<WalkieEvent, WalkieState> {
         ApiConstants.walkieMessages,
         data: {
           'team_id': currentState.channel.teamId,
-          'message': audioUrl ?? result.path,
+          'message': audioUrl,
           'message_type': 'audio',
           'duration': result.durationMs ~/ 1000, // Convert to seconds
           'sender_name': _currentUserName, // Include sender name for backend to use
           'sender_id': _currentUserId,
         },
       );
-
-      debugPrint('WalkieBloc: Voice message sent successfully');
 
       // Add the sent message to local state so it shows immediately
       if (response.statusCode == 200 || response.statusCode == 201) {
@@ -451,7 +445,7 @@ class WalkieBloc extends Bloc<WalkieEvent, WalkieState> {
           // Use _currentUserName first since backend returns hardcoded "User"
           senderName: _currentUserName ?? messageData['sender_name']?.toString() ?? 'You',
           messageType: 'audio',
-          audioUrl: audioUrl ?? result.path,
+          audioUrl: result.path, // Use local file for immediate playback (Supabase URL sent to backend for others)
           audioDurationMs: result.durationMs,
           createdAt: DateTime.tryParse(messageData['sent_at']?.toString() ?? '') ?? DateTime.now(),
         );
@@ -461,43 +455,30 @@ class WalkieBloc extends Bloc<WalkieEvent, WalkieState> {
         if (freshState is WalkieInChannel) {
           final updatedMessages = [...freshState.messages, sentMessage];
           emit(freshState.copyWith(messages: updatedMessages));
-          debugPrint('WalkieBloc: Added sent message to local state');
         }
       }
     } catch (e) {
-      debugPrint('WalkieBloc: Error sending voice message: $e');
+      // Error sending voice message
     }
   }
 
   /// Upload audio file directly to Supabase Storage
   /// Returns the public URL of the uploaded audio
   Future<String?> _uploadAudioToSupabase(String filePath, String channelId) async {
-    debugPrint('WalkieBloc._uploadAudioToSupabase: ENTRY');
-    debugPrint('WalkieBloc._uploadAudioToSupabase: filePath=$filePath');
-    debugPrint('WalkieBloc._uploadAudioToSupabase: channelId=$channelId');
-
     try {
-      debugPrint('WalkieBloc._uploadAudioToSupabase: Getting SupabaseService instance...');
       final supabaseService = await SupabaseService.getInstance();
-      debugPrint('WalkieBloc._uploadAudioToSupabase: SupabaseService instance obtained successfully');
 
-      debugPrint('WalkieBloc._uploadAudioToSupabase: Calling uploadAudioFile...');
       final audioUrl = await supabaseService.uploadAudioFile(
         filePath: filePath,
         teamId: channelId,
       );
-      debugPrint('WalkieBloc._uploadAudioToSupabase: uploadAudioFile returned: $audioUrl');
 
       if (audioUrl != null) {
-        debugPrint('WalkieBloc._uploadAudioToSupabase: SUCCESS - URL: $audioUrl');
         return audioUrl;
       }
 
-      debugPrint('WalkieBloc._uploadAudioToSupabase: Upload returned null');
       return null;
-    } catch (e, stackTrace) {
-      debugPrint('WalkieBloc._uploadAudioToSupabase: ERROR: $e');
-      debugPrint('WalkieBloc._uploadAudioToSupabase: Stack: $stackTrace');
+    } catch (e) {
       rethrow;
     }
   }
@@ -522,10 +503,9 @@ class WalkieBloc extends Bloc<WalkieEvent, WalkieState> {
       );
 
       if (response.statusCode == 200 || response.statusCode == 201) {
-        debugPrint('WalkieBloc: Text message sent');
       }
     } catch (e) {
-      debugPrint('WalkieBloc: Error sending text message: $e');
+      // Error sending text message
     }
   }
 
@@ -561,7 +541,6 @@ class WalkieBloc extends Bloc<WalkieEvent, WalkieState> {
       if ((message.messageType == 'voice' || message.messageType == 'audio') &&
           message.audioUrl != null &&
           message.senderId != _currentUserId) {
-        debugPrint('WalkieBloc: Auto-playing voice message from ${message.senderName}');
         final audioPath = message.audioUrl!;
         if (audioPath.startsWith('/') || audioPath.startsWith('file://')) {
           final filePath = audioPath.startsWith('file://') ? audioPath.substring(7) : audioPath;
@@ -588,7 +567,7 @@ class WalkieBloc extends Bloc<WalkieEvent, WalkieState> {
         });
       }
     } catch (e) {
-      debugPrint('WalkieBloc: Error processing message: $e');
+      // Error processing message
     }
   }
 
@@ -621,10 +600,9 @@ class WalkieBloc extends Bloc<WalkieEvent, WalkieState> {
           // Assume local file
           await _audio.playFromFile(audioPath, audioId: message.id);
         }
-        debugPrint('WalkieBloc: Playing message ${message.id}');
       }
     } catch (e) {
-      debugPrint('WalkieBloc: Error playing message: $e');
+      // Error playing message
     }
   }
 
@@ -640,11 +618,6 @@ class WalkieBloc extends Bloc<WalkieEvent, WalkieState> {
     _recordingAudioLevels.add(event.level);
     if (event.level > _maxAudioLevel) {
       _maxAudioLevel = event.level;
-    }
-
-    // Log every 5th sample (every 500ms) to avoid log spam
-    if (_recordingAudioLevels.length % 5 == 0) {
-      debugPrint('WalkieBloc: Audio level: ${event.level.toStringAsFixed(3)} (max so far: ${_maxAudioLevel.toStringAsFixed(3)})');
     }
 
     emit(currentState.copyWith(audioLevel: event.level));
@@ -714,10 +687,17 @@ class WalkieBloc extends Bloc<WalkieEvent, WalkieState> {
             .map<WalkieMessage>((json) => WalkieMessage.fromJson(json))
             .toList();
 
-        emit(currentState.copyWith(messages: messages));
+        // API returns newest-first (ORDER BY sent_at DESC).
+        // Reverse so messages are stored oldest-first — matches how
+        // locally appended messages work and the reversed ListView index.
+        final orderedMessages = messages.reversed.toList();
+
+        emit(currentState.copyWith(messages: orderedMessages));
+      } else {
+        // History request returned non-200 status
       }
     } catch (e) {
-      debugPrint('WalkieBloc: Error loading history: $e');
+      // Error loading history
     }
   }
 
@@ -751,16 +731,76 @@ class WalkieBloc extends Bloc<WalkieEvent, WalkieState> {
         },
       );
 
-      debugPrint('WalkieBloc: Alert sent: ${event.alertType}');
     } catch (e) {
-      debugPrint('WalkieBloc: Error sending alert: $e');
+      // Error sending alert
+    }
+  }
+
+  Future<void> _onPollMessages(
+    _WalkiePollMessages event,
+    Emitter<WalkieState> emit,
+  ) async {
+    final currentState = state;
+    if (currentState is! WalkieInChannel) return;
+
+    try {
+      await _initialize();
+
+      final response = await _api.get(
+        '/api/walkie/messages/team/${currentState.channel.id}',
+        queryParameters: {'limit': 50},
+      );
+
+      if (response.statusCode == 200) {
+        final data = response.data is List
+            ? response.data
+            : (response.data['messages'] ?? []);
+        final serverMessages = data
+            .map<WalkieMessage>((json) => WalkieMessage.fromJson(json))
+            .toList();
+
+        // Server returns newest-first, reverse to oldest-first
+        final ordered = serverMessages.reversed.toList();
+
+        // Only update if there are new messages
+        final existingIds = currentState.messages.map((m) => m.id).toSet();
+        final hasNew = ordered.any((m) => !existingIds.contains(m.id));
+
+        if (hasNew) {
+          // Merge: keep locally-added messages (with local file paths) and add new server messages
+          final merged = <WalkieMessage>[];
+          final mergedIds = <String>{};
+
+          // First add all existing local messages
+          for (final m in currentState.messages) {
+            merged.add(m);
+            mergedIds.add(m.id);
+          }
+
+          // Then add any new server messages not already present
+          for (final m in ordered) {
+            if (!mergedIds.contains(m.id)) {
+              merged.add(m);
+              mergedIds.add(m.id);
+            }
+          }
+
+          // Sort by creation time
+          merged.sort((a, b) => a.createdAt.compareTo(b.createdAt));
+
+          emit(currentState.copyWith(messages: merged));
+        }
+      }
+    } catch (_) {
+      // Polling errors are non-critical
     }
   }
 
   @override
   Future<void> close() {
     _speakingTimer?.cancel();
-    _cancelWebSocketSubscriptions();
+    _stopPolling();
+    _disconnectWalkieSocket();
     _audioService?.dispose();
     return super.close();
   }
