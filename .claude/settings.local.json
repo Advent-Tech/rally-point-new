@@ -29,7 +29,8 @@
       "Bash(flutter run:*)",
       "Bash(go build:*)",
       "Bash(cd:*)",
-      "Bash(pkill:*)"
+      "Bash(pkill:*)",
+      "Bash(GIT_LFS_SKIP_PUSH=1 git push:*)"
     ]
   }
 }
