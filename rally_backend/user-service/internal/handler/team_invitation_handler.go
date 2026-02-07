@@ -31,12 +31,12 @@ func (h *TeamInvitationHandler) SendInvitation(c *gin.Context) {
 	}
 
 	// Get inviter ID from auth context
-	userIDStr, exists := c.Get("userID")
-	if !exists {
+	userIDStr := c.GetString("user_id")
+	if userIDStr == "" {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
 		return
 	}
-	inviterID, err := uuid.Parse(userIDStr.(string))
+	inviterID, err := uuid.Parse(userIDStr)
 	if err != nil {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid user ID"})
 		return
@@ -112,12 +112,12 @@ func (h *TeamInvitationHandler) GetInvitationInfo(c *gin.Context) {
 // POST /api/invitations/accept
 func (h *TeamInvitationHandler) AcceptInvitation(c *gin.Context) {
 	// Get user from auth context
-	userIDStr, exists := c.Get("userID")
-	if !exists {
+	userIDStr := c.GetString("user_id")
+	if userIDStr == "" {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
 		return
 	}
-	userID, err := uuid.Parse(userIDStr.(string))
+	userID, err := uuid.Parse(userIDStr)
 	if err != nil {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid user ID"})
 		return
@@ -172,12 +172,12 @@ func (h *TeamInvitationHandler) CancelInvitation(c *gin.Context) {
 	}
 
 	// Get user from auth context
-	userIDStr, exists := c.Get("userID")
-	if !exists {
+	userIDStr := c.GetString("user_id")
+	if userIDStr == "" {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
 		return
 	}
-	userID, err := uuid.Parse(userIDStr.(string))
+	userID, err := uuid.Parse(userIDStr)
 	if err != nil {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid user ID"})
 		return
@@ -205,12 +205,12 @@ func (h *TeamInvitationHandler) ResendInvitation(c *gin.Context) {
 	}
 
 	// Get user from auth context
-	userIDStr, exists := c.Get("userID")
-	if !exists {
+	userIDStr := c.GetString("user_id")
+	if userIDStr == "" {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
 		return
 	}
-	userID, err := uuid.Parse(userIDStr.(string))
+	userID, err := uuid.Parse(userIDStr)
 	if err != nil {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid user ID"})
 		return

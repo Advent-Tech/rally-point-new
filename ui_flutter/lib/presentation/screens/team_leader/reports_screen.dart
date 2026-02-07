@@ -15,9 +15,6 @@ class ReportsScreen extends StatefulWidget {
 class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProviderStateMixin {
   late TabController _tabController;
   late DashboardBloc _dashboardBloc;
-  String _selectedPeriod = 'This Week';
-
-  final List<String> _periods = ['Today', 'This Week', 'This Month', 'All Time'];
 
   @override
   void initState() {
@@ -69,66 +66,12 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
             ],
           ),
         ),
-        body: Column(
+        body: TabBarView(
+          controller: _tabController,
           children: [
-            // Period selector
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              child: SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                child: Row(
-                  children: _periods.map((period) {
-                    final isSelected = _selectedPeriod == period;
-                    return Padding(
-                      padding: const EdgeInsets.only(right: 8),
-                      child: Material(
-                        color: Colors.transparent,
-                        child: InkWell(
-                          onTap: () => setState(() => _selectedPeriod = period),
-                          borderRadius: BorderRadius.circular(20),
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                            decoration: BoxDecoration(
-                              color: isSelected
-                                  ? AppColors.primary
-                                  : (isDark ? AppColors.surfaceDark : AppColors.surfaceLight),
-                              borderRadius: BorderRadius.circular(20),
-                              border: Border.all(
-                                color: isSelected
-                                    ? AppColors.primary
-                                    : (isDark ? AppColors.borderDark : AppColors.borderLight),
-                              ),
-                            ),
-                            child: Text(
-                              period,
-                              style: TextStyle(
-                                color: isSelected
-                                    ? Colors.white
-                                    : (isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight),
-                                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                                fontSize: 14,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                    );
-                  }).toList(),
-                ),
-              ),
-            ),
-
-            // Tab content
-            Expanded(
-              child: TabBarView(
-                controller: _tabController,
-                children: [
-                  _OverviewTab(isDark: isDark),
-                  _TeamTab(isDark: isDark),
-                  _TerritoriesTab(isDark: isDark),
-                ],
-              ),
-            ),
+            _OverviewTab(isDark: isDark),
+            _TeamTab(isDark: isDark),
+            _TerritoriesTab(isDark: isDark),
           ],
         ),
       ),
