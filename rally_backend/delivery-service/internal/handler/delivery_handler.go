@@ -702,7 +702,8 @@ func (h *DeliveryHandler) GetTeamDonationDeliveryStats(c *gin.Context) {
 		return
 	}
 
-	daysStr := c.DefaultQuery("days", "30")
+	// Default to 0 = all-time
+	daysStr := c.DefaultQuery("days", "0")
 	days, _ := strconv.Atoi(daysStr)
 
 	stats, err := h.deliveryService.GetTeamDonationDeliveryStats(teamID, days)
@@ -717,7 +718,8 @@ func (h *DeliveryHandler) GetTeamDonationDeliveryStats(c *gin.Context) {
 // GetGlobalDonationDeliveryStats returns global donation stats from deliveries table
 // GET /api/donations/stats
 func (h *DeliveryHandler) GetGlobalDonationDeliveryStats(c *gin.Context) {
-	daysStr := c.DefaultQuery("days", "30")
+	// Default to 0 = all-time
+	daysStr := c.DefaultQuery("days", "0")
 	days, _ := strconv.Atoi(daysStr)
 
 	stats, err := h.deliveryService.GetGlobalDonationDeliveryStats(days)

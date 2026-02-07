@@ -28,7 +28,8 @@
       "WebSearch",
       "Bash(flutter run:*)",
       "Bash(go build:*)",
-      "Bash(cd:*)"
+      "Bash(cd:*)",
+      "Bash(pkill:*)"
     ]
   }
 }

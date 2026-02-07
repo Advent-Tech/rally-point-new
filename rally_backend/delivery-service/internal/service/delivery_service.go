@@ -712,12 +712,11 @@ func (s *deliveryService) GetTeamDonationDeliveries(teamID uuid.UUID, limit, off
 }
 
 // GetGlobalDonationDeliveryStats returns aggregated donation stats from deliveries table
+// days=0 means all-time (no date filter)
 func (s *deliveryService) GetGlobalDonationDeliveryStats(days int) (*domain.DonationDeliveryStats, error) {
-	if days <= 0 {
-		days = domain.DefaultStatsDays
-	}
-	if days > domain.MaxStatsDays {
-		days = domain.MaxStatsDays
+	// Default to all-time for donation stats (days=0 means no filter)
+	if days < 0 {
+		days = 0
 	}
 
 	return s.deliveryRepo.GetGlobalDonationDeliveryStats(days)
@@ -725,11 +724,8 @@ func (s *deliveryService) GetGlobalDonationDeliveryStats(days int) (*domain.Dona
 
 // GetTeamDonationDeliveryStats returns team-specific donation stats from deliveries table
 func (s *deliveryService) GetTeamDonationDeliveryStats(teamID uuid.UUID, days int) (*domain.DonationDeliveryStats, error) {
-	if days <= 0 {
-		days = domain.DefaultStatsDays
-	}
-	if days > domain.MaxStatsDays {
-		days = domain.MaxStatsDays
+	if days < 0 {
+		days = 0
 	}
 
 	return s.deliveryRepo.GetTeamDonationDeliveryStats(teamID, days)

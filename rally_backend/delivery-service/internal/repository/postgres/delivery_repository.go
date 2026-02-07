@@ -349,17 +349,23 @@ func (r *deliveryRepository) GetTeamDonationDeliveries(teamID uuid.UUID, limit, 
 
 // GetGlobalDonationDeliveryStats returns aggregated donation stats from deliveries table
 func (r *deliveryRepository) GetGlobalDonationDeliveryStats(days int) (*domain.DonationDeliveryStats, error) {
+	// days <= 0 means all-time
+	dateFilter := ""
+	if days > 0 {
+		dateFilter = fmt.Sprintf("AND created_at >= NOW() - INTERVAL '%d days'", days)
+	}
+
 	query := fmt.Sprintf(`SELECT
 		COUNT(*) as total_donations,
 		COALESCE(SUM(donation_amount), 0) as total_amount,
 		COALESCE(AVG(donation_amount), 0) as average_donation,
 		COALESCE(MAX(donation_amount), 0) as largest_donation,
-		COALESCE(SUM(CASE WHEN payment_status = 'pending' THEN donation_amount ELSE 0 END), 0) as pending_deposit
+		COALESCE(SUM(CASE WHEN payment_method != 'cash' AND (payment_status IS NULL OR payment_status = 'pending') THEN donation_amount ELSE 0 END), 0) as pending_deposit
 		FROM deliveries
 		WHERE delivery_type = 'donation'
 		AND donation_amount IS NOT NULL
 		AND donation_amount > 0
-		AND created_at >= NOW() - INTERVAL '%d days'`, days)
+		%s`, dateFilter)
 
 	stats := &domain.DonationDeliveryStats{}
 	err := r.db.QueryRow(query).Scan(
@@ -373,7 +379,6 @@ func (r *deliveryRepository) GetGlobalDonationDeliveryStats(days int) (*domain.D
 		return nil, err
 	}
 
-	// All donation deliveries are one-time by default
 	stats.OneTimeDonations = stats.TotalDonations
 	stats.OneTimeAmount = stats.TotalAmount
 
@@ -382,18 +387,23 @@ func (r *deliveryRepository) GetGlobalDonationDeliveryStats(days int) (*domain.D
 
 // GetTeamDonationDeliveryStats returns team-specific donation stats from deliveries table
 func (r *deliveryRepository) GetTeamDonationDeliveryStats(teamID uuid.UUID, days int) (*domain.DonationDeliveryStats, error) {
+	dateFilter := ""
+	if days > 0 {
+		dateFilter = fmt.Sprintf("AND created_at >= NOW() - INTERVAL '%d days'", days)
+	}
+
 	query := fmt.Sprintf(`SELECT
 		COUNT(*) as total_donations,
 		COALESCE(SUM(donation_amount), 0) as total_amount,
 		COALESCE(AVG(donation_amount), 0) as average_donation,
 		COALESCE(MAX(donation_amount), 0) as largest_donation,
-		COALESCE(SUM(CASE WHEN payment_status = 'pending' THEN donation_amount ELSE 0 END), 0) as pending_deposit
+		COALESCE(SUM(CASE WHEN payment_method != 'cash' AND (payment_status IS NULL OR payment_status = 'pending') THEN donation_amount ELSE 0 END), 0) as pending_deposit
 		FROM deliveries
 		WHERE delivery_type = 'donation'
 		AND team_id = $1
 		AND donation_amount IS NOT NULL
 		AND donation_amount > 0
-		AND created_at >= NOW() - INTERVAL '%d days'`, days)
+		%s`, dateFilter)
 
 	stats := &domain.DonationDeliveryStats{}
 	err := r.db.QueryRow(query, teamID).Scan(

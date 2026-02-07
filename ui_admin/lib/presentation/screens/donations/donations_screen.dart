@@ -208,9 +208,9 @@ class _DonationsScreenState extends State<DonationsScreen> with SingleTickerProv
                       SizedBox(
                         width: (constraints.maxWidth - 12) / 2,
                         child: _StatCardCompact(
-                          title: 'Pending Deposit',
+                          title: 'Online Pending',
                           value: _currencyFormat.format(_donationStats?.pendingDeposit ?? 0),
-                          subtitle: 'awaiting deposit',
+                          subtitle: 'unverified online',
                           icon: Icons.pending_actions,
                           color: AppColors.warning,
                         ),
@@ -238,9 +238,9 @@ class _DonationsScreenState extends State<DonationsScreen> with SingleTickerProv
                     ),
                     const SizedBox(width: 16),
                     _StatCard(
-                      title: 'Pending Deposit',
+                      title: 'Online Pending',
                       value: _currencyFormat.format(_donationStats?.pendingDeposit ?? 0),
-                      subtitle: 'awaiting deposit',
+                      subtitle: 'unverified online',
                       icon: Icons.pending_actions,
                       color: AppColors.warning,
                     ),
