@@ -323,6 +323,96 @@ func (r *deliveryRepository) UpdateRouteStop(stop *domain.RouteStop) error {
 	return err
 }
 
+// GetAllDonationDeliveries returns all deliveries with delivery_type='donation'
+func (r *deliveryRepository) GetAllDonationDeliveries(limit, offset int) ([]*domain.Delivery, error) {
+	query := `SELECT id, team_id, worker_id, worker_name, recipient_name, recipient_phone, recipient_email,
+		address, latitude, longitude, delivery_type, priority, status, notes, scheduled_date, completed_at,
+		territory_id, territory_name, household_id, donation_amount, payment_method, payment_status,
+		stripe_payment_id, receipt_number, receipt_url, is_offline, synced_at, offline_id,
+		created_by, created_at, updated_at
+		FROM deliveries WHERE delivery_type = 'donation' ORDER BY created_at DESC LIMIT $1 OFFSET $2`
+
+	return r.scanDeliveries(r.db.Query(query, limit, offset))
+}
+
+// GetTeamDonationDeliveries returns team-specific deliveries with delivery_type='donation'
+func (r *deliveryRepository) GetTeamDonationDeliveries(teamID uuid.UUID, limit, offset int) ([]*domain.Delivery, error) {
+	query := `SELECT id, team_id, worker_id, worker_name, recipient_name, recipient_phone, recipient_email,
+		address, latitude, longitude, delivery_type, priority, status, notes, scheduled_date, completed_at,
+		territory_id, territory_name, household_id, donation_amount, payment_method, payment_status,
+		stripe_payment_id, receipt_number, receipt_url, is_offline, synced_at, offline_id,
+		created_by, created_at, updated_at
+		FROM deliveries WHERE delivery_type = 'donation' AND team_id = $1 ORDER BY created_at DESC LIMIT $2 OFFSET $3`
+
+	return r.scanDeliveries(r.db.Query(query, teamID, limit, offset))
+}
+
+// GetGlobalDonationDeliveryStats returns aggregated donation stats from deliveries table
+func (r *deliveryRepository) GetGlobalDonationDeliveryStats(days int) (*domain.DonationDeliveryStats, error) {
+	query := fmt.Sprintf(`SELECT
+		COUNT(*) as total_donations,
+		COALESCE(SUM(donation_amount), 0) as total_amount,
+		COALESCE(AVG(donation_amount), 0) as average_donation,
+		COALESCE(MAX(donation_amount), 0) as largest_donation,
+		COALESCE(SUM(CASE WHEN payment_status = 'pending' THEN donation_amount ELSE 0 END), 0) as pending_deposit
+		FROM deliveries
+		WHERE delivery_type = 'donation'
+		AND donation_amount IS NOT NULL
+		AND donation_amount > 0
+		AND created_at >= NOW() - INTERVAL '%d days'`, days)
+
+	stats := &domain.DonationDeliveryStats{}
+	err := r.db.QueryRow(query).Scan(
+		&stats.TotalDonations,
+		&stats.TotalAmount,
+		&stats.AverageDonation,
+		&stats.LargestDonation,
+		&stats.PendingDeposit,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	// All donation deliveries are one-time by default
+	stats.OneTimeDonations = stats.TotalDonations
+	stats.OneTimeAmount = stats.TotalAmount
+
+	return stats, nil
+}
+
+// GetTeamDonationDeliveryStats returns team-specific donation stats from deliveries table
+func (r *deliveryRepository) GetTeamDonationDeliveryStats(teamID uuid.UUID, days int) (*domain.DonationDeliveryStats, error) {
+	query := fmt.Sprintf(`SELECT
+		COUNT(*) as total_donations,
+		COALESCE(SUM(donation_amount), 0) as total_amount,
+		COALESCE(AVG(donation_amount), 0) as average_donation,
+		COALESCE(MAX(donation_amount), 0) as largest_donation,
+		COALESCE(SUM(CASE WHEN payment_status = 'pending' THEN donation_amount ELSE 0 END), 0) as pending_deposit
+		FROM deliveries
+		WHERE delivery_type = 'donation'
+		AND team_id = $1
+		AND donation_amount IS NOT NULL
+		AND donation_amount > 0
+		AND created_at >= NOW() - INTERVAL '%d days'`, days)
+
+	stats := &domain.DonationDeliveryStats{}
+	err := r.db.QueryRow(query, teamID).Scan(
+		&stats.TotalDonations,
+		&stats.TotalAmount,
+		&stats.AverageDonation,
+		&stats.LargestDonation,
+		&stats.PendingDeposit,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	stats.OneTimeDonations = stats.TotalDonations
+	stats.OneTimeAmount = stats.TotalAmount
+
+	return stats, nil
+}
+
 // Stats methods - basic implementations
 func (r *deliveryRepository) GetDeliveryStats(teamID uuid.UUID, days int) (*domain.DeliveryStats, error) {
 	// Simplified statuses: pending, completed, failed, cancelled

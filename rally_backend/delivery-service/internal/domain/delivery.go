@@ -225,6 +225,49 @@ type WorkerStats struct {
 	TotalRoutes         int       `json:"total_routes"`
 }
 
+// DonationView represents a delivery with delivery_type='donation' formatted for admin consumption
+type DonationView struct {
+	ID            uuid.UUID  `json:"id"`
+	SessionID     *uuid.UUID `json:"session_id,omitempty"`
+	WorkerID      uuid.UUID  `json:"worker_id"`
+	WorkerName    string     `json:"worker_name"`
+	TeamID        uuid.UUID  `json:"team_id"`
+	DonorName     string     `json:"donor_name"`
+	DonorPhone    *string    `json:"donor_phone,omitempty"`
+	DonorEmail    *string    `json:"donor_email,omitempty"`
+	DonorAddress  string     `json:"donor_address,omitempty"`
+	Latitude      float64    `json:"latitude"`
+	Longitude     float64    `json:"longitude"`
+	Amount        float64    `json:"amount"`
+	Currency      string     `json:"currency"`
+	DonationType  string     `json:"donation_type"`
+	Purpose       *string    `json:"purpose,omitempty"`
+	PaymentMethod string     `json:"payment_method"`
+	PaymentRef    *string    `json:"payment_ref,omitempty"`
+	ReceiptNumber string     `json:"receipt_number"`
+	IsAnonymous   bool       `json:"is_anonymous"`
+	Notes         *string    `json:"notes,omitempty"`
+	Status        string     `json:"status"`
+	CollectedAt   *time.Time `json:"collected_at,omitempty"`
+	DepositedAt   *time.Time `json:"deposited_at,omitempty"`
+	CreatedAt     time.Time  `json:"created_at"`
+	UpdatedAt     time.Time  `json:"updated_at"`
+}
+
+// DonationDeliveryStats represents donation statistics derived from the deliveries table
+type DonationDeliveryStats struct {
+	TotalDonations     int     `json:"total_donations"`
+	TotalAmount        float64 `json:"total_amount"`
+	OneTimeDonations   int     `json:"one_time_donations"`
+	OneTimeAmount      float64 `json:"one_time_amount"`
+	RecurringDonations int     `json:"recurring_donations"`
+	RecurringAmount    float64 `json:"recurring_amount"`
+	AverageDonation    float64 `json:"average_donation"`
+	LargestDonation    float64 `json:"largest_donation"`
+	AnonymousDonations int     `json:"anonymous_donations"`
+	PendingDeposit     float64 `json:"pending_deposit"`
+}
+
 // DeliveryRepository defines the interface for delivery data access
 type DeliveryRepository interface {
 	// Delivery management
@@ -263,6 +306,12 @@ type DeliveryRepository interface {
 	GetDeliveryStats(teamID uuid.UUID, days int) (*DeliveryStats, error)
 	GetWorkerStats(workerID uuid.UUID, days int) (*WorkerStats, error)
 	GetTeamWorkerStats(teamID uuid.UUID, days int) ([]*WorkerStats, error)
+
+	// Donation deliveries (delivery_type = 'donation')
+	GetAllDonationDeliveries(limit, offset int) ([]*Delivery, error)
+	GetTeamDonationDeliveries(teamID uuid.UUID, limit, offset int) ([]*Delivery, error)
+	GetGlobalDonationDeliveryStats(days int) (*DonationDeliveryStats, error)
+	GetTeamDonationDeliveryStats(teamID uuid.UUID, days int) (*DonationDeliveryStats, error)
 }
 
 // DeliveryService defines the interface for delivery business logic
@@ -294,6 +343,12 @@ type DeliveryService interface {
 	GetDeliveryStats(teamID uuid.UUID, days int) (*DeliveryStats, error)
 	GetWorkerStats(workerID uuid.UUID, days int) (*WorkerStats, error)
 	GetTeamWorkerStats(teamID uuid.UUID, days int) ([]*WorkerStats, error)
+
+	// Donation deliveries (delivery_type = 'donation')
+	GetAllDonationDeliveries(limit, offset int) ([]*DonationView, error)
+	GetTeamDonationDeliveries(teamID uuid.UUID, limit, offset int) ([]*DonationView, error)
+	GetGlobalDonationDeliveryStats(days int) (*DonationDeliveryStats, error)
+	GetTeamDonationDeliveryStats(teamID uuid.UUID, days int) (*DonationDeliveryStats, error)
 }
 
 // RouteOptimizer defines the interface for route optimization

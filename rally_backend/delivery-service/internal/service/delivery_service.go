@@ -677,6 +677,113 @@ func (s *deliveryService) GetTeamWorkerStats(teamID uuid.UUID, days int) ([]*dom
 	return s.deliveryRepo.GetTeamWorkerStats(teamID, days)
 }
 
+// GetAllDonationDeliveries returns donation-type deliveries formatted as DonationView
+func (s *deliveryService) GetAllDonationDeliveries(limit, offset int) ([]*domain.DonationView, error) {
+	if limit <= 0 {
+		limit = domain.DefaultDeliveryLimit
+	}
+	if limit > domain.MaxDeliveryLimit {
+		limit = domain.MaxDeliveryLimit
+	}
+
+	deliveries, err := s.deliveryRepo.GetAllDonationDeliveries(limit, offset)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get donation deliveries: %w", err)
+	}
+
+	return s.convertDeliveriesToDonationViews(deliveries), nil
+}
+
+// GetTeamDonationDeliveries returns team-specific donation deliveries formatted as DonationView
+func (s *deliveryService) GetTeamDonationDeliveries(teamID uuid.UUID, limit, offset int) ([]*domain.DonationView, error) {
+	if limit <= 0 {
+		limit = domain.DefaultDeliveryLimit
+	}
+	if limit > domain.MaxDeliveryLimit {
+		limit = domain.MaxDeliveryLimit
+	}
+
+	deliveries, err := s.deliveryRepo.GetTeamDonationDeliveries(teamID, limit, offset)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get team donation deliveries: %w", err)
+	}
+
+	return s.convertDeliveriesToDonationViews(deliveries), nil
+}
+
+// GetGlobalDonationDeliveryStats returns aggregated donation stats from deliveries table
+func (s *deliveryService) GetGlobalDonationDeliveryStats(days int) (*domain.DonationDeliveryStats, error) {
+	if days <= 0 {
+		days = domain.DefaultStatsDays
+	}
+	if days > domain.MaxStatsDays {
+		days = domain.MaxStatsDays
+	}
+
+	return s.deliveryRepo.GetGlobalDonationDeliveryStats(days)
+}
+
+// GetTeamDonationDeliveryStats returns team-specific donation stats from deliveries table
+func (s *deliveryService) GetTeamDonationDeliveryStats(teamID uuid.UUID, days int) (*domain.DonationDeliveryStats, error) {
+	if days <= 0 {
+		days = domain.DefaultStatsDays
+	}
+	if days > domain.MaxStatsDays {
+		days = domain.MaxStatsDays
+	}
+
+	return s.deliveryRepo.GetTeamDonationDeliveryStats(teamID, days)
+}
+
+// convertDeliveriesToDonationViews converts delivery records to donation view format
+func (s *deliveryService) convertDeliveriesToDonationViews(deliveries []*domain.Delivery) []*domain.DonationView {
+	var views []*domain.DonationView
+	for _, d := range deliveries {
+		view := &domain.DonationView{
+			ID:           d.ID,
+			WorkerID:     d.WorkerID,
+			WorkerName:   d.WorkerName,
+			TeamID:       d.TeamID,
+			DonorName:    d.RecipientName,
+			DonorPhone:   d.RecipientPhone,
+			DonorEmail:   d.RecipientEmail,
+			DonorAddress: d.Address,
+			Latitude:     d.Latitude,
+			Longitude:    d.Longitude,
+			Currency:     "USD",
+			DonationType: "one_time",
+			Notes:        d.Notes,
+			CreatedAt:    d.CreatedAt,
+			UpdatedAt:    d.UpdatedAt,
+		}
+
+		if d.DonationAmount != nil {
+			view.Amount = *d.DonationAmount
+		}
+		if d.PaymentMethod != nil {
+			view.PaymentMethod = *d.PaymentMethod
+		}
+		if d.ReceiptNumber != nil {
+			view.ReceiptNumber = *d.ReceiptNumber
+		}
+
+		switch d.Status {
+		case domain.StatusCompleted:
+			view.Status = "received"
+			view.CollectedAt = d.CompletedAt
+		case domain.StatusPending:
+			view.Status = "pending"
+		case domain.StatusCancelled:
+			view.Status = "cancelled"
+		default:
+			view.Status = d.Status
+		}
+
+		views = append(views, view)
+	}
+	return views
+}
+
 // Helper function to enrich deliveries with items
 func (s *deliveryService) enrichDeliveriesWithItems(deliveries []*domain.Delivery) ([]*domain.DeliveryWithItems, error) {
 	var deliveriesWithItems []*domain.DeliveryWithItems

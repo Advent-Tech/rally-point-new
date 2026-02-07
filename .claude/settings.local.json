@@ -27,7 +27,8 @@
       "Bash(TEAM_ID=\"8b17e5c6-2d2d-4dee-ab05-4c39dcf9e5fc\":*)",
       "WebSearch",
       "Bash(flutter run:*)",
-      "Bash(go build:*)"
+      "Bash(go build:*)",
+      "Bash(cd:*)"
     ]
   }
 }

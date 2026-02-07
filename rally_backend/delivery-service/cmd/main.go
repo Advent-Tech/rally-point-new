@@ -189,16 +189,18 @@ func setupRouter(deliveryHandler *handler.DeliveryHandler, receiptHandler *handl
 		// Donation management
 		donations := protected.Group("/donations")
 		{
-			donations.GET("/all", receiptHandler.GetAllDonations)
-			donations.GET("/stats", receiptHandler.GetGlobalDonationStats)
+			// Global donation endpoints query deliveries table (where donations actually live)
+			donations.GET("/all", deliveryHandler.GetAllDonationDeliveries)
+			donations.GET("/stats", deliveryHandler.GetGlobalDonationDeliveryStats)
 			donations.POST("/", receiptHandler.CreateDonation)
 			donations.GET("/:id", receiptHandler.GetDonation)
 			donations.PUT("/:id/deposit", receiptHandler.MarkDonationDeposited)
 			donations.PUT("/:id/cancel", receiptHandler.CancelDonation)
 			donations.GET("/worker/:workerId", receiptHandler.GetWorkerDonations)
-			donations.GET("/team/:teamId", receiptHandler.GetTeamDonations)
+			// Team donation endpoints query deliveries table
+			donations.GET("/team/:teamId", deliveryHandler.GetTeamDonationDeliveries)
 			donations.GET("/session/:sessionId", receiptHandler.GetSessionDonations)
-			donations.GET("/stats/team/:teamId", receiptHandler.GetDonationStats)
+			donations.GET("/stats/team/:teamId", deliveryHandler.GetTeamDonationDeliveryStats)
 			donations.GET("/stats/worker/:workerId", receiptHandler.GetWorkerDonationStats)
 		}
 

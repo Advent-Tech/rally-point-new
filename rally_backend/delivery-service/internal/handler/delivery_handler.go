@@ -643,6 +643,92 @@ func (h *DeliveryHandler) GetTeamWorkerStats(c *gin.Context) {
 	})
 }
 
+// GetAllDonationDeliveries returns all donation-type deliveries
+// GET /api/donations/all
+func (h *DeliveryHandler) GetAllDonationDeliveries(c *gin.Context) {
+	limitStr := c.DefaultQuery("limit", "50")
+	offsetStr := c.DefaultQuery("offset", "0")
+
+	limit, _ := strconv.Atoi(limitStr)
+	offset, _ := strconv.Atoi(offsetStr)
+
+	donations, err := h.deliveryService.GetAllDonationDeliveries(limit, offset)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"donations": donations,
+		"count":     len(donations),
+	})
+}
+
+// GetTeamDonationDeliveries returns team-specific donation-type deliveries
+// GET /api/donations/team/:teamId
+func (h *DeliveryHandler) GetTeamDonationDeliveries(c *gin.Context) {
+	teamIDStr := c.Param("teamId")
+	teamID, err := uuid.Parse(teamIDStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid team ID"})
+		return
+	}
+
+	limitStr := c.DefaultQuery("limit", "50")
+	offsetStr := c.DefaultQuery("offset", "0")
+
+	limit, _ := strconv.Atoi(limitStr)
+	offset, _ := strconv.Atoi(offsetStr)
+
+	donations, err := h.deliveryService.GetTeamDonationDeliveries(teamID, limit, offset)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"donations": donations,
+		"count":     len(donations),
+	})
+}
+
+// GetTeamDonationDeliveryStats returns team-specific donation stats from deliveries table
+// GET /api/donations/stats/team/:teamId
+func (h *DeliveryHandler) GetTeamDonationDeliveryStats(c *gin.Context) {
+	teamIDStr := c.Param("teamId")
+	teamID, err := uuid.Parse(teamIDStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid team ID"})
+		return
+	}
+
+	daysStr := c.DefaultQuery("days", "30")
+	days, _ := strconv.Atoi(daysStr)
+
+	stats, err := h.deliveryService.GetTeamDonationDeliveryStats(teamID, days)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, stats)
+}
+
+// GetGlobalDonationDeliveryStats returns global donation stats from deliveries table
+// GET /api/donations/stats
+func (h *DeliveryHandler) GetGlobalDonationDeliveryStats(c *gin.Context) {
+	daysStr := c.DefaultQuery("days", "30")
+	days, _ := strconv.Atoi(daysStr)
+
+	stats, err := h.deliveryService.GetGlobalDonationDeliveryStats(days)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, stats)
+}
+
 // AuthMiddleware validates JWT tokens
 func (h *DeliveryHandler) AuthMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
