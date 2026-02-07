@@ -69,8 +69,25 @@ class TerritoryAllocation {
     this.territory,
   });
 
-  factory TerritoryAllocation.fromJson(Map<String, dynamic> json) =>
-      _$TerritoryAllocationFromJson(json);
+  factory TerritoryAllocation.fromJson(Map<String, dynamic> json) {
+    final base = _$TerritoryAllocationFromJson(json);
+    // API returns entity_name, not territory_name
+    if (base.territoryName == null && json['entity_name'] != null) {
+      return TerritoryAllocation(
+        id: base.id,
+        leaderId: base.leaderId,
+        leaderName: base.leaderName,
+        territoryId: base.territoryId,
+        territorySolid: base.territorySolid,
+        territoryName: json['entity_name'] as String?,
+        allocatedBy: base.allocatedBy,
+        allocatedAt: base.allocatedAt,
+        notes: base.notes,
+        territory: base.territory,
+      );
+    }
+    return base;
+  }
   Map<String, dynamic> toJson() => _$TerritoryAllocationToJson(this);
 }
 

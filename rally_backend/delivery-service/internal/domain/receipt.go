@@ -181,6 +181,7 @@ type ReceiptRepository interface {
 	GetDonationByID(id uuid.UUID) (*Donation, error)
 	GetDonationsByWorkerID(workerID uuid.UUID, limit, offset int) ([]*Donation, error)
 	GetDonationsByTeamID(teamID uuid.UUID, limit, offset int) ([]*Donation, error)
+	GetAllDonations(limit, offset int) ([]*Donation, error)
 	GetDonationsBySessionID(sessionID uuid.UUID) ([]*Donation, error)
 	UpdateDonation(donation *Donation) error
 	DeleteDonation(id uuid.UUID) error
@@ -191,6 +192,7 @@ type ReceiptRepository interface {
 	GetReceiptStats(teamID uuid.UUID, days int) (*ReceiptStats, error)
 	GetWorkerReceiptStats(workerID uuid.UUID, days int) (*ReceiptStats, error)
 	GetDonationStats(teamID uuid.UUID, days int) (*DonationStats, error)
+	GetGlobalDonationStats(days int) (*DonationStats, error)
 	GetWorkerDonationStats(workerID uuid.UUID, days int) (*DonationStats, error)
 }
 
@@ -211,6 +213,7 @@ type ReceiptService interface {
 	GetDonation(id uuid.UUID) (*Donation, error)
 	GetWorkerDonations(workerID uuid.UUID, limit, offset int) ([]*Donation, error)
 	GetTeamDonations(teamID uuid.UUID, limit, offset int) ([]*Donation, error)
+	GetAllDonations(limit, offset int) ([]*Donation, error)
 	GetSessionDonations(sessionID uuid.UUID) ([]*Donation, error)
 	MarkDonationDeposited(id uuid.UUID) error
 	CancelDonation(id uuid.UUID) error
@@ -219,6 +222,7 @@ type ReceiptService interface {
 	GetReceiptStats(teamID uuid.UUID, days int) (*ReceiptStats, error)
 	GetWorkerReceiptStats(workerID uuid.UUID, days int) (*ReceiptStats, error)
 	GetDonationStats(teamID uuid.UUID, days int) (*DonationStats, error)
+	GetGlobalDonationStats(days int) (*DonationStats, error)
 	GetWorkerDonationStats(workerID uuid.UUID, days int) (*DonationStats, error)
 }
 

@@ -508,6 +508,8 @@ func setupRouter(cfg *config.Config, jwtManager *auth.JWTManager, rateLimiter mi
 		// Donations routes
 		donations := protected.Group("/donations")
 		{
+			donations.GET("/all", serviceProxy.ProxyRequest("delivery"))
+			donations.GET("/stats", serviceProxy.ProxyRequest("delivery"))
 			donations.POST("/", serviceProxy.ProxyRequest("delivery"))
 			donations.GET("/:id", serviceProxy.ProxyRequest("delivery"))
 			donations.PUT("/:id/deposit", serviceProxy.ProxyRequest("delivery"))

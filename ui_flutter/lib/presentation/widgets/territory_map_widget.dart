@@ -219,7 +219,7 @@ class _TerritoryMapWidgetState extends State<TerritoryMapWidget> {
           final polygonOptions = PolygonAnnotationOptions(
             geometry: Polygon(coordinates: [coords]),
             fillColor: baseColor.toARGB32(),
-            fillOpacity: isSelected ? 0.5 : 0.4,
+            fillOpacity: isSelected ? 0.35 : 0.2,
           );
           await _polygonManager!.create(polygonOptions);
 
@@ -240,7 +240,7 @@ class _TerritoryMapWidgetState extends State<TerritoryMapWidget> {
           final lineOptions = PolylineAnnotationOptions(
             geometry: LineString(coordinates: lineCoords),
             lineColor: borderColor.toARGB32(),
-            lineWidth: isSelected ? 6.0 : 4.0,
+            lineWidth: isSelected ? 5.0 : 3.0,
             lineOpacity: 1.0,
           );
           await _polylineManager!.create(lineOptions);
@@ -320,10 +320,13 @@ class _TerritoryMapWidgetState extends State<TerritoryMapWidget> {
       final lng = widget.userLongitude ?? MapConstants.defaultLongitude;
       final zoom = widget.userLatitude != null ? 12.0 : MapConstants.defaultZoom;
 
-      _mapboxMap?.setCamera(CameraOptions(
-        center: Point(coordinates: Position(lng, lat)),
-        zoom: zoom,
-      ));
+      _mapboxMap?.flyTo(
+        CameraOptions(
+          center: Point(coordinates: Position(lng, lat)),
+          zoom: zoom,
+        ),
+        MapAnimationOptions(duration: 1000),
+      );
       return;
     }
 
@@ -340,7 +343,7 @@ class _TerritoryMapWidgetState extends State<TerritoryMapWidget> {
         null, // offset
       ).then((cameraOptions) {
         debugPrint('TerritoryMapWidget: Camera zoom: ${cameraOptions.zoom}');
-        _mapboxMap?.setCamera(cameraOptions);
+        _mapboxMap?.flyTo(cameraOptions, MapAnimationOptions(duration: 1000));
       });
       _hasInitiallyFitTerritories = true;
     }
@@ -378,20 +381,26 @@ class _TerritoryMapWidgetState extends State<TerritoryMapWidget> {
   void _zoomIn() async {
     final currentCamera = await _mapboxMap?.getCameraState();
     if (currentCamera != null) {
-      _mapboxMap?.setCamera(CameraOptions(
-        center: currentCamera.center,
-        zoom: (currentCamera.zoom) + 1,
-      ));
+      _mapboxMap?.easeTo(
+        CameraOptions(
+          center: currentCamera.center,
+          zoom: (currentCamera.zoom) + 1,
+        ),
+        MapAnimationOptions(duration: 500),
+      );
     }
   }
 
   void _zoomOut() async {
     final currentCamera = await _mapboxMap?.getCameraState();
     if (currentCamera != null) {
-      _mapboxMap?.setCamera(CameraOptions(
-        center: currentCamera.center,
-        zoom: math.max(1, (currentCamera.zoom) - 1),
-      ));
+      _mapboxMap?.easeTo(
+        CameraOptions(
+          center: currentCamera.center,
+          zoom: math.max(1, (currentCamera.zoom) - 1),
+        ),
+        MapAnimationOptions(duration: 500),
+      );
     }
   }
 
@@ -453,6 +462,14 @@ class _TerritoryMapWidgetState extends State<TerritoryMapWidget> {
                 }
               : null,
         ),
+
+        // Map Style Toggle
+        if (_isMapReady && _mapboxMap != null)
+          Positioned(
+            left: 16,
+            top: 16,
+            child: MapStyleToggle(mapboxMap: _mapboxMap!),
+          ),
 
         // Zoom Controls
         if (widget.showZoomControls)
@@ -710,7 +727,7 @@ class _TerritoryDetailMapWidgetState extends State<TerritoryDetailMapWidget> {
         null, // offset
       )
           .then((cameraOptions) {
-        _mapboxMap!.setCamera(cameraOptions);
+        _mapboxMap!.flyTo(cameraOptions, MapAnimationOptions(duration: 1000));
       });
     }
   }
@@ -740,20 +757,26 @@ class _TerritoryDetailMapWidgetState extends State<TerritoryDetailMapWidget> {
   void _zoomIn() async {
     final currentCamera = await _mapboxMap?.getCameraState();
     if (currentCamera != null) {
-      _mapboxMap?.setCamera(CameraOptions(
-        center: currentCamera.center,
-        zoom: (currentCamera.zoom) + 1,
-      ));
+      _mapboxMap?.easeTo(
+        CameraOptions(
+          center: currentCamera.center,
+          zoom: (currentCamera.zoom) + 1,
+        ),
+        MapAnimationOptions(duration: 500),
+      );
     }
   }
 
   void _zoomOut() async {
     final currentCamera = await _mapboxMap?.getCameraState();
     if (currentCamera != null) {
-      _mapboxMap?.setCamera(CameraOptions(
-        center: currentCamera.center,
-        zoom: math.max(1, (currentCamera.zoom) - 1),
-      ));
+      _mapboxMap?.easeTo(
+        CameraOptions(
+          center: currentCamera.center,
+          zoom: math.max(1, (currentCamera.zoom) - 1),
+        ),
+        MapAnimationOptions(duration: 500),
+      );
     }
   }
 
@@ -761,9 +784,10 @@ class _TerritoryDetailMapWidgetState extends State<TerritoryDetailMapWidget> {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final center = _getTerritoryCenter(_parseGeometry(widget.territory.geometry));
+    final responsiveHeight = math.min(widget.height, MediaQuery.of(context).size.height * 0.35);
 
     return SizedBox(
-      height: widget.height,
+      height: responsiveHeight,
       child: ClipRRect(
         borderRadius: BorderRadius.circular(16),
         child: Stack(

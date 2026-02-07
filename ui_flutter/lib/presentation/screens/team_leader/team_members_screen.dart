@@ -264,6 +264,11 @@ class _TeamMembersScreenState extends State<TeamMembersScreen> {
             if (state is TeamInvitationSent) {
               Navigator.pop(dialogContext);
               _showInvitationSuccessDialog(context, state.email);
+              // Reload members list so screen doesn't show empty state
+              final authState = context.read<AuthBloc>().state;
+              if (authState is AuthAuthenticated && authState.user.teamId != null) {
+                _teamBloc.add(TeamLoadMembers(teamId: authState.user.teamId!));
+              }
             } else if (state is TeamError) {
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(

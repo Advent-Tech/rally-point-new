@@ -313,6 +313,19 @@ func (s *receiptService) GetTeamDonations(teamID uuid.UUID, limit, offset int) (
 	return donations, nil
 }
 
+// GetAllDonations gets all donations across all teams
+func (s *receiptService) GetAllDonations(limit, offset int) ([]*domain.Donation, error) {
+	if limit <= 0 || limit > domain.MaxDonationLimit {
+		limit = domain.DefaultDonationLimit
+	}
+
+	donations, err := s.repo.GetAllDonations(limit, offset)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get all donations: %w", err)
+	}
+	return donations, nil
+}
+
 // GetSessionDonations gets donations by session ID
 func (s *receiptService) GetSessionDonations(sessionID uuid.UUID) ([]*domain.Donation, error) {
 	donations, err := s.repo.GetDonationsBySessionID(sessionID)
@@ -379,6 +392,14 @@ func (s *receiptService) GetDonationStats(teamID uuid.UUID, days int) (*domain.D
 		days = domain.DefaultStatsDays
 	}
 	return s.repo.GetDonationStats(teamID, days)
+}
+
+// GetGlobalDonationStats gets donation statistics across all teams
+func (s *receiptService) GetGlobalDonationStats(days int) (*domain.DonationStats, error) {
+	if days <= 0 {
+		days = domain.DefaultStatsDays
+	}
+	return s.repo.GetGlobalDonationStats(days)
 }
 
 // GetWorkerDonationStats gets donation statistics for a worker

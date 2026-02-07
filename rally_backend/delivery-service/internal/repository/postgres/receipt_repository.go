@@ -357,6 +357,28 @@ func (r *ReceiptRepository) GetDonationsByTeamID(teamID uuid.UUID, limit, offset
 	return r.scanDonations(rows)
 }
 
+// GetAllDonations gets all donations across all teams
+func (r *ReceiptRepository) GetAllDonations(limit, offset int) ([]*domain.Donation, error) {
+	query := `
+		SELECT id, session_id, worker_id, worker_name, team_id,
+			donor_name, donor_phone, donor_email, donor_address,
+			latitude, longitude, amount, currency, donation_type,
+			purpose, payment_method, payment_ref, receipt_number,
+			is_anonymous, notes, status, collected_at, deposited_at, created_at, updated_at
+		FROM donations
+		ORDER BY created_at DESC
+		LIMIT $1 OFFSET $2
+	`
+
+	rows, err := r.db.Query(query, limit, offset)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	return r.scanDonations(rows)
+}
+
 // GetDonationsBySessionID gets donations by session ID
 func (r *ReceiptRepository) GetDonationsBySessionID(sessionID uuid.UUID) ([]*domain.Donation, error) {
 	query := `
@@ -542,6 +564,43 @@ func (r *ReceiptRepository) GetDonationStats(teamID uuid.UUID, days int) (*domai
 
 	stats := &domain.DonationStats{}
 	err := r.db.QueryRow(query, teamID, days).Scan(
+		&stats.TotalDonations, &stats.TotalAmount,
+		&stats.OneTimeDonations, &stats.OneTimeAmount,
+		&stats.RecurringDonations, &stats.RecurringAmount,
+		&stats.LargestDonation, &stats.AnonymousDonations,
+		&stats.PendingDeposit,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	if stats.TotalDonations > 0 {
+		stats.AverageDonation = stats.TotalAmount / float64(stats.TotalDonations)
+	}
+
+	return stats, nil
+}
+
+// GetGlobalDonationStats gets donation statistics across all teams
+func (r *ReceiptRepository) GetGlobalDonationStats(days int) (*domain.DonationStats, error) {
+	query := `
+		SELECT
+			COUNT(*) as total_donations,
+			COALESCE(SUM(amount), 0) as total_amount,
+			COUNT(*) FILTER (WHERE donation_type = 'one_time') as one_time_donations,
+			COALESCE(SUM(amount) FILTER (WHERE donation_type = 'one_time'), 0) as one_time_amount,
+			COUNT(*) FILTER (WHERE donation_type = 'recurring') as recurring_donations,
+			COALESCE(SUM(amount) FILTER (WHERE donation_type = 'recurring'), 0) as recurring_amount,
+			COALESCE(MAX(amount), 0) as largest_donation,
+			COUNT(*) FILTER (WHERE is_anonymous = true) as anonymous_donations,
+			COALESCE(SUM(amount) FILTER (WHERE status = 'received'), 0) as pending_deposit
+		FROM donations
+		WHERE status != 'cancelled'
+			AND created_at >= NOW() - INTERVAL '1 day' * $1
+	`
+
+	stats := &domain.DonationStats{}
+	err := r.db.QueryRow(query, days).Scan(
 		&stats.TotalDonations, &stats.TotalAmount,
 		&stats.OneTimeDonations, &stats.OneTimeAmount,
 		&stats.RecurringDonations, &stats.RecurringAmount,

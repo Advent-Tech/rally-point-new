@@ -627,6 +627,12 @@ class _MapTabState extends State<_MapTab> {
             ),
           ),
         ),
+        // Visit outcome legend
+        const Positioned(
+          left: 16,
+          bottom: 56,
+          child: _VisitLegend(),
+        ),
         // Tap hint
         Positioned(
           left: AppSpacing.md,
@@ -1042,6 +1048,88 @@ class _DetailRow extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _VisitLegend extends StatefulWidget {
+  const _VisitLegend();
+
+  @override
+  State<_VisitLegend> createState() => _VisitLegendState();
+}
+
+class _VisitLegendState extends State<_VisitLegend> {
+  bool _expanded = false;
+
+  @override
+  Widget build(BuildContext context) {
+    if (!_expanded) {
+      return GestureDetector(
+        onTap: () => setState(() => _expanded = true),
+        child: Container(
+          width: 36,
+          height: 36,
+          decoration: BoxDecoration(
+            color: Colors.white,
+            shape: BoxShape.circle,
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withAlpha(40),
+                blurRadius: 4,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: const Icon(Icons.info_outline, size: 20, color: AppColors.textSecondaryLight),
+        ),
+      );
+    }
+
+    return GestureDetector(
+      onTap: () => setState(() => _expanded = false),
+      child: Container(
+        padding: const EdgeInsets.all(10),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(10),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withAlpha(40),
+              blurRadius: 6,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _legendDot(AppColors.warning, 'Not Home'),
+            const SizedBox(height: 6),
+            _legendDot(AppColors.success, 'Interested'),
+            const SizedBox(height: 6),
+            _legendDot(AppColors.error, 'Not Interested'),
+            const SizedBox(height: 6),
+            _legendDot(AppColors.info, 'Callback'),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _legendDot(Color color, String label) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 10,
+          height: 10,
+          decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+        ),
+        const SizedBox(width: 6),
+        Text(label, style: const TextStyle(fontSize: 11)),
+      ],
     );
   }
 }

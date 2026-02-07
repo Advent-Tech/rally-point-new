@@ -64,39 +64,50 @@ class _WorkerTrailScreenState extends State<WorkerTrailScreen> {
         .map((p) => Position(p.longitude, p.latitude))
         .toList();
 
-    // Draw the trail polyline
+    // Draw the trail polyline (thicker)
     await _polylineManager!.create(PolylineAnnotationOptions(
       geometry: LineString(coordinates: coords),
       lineColor: AppColors.primary.toARGB32(),
-      lineWidth: 4.0,
+      lineWidth: 5.0,
     ));
 
-    // Start marker (green)
+    // Start marker (green, larger)
     final first = state.trailPoints.first;
     await _circleManager!.create(CircleAnnotationOptions(
       geometry: Point(coordinates: Position(first.longitude, first.latitude)),
       circleColor: AppColors.success.toARGB32(),
-      circleRadius: 10,
+      circleRadius: 12,
       circleStrokeColor: Colors.white.toARGB32(),
       circleStrokeWidth: 3,
     ));
 
-    // End marker (red)
+    // End marker (red, larger)
     final last = state.trailPoints.last;
     await _circleManager!.create(CircleAnnotationOptions(
       geometry: Point(coordinates: Position(last.longitude, last.latitude)),
       circleColor: AppColors.error.toARGB32(),
-      circleRadius: 10,
+      circleRadius: 12,
       circleStrokeColor: Colors.white.toARGB32(),
       circleStrokeWidth: 3,
     ));
 
-    // Direction indicator dots every ~20 points
-    for (int i = 20; i < state.trailPoints.length - 1; i += 20) {
+    // Direction indicator dots every ~15 points with gradient coloring
+    final totalPoints = state.trailPoints.length;
+    final oneThird = totalPoints ~/ 3;
+    final twoThirds = oneThird * 2;
+    for (int i = 15; i < totalPoints - 1; i += 15) {
       final p = state.trailPoints[i];
+      Color dotColor;
+      if (i < oneThird) {
+        dotColor = Colors.grey.shade400;
+      } else if (i < twoThirds) {
+        dotColor = AppColors.primary.withAlpha(153); // 0.6 opacity
+      } else {
+        dotColor = AppColors.primary;
+      }
       await _circleManager!.create(CircleAnnotationOptions(
         geometry: Point(coordinates: Position(p.longitude, p.latitude)),
-        circleColor: AppColors.primaryDark.toARGB32(),
+        circleColor: dotColor.toARGB32(),
         circleRadius: 4,
         circleStrokeColor: Colors.white.toARGB32(),
         circleStrokeWidth: 1.5,
@@ -136,7 +147,7 @@ class _WorkerTrailScreenState extends State<WorkerTrailScreen> {
       null,
       null,
     ).then((cameraOptions) {
-      _mapboxMap!.setCamera(cameraOptions);
+      _mapboxMap!.flyTo(cameraOptions, MapAnimationOptions(duration: 1000));
     });
   }
 
@@ -288,6 +299,14 @@ class _WorkerTrailScreenState extends State<WorkerTrailScreen> {
                 },
               ),
 
+              // Map Style Toggle
+              if (_isMapReady && _mapboxMap != null)
+                Positioned(
+                  right: 16,
+                  top: 16,
+                  child: MapStyleToggle(mapboxMap: _mapboxMap!),
+                ),
+
               // Empty state overlay
               if (isTrailLoaded && !hasPoints)
                 Center(
@@ -374,6 +393,9 @@ class _StatsPanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final safeBottom = MediaQuery.of(context).padding.bottom;
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isSmall = screenWidth < 375;
+    final hPad = isSmall ? 12.0 : 20.0;
     return Container(
       decoration: BoxDecoration(
         color: isDark ? AppColors.surfaceDark : Colors.white,
@@ -386,7 +408,7 @@ class _StatsPanel extends StatelessWidget {
           ),
         ],
       ),
-      padding: EdgeInsets.fromLTRB(20, 12, 20, 12 + safeBottom),
+      padding: EdgeInsets.fromLTRB(hPad, 12, hPad, 12 + safeBottom),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -499,8 +521,12 @@ class _StatTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isSmall = MediaQuery.of(context).size.width < 375;
     return Container(
-      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+      padding: EdgeInsets.symmetric(
+        vertical: isSmall ? 8 : 12,
+        horizontal: isSmall ? 4 : 8,
+      ),
       decoration: BoxDecoration(
         color: isDark ? AppColors.backgroundDark : AppColors.backgroundLight,
         borderRadius: BorderRadius.circular(12),
@@ -512,16 +538,17 @@ class _StatTile extends StatelessWidget {
         children: [
           Text(
             value,
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-              fontWeight: FontWeight.bold,
-            ),
+            style: (isSmall
+                    ? Theme.of(context).textTheme.bodyMedium
+                    : Theme.of(context).textTheme.titleMedium)
+                ?.copyWith(fontWeight: FontWeight.bold),
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: 2),
           Text(
             label,
             style: TextStyle(
-              fontSize: 11,
+              fontSize: isSmall ? 10 : 11,
               color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
             ),
           ),

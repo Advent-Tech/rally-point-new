@@ -25,6 +25,7 @@ class _TerritoriesScreenState extends State<TerritoriesScreen> with SingleTicker
   List<TerritoryModel> _territories = [];
   List<TerritoryAllocation> _allocations = [];
   List<UserModel> _teamLeaders = [];
+  List<UserModel> _allLeaders = [];
   List<UnionStats> _unionStats = [];
   bool _isLoading = true;
   bool _isLoadingMap = false;
@@ -140,10 +141,10 @@ class _TerritoriesScreenState extends State<TerritoriesScreen> with SingleTicker
           final data = leadersResponse.data is List
               ? leadersResponse.data
               : leadersResponse.data['leaders'] ?? [];
-          _teamLeaders = (data as List)
+          _allLeaders = (data as List)
               .map((json) => UserModel.fromJson(json))
-              .where((u) => u.isVerified)
               .toList();
+          _teamLeaders = _allLeaders.where((u) => u.isVerified).toList();
           debugPrint('Loaded ${_teamLeaders.length} verified team leaders');
         }
       } catch (e) {
@@ -151,6 +152,9 @@ class _TerritoriesScreenState extends State<TerritoriesScreen> with SingleTicker
       }
 
       setState(() => _isLoading = false);
+
+      // Resolve territory names for allocations in background
+      _resolveTerritoryNames();
 
       // Load union stats in background
       debugPrint('About to call _loadUnionStats()');
@@ -163,6 +167,43 @@ class _TerritoriesScreenState extends State<TerritoriesScreen> with SingleTicker
           SnackBar(content: Text('Failed to load data: $e')),
         );
       }
+    }
+  }
+
+  /// Look up territory names for allocations that don't have them
+  Future<void> _resolveTerritoryNames() async {
+    final needsResolving = _allocations
+        .where((a) => a.territoryName == null && a.territorySolid != null)
+        .toList();
+    if (needsResolving.isEmpty) return;
+
+    try {
+      final api = await ApiClient.getInstance();
+      for (final alloc in needsResolving) {
+        // Search by SOLID code to find the territory name
+        final response = await api.get(
+          ApiConstants.territoriesSearch,
+          queryParameters: {'q': alloc.territorySolid!, 'limit': 1},
+        );
+        if (response.statusCode == 200) {
+          final data = response.data is List
+              ? response.data
+              : response.data['territories'] ?? [];
+          if ((data as List).isNotEmpty) {
+            final territory = TerritoryModel.fromJson(data.first);
+            // Cache this territory for display
+            _territoriesCache[alloc.territoryId] = GeoTerritory(
+              id: alloc.territoryId,
+              solid: alloc.territorySolid ?? '',
+              entityName: territory.entityName,
+              unionName: territory.unionName,
+            );
+          }
+        }
+      }
+      if (mounted) setState(() {});
+    } catch (e) {
+      debugPrint('Failed to resolve territory names: $e');
     }
   }
 
@@ -1330,6 +1371,21 @@ class _TerritoriesScreenState extends State<TerritoriesScreen> with SingleTicker
     return number.toString();
   }
 
+  String _resolveLeaderName(String leaderId) {
+    final leader = _allLeaders.where((l) => l.id == leaderId).firstOrNull;
+    return leader?.fullName ?? leaderId;
+  }
+
+  String _resolveTerritoryName(TerritoryAllocation allocation) {
+    // Try to find in cached territories
+    final cached = _territoriesCache[allocation.territoryId];
+    if (cached != null && cached.entityName.isNotEmpty) {
+      return cached.entityName;
+    }
+    // Fall back to SOLID code if available, otherwise show ID
+    return allocation.territorySolid ?? allocation.territoryId;
+  }
+
   Widget _buildAllocations() {
     if (_allocations.isEmpty) {
       return Center(
@@ -1371,11 +1427,11 @@ class _TerritoriesScreenState extends State<TerritoriesScreen> with SingleTicker
                 ),
                 child: const Icon(Icons.check_circle, color: AppColors.success),
               ),
-              title: Text(allocation.territoryName ?? allocation.territoryId),
+              title: Text(allocation.territoryName ?? _resolveTerritoryName(allocation)),
               subtitle: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('Leader: ${allocation.leaderName ?? allocation.leaderId}'),
+                  Text('Leader: ${allocation.leaderName ?? _resolveLeaderName(allocation.leaderId)}'),
                   if (allocation.allocatedAt != null)
                     Text(
                       'Allocated: ${allocation.allocatedAt!.toLocal().toString().split('.')[0]}',
@@ -1400,7 +1456,7 @@ class _TerritoriesScreenState extends State<TerritoriesScreen> with SingleTicker
       builder: (context) => AlertDialog(
         title: const Text('Revoke Allocation'),
         content: Text(
-          'Are you sure you want to revoke this territory allocation from ${allocation.leaderName}?',
+          'Are you sure you want to revoke this territory allocation from ${allocation.leaderName ?? _resolveLeaderName(allocation.leaderId)}?',
         ),
         actions: [
           TextButton(

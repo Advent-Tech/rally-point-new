@@ -1,12 +1,14 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
+import 'package:intl/intl.dart';
 import 'package:latlong2/latlong.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/network/api_client.dart';
 import '../../../core/constants/api_constants.dart';
 import '../../../core/constants/map_constants.dart';
 import '../../../data/models/activity_stats_model.dart';
+import '../../../data/models/donation_model.dart';
 import '../../../data/models/territory_model.dart';
 import '../../../data/models/user_model.dart';
 
@@ -34,6 +36,7 @@ class _AdminMapScreenState extends State<AdminMapScreen> {
   List<ActiveWorkerLocation> _activeWorkers = [];
   List<ChurchLocation> _churches = [];
   List<PrayerMapMarker> _prayerMarkers = [];
+  List<DonationModel> _donations = [];
   List<TeamModel> _teams = [];
   String? _selectedTeamId;
 
@@ -42,6 +45,7 @@ class _AdminMapScreenState extends State<AdminMapScreen> {
   bool _showWorkers = true;
   bool _showChurches = true;
   bool _showPrayers = true;
+  bool _showDonations = true;
 
   // Caching
   final Map<String, GeoTerritory> _territoriesCache = {};
@@ -49,6 +53,9 @@ class _AdminMapScreenState extends State<AdminMapScreen> {
   static const double _gridCellSize = 0.15;
   static const double _polygonZoomThreshold = 10.0;
   static const int _maxPointsPerPolygon = 30;
+
+  // Map style
+  String _currentMapStyle = MapConstants.mapboxStyleStreets;
 
   // Debounce timer
   Timer? _loadDebounceTimer;
@@ -128,6 +135,7 @@ class _AdminMapScreenState extends State<AdminMapScreen> {
       _loadChurches(),
       _loadActiveWorkers(),
       _loadPrayerMarkers(),
+      _loadDonations(),
     ]);
 
     setState(() => _isLoading = false);
@@ -191,6 +199,26 @@ class _AdminMapScreenState extends State<AdminMapScreen> {
       }
     } catch (e) {
       debugPrint('Failed to load prayer markers: $e');
+    }
+  }
+
+  Future<void> _loadDonations() async {
+    try {
+      final api = await ApiClient.getInstance();
+      final response = await api.get(ApiConstants.donationsAll);
+      if (response.statusCode == 200) {
+        final data = response.data is List
+            ? response.data
+            : response.data['donations'] ?? [];
+        setState(() {
+          _donations = (data as List)
+              .map((json) => DonationModel.fromJson(json))
+              .where((d) => d.latitude != null && d.longitude != null)
+              .toList();
+        });
+      }
+    } catch (e) {
+      debugPrint('Failed to load donations: $e');
     }
   }
 
@@ -400,6 +428,9 @@ class _AdminMapScreenState extends State<AdminMapScreen> {
                   case 'prayers':
                     _showPrayers = !_showPrayers;
                     break;
+                  case 'donations':
+                    _showDonations = !_showDonations;
+                    break;
                 }
               });
             },
@@ -423,6 +454,11 @@ class _AdminMapScreenState extends State<AdminMapScreen> {
                 value: 'prayers',
                 checked: _showPrayers,
                 child: const Text('Prayer Requests'),
+              ),
+              CheckedPopupMenuItem(
+                value: 'donations',
+                checked: _showDonations,
+                child: const Text('Donations'),
               ),
             ],
           ),
@@ -451,7 +487,7 @@ class _AdminMapScreenState extends State<AdminMapScreen> {
             ),
             children: [
               TileLayer(
-                urlTemplate: MapConstants.getTileUrl(),
+                urlTemplate: MapConstants.getTileUrl(style: _currentMapStyle),
                 userAgentPackageName: 'com.rallypoint.admin',
                 tileSize: 512,
                 zoomOffset: -1,
@@ -471,6 +507,9 @@ class _AdminMapScreenState extends State<AdminMapScreen> {
               // Prayer request markers
               if (_showPrayers)
                 MarkerLayer(markers: _buildPrayerMarkers()),
+              // Donation markers
+              if (_showDonations)
+                MarkerLayer(markers: _buildDonationMarkers()),
             ],
           ),
           // Loading indicator
@@ -539,6 +578,12 @@ class _AdminMapScreenState extends State<AdminMapScreen> {
                 ),
               ],
             ),
+          ),
+          // Map style toggle
+          Positioned(
+            left: 16,
+            top: 16,
+            child: _buildMapStyleToggle(),
           ),
           // Legend
           Positioned(
@@ -710,6 +755,37 @@ class _AdminMapScreenState extends State<AdminMapScreen> {
     }).toList();
   }
 
+  List<Marker> _buildDonationMarkers() {
+    return _donations.map((donation) {
+      return Marker(
+        point: LatLng(donation.latitude!, donation.longitude!),
+        width: 28,
+        height: 28,
+        child: GestureDetector(
+          onTap: () => _showDonationDetails(donation),
+          child: Container(
+            decoration: BoxDecoration(
+              color: const Color(0xFF2E7D32),
+              shape: BoxShape.circle,
+              border: Border.all(color: Colors.white, width: 2),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withAlpha(40),
+                  blurRadius: 4,
+                ),
+              ],
+            ),
+            child: const Icon(
+              Icons.attach_money,
+              color: Colors.white,
+              size: 14,
+            ),
+          ),
+        ),
+      );
+    }).toList();
+  }
+
   Color _getPrayerUrgencyColor(String urgency) {
     switch (urgency.toLowerCase()) {
       case 'urgent':
@@ -721,6 +797,49 @@ class _AdminMapScreenState extends State<AdminMapScreen> {
       default:
         return AppColors.info;
     }
+  }
+
+  Widget _buildMapStyleToggle() {
+    final styles = [
+      (MapConstants.mapboxStyleStreets, Icons.map, 'Streets'),
+      (MapConstants.mapboxStyleSatelliteStreets, Icons.satellite_alt, 'Satellite'),
+      (MapConstants.mapboxStyleOutdoors, Icons.terrain, 'Outdoors'),
+    ];
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(4),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: styles.map((style) {
+            final isSelected = _currentMapStyle == style.$1;
+            return Tooltip(
+              message: style.$3,
+              child: Material(
+                color: isSelected
+                    ? AppColors.primary.withAlpha(30)
+                    : Colors.transparent,
+                borderRadius: BorderRadius.circular(8),
+                child: InkWell(
+                  onTap: () {
+                    setState(() => _currentMapStyle = style.$1);
+                  },
+                  borderRadius: BorderRadius.circular(8),
+                  child: Padding(
+                    padding: const EdgeInsets.all(8),
+                    child: Icon(
+                      style.$2,
+                      size: 20,
+                      color: isSelected ? AppColors.primary : Colors.grey[600],
+                    ),
+                  ),
+                ),
+              ),
+            );
+          }).toList(),
+        ),
+      ),
+    );
   }
 
   Widget _buildLegend() {
@@ -756,6 +875,11 @@ class _AdminMapScreenState extends State<AdminMapScreen> {
               color: AppColors.error,
               label: 'Prayer Request',
             ),
+            _LegendItem(
+              icon: Icons.attach_money,
+              color: const Color(0xFF2E7D32),
+              label: 'Donation',
+            ),
           ],
         ),
       ),
@@ -779,6 +903,7 @@ class _AdminMapScreenState extends State<AdminMapScreen> {
             Text('${_activeWorkers.length} active workers', style: const TextStyle(fontSize: 11)),
             Text('${_churches.length} churches', style: const TextStyle(fontSize: 11)),
             Text('${_prayerMarkers.length} prayer requests', style: const TextStyle(fontSize: 11)),
+            Text('${_donations.length} donations', style: const TextStyle(fontSize: 11)),
             const SizedBox(height: 4),
             Text(
               'Zoom: ${_currentZoom.toStringAsFixed(0)}',
@@ -820,6 +945,13 @@ class _AdminMapScreenState extends State<AdminMapScreen> {
     showModalBottomSheet(
       context: context,
       builder: (context) => _PrayerDetailsSheet(prayer: prayer),
+    );
+  }
+
+  void _showDonationDetails(DonationModel donation) {
+    showModalBottomSheet(
+      context: context,
+      builder: (context) => _DonationDetailsSheet(donation: donation),
     );
   }
 }
@@ -1173,6 +1305,74 @@ class _PrayerDetailsSheet extends StatelessWidget {
           _DetailRow(label: 'Request Type', value: prayer.requestType),
           _DetailRow(label: 'Status', value: prayer.status),
           _DetailRow(label: 'Urgency', value: prayer.urgency.toUpperCase()),
+        ],
+      ),
+    );
+  }
+}
+
+class _DonationDetailsSheet extends StatelessWidget {
+  final DonationModel donation;
+
+  const _DonationDetailsSheet({required this.donation});
+
+  @override
+  Widget build(BuildContext context) {
+    final currencyFormat = NumberFormat.currency(symbol: '\$', decimalDigits: 2);
+    return Container(
+      padding: const EdgeInsets.all(20),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF2E7D32).withAlpha(30),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(Icons.attach_money, color: Color(0xFF2E7D32)),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      donation.isAnonymous ? 'Anonymous Donor' : donation.donorName,
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    Text(
+                      currencyFormat.format(donation.amount),
+                      style: const TextStyle(
+                        color: Color(0xFF2E7D32),
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              IconButton(
+                icon: const Icon(Icons.close),
+                onPressed: () => Navigator.pop(context),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          const Divider(),
+          const SizedBox(height: 16),
+          _DetailRow(label: 'Type', value: donation.donationType),
+          _DetailRow(label: 'Payment', value: donation.paymentMethod),
+          _DetailRow(label: 'Status', value: donation.status.toUpperCase()),
+          if (donation.workerName != null)
+            _DetailRow(label: 'Worker', value: donation.workerName!),
+          if (donation.teamName != null)
+            _DetailRow(label: 'Team', value: donation.teamName!),
         ],
       ),
     );

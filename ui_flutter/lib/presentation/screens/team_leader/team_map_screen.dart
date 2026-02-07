@@ -343,7 +343,7 @@ class _TeamMapScreenState extends State<TeamMapScreen> {
       null, // maxZoom
       null, // offset
     ).then((cameraOptions) {
-      _mapboxMap!.setCamera(cameraOptions);
+      _mapboxMap!.flyTo(cameraOptions, MapAnimationOptions(duration: 1000));
     });
   }
 
@@ -367,20 +367,26 @@ class _TeamMapScreenState extends State<TeamMapScreen> {
   void _zoomIn() async {
     final currentCamera = await _mapboxMap?.getCameraState();
     if (currentCamera != null) {
-      _mapboxMap?.setCamera(CameraOptions(
-        center: currentCamera.center,
-        zoom: currentCamera.zoom + 1,
-      ));
+      _mapboxMap?.easeTo(
+        CameraOptions(
+          center: currentCamera.center,
+          zoom: currentCamera.zoom + 1,
+        ),
+        MapAnimationOptions(duration: 500),
+      );
     }
   }
 
   void _zoomOut() async {
     final currentCamera = await _mapboxMap?.getCameraState();
     if (currentCamera != null) {
-      _mapboxMap?.setCamera(CameraOptions(
-        center: currentCamera.center,
-        zoom: math.max(1, currentCamera.zoom - 1),
-      ));
+      _mapboxMap?.easeTo(
+        CameraOptions(
+          center: currentCamera.center,
+          zoom: math.max(1, currentCamera.zoom - 1),
+        ),
+        MapAnimationOptions(duration: 500),
+      );
     }
   }
 
@@ -510,6 +516,14 @@ class _TeamMapScreenState extends State<TeamMapScreen> {
                     ),
                   ),
 
+                // Map Style Toggle
+                if (_isMapReady && _mapboxMap != null)
+                  Positioned(
+                    left: 16,
+                    top: 16,
+                    child: MapStyleToggle(mapboxMap: _mapboxMap!),
+                  ),
+
                 // Map controls
                 Positioned(
                   right: 16,
@@ -534,12 +548,13 @@ class _TeamMapScreenState extends State<TeamMapScreen> {
                   ),
                 ),
 
-                // Stats overlay
+                // Stats overlay & legend — responsive layout
                 if (hasData)
                   Positioned(
                     left: 16,
+                    right: 16,
                     bottom: 16,
-                    child: _StatsOverlay(
+                    child: _ResponsiveBottomOverlays(
                       totalTerritories: state.territoryBoundaries.length,
                       activeWorkers: state.activeWorkers.length,
                       prayerRequests: state.prayerRequests.length,
@@ -547,14 +562,6 @@ class _TeamMapScreenState extends State<TeamMapScreen> {
                       activeTerritoriesCount: state.activeWorkers.map((w) => w.territoryName).toSet().length,
                       isDark: isDark,
                     ),
-                  ),
-
-                // Legend
-                if (hasData)
-                  Positioned(
-                    right: 16,
-                    bottom: 16,
-                    child: _MapLegend(isDark: isDark),
                   ),
               ],
             );
@@ -676,6 +683,113 @@ class _StatsOverlay extends StatelessWidget {
           _StatRow(icon: Icons.volunteer_activism, color: AppColors.success, label: 'Donations', value: '$donations'),
         ],
       ),
+    );
+  }
+}
+
+class _ResponsiveBottomOverlays extends StatelessWidget {
+  final int totalTerritories;
+  final int activeTerritoriesCount;
+  final int activeWorkers;
+  final int prayerRequests;
+  final int donations;
+  final bool isDark;
+
+  const _ResponsiveBottomOverlays({
+    required this.totalTerritories,
+    required this.activeTerritoriesCount,
+    required this.activeWorkers,
+    required this.prayerRequests,
+    required this.donations,
+    required this.isDark,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isNarrow = screenWidth < 400;
+
+    final stats = _StatsOverlay(
+      totalTerritories: totalTerritories,
+      activeWorkers: activeWorkers,
+      prayerRequests: prayerRequests,
+      donations: donations,
+      activeTerritoriesCount: activeTerritoriesCount,
+      isDark: isDark,
+    );
+    final legend = _CollapsibleMapLegend(isDark: isDark, startCollapsed: isNarrow);
+
+    if (isNarrow) {
+      // Stack vertically on narrow screens
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          legend,
+          const SizedBox(height: 8),
+          stats,
+        ],
+      );
+    }
+
+    // Side by side on wider screens
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.end,
+      children: [
+        stats,
+        const Spacer(),
+        legend,
+      ],
+    );
+  }
+}
+
+class _CollapsibleMapLegend extends StatefulWidget {
+  final bool isDark;
+  final bool startCollapsed;
+
+  const _CollapsibleMapLegend({required this.isDark, this.startCollapsed = false});
+
+  @override
+  State<_CollapsibleMapLegend> createState() => _CollapsibleMapLegendState();
+}
+
+class _CollapsibleMapLegendState extends State<_CollapsibleMapLegend> {
+  late bool _collapsed;
+
+  @override
+  void initState() {
+    super.initState();
+    _collapsed = widget.startCollapsed;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_collapsed) {
+      return GestureDetector(
+        onTap: () => setState(() => _collapsed = false),
+        child: Container(
+          width: 36,
+          height: 36,
+          decoration: BoxDecoration(
+            color: widget.isDark ? AppColors.surfaceDark : Colors.white,
+            shape: BoxShape.circle,
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withAlpha(30),
+                blurRadius: 4,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: const Icon(Icons.legend_toggle, size: 18, color: AppColors.textSecondaryLight),
+        ),
+      );
+    }
+
+    return GestureDetector(
+      onTap: () => setState(() => _collapsed = true),
+      child: _MapLegend(isDark: widget.isDark),
     );
   }
 }

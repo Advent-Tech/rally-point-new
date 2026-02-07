@@ -16,6 +16,7 @@ class _UsersScreenState extends State<UsersScreen>
   late TabController _tabController;
   List<UserModel> _pendingLeaders = [];
   List<UserModel> _pendingWorkers = [];
+  List<UserModel> _allUsers = [];
   bool _isLoading = true;
 
   @override
@@ -59,6 +60,37 @@ class _UsersScreenState extends State<UsersScreen>
             : workersResponse.data['workers'] ?? [];
         _pendingWorkers =
             (data as List).map((json) => UserModel.fromJson(json)).toList();
+      }
+
+      // Load all users (leaders + verified workers)
+      _allUsers = [];
+      try {
+        // Get all leaders (any status)
+        final allLeadersResponse = await api.get(ApiConstants.adminTeamLeaders);
+        if (allLeadersResponse.statusCode == 200) {
+          final data = allLeadersResponse.data is List
+              ? allLeadersResponse.data
+              : allLeadersResponse.data['leaders'] ?? [];
+          _allUsers.addAll(
+              (data as List).map((json) => UserModel.fromJson(json)));
+        }
+        // Get verified workers
+        final verifiedWorkersResponse =
+            await api.get(ApiConstants.adminWorkersVerified);
+        if (verifiedWorkersResponse.statusCode == 200) {
+          final data = verifiedWorkersResponse.data is List
+              ? verifiedWorkersResponse.data
+              : verifiedWorkersResponse.data['workers'] ?? [];
+          _allUsers.addAll(
+              (data as List).map((json) => UserModel.fromJson(json)));
+        }
+        // Add pending workers too
+        _allUsers.addAll(_pendingWorkers);
+        // Remove duplicates by ID
+        final seen = <String>{};
+        _allUsers = _allUsers.where((u) => seen.add(u.id)).toList();
+      } catch (e) {
+        debugPrint('Failed to load all users: $e');
       }
 
       setState(() => _isLoading = false);
@@ -467,23 +499,133 @@ class _UsersScreenState extends State<UsersScreen>
   }
 
   Widget _buildAllUsers() {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(Icons.people_outline, size: 64, color: AppColors.textSecondary),
-          const SizedBox(height: 16),
-          Text(
-            'All Users View',
-            style: Theme.of(context).textTheme.titleLarge,
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'Coming soon - full user management',
-            style: TextStyle(color: AppColors.textSecondary),
-          ),
-        ],
+    if (_allUsers.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.people_outline, size: 64, color: AppColors.textSecondary),
+            const SizedBox(height: 16),
+            Text(
+              'No Users Found',
+              style: Theme.of(context).textTheme.titleLarge,
+            ),
+          ],
+        ),
+      );
+    }
+
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isMobile = screenWidth < 768;
+
+    return RefreshIndicator(
+      onRefresh: _loadData,
+      child: ListView.builder(
+        padding: EdgeInsets.all(isMobile ? 12 : 16),
+        itemCount: _allUsers.length,
+        itemBuilder: (context, index) {
+          final user = _allUsers[index];
+          return Card(
+            margin: EdgeInsets.only(bottom: isMobile ? 8 : 12),
+            child: ListTile(
+              leading: CircleAvatar(
+                backgroundColor: _getRoleColor(user).withAlpha(30),
+                child: Text(
+                  user.fullName.isNotEmpty
+                      ? user.fullName[0].toUpperCase()
+                      : '?',
+                  style: TextStyle(
+                    color: _getRoleColor(user),
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+              title: Text(
+                user.fullName,
+                style: const TextStyle(fontWeight: FontWeight.w600),
+              ),
+              subtitle: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    user.email,
+                    style: TextStyle(
+                      color: AppColors.textSecondary,
+                      fontSize: 12,
+                    ),
+                  ),
+                  if (user.teamName != null)
+                    Text(
+                      'Team: ${user.teamName}',
+                      style: TextStyle(
+                        color: AppColors.textSecondary,
+                        fontSize: 12,
+                      ),
+                    ),
+                ],
+              ),
+              trailing: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: _getRoleColor(user).withAlpha(30),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Text(
+                      _getRoleLabel(user),
+                      style: TextStyle(
+                        color: _getRoleColor(user),
+                        fontWeight: FontWeight.w600,
+                        fontSize: 11,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: _getStatusColor(user).withAlpha(30),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Text(
+                      user.verificationStatus?.toUpperCase() ?? 'N/A',
+                      style: TextStyle(
+                        color: _getStatusColor(user),
+                        fontWeight: FontWeight.w600,
+                        fontSize: 11,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
       ),
     );
+  }
+
+  Color _getRoleColor(UserModel user) {
+    if (user.isAdmin || user.isSuperAdmin) return AppColors.error;
+    if (user.isTeamLeader) return AppColors.primary;
+    return AppColors.info;
+  }
+
+  String _getRoleLabel(UserModel user) {
+    if (user.isSuperAdmin) return 'SUPERADMIN';
+    if (user.isAdmin) return 'ADMIN';
+    if (user.isTeamLeader) return 'LEADER';
+    return 'WORKER';
+  }
+
+  Color _getStatusColor(UserModel user) {
+    if (user.isVerified) return AppColors.success;
+    if (user.isPending) return AppColors.warning;
+    if (user.isRejected) return AppColors.error;
+    return AppColors.textSecondary;
   }
 }

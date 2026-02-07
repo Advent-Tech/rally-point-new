@@ -336,6 +336,37 @@ func (h *ReceiptHandler) CreateDonation(c *gin.Context) {
 	})
 }
 
+// GetAllDonations gets all donations across all teams
+// GET /api/donations/all
+func (h *ReceiptHandler) GetAllDonations(c *gin.Context) {
+	limit, offset := getPaginationParams(c)
+
+	donations, err := h.service.GetAllDonations(limit, offset)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"donations": donations,
+		"count":     len(donations),
+	})
+}
+
+// GetGlobalDonationStats gets donation statistics across all teams
+// GET /api/donations/stats
+func (h *ReceiptHandler) GetGlobalDonationStats(c *gin.Context) {
+	days := getDaysParam(c)
+
+	stats, err := h.service.GetGlobalDonationStats(days)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, stats)
+}
+
 // GetDonation gets a donation by ID
 // GET /api/donations/:id
 func (h *ReceiptHandler) GetDonation(c *gin.Context) {

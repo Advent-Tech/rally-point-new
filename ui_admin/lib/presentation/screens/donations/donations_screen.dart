@@ -54,6 +54,7 @@ class _DonationsScreenState extends State<DonationsScreen> with SingleTickerProv
         });
       }
     } catch (e) {
+      debugPrint('Failed to load teams: $e');
       setState(() => _isLoading = false);
     }
   }
@@ -68,11 +69,11 @@ class _DonationsScreenState extends State<DonationsScreen> with SingleTickerProv
       // Determine API path based on selection
       final isAll = _selectedTeamId == 'all';
       final donationsPath = isAll
-          ? ApiConstants.donations
+          ? ApiConstants.donationsAll
           : '${ApiConstants.donations}/team/$_selectedTeamId';
       final statsPath = isAll
           ? ApiConstants.donationStats
-          : '${ApiConstants.donationStats}/team/$_selectedTeamId';
+          : '${ApiConstants.donations}/stats/team/$_selectedTeamId';
       final receiptsPath = isAll
           ? ApiConstants.receipts
           : '${ApiConstants.receipts}/team/$_selectedTeamId';
@@ -103,6 +104,7 @@ class _DonationsScreenState extends State<DonationsScreen> with SingleTickerProv
 
       setState(() => _isLoading = false);
     } catch (e) {
+      debugPrint('Failed to load donation data: $e');
       setState(() => _isLoading = false);
     }
   }
@@ -119,12 +121,16 @@ class _DonationsScreenState extends State<DonationsScreen> with SingleTickerProv
               child: DropdownButton<String>(
                 value: _selectedTeamId,
                 underline: const SizedBox(),
-                items: _teams
-                    .map((t) => DropdownMenuItem(
-                          value: t.id,
-                          child: Text(t.name),
-                        ))
-                    .toList(),
+                items: [
+                  const DropdownMenuItem(
+                    value: 'all',
+                    child: Text('All Teams'),
+                  ),
+                  ..._teams.map((t) => DropdownMenuItem(
+                        value: t.id,
+                        child: Text(t.name),
+                      )),
+                ],
                 onChanged: (value) {
                   setState(() => _selectedTeamId = value);
                   _loadData();

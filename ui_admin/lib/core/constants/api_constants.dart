@@ -42,6 +42,7 @@ class ApiConstants {
 
   // Donation endpoints
   static const String donations = '/api/donations';
+  static const String donationsAll = '/api/donations/all';
   static const String donationStats = '/api/donations/stats';
 
   // Receipt endpoints

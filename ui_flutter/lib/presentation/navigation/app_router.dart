@@ -202,25 +202,6 @@ class AppRouter {
               ),
             ),
             GoRoute(
-              path: '/chat/team/:teamId',
-              pageBuilder: (context, state) {
-                final teamId = state.pathParameters['teamId'] ?? '';
-                final teamName = state.uri.queryParameters['name'];
-                return NoTransitionPage(
-                  child: TeamChatScreen(teamId: teamId, teamName: teamName),
-                );
-              },
-            ),
-            GoRoute(
-              path: '/chat/:conversationId',
-              pageBuilder: (context, state) {
-                final conversationId = state.pathParameters['conversationId'] ?? '';
-                return NoTransitionPage(
-                  child: ChatScreen(conversationId: conversationId),
-                );
-              },
-            ),
-            GoRoute(
               path: '/blogs',
               pageBuilder: (context, state) => const NoTransitionPage(
                 child: BlogScreen(),
@@ -236,6 +217,23 @@ class AppRouter {
               ),
             ),
           ],
+        ),
+
+        // Worker chat conversation routes (outside shell — no bottom nav)
+        GoRoute(
+          path: '/chat/team/:teamId',
+          builder: (context, state) {
+            final teamId = state.pathParameters['teamId'] ?? '';
+            final teamName = state.uri.queryParameters['name'];
+            return TeamChatScreen(teamId: teamId, teamName: teamName);
+          },
+        ),
+        GoRoute(
+          path: '/chat/:conversationId',
+          builder: (context, state) {
+            final conversationId = state.pathParameters['conversationId'] ?? '';
+            return ChatScreen(conversationId: conversationId);
+          },
         ),
 
         // Prayer request form route (accessible from anywhere)

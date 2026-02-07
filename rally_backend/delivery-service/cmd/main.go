@@ -189,6 +189,8 @@ func setupRouter(deliveryHandler *handler.DeliveryHandler, receiptHandler *handl
 		// Donation management
 		donations := protected.Group("/donations")
 		{
+			donations.GET("/all", receiptHandler.GetAllDonations)
+			donations.GET("/stats", receiptHandler.GetGlobalDonationStats)
 			donations.POST("/", receiptHandler.CreateDonation)
 			donations.GET("/:id", receiptHandler.GetDonation)
 			donations.PUT("/:id/deposit", receiptHandler.MarkDonationDeposited)
