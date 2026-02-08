@@ -50,4 +50,11 @@ class MapConstants {
   /// Attribution (required by Mapbox ToS)
   static const String mapboxAttribution =
       '© Mapbox © OpenStreetMap';
+
+  /// Get Mapbox geocoding URL for a search query
+  static String getGeocodingUrl(String query) {
+    final encoded = Uri.encodeComponent(query);
+    return 'https://api.mapbox.com/geocoding/v5/mapbox.places/$encoded.json'
+        '?access_token=$mapboxAccessToken&limit=5';
+  }
 }

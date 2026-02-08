@@ -1,7 +1,9 @@
 package service
 
 import (
+	"encoding/json"
 	"fmt"
+	"time"
 
 	"github.com/google/uuid"
 	"rally-point/territory-service/internal/domain"
@@ -164,6 +166,126 @@ func (s *geoTerritoryService) GetVectorTile(z, x, y int) ([]byte, error) {
 	}
 
 	return s.repo.GetVectorTile(z, x, y)
+}
+
+// CreateTerritory creates a new territory
+func (s *geoTerritoryService) CreateTerritory(req *domain.CreateGeoTerritoryRequest) (*domain.GeoTerritory, error) {
+	// Validate geometry
+	validation, err := s.repo.ValidateGeometry(req.Geometry)
+	if err != nil {
+		return nil, fmt.Errorf("failed to validate geometry: %w", err)
+	}
+	if !validation.IsValid {
+		return nil, fmt.Errorf("invalid geometry: %s", validation.Reason)
+	}
+
+	// Check overlaps (warn, don't block)
+	overlaps, err := s.repo.CheckOverlaps(req.Geometry, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to check overlaps: %w", err)
+	}
+	_ = overlaps // overlaps are informational only
+
+	// Get next FID
+	fid, err := s.repo.GetNextFID()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get next FID: %w", err)
+	}
+
+	// Auto-generate SOLID if not provided
+	id := uuid.New()
+	solid := ""
+	if req.SOLID != nil {
+		solid = *req.SOLID
+	} else {
+		solid = fmt.Sprintf("MANUAL-%s", id.String()[:8])
+	}
+
+	sourceFile := "manual"
+	now := time.Now()
+
+	territory := &domain.GeoTerritory{
+		ID:            id,
+		FID:           fid,
+		SOLID:         solid,
+		EntityName:    req.EntityName,
+		EntityID:      req.EntityID,
+		GroupID:        req.GroupID,
+		Address:       req.Address,
+		StreetAddress: req.StreetAddress,
+		City:          req.City,
+		County:        req.County,
+		State:         req.State,
+		Zipcode:       req.Zipcode,
+		Population:    req.Population,
+		HousingUnits:  req.HousingUnits,
+		UnionName:     req.UnionName,
+		Conference:    req.Conference,
+		GEOID:         req.GEOID,
+		ZID:           req.ZID,
+		Label:         req.Label,
+		Order:         req.Order,
+		Geometry:      req.Geometry,
+		SourceFile:    &sourceFile,
+		ImportedAt:    now,
+		CreatedAt:     now,
+		UpdatedAt:     now,
+	}
+
+	if err := s.repo.Create(territory); err != nil {
+		return nil, fmt.Errorf("failed to create territory: %w", err)
+	}
+
+	// Re-fetch to get the full object
+	return s.repo.GetByID(id)
+}
+
+// UpdateTerritory updates an existing territory
+func (s *geoTerritoryService) UpdateTerritory(id uuid.UUID, req *domain.UpdateGeoTerritoryRequest) (*domain.GeoTerritory, error) {
+	// Verify exists
+	_, err := s.repo.GetByID(id)
+	if err != nil {
+		return nil, fmt.Errorf("territory not found: %w", err)
+	}
+
+	// If geometry changed, validate and check overlaps
+	if len(req.Geometry) > 0 {
+		validation, err := s.repo.ValidateGeometry(req.Geometry)
+		if err != nil {
+			return nil, fmt.Errorf("failed to validate geometry: %w", err)
+		}
+		if !validation.IsValid {
+			return nil, fmt.Errorf("invalid geometry: %s", validation.Reason)
+		}
+	}
+
+	if err := s.repo.Update(id, req); err != nil {
+		return nil, fmt.Errorf("failed to update territory: %w", err)
+	}
+
+	return s.repo.GetByID(id)
+}
+
+// DeleteTerritory deletes a territory
+func (s *geoTerritoryService) DeleteTerritory(id uuid.UUID) error {
+	return s.repo.Delete(id)
+}
+
+// ValidateGeometry validates a GeoJSON geometry and checks for overlaps
+func (s *geoTerritoryService) ValidateGeometry(geojson json.RawMessage) (*domain.GeometryValidationResult, error) {
+	validation, err := s.repo.ValidateGeometry(geojson)
+	if err != nil {
+		return nil, fmt.Errorf("failed to validate geometry: %w", err)
+	}
+
+	// Also check overlaps
+	overlaps, err := s.repo.CheckOverlaps(geojson, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to check overlaps: %w", err)
+	}
+	validation.OverlappingIDs = overlaps
+
+	return validation, nil
 }
 
 // ImportGeoPackage imports a GeoPackage file

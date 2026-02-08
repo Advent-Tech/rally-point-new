@@ -95,6 +95,59 @@ type GeoJSONFeatureCollection struct {
 	Features []GeoJSONFeature `json:"features"`
 }
 
+// CreateGeoTerritoryRequest represents a request to create a new territory
+type CreateGeoTerritoryRequest struct {
+	EntityName   string          `json:"entity_name" binding:"required"`
+	EntityID     string          `json:"entity_id" binding:"required"`
+	Geometry     json.RawMessage `json:"geometry" binding:"required"`
+	SOLID        *string         `json:"solid,omitempty"`
+	GroupID      *string         `json:"group_id,omitempty"`
+	Address      *string         `json:"address,omitempty"`
+	StreetAddress *string        `json:"street_address,omitempty"`
+	City         *string         `json:"city,omitempty"`
+	County       *string         `json:"county,omitempty"`
+	State        *string         `json:"state,omitempty"`
+	Zipcode      *string         `json:"zipcode,omitempty"`
+	Population   *int            `json:"population,omitempty"`
+	HousingUnits *int            `json:"housing_units,omitempty"`
+	UnionName    *string         `json:"union_name,omitempty"`
+	Conference   *string         `json:"conference,omitempty"`
+	GEOID        *string         `json:"geoid,omitempty"`
+	ZID          *string         `json:"zid,omitempty"`
+	Label        *string         `json:"label,omitempty"`
+	Order        *float64        `json:"order,omitempty"`
+}
+
+// UpdateGeoTerritoryRequest represents a request to update a territory (all fields optional)
+type UpdateGeoTerritoryRequest struct {
+	EntityName   *string         `json:"entity_name,omitempty"`
+	EntityID     *string         `json:"entity_id,omitempty"`
+	Geometry     json.RawMessage `json:"geometry,omitempty"`
+	SOLID        *string         `json:"solid,omitempty"`
+	GroupID      *string         `json:"group_id,omitempty"`
+	Address      *string         `json:"address,omitempty"`
+	StreetAddress *string        `json:"street_address,omitempty"`
+	City         *string         `json:"city,omitempty"`
+	County       *string         `json:"county,omitempty"`
+	State        *string         `json:"state,omitempty"`
+	Zipcode      *string         `json:"zipcode,omitempty"`
+	Population   *int            `json:"population,omitempty"`
+	HousingUnits *int            `json:"housing_units,omitempty"`
+	UnionName    *string         `json:"union_name,omitempty"`
+	Conference   *string         `json:"conference,omitempty"`
+	GEOID        *string         `json:"geoid,omitempty"`
+	ZID          *string         `json:"zid,omitempty"`
+	Label        *string         `json:"label,omitempty"`
+	Order        *float64        `json:"order,omitempty"`
+}
+
+// GeometryValidationResult represents the result of a geometry validation
+type GeometryValidationResult struct {
+	IsValid        bool     `json:"is_valid"`
+	Reason         string   `json:"reason,omitempty"`
+	OverlappingIDs []string `json:"overlapping_ids,omitempty"`
+}
+
 // BoundsQuery represents a spatial bounds query
 type BoundsQuery struct {
 	MinLng float64 `json:"min_lng" form:"min_lng"`
@@ -194,6 +247,14 @@ type GeoTerritoryRepository interface {
 	// Vector tiles
 	GetVectorTile(z, x, y int) ([]byte, error)
 
+	// CRUD
+	Create(territory *GeoTerritory) error
+	Update(id uuid.UUID, req *UpdateGeoTerritoryRequest) error
+	Delete(id uuid.UUID) error
+	GetNextFID() (int, error)
+	ValidateGeometry(geojson json.RawMessage) (*GeometryValidationResult, error)
+	CheckOverlaps(geojson json.RawMessage, excludeID *uuid.UUID) ([]string, error)
+
 	// Import
 	CreateBatch(territories []*GeoTerritory) error
 	UpdateSimplifiedGeometry(tolerance float64) error
@@ -229,6 +290,12 @@ type GeoTerritoryService interface {
 
 	// Vector tiles
 	GetVectorTile(z, x, y int) ([]byte, error)
+
+	// CRUD
+	CreateTerritory(req *CreateGeoTerritoryRequest) (*GeoTerritory, error)
+	UpdateTerritory(id uuid.UUID, req *UpdateGeoTerritoryRequest) (*GeoTerritory, error)
+	DeleteTerritory(id uuid.UUID) error
+	ValidateGeometry(geojson json.RawMessage) (*GeometryValidationResult, error)
 
 	// Import
 	ImportGeoPackage(filePath string) (*ImportProgress, error)

@@ -78,4 +78,7 @@ class ApiConstants {
 
   // Conference stats
   static const String conferenceStats = '/api/geo/stats/conferences';
+
+  // Territory validation
+  static const String validateGeometry = '/api/geo/territories/validate';
 }

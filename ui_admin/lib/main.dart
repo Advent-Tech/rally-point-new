@@ -15,6 +15,8 @@ import 'presentation/screens/dashboard/admin_layout.dart';
 import 'presentation/screens/dashboard/dashboard_screen.dart';
 import 'presentation/screens/users/users_screen.dart';
 import 'presentation/screens/territories/territories_screen.dart';
+import 'presentation/screens/territories/create_territory_screen.dart';
+import 'data/models/territory_model.dart';
 import 'presentation/screens/surveys/surveys_screen.dart';
 import 'presentation/screens/donations/donations_screen.dart';
 import 'presentation/screens/teams/teams_screen.dart';
@@ -131,6 +133,17 @@ class _RallyAdminAppState extends State<RallyAdminApp> {
             GoRoute(
               path: '/territories',
               builder: (context, state) => const TerritoriesScreen(),
+            ),
+            GoRoute(
+              path: '/territories/create',
+              builder: (context, state) => const CreateTerritoryScreen(),
+            ),
+            GoRoute(
+              path: '/territories/edit',
+              builder: (context, state) {
+                final territory = state.extra as GeoTerritory?;
+                return CreateTerritoryScreen(existingTerritory: territory);
+              },
             ),
             GoRoute(
               path: '/surveys',

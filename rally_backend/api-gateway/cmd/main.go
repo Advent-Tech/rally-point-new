@@ -350,6 +350,12 @@ func setupRouter(cfg *config.Config, jwtManager *auth.JWTManager, rateLimiter mi
 			geo.GET("/territories/solid/:solid", serviceProxy.ProxyRequest("territory"))
 			geo.GET("/territories/entity/:entityId", serviceProxy.ProxyRequest("territory"))
 
+			// Territory CRUD
+			geo.POST("/territories", serviceProxy.ProxyRequest("territory"))
+			geo.POST("/territories/validate", serviceProxy.ProxyRequest("territory"))
+			geo.PUT("/territories/:id", serviceProxy.ProxyRequest("territory"))
+			geo.DELETE("/territories/:id", serviceProxy.ProxyRequest("territory"))
+
 			// Church locations
 			geo.GET("/churches", serviceProxy.ProxyRequest("territory"))
 			geo.GET("/churches/:entityId", serviceProxy.ProxyRequest("territory"))

@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"encoding/json"
 	"net/http"
 	"strconv"
 	"strings"
@@ -412,6 +413,87 @@ func (h *GeoTerritoryHandler) GetImportProgress(c *gin.Context) {
 	c.JSON(http.StatusOK, progress)
 }
 
+// CreateTerritory creates a new territory
+// POST /api/geo/territories
+func (h *GeoTerritoryHandler) CreateTerritory(c *gin.Context) {
+	var req domain.CreateGeoTerritoryRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	territory, err := h.service.CreateTerritory(&req)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusCreated, territory)
+}
+
+// UpdateTerritory updates an existing territory
+// PUT /api/geo/territories/:id
+func (h *GeoTerritoryHandler) UpdateTerritory(c *gin.Context) {
+	idStr := c.Param("id")
+	id, err := uuid.Parse(idStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid territory ID"})
+		return
+	}
+
+	var req domain.UpdateGeoTerritoryRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	territory, err := h.service.UpdateTerritory(id, &req)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, territory)
+}
+
+// DeleteTerritory deletes a territory
+// DELETE /api/geo/territories/:id
+func (h *GeoTerritoryHandler) DeleteTerritory(c *gin.Context) {
+	idStr := c.Param("id")
+	id, err := uuid.Parse(idStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid territory ID"})
+		return
+	}
+
+	if err := h.service.DeleteTerritory(id); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "territory deleted"})
+}
+
+// ValidateGeometry validates a GeoJSON geometry
+// POST /api/geo/territories/validate
+func (h *GeoTerritoryHandler) ValidateGeometry(c *gin.Context) {
+	var req struct {
+		Geometry json.RawMessage `json:"geometry" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	result, err := h.service.ValidateGeometry(req.Geometry)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, result)
+}
+
 // RegisterRoutes registers the geo territory routes
 func (h *GeoTerritoryHandler) RegisterRoutes(router *gin.RouterGroup) {
 	geo := router.Group("/geo")
@@ -424,6 +506,12 @@ func (h *GeoTerritoryHandler) RegisterRoutes(router *gin.RouterGroup) {
 		geo.GET("/territories/:id", h.GetTerritoryByID)
 		geo.GET("/territories/solid/:solid", h.GetTerritoryBySOLID)
 		geo.GET("/territories/entity/:entityId", h.GetTerritoriesByEntity)
+
+		// Territory CRUD
+		geo.POST("/territories", h.CreateTerritory)
+		geo.POST("/territories/validate", h.ValidateGeometry)
+		geo.PUT("/territories/:id", h.UpdateTerritory)
+		geo.DELETE("/territories/:id", h.DeleteTerritory)
 
 		// Church endpoints
 		geo.GET("/churches", h.GetChurchLocations)

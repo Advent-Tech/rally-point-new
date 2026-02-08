@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
+import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/network/api_client.dart';
 import '../../../core/constants/api_constants.dart';
@@ -554,6 +555,20 @@ class _TerritoriesScreenState extends State<TerritoriesScreen> with SingleTicker
     return Scaffold(
       appBar: AppBar(
         title: const Text('Territory Management'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.add_location_alt),
+            tooltip: 'Create Territory',
+            onPressed: () async {
+              final result = await context.push('/territories/create');
+              if (result == true) {
+                _territoriesCache.clear();
+                _loadedGridCells.clear();
+                _loadData();
+              }
+            },
+          ),
+        ],
         bottom: TabBar(
           controller: _tabController,
           tabs: const [
