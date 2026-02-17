@@ -108,14 +108,16 @@ type LocationRepository interface {
 	GetTracksByUserID(userID uuid.UUID, limit, offset int) ([]*LocationTrack, error)
 	GetTracksBySessionID(sessionID uuid.UUID) ([]*LocationTrack, error)
 	GetTracksInTimeRange(userID uuid.UUID, startTime, endTime time.Time) ([]*LocationTrack, error)
-	
+	GetLastTrackForSession(sessionID uuid.UUID, beforeTrackID uuid.UUID) (*LocationTrack, error)
+
 	CreateSession(session *LocationSession) error
 	GetSessionByID(id uuid.UUID) (*LocationSession, error)
 	GetActiveSession(userID uuid.UUID) (*LocationSession, error)
 	UpdateSession(session *LocationSession) error
 	EndSession(sessionID uuid.UUID) error
 	GetUserSessions(userID uuid.UUID, limit, offset int) ([]*LocationSession, error)
-	
+	IncrementSessionDistance(sessionID uuid.UUID, addDistance float64) error
+
 	GetLocationStats(userID uuid.UUID, days int) (*LocationStats, error)
 	GetActiveWorkers() ([]*WorkerLocation, error)
 	UpdateWorkerLocation(location *WorkerLocation) error

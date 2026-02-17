@@ -556,17 +556,24 @@ class _TerritoriesScreenState extends State<TerritoriesScreen> with SingleTicker
       appBar: AppBar(
         title: const Text('Territory Management'),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.add_location_alt),
-            tooltip: 'Create Territory',
-            onPressed: () async {
-              final result = await context.push('/territories/create');
-              if (result == true) {
-                _territoriesCache.clear();
-                _loadedGridCells.clear();
-                _loadData();
-              }
-            },
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+            child: ElevatedButton.icon(
+              icon: const Icon(Icons.add_location_alt, size: 18),
+              label: const Text('Create Territory'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                foregroundColor: Colors.white,
+              ),
+              onPressed: () async {
+                final result = await context.push('/territories/create');
+                if (result == true) {
+                  _territoriesCache.clear();
+                  _loadedGridCells.clear();
+                  _loadData();
+                }
+              },
+            ),
           ),
         ],
         bottom: TabBar(
@@ -1323,8 +1330,82 @@ class _TerritoriesScreenState extends State<TerritoriesScreen> with SingleTicker
           Navigator.pop(context);
           _allocateTerritoryFromMap(territory, leader);
         },
+        onEdit: () {
+          Navigator.pop(context);
+          _editTerritory(territory);
+        },
+        onDelete: () {
+          Navigator.pop(context);
+          _confirmDeleteTerritory(territory);
+        },
       ),
     );
+  }
+
+  void _editTerritory(GeoTerritory territory) async {
+    final result = await context.push('/territories/edit', extra: territory);
+    if (result == true) {
+      _territoriesCache.clear();
+      _loadedGridCells.clear();
+      _loadData();
+    }
+  }
+
+  void _confirmDeleteTerritory(GeoTerritory territory) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete Territory'),
+        content: Text(
+          'Are you sure you want to delete "${territory.entityName}"?\n\nThis action cannot be undone.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.error),
+            onPressed: () {
+              Navigator.pop(context);
+              _deleteTerritory(territory);
+            },
+            child: const Text('Delete', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _deleteTerritory(GeoTerritory territory) async {
+    try {
+      final api = await ApiClient.getInstance();
+      final response = await api.delete('${ApiConstants.territories}/${territory.id}');
+
+      if (mounted) {
+        if (response.statusCode == 200) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('"${territory.entityName}" deleted'),
+              backgroundColor: AppColors.success,
+            ),
+          );
+          _territoriesCache.remove(territory.id);
+          _loadedGridCells.clear();
+          _updateVisibleTerritories();
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Failed to delete: ${response.data}')),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error deleting territory: $e')),
+        );
+      }
+    }
   }
 
   // Allocate territory from map view
@@ -1669,12 +1750,16 @@ class _TerritoryDetailsSheet extends StatelessWidget {
   final List<UserModel> teamLeaders;
   final Color unionColor;
   final Function(UserModel) onAssign;
+  final VoidCallback onEdit;
+  final VoidCallback onDelete;
 
   const _TerritoryDetailsSheet({
     required this.territory,
     required this.teamLeaders,
     required this.unionColor,
     required this.onAssign,
+    required this.onEdit,
+    required this.onDelete,
   });
 
   @override
@@ -1784,6 +1869,36 @@ class _TerritoryDetailsSheet extends StatelessWidget {
                     ),
                   ),
                 ],
+              ],
+            ),
+          ),
+          // Edit / Delete buttons
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            child: Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: onEdit,
+                    icon: const Icon(Icons.edit, size: 18),
+                    label: const Text('Edit'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: AppColors.primary,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: onDelete,
+                    icon: const Icon(Icons.delete_outline, size: 18),
+                    label: const Text('Delete'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: AppColors.error,
+                      side: const BorderSide(color: AppColors.error),
+                    ),
+                  ),
+                ),
               ],
             ),
           ),

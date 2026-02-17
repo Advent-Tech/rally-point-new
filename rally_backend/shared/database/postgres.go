@@ -12,12 +12,15 @@ import (
 
 // Config holds database configuration
 type Config struct {
-	Host     string
-	Port     int
-	User     string
-	Password string
-	DBName   string
-	SSLMode  string
+	Host                   string
+	Port                   int
+	User                   string
+	Password               string
+	DBName                 string
+	SSLMode                string
+	MaxOpenConns           int
+	MaxIdleConns           int
+	ConnMaxLifetimeSeconds int
 }
 
 // DB wraps sql.DB with additional functionality
@@ -37,10 +40,22 @@ func NewConnection(config Config) (*DB, error) {
 		return nil, fmt.Errorf("failed to open database: %w", err)
 	}
 
-	// Configure connection pool
-	db.SetMaxOpenConns(25)
-	db.SetMaxIdleConns(5)
-	db.SetConnMaxLifetime(5 * time.Minute)
+	// Configure connection pool (configurable via env vars)
+	maxOpen := config.MaxOpenConns
+	if maxOpen <= 0 {
+		maxOpen = 25
+	}
+	maxIdle := config.MaxIdleConns
+	if maxIdle <= 0 {
+		maxIdle = 10
+	}
+	connLifetime := config.ConnMaxLifetimeSeconds
+	if connLifetime <= 0 {
+		connLifetime = 300
+	}
+	db.SetMaxOpenConns(maxOpen)
+	db.SetMaxIdleConns(maxIdle)
+	db.SetConnMaxLifetime(time.Duration(connLifetime) * time.Second)
 
 	// Test connection
 	if err := db.Ping(); err != nil {

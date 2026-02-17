@@ -497,11 +497,16 @@ class _CreateTerritoryScreenState extends State<CreateTerritoryScreen> {
               ),
             )
           else
-            TextButton.icon(
+            ElevatedButton.icon(
               onPressed: _save,
-              icon: const Icon(Icons.save, color: Colors.white),
-              label: const Text('Save', style: TextStyle(color: Colors.white)),
+              icon: const Icon(Icons.save, size: 18),
+              label: const Text('Save'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                foregroundColor: Colors.white,
+              ),
             ),
+            const SizedBox(width: 8),
         ],
       ),
       body: SingleChildScrollView(

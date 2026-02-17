@@ -3,6 +3,30 @@ services:
   postgres:
     image: postgis/postgis:15-3.4-alpine
     container_name: rally_postgres
+    command:
+      - "postgres"
+      - "-c"
+      - "shared_buffers=512MB"
+      - "-c"
+      - "effective_cache_size=1536MB"
+      - "-c"
+      - "work_mem=8MB"
+      - "-c"
+      - "maintenance_work_mem=128MB"
+      - "-c"
+      - "wal_buffers=16MB"
+      - "-c"
+      - "max_connections=300"
+      - "-c"
+      - "checkpoint_completion_target=0.9"
+      - "-c"
+      - "random_page_cost=1.1"
+      - "-c"
+      - "effective_io_concurrency=200"
+      - "-c"
+      - "max_wal_size=1GB"
+      - "-c"
+      - "log_min_duration_statement=1000"
     environment:
       POSTGRES_DB: rally_point
       POSTGRES_USER: rally_user
@@ -15,6 +39,7 @@ services:
       - ../Geopackage:/geopackage:ro
     networks:
       - rally_network
+    shm_size: '256mb'
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U rally_user -d rally_point"]
       interval: 30s
@@ -138,6 +163,8 @@ services:
       - DB_NAME=rally_point
       - DB_USER=rally_user
       - DB_PASSWORD=rally_password
+      - DB_MAX_OPEN_CONNS=20
+      - DB_MAX_IDLE_CONNS=8
       - REDIS_URL=redis:6379
       - JWT_SECRET=your-super-secret-jwt-key-change-in-production
       - NATS_URL=nats:4222
@@ -186,6 +213,8 @@ services:
       - DB_NAME=rally_point
       - DB_USER=rally_user
       - DB_PASSWORD=rally_password
+      - DB_MAX_OPEN_CONNS=40
+      - DB_MAX_IDLE_CONNS=15
       - REDIS_URL=redis:6379
       - NATS_URL=nats:4222
     depends_on:
@@ -220,6 +249,8 @@ services:
       - DB_NAME=rally_point
       - DB_USER=rally_user
       - DB_PASSWORD=rally_password
+      - DB_MAX_OPEN_CONNS=30
+      - DB_MAX_IDLE_CONNS=10
       - REDIS_URL=redis:6379
       - NATS_URL=nats:4222
     volumes:

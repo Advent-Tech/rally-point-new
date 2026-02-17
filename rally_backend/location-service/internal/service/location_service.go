@@ -134,34 +134,28 @@ func (s *locationService) broadcastGeofenceEvent(event *domain.GeofenceEvent) {
 	_ = alert // Used for logging/broadcast
 }
 
-// updateSessionWithNewLocation updates session statistics with new location
+// updateSessionWithNewLocation incrementally updates session distance with the new track
 func (s *locationService) updateSessionWithNewLocation(sessionID uuid.UUID, newTrack *domain.LocationTrack) error {
-	session, err := s.locationRepo.GetSessionByID(sessionID)
+	// Get only the previous track (1 row) instead of ALL tracks
+	prevTrack, err := s.locationRepo.GetLastTrackForSession(sessionID, newTrack.ID)
 	if err != nil {
-		return fmt.Errorf("failed to get session: %w", err)
+		return fmt.Errorf("failed to get previous track: %w", err)
 	}
 
-	if !session.IsActive {
-		return fmt.Errorf("session is not active")
+	var segmentDistance float64
+	if prevTrack != nil {
+		segmentDistance = s.distanceCalc.CalculateDistance(
+			prevTrack.Latitude, prevTrack.Longitude,
+			newTrack.Latitude, newTrack.Longitude,
+		)
+		// Ignore jumps > 1km between updates (GPS glitch)
+		if segmentDistance > 1000 {
+			segmentDistance = 0
+		}
 	}
 
-	// Get all tracks for this session to calculate distance
-	tracks, err := s.locationRepo.GetTracksBySessionID(sessionID)
-	if err != nil {
-		return fmt.Errorf("failed to get session tracks: %w", err)
-	}
-
-	// Calculate total distance
-	session.TotalDistance = s.distanceCalc.CalculateSessionDistance(tracks)
-	session.LocationCount = len(tracks)
-
-	// Update session
-	err = s.locationRepo.UpdateSession(session)
-	if err != nil {
-		return fmt.Errorf("failed to update session: %w", err)
-	}
-
-	return nil
+	// Atomic increment — no race conditions, no full re-read
+	return s.locationRepo.IncrementSessionDistance(sessionID, segmentDistance)
 }
 
 // GetUserLocations retrieves user locations based on query

@@ -28,12 +28,15 @@ func main() {
 
 	// Database configuration
 	dbConfig := database.Config{
-		Host:     getEnv("DB_HOST", "localhost"),
-		Port:     getEnvAsInt("DB_PORT", 5432),
-		User:     getEnv("DB_USER", "rally_user"),
-		Password: getEnv("DB_PASSWORD", "rally_password"),
-		DBName:   getEnv("DB_NAME", "rally_point"),
-		SSLMode:  getEnv("DB_SSL_MODE", "disable"),
+		Host:                   getEnv("DB_HOST", "localhost"),
+		Port:                   getEnvAsInt("DB_PORT", 5432),
+		User:                   getEnv("DB_USER", "rally_user"),
+		Password:               getEnv("DB_PASSWORD", "rally_password"),
+		DBName:                 getEnv("DB_NAME", "rally_point"),
+		SSLMode:                getEnv("DB_SSL_MODE", "disable"),
+		MaxOpenConns:           getEnvAsInt("DB_MAX_OPEN_CONNS", 0),
+		MaxIdleConns:           getEnvAsInt("DB_MAX_IDLE_CONNS", 0),
+		ConnMaxLifetimeSeconds: getEnvAsInt("DB_CONN_MAX_LIFETIME", 0),
 	}
 
 	// Connect to database

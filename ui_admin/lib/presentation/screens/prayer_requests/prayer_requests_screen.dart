@@ -248,48 +248,62 @@ class _PrayerRequestsScreenState extends State<PrayerRequestsScreen>
                 ),
                 const SizedBox(height: 32),
 
-            // By Category
-            if (_stats?.byCategory != null && _stats!.byCategory!.isNotEmpty) ...[
-              Text(
-                'By Category',
-                style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                      fontWeight: FontWeight.bold,
+            // By Category & By Urgency side by side on desktop
+            if ((_stats?.byCategory != null && _stats!.byCategory!.isNotEmpty) ||
+                (_stats?.byUrgency != null && _stats!.byUrgency!.isNotEmpty))
+              isMobile
+                  ? Column(
+                      children: [
+                        if (_stats?.byCategory != null && _stats!.byCategory!.isNotEmpty)
+                          _DistributionCard(
+                            title: 'By Category',
+                            icon: Icons.category_outlined,
+                            entries: _stats!.byCategory!,
+                            total: _stats?.totalRequests ?? 0,
+                            colorMapper: _categoryColor,
+                          ),
+                        if (_stats?.byCategory != null && _stats!.byCategory!.isNotEmpty)
+                          const SizedBox(height: 16),
+                        if (_stats?.byUrgency != null && _stats!.byUrgency!.isNotEmpty)
+                          _DistributionCard(
+                            title: 'By Urgency',
+                            icon: Icons.flag_outlined,
+                            entries: _stats!.byUrgency!,
+                            total: _stats?.totalRequests ?? 0,
+                            colorMapper: _urgencyColor,
+                          ),
+                      ],
+                    )
+                  : Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        if (_stats?.byCategory != null && _stats!.byCategory!.isNotEmpty)
+                          Expanded(
+                            child: _DistributionCard(
+                              title: 'By Category',
+                              icon: Icons.category_outlined,
+                              entries: _stats!.byCategory!,
+                              total: _stats?.totalRequests ?? 0,
+                              colorMapper: _categoryColor,
+                            ),
+                          ),
+                        if (_stats?.byCategory != null &&
+                            _stats!.byCategory!.isNotEmpty &&
+                            _stats?.byUrgency != null &&
+                            _stats!.byUrgency!.isNotEmpty)
+                          const SizedBox(width: 16),
+                        if (_stats?.byUrgency != null && _stats!.byUrgency!.isNotEmpty)
+                          Expanded(
+                            child: _DistributionCard(
+                              title: 'By Urgency',
+                              icon: Icons.flag_outlined,
+                              entries: _stats!.byUrgency!,
+                              total: _stats?.totalRequests ?? 0,
+                              colorMapper: _urgencyColor,
+                            ),
+                          ),
+                      ],
                     ),
-              ),
-              const SizedBox(height: 16),
-              Wrap(
-                spacing: 12,
-                runSpacing: 12,
-                children: _stats!.byCategory!.entries.map((e) {
-                  return _CategoryChip(
-                    category: e.key,
-                    count: e.value,
-                  );
-                }).toList(),
-              ),
-              const SizedBox(height: 32),
-            ],
-
-            // By Urgency
-            if (_stats?.byUrgency != null && _stats!.byUrgency!.isNotEmpty) ...[
-              Text(
-                'By Urgency',
-                style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
-              ),
-              const SizedBox(height: 16),
-              Wrap(
-                spacing: 12,
-                runSpacing: 12,
-                children: _stats!.byUrgency!.entries.map((e) {
-                  return _UrgencyChip(
-                    urgency: e.key,
-                    count: e.value,
-                  );
-                }).toList(),
-              ),
-            ],
               ],
             );
           },
@@ -488,6 +502,35 @@ class _PrayerRequestsScreenState extends State<PrayerRequestsScreen>
   String _formatUrgency(String urgency) {
     return urgency[0].toUpperCase() + urgency.substring(1);
   }
+
+  static Color _categoryColor(String key) {
+    final colors = [
+      AppColors.primary,
+      AppColors.info,
+      AppColors.success,
+      AppColors.warning,
+      AppColors.error,
+      const Color(0xFF9C27B0),
+      const Color(0xFF00BCD4),
+      const Color(0xFFFF9800),
+    ];
+    return colors[key.hashCode.abs() % colors.length];
+  }
+
+  static Color _urgencyColor(String key) {
+    switch (key.toLowerCase()) {
+      case 'urgent':
+        return AppColors.error;
+      case 'high':
+        return AppColors.warning;
+      case 'normal':
+        return AppColors.info;
+      case 'low':
+        return AppColors.textSecondary;
+      default:
+        return AppColors.textSecondary;
+    }
+  }
 }
 
 class _StatCard extends StatelessWidget {
@@ -648,80 +691,115 @@ class _ResponsiveStatCard extends StatelessWidget {
   }
 }
 
-class _CategoryChip extends StatelessWidget {
-  final String category;
-  final int count;
+class _DistributionCard extends StatelessWidget {
+  final String title;
+  final IconData icon;
+  final Map<String, int> entries;
+  final int total;
+  final Color Function(String) colorMapper;
 
-  const _CategoryChip({
-    required this.category,
-    required this.count,
+  const _DistributionCard({
+    required this.title,
+    required this.icon,
+    required this.entries,
+    required this.total,
+    required this.colorMapper,
   });
 
-  @override
-  Widget build(BuildContext context) {
-    return Chip(
-      avatar: CircleAvatar(
-        backgroundColor: AppColors.primary,
-        child: Text(
-          '$count',
-          style: const TextStyle(
-            color: Colors.white,
-            fontSize: 12,
-          ),
-        ),
-      ),
-      label: Text(_formatCategory(category)),
-      backgroundColor: AppColors.primary.withAlpha(20),
-    );
-  }
-
-  String _formatCategory(String category) {
-    return category.replaceAll('_', ' ').split(' ').map((word) {
+  String _formatLabel(String key) {
+    return key.replaceAll('_', ' ').split(' ').map((word) {
       if (word.isEmpty) return word;
       return word[0].toUpperCase() + word.substring(1);
     }).join(' ');
   }
-}
-
-class _UrgencyChip extends StatelessWidget {
-  final String urgency;
-  final int count;
-
-  const _UrgencyChip({
-    required this.urgency,
-    required this.count,
-  });
-
-  Color get _color {
-    switch (urgency.toLowerCase()) {
-      case 'urgent':
-        return AppColors.error;
-      case 'high':
-        return AppColors.warning;
-      case 'normal':
-        return AppColors.info;
-      case 'low':
-        return AppColors.textSecondary;
-      default:
-        return AppColors.textSecondary;
-    }
-  }
 
   @override
   Widget build(BuildContext context) {
-    return Chip(
-      avatar: CircleAvatar(
-        backgroundColor: _color,
-        child: Text(
-          '$count',
-          style: const TextStyle(
-            color: Colors.white,
-            fontSize: 12,
-          ),
+    final sortedEntries = entries.entries.toList()
+      ..sort((a, b) => b.value.compareTo(a.value));
+    final maxVal = sortedEntries.isNotEmpty ? sortedEntries.first.value : 1;
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(icon, size: 20, color: AppColors.textSecondary),
+                const SizedBox(width: 8),
+                Text(
+                  title,
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 20),
+            ...sortedEntries.map((entry) {
+              final color = colorMapper(entry.key);
+              final fraction = maxVal > 0 ? entry.value / maxVal : 0.0;
+              final percentage = total > 0
+                  ? (entry.value / total * 100).round()
+                  : 0;
+
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 14),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Row(
+                          children: [
+                            Container(
+                              width: 10,
+                              height: 10,
+                              decoration: BoxDecoration(
+                                color: color,
+                                borderRadius: BorderRadius.circular(3),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              _formatLabel(entry.key),
+                              style: const TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ],
+                        ),
+                        Text(
+                          '${entry.value}  ($percentage%)',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(4),
+                      child: LinearProgressIndicator(
+                        value: fraction.toDouble(),
+                        minHeight: 8,
+                        backgroundColor: color.withAlpha(30),
+                        valueColor: AlwaysStoppedAnimation<Color>(color),
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            }),
+          ],
         ),
       ),
-      label: Text(urgency[0].toUpperCase() + urgency.substring(1)),
-      backgroundColor: _color.withAlpha(20),
     );
   }
 }

@@ -167,6 +167,58 @@ func (r *locationRepository) GetTracksInTimeRange(userID uuid.UUID, startTime, e
 	return tracks, nil
 }
 
+// GetLastTrackForSession gets the most recent track for a session (before the given track)
+func (r *locationRepository) GetLastTrackForSession(sessionID uuid.UUID, beforeTrackID uuid.UUID) (*domain.LocationTrack, error) {
+	query := `
+		SELECT id, user_id, latitude, longitude, accuracy, speed, heading, session_id, tracked_at, created_at
+		FROM location_tracks
+		WHERE session_id = $1 AND id != $2
+		ORDER BY tracked_at DESC
+		LIMIT 1
+	`
+
+	track := &domain.LocationTrack{}
+	err := r.db.QueryRow(query, sessionID, beforeTrackID).Scan(
+		&track.ID,
+		&track.UserID,
+		&track.Latitude,
+		&track.Longitude,
+		&track.Accuracy,
+		&track.Speed,
+		&track.Heading,
+		&track.SessionID,
+		&track.TrackedAt,
+		&track.CreatedAt,
+	)
+
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, nil // First track in session
+		}
+		return nil, fmt.Errorf("failed to get last track for session: %w", err)
+	}
+
+	return track, nil
+}
+
+// IncrementSessionDistance atomically adds distance and increments location count
+func (r *locationRepository) IncrementSessionDistance(sessionID uuid.UUID, addDistance float64) error {
+	query := `
+		UPDATE location_sessions
+		SET total_distance = total_distance + $2,
+			location_count = location_count + 1,
+			updated_at = NOW()
+		WHERE id = $1 AND is_active = true
+	`
+
+	_, err := r.db.Exec(query, sessionID, addDistance)
+	if err != nil {
+		return fmt.Errorf("failed to increment session distance: %w", err)
+	}
+
+	return nil
+}
+
 // CreateSession creates a new location session
 func (r *locationRepository) CreateSession(session *domain.LocationSession) error {
 	query := `
