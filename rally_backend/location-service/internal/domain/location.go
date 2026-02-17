@@ -176,6 +176,22 @@ type GeofenceClient interface {
 	ProcessLocationUpdate(workerID uuid.UUID, teamID *uuid.UUID, lat, lng float64) (*GeofenceEvent, error)
 }
 
+// LocationEventMessage is the message sent via NATS for async geofence processing
+type LocationEventMessage struct {
+	WorkerID  uuid.UUID  `json:"worker_id"`
+	TeamID    *uuid.UUID `json:"team_id,omitempty"`
+	Latitude  float64    `json:"latitude"`
+	Longitude float64    `json:"longitude"`
+	SessionID *uuid.UUID `json:"session_id,omitempty"`
+	Timestamp time.Time  `json:"timestamp"`
+}
+
+// LocationEventPublisher defines the interface for publishing location events
+type LocationEventPublisher interface {
+	PublishLocationUpdate(event *LocationEventMessage) error
+	Close()
+}
+
 // Constants
 const (
 	// Alert types

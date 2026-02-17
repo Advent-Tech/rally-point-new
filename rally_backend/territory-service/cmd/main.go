@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"log"
 	"net/http"
 	"os"
@@ -10,6 +11,7 @@ import (
 	"syscall"
 	"time"
 
+	"rally-point/territory-service/internal/domain"
 	"rally-point/territory-service/internal/handler"
 	"rally-point/territory-service/internal/importer"
 	"rally-point/territory-service/internal/realtime"
@@ -17,7 +19,9 @@ import (
 	"rally-point/territory-service/internal/service"
 
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 	"github.com/joho/godotenv"
+	"github.com/nats-io/nats.go"
 	"github.com/rally-point/shared/auth"
 	"github.com/rally-point/shared/database"
 )
@@ -82,6 +86,60 @@ func main() {
 	// Initialize allocation components (admin → team leader territory allocations)
 	allocationRepo := postgres.NewAllocationRepository(db.DB)
 	allocationService := service.NewAllocationService(allocationRepo)
+
+	// Subscribe to NATS location events for async geofence processing
+	natsURL := getEnv("NATS_URL", "")
+	if natsURL != "" {
+		nc, err := nats.Connect(natsURL,
+			nats.RetryOnFailedConnect(true),
+			nats.MaxReconnects(10),
+			nats.ReconnectWait(2*time.Second),
+		)
+		if err != nil {
+			log.Printf("Warning: failed to connect to NATS (%s): %v - geofence will only work via HTTP", natsURL, err)
+		} else {
+			log.Printf("Connected to NATS at %s - subscribing to location.update", natsURL)
+			_, err = nc.Subscribe("location.update", func(msg *nats.Msg) {
+				var event struct {
+					WorkerID  uuid.UUID  `json:"worker_id"`
+					TeamID    *uuid.UUID `json:"team_id,omitempty"`
+					Latitude  float64    `json:"latitude"`
+					Longitude float64    `json:"longitude"`
+					SessionID *uuid.UUID `json:"session_id,omitempty"`
+					Timestamp time.Time  `json:"timestamp"`
+				}
+				if err := json.Unmarshal(msg.Data, &event); err != nil {
+					log.Printf("Warning: failed to unmarshal NATS location event: %v", err)
+					return
+				}
+				update := &domain.WorkerLocationUpdate{
+					WorkerID:  event.WorkerID,
+					TeamID:    event.TeamID,
+					Latitude:  event.Latitude,
+					Longitude: event.Longitude,
+					Timestamp: event.Timestamp,
+				}
+				if update.Timestamp.IsZero() {
+					update.Timestamp = time.Now()
+				}
+				geofenceResult, err := geofenceService.ProcessLocationUpdate(update)
+				if err != nil {
+					log.Printf("Warning: NATS geofence processing failed for worker %s: %v", event.WorkerID, err)
+					return
+				}
+				if geofenceResult != nil {
+					log.Printf("Geofence event via NATS: %s - Territory: %s, Worker: %s",
+						geofenceResult.EventType, geofenceResult.TerritoryName, event.WorkerID)
+				}
+			})
+			if err != nil {
+				log.Printf("Warning: failed to subscribe to location.update: %v", err)
+			} else {
+				log.Println("Subscribed to location.update NATS topic for geofence processing")
+			}
+			defer nc.Drain()
+		}
+	}
 
 	// Initialize handlers
 	territoryHandler := handler.NewTerritoryHandler(territoryService, jwtManager)

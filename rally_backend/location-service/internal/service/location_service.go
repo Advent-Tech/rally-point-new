@@ -14,6 +14,7 @@ type locationService struct {
 	realtimeManager domain.RealtimeManager
 	distanceCalc    domain.DistanceCalculator
 	geofenceClient  domain.GeofenceClient
+	natsPublisher   domain.LocationEventPublisher
 }
 
 // NewLocationService creates a new location service
@@ -33,6 +34,16 @@ func NewLocationServiceWithGeofence(locationRepo domain.LocationRepository, real
 		realtimeManager: realtimeManager,
 		distanceCalc:    distanceCalc,
 		geofenceClient:  geofenceClient,
+	}
+}
+
+// NewLocationServiceWithNATS creates a location service that publishes geofence events via NATS (async)
+func NewLocationServiceWithNATS(locationRepo domain.LocationRepository, realtimeManager domain.RealtimeManager, distanceCalc domain.DistanceCalculator, publisher domain.LocationEventPublisher) domain.LocationService {
+	return &locationService{
+		locationRepo:    locationRepo,
+		realtimeManager: realtimeManager,
+		distanceCalc:    distanceCalc,
+		natsPublisher:   publisher,
 	}
 }
 
@@ -93,13 +104,26 @@ func (s *locationService) UpdateLocation(userID uuid.UUID, update *domain.Locati
 		fmt.Printf("Warning: failed to broadcast location update: %v\n", err)
 	}
 
-	// Check geofencing if client is configured
-	if s.geofenceClient != nil {
+	// Publish location event for async geofence processing via NATS
+	if s.natsPublisher != nil {
+		go func() {
+			evt := &domain.LocationEventMessage{
+				WorkerID:  userID,
+				Latitude:  update.Latitude,
+				Longitude: update.Longitude,
+				SessionID: update.SessionID,
+				Timestamp: time.Now(),
+			}
+			if err := s.natsPublisher.PublishLocationUpdate(evt); err != nil {
+				fmt.Printf("Warning: failed to publish location event to NATS: %v\n", err)
+			}
+		}()
+	} else if s.geofenceClient != nil {
+		// Fallback: synchronous geofence check (if NATS not configured)
 		geofenceEvent, err := s.geofenceClient.ProcessLocationUpdate(userID, nil, update.Latitude, update.Longitude)
 		if err != nil {
 			fmt.Printf("Warning: failed to check geofence: %v\n", err)
 		} else if geofenceEvent != nil {
-			// Broadcast geofence event via WebSocket
 			s.broadcastGeofenceEvent(geofenceEvent)
 		}
 	}

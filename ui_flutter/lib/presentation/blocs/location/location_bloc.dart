@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:equatable/equatable.dart';
 import 'package:geolocator/geolocator.dart';
@@ -174,11 +175,8 @@ class LocationBloc extends Bloc<LocationEvent, LocationState> {
           ));
         });
 
-        // Start periodic upload timer (every 30 seconds)
-        _uploadTimer = Timer.periodic(
-          const Duration(seconds: 30),
-          (_) => add(const LocationSyncPending()),
-        );
+        // Start upload timer with jitter to prevent thundering herd
+        _startJitteredUploadTimer();
       } else {
         emit(LocationError(message: 'Failed to start tracking session'));
       }
@@ -224,6 +222,18 @@ class LocationBloc extends Bloc<LocationEvent, LocationState> {
       _currentSessionId = null;
       emit(LocationStopped());
     }
+  }
+
+  void _startJitteredUploadTimer() {
+    // Random interval between 25-35 seconds to spread load across users
+    final jitter = 25 + Random().nextInt(11);
+    _uploadTimer = Timer(
+      Duration(seconds: jitter),
+      () {
+        add(const LocationSyncPending());
+        _startJitteredUploadTimer();
+      },
+    );
   }
 
   Future<void> _onUpdatePosition(

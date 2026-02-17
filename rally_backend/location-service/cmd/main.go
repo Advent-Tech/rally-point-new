@@ -11,6 +11,8 @@ import (
 	"time"
 
 	"rally-point/location-service/internal/client"
+	"rally-point/location-service/internal/domain"
+	"rally-point/location-service/internal/events"
 	"rally-point/location-service/internal/handler"
 	"rally-point/location-service/internal/realtime"
 	"rally-point/location-service/internal/repository/postgres"
@@ -61,12 +63,23 @@ func main() {
 	realtimeManager := realtime.NewRealtimeManager()
 	distanceCalc := service.NewDistanceCalculator()
 
-	// Initialize geofence client for territory integration
-	territoryServiceURL := getEnv("TERRITORY_SERVICE_URL", "http://localhost:8083")
-	geofenceClient := client.NewGeofenceClient(territoryServiceURL)
-
-	// Create location service with geofence integration
-	locationService := service.NewLocationServiceWithGeofence(locationRepo, realtimeManager, distanceCalc, geofenceClient)
+	// Try NATS first for async geofence processing, fall back to sync HTTP
+	var locationService = func() domain.LocationService {
+		natsURL := getEnv("NATS_URL", "")
+		if natsURL != "" {
+			publisher, err := events.NewNATSPublisher(natsURL)
+			if err != nil {
+				log.Printf("Warning: failed to connect to NATS (%s), falling back to sync geofence: %v", natsURL, err)
+			} else {
+				log.Printf("Connected to NATS at %s - geofence checks will be async", natsURL)
+				return service.NewLocationServiceWithNATS(locationRepo, realtimeManager, distanceCalc, publisher)
+			}
+		}
+		// Fallback: synchronous HTTP geofence client
+		territoryServiceURL := getEnv("TERRITORY_SERVICE_URL", "http://localhost:8083")
+		geofenceClient := client.NewGeofenceClient(territoryServiceURL)
+		return service.NewLocationServiceWithGeofence(locationRepo, realtimeManager, distanceCalc, geofenceClient)
+	}()
 
 	// Initialize handlers
 	locationHandler := handler.NewLocationHandler(locationService, jwtManager)
