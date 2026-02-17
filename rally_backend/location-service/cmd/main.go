@@ -10,6 +10,7 @@ import (
 	"syscall"
 	"time"
 
+	"rally-point/location-service/internal/cache"
 	"rally-point/location-service/internal/client"
 	"rally-point/location-service/internal/domain"
 	"rally-point/location-service/internal/events"
@@ -63,6 +64,19 @@ func main() {
 	realtimeManager := realtime.NewRealtimeManager()
 	distanceCalc := service.NewDistanceCalculator()
 
+	// Initialize Redis cache for real-time worker locations
+	var workerCache domain.WorkerLocationCache
+	redisURL := getEnv("REDIS_URL", "")
+	if redisURL != "" {
+		rc, err := cache.NewRedisLocationCache(redisURL)
+		if err != nil {
+			log.Printf("Warning: failed to connect to Redis (%s): %v - worker cache disabled", redisURL, err)
+		} else {
+			log.Printf("Connected to Redis at %s - worker location cache enabled", redisURL)
+			workerCache = rc
+		}
+	}
+
 	// Try NATS first for async geofence processing, fall back to sync HTTP
 	var locationService = func() domain.LocationService {
 		natsURL := getEnv("NATS_URL", "")
@@ -72,7 +86,7 @@ func main() {
 				log.Printf("Warning: failed to connect to NATS (%s), falling back to sync geofence: %v", natsURL, err)
 			} else {
 				log.Printf("Connected to NATS at %s - geofence checks will be async", natsURL)
-				return service.NewLocationServiceWithNATS(locationRepo, realtimeManager, distanceCalc, publisher)
+				return service.NewLocationServiceWithNATS(locationRepo, realtimeManager, distanceCalc, publisher, workerCache)
 			}
 		}
 		// Fallback: synchronous HTTP geofence client

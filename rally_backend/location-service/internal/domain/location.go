@@ -192,6 +192,13 @@ type LocationEventPublisher interface {
 	Close()
 }
 
+// WorkerLocationCache defines the interface for caching real-time worker locations
+type WorkerLocationCache interface {
+	SetWorkerLocation(location *WorkerLocation) error
+	GetActiveWorkers() ([]*WorkerLocation, error)
+	RemoveWorker(userID uuid.UUID) error
+}
+
 // Constants
 const (
 	// Alert types

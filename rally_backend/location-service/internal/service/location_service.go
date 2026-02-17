@@ -15,6 +15,7 @@ type locationService struct {
 	distanceCalc    domain.DistanceCalculator
 	geofenceClient  domain.GeofenceClient
 	natsPublisher   domain.LocationEventPublisher
+	workerCache     domain.WorkerLocationCache
 }
 
 // NewLocationService creates a new location service
@@ -38,12 +39,13 @@ func NewLocationServiceWithGeofence(locationRepo domain.LocationRepository, real
 }
 
 // NewLocationServiceWithNATS creates a location service that publishes geofence events via NATS (async)
-func NewLocationServiceWithNATS(locationRepo domain.LocationRepository, realtimeManager domain.RealtimeManager, distanceCalc domain.DistanceCalculator, publisher domain.LocationEventPublisher) domain.LocationService {
+func NewLocationServiceWithNATS(locationRepo domain.LocationRepository, realtimeManager domain.RealtimeManager, distanceCalc domain.DistanceCalculator, publisher domain.LocationEventPublisher, workerCache domain.WorkerLocationCache) domain.LocationService {
 	return &locationService{
 		locationRepo:    locationRepo,
 		realtimeManager: realtimeManager,
 		distanceCalc:    distanceCalc,
 		natsPublisher:   publisher,
+		workerCache:     workerCache,
 	}
 }
 
@@ -92,7 +94,13 @@ func (s *locationService) UpdateLocation(userID uuid.UUID, update *domain.Locati
 		UpdatedAt: time.Now(),
 	}
 
-	// Update real-time location
+	// Update real-time location in Redis cache
+	if s.workerCache != nil {
+		if cacheErr := s.workerCache.SetWorkerLocation(workerLocation); cacheErr != nil {
+			fmt.Printf("Warning: failed to update Redis worker cache: %v\n", cacheErr)
+		}
+	}
+	// Also update via repo (currently a no-op, kept for interface compatibility)
 	err = s.locationRepo.UpdateWorkerLocation(workerLocation)
 	if err != nil {
 		fmt.Printf("Warning: failed to update real-time location: %v\n", err)
@@ -292,13 +300,27 @@ func (s *locationService) GetLocationStats(userID uuid.UUID, days int) (*domain.
 	return s.locationRepo.GetLocationStats(userID, days)
 }
 
-// GetActiveWorkers retrieves all active workers
+// GetActiveWorkers retrieves all active workers (Redis first, PostgreSQL fallback)
 func (s *locationService) GetActiveWorkers() ([]*domain.WorkerLocation, error) {
+	if s.workerCache != nil {
+		workers, err := s.workerCache.GetActiveWorkers()
+		if err == nil && len(workers) > 0 {
+			return workers, nil
+		}
+		if err != nil {
+			fmt.Printf("Warning: Redis cache miss for active workers: %v\n", err)
+		}
+	}
 	return s.locationRepo.GetActiveWorkers()
 }
 
 // SetWorkerOffline sets a worker as offline
 func (s *locationService) SetWorkerOffline(userID uuid.UUID) error {
+	if s.workerCache != nil {
+		if err := s.workerCache.RemoveWorker(userID); err != nil {
+			fmt.Printf("Warning: failed to remove worker from Redis cache: %v\n", err)
+		}
+	}
 	return s.locationRepo.SetWorkerOffline(userID)
 }
 
