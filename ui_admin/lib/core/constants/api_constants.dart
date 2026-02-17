@@ -1,7 +1,8 @@
 class ApiConstants {
   // Base URL - change this based on environment
   //static const String baseUrl = 'http://localhost:8080';
-  static const String baseUrl = 'http://18.188.1.122:8080';
+  //static const String baseUrl = 'http://18.188.1.122:8080';
+  static const String baseUrl = 'https://18.188.1.122';
 
   // Auth endpoints
   static const String login = '/api/auth/login';

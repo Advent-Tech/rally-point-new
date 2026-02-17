@@ -4,7 +4,7 @@ class ApiConstants {
 
   // Base URLs
   // EC2 Production Server
-  static const String prodBaseUrl = 'http://18.188.1.122:8080';
+  static const String prodBaseUrl = 'https://18.188.1.122';
   static const String devBaseUrl = 'http://10.0.2.2:8080'; // Android emulator
   static const String devBaseUrlIOS = 'http://localhost:8080'; // iOS simulator
 
