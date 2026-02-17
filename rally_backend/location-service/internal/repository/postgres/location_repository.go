@@ -10,42 +10,21 @@ import (
 )
 
 type locationRepository struct {
-	db *sql.DB
+	db          *sql.DB
+	batchWriter *BatchWriter
 }
 
-// NewLocationRepository creates a new location repository
+// NewLocationRepository creates a new location repository with batch writing enabled
 func NewLocationRepository(db *sql.DB) domain.LocationRepository {
-	return &locationRepository{db: db}
+	return &locationRepository{
+		db:          db,
+		batchWriter: NewBatchWriter(db),
+	}
 }
 
-// CreateTrack creates a new location track
+// CreateTrack queues a location track for batch insertion (writes within 0-2 seconds)
 func (r *locationRepository) CreateTrack(track *domain.LocationTrack) error {
-	// Insert with PostGIS location column - use separate parameters for ST_MakePoint
-	query := `
-		INSERT INTO location_tracks (id, user_id, latitude, longitude, accuracy, speed, heading, session_id, tracked_at, created_at, location)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, ST_SetSRID(ST_MakePoint($11, $12), 4326))
-	`
-
-	_, err := r.db.Exec(
-		query,
-		track.ID,
-		track.UserID,
-		track.Latitude,
-		track.Longitude,
-		track.Accuracy,
-		track.Speed,
-		track.Heading,
-		track.SessionID,
-		track.TrackedAt,
-		track.CreatedAt,
-		track.Longitude, // $11 for ST_MakePoint (longitude first)
-		track.Latitude,  // $12 for ST_MakePoint (latitude second)
-	)
-
-	if err != nil {
-		return fmt.Errorf("failed to create location track: %w", err)
-	}
-
+	r.batchWriter.Add(track)
 	return nil
 }
 
