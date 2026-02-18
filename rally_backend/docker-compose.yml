@@ -413,11 +413,33 @@ services:
       retries: 3
       start_period: 30s
 
+  # Database Backup (daily pg_dump, keeps last 7 days)
+  backup:
+    image: postgres:15-alpine
+    container_name: rally_backup
+    restart: unless-stopped
+    environment:
+      - POSTGRES_HOST=postgres
+      - POSTGRES_USER=rally_user
+      - POSTGRES_PASSWORD=rally_password
+      - POSTGRES_DB=rally_point
+    volumes:
+      - ./backup/backup.sh:/backup.sh:ro
+      - backup_data:/backups
+    entrypoint: /bin/sh
+    command: -c "chmod +x /backup.sh && echo 'Backup service started. Running daily backups.' && while true; do /backup.sh; sleep 86400; done"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - rally_network
+
 volumes:
   postgres_data:
   redis_data:
   audio_storage:
   blog_uploads:
+  backup_data:
 
 networks:
   rally_network:
