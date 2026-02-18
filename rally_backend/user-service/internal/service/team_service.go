@@ -2,22 +2,43 @@ package service
 
 import (
 	"database/sql"
+	"encoding/json"
 	"fmt"
+	"log"
 	"rally-point/user-service/internal/domain"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
+	"github.com/nats-io/nats.go"
 )
 
 type TeamService struct {
 	teamRepo domain.TeamRepository
 	db       *sql.DB
+	nc       *nats.Conn
 }
 
-func NewTeamService(teamRepo domain.TeamRepository, db *sql.DB) *TeamService {
+func NewTeamService(teamRepo domain.TeamRepository, db *sql.DB, nc *nats.Conn) *TeamService {
 	return &TeamService{
 		teamRepo: teamRepo,
 		db:       db,
+		nc:       nc,
+	}
+}
+
+// publishNotify publishes a notification event to NATS
+func (t *TeamService) publishNotify(subject string, event map[string]interface{}) {
+	if t.nc == nil {
+		return
+	}
+	data, err := json.Marshal(event)
+	if err != nil {
+		log.Printf("Failed to marshal notification: %v", err)
+		return
+	}
+	if err := t.nc.Publish(subject, data); err != nil {
+		log.Printf("Failed to publish notification %s: %v", subject, err)
 	}
 }
 
@@ -116,6 +137,20 @@ func (t *TeamService) JoinTeam(userID uuid.UUID, req *domain.JoinTeamRequest) er
 	if err == nil {
 		team.WorkerCount++
 		t.teamRepo.Update(team)
+
+		// Publish notification for new team member (target: team leader)
+		t.publishNotify("notify.team.member_joined", map[string]interface{}{
+			"event_type":        "team.member_joined",
+			"target_type":       "user",
+			"target_id":         team.LeaderID.String(),
+			"actor_id":          userID.String(),
+			"title":             "New team member",
+			"body":              fmt.Sprintf("A new worker joined %s", team.Name),
+			"data":              map[string]interface{}{"team_id": req.TeamID.String()},
+			"priority":          "normal",
+			"notification_type": "team",
+			"created_at":        time.Now().Format(time.RFC3339),
+		})
 	}
 
 	return nil

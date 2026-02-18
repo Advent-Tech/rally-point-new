@@ -12,12 +12,13 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
+	"github.com/nats-io/nats.go"
 	"github.com/rally-point/shared/auth"
 	"github.com/rally-point/shared/database"
 	"rally-point/walkie-service/internal/handler"
+	"rally-point/walkie-service/internal/realtime"
 	"rally-point/walkie-service/internal/repository/postgres"
 	"rally-point/walkie-service/internal/service"
-	"rally-point/walkie-service/internal/realtime"
 )
 
 func main() {
@@ -54,16 +55,35 @@ func main() {
 		7*24*time.Hour, // Refresh token duration
 	)
 
+	// Connect to NATS for notification publishing
+	var nc *nats.Conn
+	natsURL := getEnv("NATS_URL", "")
+	if natsURL != "" {
+		var natsErr error
+		nc, natsErr = nats.Connect(natsURL,
+			nats.RetryOnFailedConnect(true),
+			nats.MaxReconnects(10),
+			nats.ReconnectWait(2*time.Second),
+		)
+		if natsErr != nil {
+			log.Printf("Warning: failed to connect to NATS (%s): %v", natsURL, natsErr)
+			nc = nil
+		} else {
+			log.Printf("Connected to NATS at %s", natsURL)
+			defer nc.Drain()
+		}
+	}
+
 	// Initialize components
 	walkieRepo := postgres.NewWalkieRepository(db.DB)
 	realtimeManager := realtime.NewRealtimeManager()
 	audioStoragePath := getEnv("AUDIO_STORAGE_PATH", "/app/audio")
 	audioManager := service.NewAudioManager(audioStoragePath)
-	walkieService := service.NewWalkieService(walkieRepo, realtimeManager, audioManager)
+	walkieService := service.NewWalkieService(walkieRepo, realtimeManager, audioManager, nc)
 
 	// Initialize chat components
 	chatRepo := postgres.NewChatRepository(db.DB)
-	chatService := service.NewChatService(chatRepo)
+	chatService := service.NewChatService(chatRepo, nc)
 
 	// Initialize handlers
 	walkieHandler := handler.NewWalkieHandler(walkieService, jwtManager)

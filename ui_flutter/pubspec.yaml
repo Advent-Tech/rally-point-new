@@ -74,6 +74,11 @@ dependencies:
   # Payments
   flutter_stripe: ^11.4.0
 
+  # Push Notifications (Firebase Cloud Messaging)
+  firebase_core: ^3.12.0
+  firebase_messaging: ^15.2.0
+  flutter_local_notifications: ^18.0.0
+
   # Supabase (for direct storage uploads)
   supabase_flutter: ^2.3.0
 

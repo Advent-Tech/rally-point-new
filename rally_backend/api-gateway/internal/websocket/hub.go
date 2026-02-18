@@ -225,6 +225,19 @@ func (h *Hub) BroadcastToAll(message Message) {
 	h.broadcast <- data
 }
 
+// IsUserConnected checks if a user has any active WebSocket connections
+func (h *Hub) IsUserConnected(userID string) bool {
+	h.mutex.RLock()
+	defer h.mutex.RUnlock()
+
+	for client := range h.clients {
+		if client.UserID == userID {
+			return true
+		}
+	}
+	return false
+}
+
 // GetStats returns hub statistics
 func (h *Hub) GetStats() map[string]interface{} {
 	h.mutex.RLock()

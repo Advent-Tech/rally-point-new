@@ -162,6 +162,16 @@ services:
       - REDIS_HOST=redis
       - REDIS_PORT=6379
       - NATS_URL=nats:4222
+      # Database (for notifications)
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_NAME=rally_point
+      - DB_USER=rally_user
+      - DB_PASSWORD=rally_password
+      # Firebase Cloud Messaging
+      - FIREBASE_PROJECT_ID=${FIREBASE_PROJECT_ID:-}
+      - FIREBASE_PRIVATE_KEY=${FIREBASE_PRIVATE_KEY:-}
+      - FIREBASE_CLIENT_EMAIL=${FIREBASE_CLIENT_EMAIL:-}
     depends_on:
       redis:
         condition: service_healthy

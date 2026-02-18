@@ -1,18 +1,22 @@
 package service
 
 import (
+	"encoding/json"
 	"fmt"
+	"log"
 	"time"
 
 	"rally-point/user-service/internal/domain"
 
 	"github.com/google/uuid"
+	"github.com/nats-io/nats.go"
 )
 
 type joinRequestService struct {
 	joinRequestRepo domain.JoinRequestRepository
 	userRepo        domain.UserRepository
 	teamRepo        domain.TeamRepository
+	nc              *nats.Conn
 }
 
 // NewJoinRequestService creates a new join request service
@@ -20,11 +24,28 @@ func NewJoinRequestService(
 	joinRequestRepo domain.JoinRequestRepository,
 	userRepo domain.UserRepository,
 	teamRepo domain.TeamRepository,
+	nc *nats.Conn,
 ) domain.JoinRequestService {
 	return &joinRequestService{
 		joinRequestRepo: joinRequestRepo,
 		userRepo:        userRepo,
 		teamRepo:        teamRepo,
+		nc:              nc,
+	}
+}
+
+// publishNotify publishes a notification event to NATS
+func (s *joinRequestService) publishNotify(subject string, event map[string]interface{}) {
+	if s.nc == nil {
+		return
+	}
+	data, err := json.Marshal(event)
+	if err != nil {
+		log.Printf("Failed to marshal notification: %v", err)
+		return
+	}
+	if err := s.nc.Publish(subject, data); err != nil {
+		log.Printf("Failed to publish notification %s: %v", subject, err)
 	}
 }
 
@@ -81,6 +102,20 @@ func (s *joinRequestService) CreateRequest(userID uuid.UUID, req *domain.CreateJ
 	joinRequest.Team = team
 
 	fmt.Printf("📨 Worker %s requested to join team %s\n", user.DisplayName, team.Name)
+
+	// Publish notification for join request (target: team leader)
+	s.publishNotify("notify.team.join_request", map[string]interface{}{
+		"event_type":        "team.join_request",
+		"target_type":       "user",
+		"target_id":         team.LeaderID.String(),
+		"actor_id":          userID.String(),
+		"title":             "New join request",
+		"body":              fmt.Sprintf("%s wants to join %s", user.DisplayName, team.Name),
+		"data":              map[string]interface{}{"team_id": req.TeamID.String(), "request_id": joinRequest.ID.String()},
+		"priority":          "high",
+		"notification_type": "team",
+		"created_at":        time.Now().Format(time.RFC3339),
+	})
 
 	return joinRequest, nil
 }
@@ -168,6 +203,20 @@ func (s *joinRequestService) ApproveRequest(requestID, reviewerID uuid.UUID) err
 
 	fmt.Printf("✅ Join request approved: %s joined team %s\n", user.DisplayName, team.Name)
 
+	// Publish notification for approved request (target: the worker)
+	s.publishNotify("notify.team.request_approved", map[string]interface{}{
+		"event_type":        "team.request_approved",
+		"target_type":       "user",
+		"target_id":         request.UserID.String(),
+		"actor_id":          reviewerID.String(),
+		"title":             "Welcome to the team!",
+		"body":              fmt.Sprintf("You've been approved to join %s", team.Name),
+		"data":              map[string]interface{}{"team_id": request.TeamID.String()},
+		"priority":          "high",
+		"notification_type": "team",
+		"created_at":        time.Now().Format(time.RFC3339),
+	})
+
 	return nil
 }
 
@@ -211,6 +260,24 @@ func (s *joinRequestService) RejectRequest(requestID, reviewerID uuid.UUID, reas
 	}
 
 	fmt.Printf("❌ Join request rejected for team %s\n", team.Name)
+
+	// Publish notification for rejected request (target: the worker)
+	rejectBody := fmt.Sprintf("Your request to join %s was not approved", team.Name)
+	if reason != "" {
+		rejectBody = fmt.Sprintf("Your request to join %s was not approved: %s", team.Name, reason)
+	}
+	s.publishNotify("notify.team.request_rejected", map[string]interface{}{
+		"event_type":        "team.request_rejected",
+		"target_type":       "user",
+		"target_id":         request.UserID.String(),
+		"actor_id":          reviewerID.String(),
+		"title":             "Join request update",
+		"body":              rejectBody,
+		"data":              map[string]interface{}{"team_id": request.TeamID.String()},
+		"priority":          "normal",
+		"notification_type": "team",
+		"created_at":        time.Now().Format(time.RFC3339),
+	})
 
 	return nil
 }

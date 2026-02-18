@@ -1,21 +1,40 @@
 package service
 
 import (
+	"encoding/json"
 	"fmt"
+	"log"
 	"math"
 	"time"
 
 	"rally-point/delivery-service/internal/domain"
 
 	"github.com/google/uuid"
+	"github.com/nats-io/nats.go"
 )
 
 type PrayerRequestService struct {
 	repo domain.PrayerRequestRepository
+	nc   *nats.Conn
 }
 
-func NewPrayerRequestService(repo domain.PrayerRequestRepository) *PrayerRequestService {
-	return &PrayerRequestService{repo: repo}
+func NewPrayerRequestService(repo domain.PrayerRequestRepository, nc *nats.Conn) *PrayerRequestService {
+	return &PrayerRequestService{repo: repo, nc: nc}
+}
+
+// publishNotify publishes a notification event to NATS
+func (s *PrayerRequestService) publishNotify(subject string, event map[string]interface{}) {
+	if s.nc == nil {
+		return
+	}
+	data, err := json.Marshal(event)
+	if err != nil {
+		log.Printf("Failed to marshal notification: %v", err)
+		return
+	}
+	if err := s.nc.Publish(subject, data); err != nil {
+		log.Printf("Failed to publish notification %s: %v", subject, err)
+	}
 }
 
 func (s *PrayerRequestService) CreatePrayerRequest(workerID, teamID uuid.UUID, req *domain.CreatePrayerRequestRequest) (*domain.PrayerRequest, error) {
@@ -71,6 +90,20 @@ func (s *PrayerRequestService) CreatePrayerRequest(workerID, teamID uuid.UUID, r
 	if err != nil {
 		return nil, fmt.Errorf("failed to create prayer request: %w", err)
 	}
+
+	// Publish notification for new prayer request (target: team)
+	s.publishNotify("notify.prayer.created", map[string]interface{}{
+		"event_type":        "prayer.created",
+		"target_type":       "team",
+		"target_id":         teamID.String(),
+		"actor_id":          workerID.String(),
+		"title":             fmt.Sprintf("Prayer request: %s", req.PrayerSubject),
+		"body":              fmt.Sprintf("From %s - %s", req.RequesterName, category),
+		"data":              map[string]interface{}{"prayer_request_id": prayerRequest.ID.String()},
+		"priority":          "normal",
+		"notification_type": "prayer",
+		"created_at":        time.Now().Format(time.RFC3339),
+	})
 
 	return prayerRequest, nil
 }
@@ -206,7 +239,33 @@ func (s *PrayerRequestService) UpdateStatus(id uuid.UUID, status string, complet
 		return fmt.Errorf("invalid status: %s", status)
 	}
 
-	return s.repo.UpdateStatus(id, status, completedBy, notes)
+	err := s.repo.UpdateStatus(id, status, completedBy, notes)
+	if err != nil {
+		return err
+	}
+
+	// Publish notification for status change
+	request, _ := s.repo.GetByID(id)
+	if request != nil {
+		actorID := ""
+		if completedBy != nil {
+			actorID = completedBy.String()
+		}
+		s.publishNotify("notify.prayer.status_changed", map[string]interface{}{
+			"event_type":        "prayer.status_changed",
+			"target_type":       "user",
+			"target_id":         request.WorkerID.String(),
+			"actor_id":          actorID,
+			"title":             fmt.Sprintf("Prayer request %s", status),
+			"body":              fmt.Sprintf("%s is now %s", request.PrayerSubject, status),
+			"data":              map[string]interface{}{"prayer_request_id": id.String(), "status": status},
+			"priority":          "normal",
+			"notification_type": "prayer",
+			"created_at":        time.Now().Format(time.RFC3339),
+		})
+	}
+
+	return nil
 }
 
 func (s *PrayerRequestService) AssignPreacher(id uuid.UUID, preacherID uuid.UUID, scheduledAt *time.Time, notes *string) error {
@@ -220,7 +279,26 @@ func (s *PrayerRequestService) AssignPreacher(id uuid.UUID, preacherID uuid.UUID
 		return fmt.Errorf("can only assign preacher to home visit requests")
 	}
 
-	return s.repo.AssignPreacher(id, preacherID, scheduledAt, notes)
+	err = s.repo.AssignPreacher(id, preacherID, scheduledAt, notes)
+	if err != nil {
+		return err
+	}
+
+	// Publish notification for preacher assignment
+	s.publishNotify("notify.prayer.assigned", map[string]interface{}{
+		"event_type":        "prayer.assigned",
+		"target_type":       "user",
+		"target_id":         preacherID.String(),
+		"actor_id":          preacherID.String(),
+		"title":             "Home visit assigned",
+		"body":              fmt.Sprintf("Prayer request: %s", request.PrayerSubject),
+		"data":              map[string]interface{}{"prayer_request_id": id.String()},
+		"priority":          "high",
+		"notification_type": "prayer",
+		"created_at":        time.Now().Format(time.RFC3339),
+	})
+
+	return nil
 }
 
 func (s *PrayerRequestService) CompletePrayerRequest(id uuid.UUID, completedBy uuid.UUID, notes *string) error {

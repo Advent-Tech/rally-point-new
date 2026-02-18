@@ -12,6 +12,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
+	"github.com/nats-io/nats.go"
 	"github.com/rally-point/shared/auth"
 	"github.com/rally-point/shared/database"
 	"rally-point/survey-service/internal/handler"
@@ -53,9 +54,28 @@ func main() {
 		7*24*time.Hour, // Refresh token duration
 	)
 
+	// Connect to NATS for notification publishing
+	var nc *nats.Conn
+	natsURL := getEnv("NATS_URL", "")
+	if natsURL != "" {
+		var natsErr error
+		nc, natsErr = nats.Connect(natsURL,
+			nats.RetryOnFailedConnect(true),
+			nats.MaxReconnects(10),
+			nats.ReconnectWait(2*time.Second),
+		)
+		if natsErr != nil {
+			log.Printf("Warning: failed to connect to NATS (%s): %v", natsURL, natsErr)
+			nc = nil
+		} else {
+			log.Printf("Connected to NATS at %s", natsURL)
+			defer nc.Drain()
+		}
+	}
+
 	// Initialize components
 	surveyRepo := postgres.NewSurveyRepository(db.DB)
-	surveyService := service.NewSurveyService(surveyRepo)
+	surveyService := service.NewSurveyService(surveyRepo, nc)
 
 	// Initialize handlers
 	surveyHandler := handler.NewSurveyHandler(surveyService, jwtManager)

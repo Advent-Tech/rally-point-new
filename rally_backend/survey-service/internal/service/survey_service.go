@@ -3,20 +3,39 @@ package service
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/nats-io/nats.go"
 	"rally-point/survey-service/internal/domain"
 )
 
 type surveyService struct {
 	surveyRepo domain.SurveyRepository
+	nc         *nats.Conn
 }
 
 // NewSurveyService creates a new survey service
-func NewSurveyService(surveyRepo domain.SurveyRepository) domain.SurveyService {
+func NewSurveyService(surveyRepo domain.SurveyRepository, nc *nats.Conn) domain.SurveyService {
 	return &surveyService{
 		surveyRepo: surveyRepo,
+		nc:         nc,
+	}
+}
+
+// publishNotify publishes a notification event to NATS
+func (s *surveyService) publishNotify(subject string, event map[string]interface{}) {
+	if s.nc == nil {
+		return
+	}
+	data, err := json.Marshal(event)
+	if err != nil {
+		log.Printf("Failed to marshal notification: %v", err)
+		return
+	}
+	if err := s.nc.Publish(subject, data); err != nil {
+		log.Printf("Failed to publish notification %s: %v", subject, err)
 	}
 }
 
@@ -601,6 +620,25 @@ func (s *surveyService) AssignSurvey(assignerID uuid.UUID, req *domain.AssignSur
 		if err != nil {
 			return fmt.Errorf("failed to create assignment for user %s: %w", userID, err)
 		}
+
+		// Publish notification for survey assignment
+		survey, _ := s.surveyRepo.GetSurveyByID(req.SurveyID)
+		title := "New survey assigned"
+		if survey != nil {
+			title = fmt.Sprintf("Survey: %s", survey.Title)
+		}
+		s.publishNotify("notify.survey.assigned", map[string]interface{}{
+			"event_type":        "survey.assigned",
+			"target_type":       "user",
+			"target_id":         userID.String(),
+			"actor_id":          assignerID.String(),
+			"title":             title,
+			"body":              "You have a new survey to complete",
+			"data":              map[string]interface{}{"survey_id": req.SurveyID.String(), "assignment_id": assignment.ID.String()},
+			"priority":          "normal",
+			"notification_type": "survey",
+			"created_at":        time.Now().Format(time.RFC3339),
+		})
 	}
 
 	return nil

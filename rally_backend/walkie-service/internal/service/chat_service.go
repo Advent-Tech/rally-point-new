@@ -1,21 +1,41 @@
 package service
 
 import (
+	"encoding/json"
 	"errors"
+	"log"
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/nats-io/nats.go"
 	"rally-point/walkie-service/internal/domain"
 )
 
 type chatService struct {
 	chatRepo domain.ChatRepository
+	nc       *nats.Conn
 }
 
 // NewChatService creates a new chat service
-func NewChatService(chatRepo domain.ChatRepository) domain.ChatService {
+func NewChatService(chatRepo domain.ChatRepository, nc *nats.Conn) domain.ChatService {
 	return &chatService{
 		chatRepo: chatRepo,
+		nc:       nc,
+	}
+}
+
+// publishNotify publishes a notification event to NATS
+func (s *chatService) publishNotify(subject string, event map[string]interface{}) {
+	if s.nc == nil {
+		return
+	}
+	data, err := json.Marshal(event)
+	if err != nil {
+		log.Printf("Failed to marshal notification: %v", err)
+		return
+	}
+	if err := s.nc.Publish(subject, data); err != nil {
+		log.Printf("Failed to publish notification %s: %v", subject, err)
 	}
 }
 
@@ -341,6 +361,24 @@ func (s *chatService) SendMessage(userID uuid.UUID, req *domain.SendChatMessageR
 
 	if err := s.chatRepo.CreateMessage(message); err != nil {
 		return nil, err
+	}
+
+	// Publish chat notification for each participant (except sender)
+	for _, p := range participants {
+		if p.UserID != userID {
+			s.publishNotify("notify.chat.new_message", map[string]interface{}{
+				"event_type":        "chat.new_message",
+				"target_type":       "user",
+				"target_id":         p.UserID.String(),
+				"actor_id":          userID.String(),
+				"title":             senderName,
+				"body":              message.Content,
+				"data":              map[string]interface{}{"conversation_id": req.ConversationID.String(), "message_id": message.ID.String()},
+				"priority":          "normal",
+				"notification_type": "chat",
+				"created_at":        time.Now().Format(time.RFC3339),
+			})
+		}
 	}
 
 	return message, nil

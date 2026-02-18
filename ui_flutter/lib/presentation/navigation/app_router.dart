@@ -35,6 +35,8 @@ import '../screens/blog/blog_screen.dart';
 import '../screens/blog/blog_detail_screen.dart';
 import '../screens/prayer/prayer_request_screen.dart';
 import '../screens/prayer/prayer_request_form_screen.dart';
+import '../screens/notification/notification_center_screen.dart';
+import '../screens/notification/notification_settings_screen.dart';
 import '../widgets/bottom_nav_shell.dart';
 
 class AppRouter {
@@ -234,6 +236,16 @@ class AppRouter {
             final conversationId = state.pathParameters['conversationId'] ?? '';
             return ChatScreen(conversationId: conversationId);
           },
+        ),
+
+        // Notification routes (accessible from anywhere)
+        GoRoute(
+          path: '/notifications',
+          builder: (context, state) => const NotificationCenterScreen(),
+        ),
+        GoRoute(
+          path: '/notifications/settings',
+          builder: (context, state) => const NotificationSettingsScreen(),
         ),
 
         // Prayer request form route (accessible from anywhere)

@@ -16,6 +16,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
+	"github.com/nats-io/nats.go"
 	"github.com/rally-point/shared/auth"
 	"github.com/rally-point/shared/database"
 )
@@ -67,12 +68,31 @@ func main() {
 	storagePath := getEnv("STORAGE_PATH", "./uploads")
 	baseURL := getEnv("BASE_URL", "http://localhost:8081")
 
+	// Connect to NATS for notification publishing
+	var nc *nats.Conn
+	natsURL := getEnv("NATS_URL", "")
+	if natsURL != "" {
+		var natsErr error
+		nc, natsErr = nats.Connect(natsURL,
+			nats.RetryOnFailedConnect(true),
+			nats.MaxReconnects(10),
+			nats.ReconnectWait(2*time.Second),
+		)
+		if natsErr != nil {
+			log.Printf("Warning: failed to connect to NATS (%s): %v", natsURL, natsErr)
+			nc = nil
+		} else {
+			log.Printf("Connected to NATS at %s", natsURL)
+			defer nc.Drain()
+		}
+	}
+
 	// Initialize services
-	teamService := service.NewTeamService(teamRepo, db.DB)
+	teamService := service.NewTeamService(teamRepo, db.DB, nc)
 	userService := service.NewUserService(userRepo, sessionRepo, joinRequestRepo, jwtManager, db.DB)
 	adminService := service.NewAdminService(userRepo, teamRepo, db.DB)
 	superAdminService := service.NewSuperAdminService(userRepo, db.DB)
-	joinRequestService := service.NewJoinRequestService(joinRequestRepo, userRepo, teamRepo)
+	joinRequestService := service.NewJoinRequestService(joinRequestRepo, userRepo, teamRepo, nc)
 	blogService := service.NewBlogService(blogRepo, storagePath, baseURL)
 	verificationService := service.NewVerificationService(userRepo, verificationTokenRepo, sessionRepo)
 	teamInvitationService := service.NewTeamInvitationService(teamInvitationRepo, teamRepo, userRepo)

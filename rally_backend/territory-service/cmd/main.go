@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
 	"os"
@@ -75,9 +76,28 @@ func main() {
 	assignmentRepo := postgres.NewAssignmentRepository(db.DB)
 	assignmentService := service.NewAssignmentService(assignmentRepo)
 
+	// Connect to NATS for location events and notification publishing
+	var nc *nats.Conn
+	natsURL := getEnv("NATS_URL", "")
+	if natsURL != "" {
+		var natsErr error
+		nc, natsErr = nats.Connect(natsURL,
+			nats.RetryOnFailedConnect(true),
+			nats.MaxReconnects(10),
+			nats.ReconnectWait(2*time.Second),
+		)
+		if natsErr != nil {
+			log.Printf("Warning: failed to connect to NATS (%s): %v - geofence will only work via HTTP", natsURL, natsErr)
+			nc = nil
+		} else {
+			log.Printf("Connected to NATS at %s", natsURL)
+			defer nc.Drain()
+		}
+	}
+
 	// Initialize geofence components
 	geofenceRepo := postgres.NewGeofenceRepository(db.DB)
-	geofenceService := service.NewGeofenceService(geofenceRepo, geofenceManager)
+	geofenceService := service.NewGeofenceService(geofenceRepo, geofenceManager, nc)
 
 	// Initialize schedule components
 	scheduleRepo := postgres.NewScheduleRepository(db.DB)
@@ -88,18 +108,8 @@ func main() {
 	allocationService := service.NewAllocationService(allocationRepo)
 
 	// Subscribe to NATS location events for async geofence processing
-	natsURL := getEnv("NATS_URL", "")
-	if natsURL != "" {
-		nc, err := nats.Connect(natsURL,
-			nats.RetryOnFailedConnect(true),
-			nats.MaxReconnects(10),
-			nats.ReconnectWait(2*time.Second),
-		)
-		if err != nil {
-			log.Printf("Warning: failed to connect to NATS (%s): %v - geofence will only work via HTTP", natsURL, err)
-		} else {
-			log.Printf("Connected to NATS at %s - subscribing to location.update", natsURL)
-			_, err = nc.Subscribe("location.update", func(msg *nats.Msg) {
+	if nc != nil {
+		_, err := nc.Subscribe("location.update", func(msg *nats.Msg) {
 				var event struct {
 					WorkerID  uuid.UUID  `json:"worker_id"`
 					TeamID    *uuid.UUID `json:"team_id,omitempty"`
@@ -130,6 +140,33 @@ func main() {
 				if geofenceResult != nil {
 					log.Printf("Geofence event via NATS: %s - Territory: %s, Worker: %s",
 						geofenceResult.EventType, geofenceResult.TerritoryName, event.WorkerID)
+
+					// Publish geofence notification
+					titleVerb := "Entered"
+					bodyText := "Work session started"
+					if geofenceResult.EventType == "exit" {
+						titleVerb = "Left"
+						bodyText = "Work session ended"
+					}
+					notifyEvent := map[string]interface{}{
+						"event_type":        "territory.geofence." + geofenceResult.EventType,
+						"target_type":       "user",
+						"target_id":         event.WorkerID.String(),
+						"actor_id":          event.WorkerID.String(),
+						"title":             fmt.Sprintf("%s %s", titleVerb, geofenceResult.TerritoryName),
+						"body":              bodyText,
+						"data":              map[string]interface{}{"territory_id": geofenceResult.TerritoryID.String()},
+						"priority":          "normal",
+						"notification_type": "geofence",
+						"created_at":        time.Now().Format(time.RFC3339),
+					}
+					if geofenceResult.SessionID != nil {
+						notifyEvent["data"].(map[string]interface{})["session_id"] = geofenceResult.SessionID.String()
+					}
+					notifyData, _ := json.Marshal(notifyEvent)
+					if pubErr := nc.Publish("notify.territory.geofence", notifyData); pubErr != nil {
+						log.Printf("Failed to publish geofence notification: %v", pubErr)
+					}
 				}
 			})
 			if err != nil {
@@ -137,8 +174,6 @@ func main() {
 			} else {
 				log.Println("Subscribed to location.update NATS topic for geofence processing")
 			}
-			defer nc.Drain()
-		}
 	}
 
 	// Initialize handlers

@@ -107,7 +107,75 @@ class RealtimeProvider extends ChangeNotifier {
         _handleTeamMemberStatus(message);
         break;
       default:
+        // Handle server-side notifications (from api-gateway notification handler)
+        if (message.type.name == 'unknown' && message.data['type'] == 'notification') {
+          _handleServerNotification(message);
+        }
         break;
+    }
+  }
+
+  void _handleServerNotification(WsMessage message) {
+    try {
+      final data = message.data;
+      final notifType = _mapNotificationType(data['type']?.toString() ?? 'general');
+
+      _addNotification(RealtimeNotification(
+        id: data['id']?.toString() ?? DateTime.now().millisecondsSinceEpoch.toString(),
+        type: notifType,
+        title: data['title']?.toString() ?? '',
+        body: data['body']?.toString() ?? '',
+        data: data,
+        timestamp: data['created_at'] != null
+            ? DateTime.tryParse(data['created_at'].toString()) ?? DateTime.now()
+            : DateTime.now(),
+        priority: data['priority'] == 'high'
+            ? NotificationPriority.high
+            : NotificationPriority.normal,
+      ));
+
+      notifyListeners();
+    } catch (e) {
+      debugPrint('RealtimeProvider: Error parsing server notification: $e');
+    }
+  }
+
+  /// Called by PushNotificationService when an FCM message arrives in foreground
+  void addServerNotification({
+    required String id,
+    required String type,
+    required String title,
+    required String body,
+    required Map<String, dynamic> data,
+  }) {
+    _addNotification(RealtimeNotification(
+      id: id.isNotEmpty ? id : DateTime.now().millisecondsSinceEpoch.toString(),
+      type: _mapNotificationType(type),
+      title: title,
+      body: body,
+      data: data,
+      timestamp: DateTime.now(),
+    ));
+    notifyListeners();
+  }
+
+  NotificationType _mapNotificationType(String type) {
+    switch (type) {
+      case 'geofence':
+      case 'session':
+        return NotificationType.sessionUpdate;
+      case 'prayer':
+      case 'delivery':
+      case 'survey':
+        return NotificationType.deliveryUpdate;
+      case 'team':
+        return NotificationType.teamStatus;
+      case 'walkie':
+        return NotificationType.walkieMessage;
+      case 'chat':
+        return NotificationType.walkieMessage;
+      default:
+        return NotificationType.general;
     }
   }
 

@@ -1,4 +1,4 @@
-package com.example.ui_flutter
+package com.rallypoint.app
 
 import io.flutter.embedding.android.FlutterActivity
 

@@ -1,12 +1,15 @@
 package service
 
 import (
+	"encoding/json"
 	"fmt"
+	"log"
 	"os"
 	"path/filepath"
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/nats-io/nats.go"
 	"rally-point/walkie-service/internal/domain"
 )
 
@@ -14,14 +17,31 @@ type walkieService struct {
 	walkieRepo      domain.WalkieRepository
 	realtimeManager domain.RealtimeManager
 	audioManager    domain.AudioManager
+	nc              *nats.Conn
 }
 
 // NewWalkieService creates a new walkie service
-func NewWalkieService(walkieRepo domain.WalkieRepository, realtimeManager domain.RealtimeManager, audioManager domain.AudioManager) domain.WalkieService {
+func NewWalkieService(walkieRepo domain.WalkieRepository, realtimeManager domain.RealtimeManager, audioManager domain.AudioManager, nc *nats.Conn) domain.WalkieService {
 	return &walkieService{
 		walkieRepo:      walkieRepo,
 		realtimeManager: realtimeManager,
 		audioManager:    audioManager,
+		nc:              nc,
+	}
+}
+
+// publishNotify publishes a notification event to NATS
+func (s *walkieService) publishNotify(subject string, event map[string]interface{}) {
+	if s.nc == nil {
+		return
+	}
+	data, err := json.Marshal(event)
+	if err != nil {
+		log.Printf("Failed to marshal notification: %v", err)
+		return
+	}
+	if err := s.nc.Publish(subject, data); err != nil {
+		log.Printf("Failed to publish notification %s: %v", subject, err)
 	}
 }
 
@@ -122,6 +142,20 @@ func (s *walkieService) EndTransmission(userID uuid.UUID, req *domain.EndTransmi
 	if err != nil {
 		fmt.Printf("Warning: failed to broadcast transmission end: %v\n", err)
 	}
+
+	// Publish voice message notification (target: team members)
+	s.publishNotify("notify.walkie.voice_message", map[string]interface{}{
+		"event_type":        "walkie.voice_message",
+		"target_type":       "team",
+		"target_id":         session.TeamID.String(),
+		"actor_id":          userID.String(),
+		"title":             fmt.Sprintf("Voice message from %s", session.SpeakerName),
+		"body":              fmt.Sprintf("%ds voice message", req.Duration),
+		"data":              map[string]interface{}{"session_id": session.ID.String(), "team_id": session.TeamID.String()},
+		"priority":          "normal",
+		"notification_type": "walkie",
+		"created_at":        time.Now().Format(time.RFC3339),
+	})
 
 	return session, nil
 }

@@ -198,9 +198,9 @@ class _HomeScreenState extends State<HomeScreen> {
                 child: AppHorizontalLogo(),
               ),
               actions: [
-                IconButton(
-                  icon: const Icon(Icons.notifications_outlined),
-                  onPressed: () {},
+                RealtimeNotificationBadge(
+                  onTap: () => context.push('/notifications'),
+                  child: const Icon(Icons.notifications_outlined),
                 ),
                 IconButton(
                   icon: CircleAvatar(
@@ -572,9 +572,9 @@ class _HomeScreenState extends State<HomeScreen> {
                 child: AppHorizontalLogo(),
               ),
               actions: [
-                IconButton(
-                  icon: const Icon(Icons.notifications_outlined),
-                  onPressed: () {},
+                RealtimeNotificationBadge(
+                  onTap: () => context.push('/notifications'),
+                  child: const Icon(Icons.notifications_outlined),
                 ),
                 IconButton(
                   icon: CircleAvatar(

@@ -13,6 +13,24 @@ type Config struct {
 	Redis     RedisConfig
 	JWT       JWTConfig
 	RateLimit RateLimitConfig
+	Database  DatabaseConfig
+	Firebase  FirebaseConfig
+}
+
+// DatabaseConfig holds PostgreSQL configuration
+type DatabaseConfig struct {
+	Host     string
+	Port     string
+	Name     string
+	User     string
+	Password string
+}
+
+// FirebaseConfig holds Firebase Cloud Messaging configuration
+type FirebaseConfig struct {
+	ProjectID   string
+	PrivateKey  string
+	ClientEmail string
 }
 
 // ServerConfig holds server configuration
@@ -87,6 +105,18 @@ func Load() *Config {
 		RateLimit: RateLimitConfig{
 			RequestsPerMinute: getIntEnv("RATE_LIMIT_RPM", 100),
 			BurstSize:         getIntEnv("RATE_LIMIT_BURST", 10),
+		},
+		Database: DatabaseConfig{
+			Host:     getEnv("DB_HOST", "localhost"),
+			Port:     getEnv("DB_PORT", "5432"),
+			Name:     getEnv("DB_NAME", "rally_point"),
+			User:     getEnv("DB_USER", "rally_user"),
+			Password: getEnv("DB_PASSWORD", "rally_password"),
+		},
+		Firebase: FirebaseConfig{
+			ProjectID:   getEnv("FIREBASE_PROJECT_ID", ""),
+			PrivateKey:  getEnv("FIREBASE_PRIVATE_KEY", ""),
+			ClientEmail: getEnv("FIREBASE_CLIENT_EMAIL", ""),
 		},
 	}
 }

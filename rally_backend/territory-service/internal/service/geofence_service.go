@@ -1,10 +1,13 @@
 package service
 
 import (
+	"encoding/json"
 	"fmt"
+	"log"
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/nats-io/nats.go"
 	"rally-point/territory-service/internal/domain"
 )
 
@@ -12,13 +15,30 @@ import (
 type geofenceService struct {
 	repo            domain.GeofenceRepository
 	geofenceManager domain.GeofenceManager
+	nc              *nats.Conn
 }
 
 // NewGeofenceService creates a new geofence service
-func NewGeofenceService(repo domain.GeofenceRepository, manager domain.GeofenceManager) domain.GeofenceService {
+func NewGeofenceService(repo domain.GeofenceRepository, manager domain.GeofenceManager, nc *nats.Conn) domain.GeofenceService {
 	return &geofenceService{
 		repo:            repo,
 		geofenceManager: manager,
+		nc:              nc,
+	}
+}
+
+// publishNotify publishes a notification event to NATS
+func (s *geofenceService) publishNotify(subject string, event map[string]interface{}) {
+	if s.nc == nil {
+		return
+	}
+	data, err := json.Marshal(event)
+	if err != nil {
+		log.Printf("Failed to marshal notification: %v", err)
+		return
+	}
+	if err := s.nc.Publish(subject, data); err != nil {
+		log.Printf("Failed to publish notification %s: %v", subject, err)
 	}
 }
 
@@ -232,6 +252,20 @@ func (s *geofenceService) CheckIn(req *domain.CheckInRequest) (*domain.Territory
 		return nil, fmt.Errorf("failed to create work session: %w", err)
 	}
 
+	// Publish check-in notification
+	s.publishNotify("notify.session.checkin", map[string]interface{}{
+		"event_type":        "session.checkin",
+		"target_type":       "user",
+		"target_id":         req.WorkerID.String(),
+		"actor_id":          req.WorkerID.String(),
+		"title":             fmt.Sprintf("Checked in to %s", req.TerritoryName),
+		"body":              "Work session started",
+		"data":              map[string]interface{}{"territory_id": req.TerritoryID.String(), "session_id": createdSession.ID.String()},
+		"priority":          "normal",
+		"notification_type": "session",
+		"created_at":        time.Now().Format(time.RFC3339),
+	})
+
 	return createdSession, nil
 }
 
@@ -252,6 +286,24 @@ func (s *geofenceService) CheckOut(req *domain.CheckOutRequest) (*domain.Territo
 	if err != nil {
 		return nil, fmt.Errorf("failed to end work session: %w", err)
 	}
+
+	// Publish check-out notification
+	territoryName := ""
+	if endedSession != nil {
+		territoryName = endedSession.EntityName
+	}
+	s.publishNotify("notify.session.checkout", map[string]interface{}{
+		"event_type":        "session.checkout",
+		"target_type":       "user",
+		"target_id":         req.WorkerID.String(),
+		"actor_id":          req.WorkerID.String(),
+		"title":             fmt.Sprintf("Checked out of %s", territoryName),
+		"body":              "Work session ended",
+		"data":              map[string]interface{}{"territory_id": activeSession.TerritoryID.String(), "session_id": activeSession.ID.String()},
+		"priority":          "normal",
+		"notification_type": "session",
+		"created_at":        time.Now().Format(time.RFC3339),
+	})
 
 	return endedSession, nil
 }

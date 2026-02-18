@@ -1,25 +1,45 @@
 package service
 
 import (
+	"encoding/json"
 	"fmt"
+	"log"
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/nats-io/nats.go"
 	"rally-point/delivery-service/internal/domain"
 )
 
 type deliveryService struct {
-	deliveryRepo     domain.DeliveryRepository
-	routeOptimizer   domain.RouteOptimizer
-	territoryClient  domain.TerritoryClient
+	deliveryRepo    domain.DeliveryRepository
+	routeOptimizer  domain.RouteOptimizer
+	territoryClient domain.TerritoryClient
+	nc              *nats.Conn
 }
 
 // NewDeliveryService creates a new delivery service
-func NewDeliveryService(deliveryRepo domain.DeliveryRepository, routeOptimizer domain.RouteOptimizer, territoryClient domain.TerritoryClient) domain.DeliveryService {
+func NewDeliveryService(deliveryRepo domain.DeliveryRepository, routeOptimizer domain.RouteOptimizer, territoryClient domain.TerritoryClient, nc *nats.Conn) domain.DeliveryService {
 	return &deliveryService{
 		deliveryRepo:    deliveryRepo,
 		routeOptimizer:  routeOptimizer,
 		territoryClient: territoryClient,
+		nc:              nc,
+	}
+}
+
+// publishNotify publishes a notification event to NATS
+func (s *deliveryService) publishNotify(subject string, event map[string]interface{}) {
+	if s.nc == nil {
+		return
+	}
+	data, err := json.Marshal(event)
+	if err != nil {
+		log.Printf("Failed to marshal notification: %v", err)
+		return
+	}
+	if err := s.nc.Publish(subject, data); err != nil {
+		log.Printf("Failed to publish notification %s: %v", subject, err)
 	}
 }
 
@@ -149,10 +169,28 @@ func (s *deliveryService) CreateDelivery(creatorID uuid.UUID, req *domain.Create
 		items = append(items, item)
 	}
 
-	return &domain.DeliveryWithItems{
+	result := &domain.DeliveryWithItems{
 		Delivery: delivery,
 		Items:    items,
-	}, nil
+	}
+
+	// Publish notification for new delivery assignment
+	if delivery.WorkerID != uuid.Nil {
+		s.publishNotify("notify.delivery.assigned", map[string]interface{}{
+			"event_type":        "delivery.assigned",
+			"target_type":       "user",
+			"target_id":         delivery.WorkerID.String(),
+			"actor_id":          creatorID.String(),
+			"title":             fmt.Sprintf("New delivery: %s", delivery.RecipientName),
+			"body":              fmt.Sprintf("Delivery to %s", delivery.Address),
+			"data":              map[string]interface{}{"delivery_id": delivery.ID.String(), "team_id": delivery.TeamID.String()},
+			"priority":          "normal",
+			"notification_type": "delivery",
+			"created_at":        time.Now().Format(time.RFC3339),
+		})
+	}
+
+	return result, nil
 }
 
 // GetDelivery retrieves a delivery with its items
@@ -328,6 +366,20 @@ func (s *deliveryService) UpdateDeliveryStatus(deliveryID, userID uuid.UUID, req
 	if err != nil {
 		return err
 	}
+
+	// Publish notification for delivery status change
+	s.publishNotify("notify.delivery.status_changed", map[string]interface{}{
+		"event_type":        "delivery.status_changed",
+		"target_type":       "user",
+		"target_id":         delivery.WorkerID.String(),
+		"actor_id":          userID.String(),
+		"title":             fmt.Sprintf("Delivery %s", req.Status),
+		"body":              fmt.Sprintf("Delivery to %s is now %s", delivery.RecipientName, req.Status),
+		"data":              map[string]interface{}{"delivery_id": deliveryID.String(), "status": req.Status},
+		"priority":          "normal",
+		"notification_type": "delivery",
+		"created_at":        time.Now().Format(time.RFC3339),
+	})
 
 	// Record territory visit when delivery is completed
 	// This updates the territory completion percentage

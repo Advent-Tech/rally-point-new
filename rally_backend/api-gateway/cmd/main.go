@@ -2,7 +2,9 @@ package main
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
 	"os"
@@ -12,11 +14,13 @@ import (
 
 	"rally-point/api-gateway/internal/config"
 	"rally-point/api-gateway/internal/middleware"
+	"rally-point/api-gateway/internal/notification"
 	"rally-point/api-gateway/internal/proxy"
 	"rally-point/api-gateway/internal/websocket"
 
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
+	_ "github.com/lib/pq"
 	"github.com/nats-io/nats.go"
 	"github.com/rally-point/shared/auth"
 	"github.com/redis/go-redis/v9"
@@ -107,8 +111,45 @@ func main() {
 		defer nc.Drain()
 	}
 
+	// Initialize PostgreSQL connection for notifications
+	dbDSN := fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=disable",
+		cfg.Database.Host, cfg.Database.Port, cfg.Database.User, cfg.Database.Password, cfg.Database.Name)
+	db, dbErr := sql.Open("postgres", dbDSN)
+	if dbErr != nil {
+		log.Printf("Warning: failed to open PostgreSQL connection: %v", dbErr)
+	} else {
+		db.SetMaxOpenConns(10)
+		db.SetMaxIdleConns(5)
+		db.SetConnMaxLifetime(5 * time.Minute)
+		if pingErr := db.Ping(); pingErr != nil {
+			log.Printf("Warning: failed to ping PostgreSQL: %v", pingErr)
+			db = nil
+		} else {
+			log.Println("Connected to PostgreSQL for notifications")
+		}
+	}
+
+	// Initialize notification handler
+	var notifHandler *notification.Handler
+	if db != nil && nc != nil {
+		notifStore := notification.NewStore(db)
+
+		// Initialize FCM (optional — works without it)
+		fcm, fcmErr := notification.NewFCMSender()
+		if fcmErr != nil {
+			log.Printf("Warning: FCM not available: %v", fcmErr)
+		}
+
+		notifHandler = notification.NewHandler(notifStore, wsHub, fcm, nc)
+		if subErr := notifHandler.SubscribeNATS(); subErr != nil {
+			log.Printf("Warning: failed to subscribe to notify.>: %v", subErr)
+		} else {
+			log.Println("Subscribed to NATS notify.> for push notifications")
+		}
+	}
+
 	// Setup router
-	router := setupRouter(cfg, jwtManager, rateLimiter, serviceProxy, wsHub)
+	router := setupRouter(cfg, jwtManager, rateLimiter, serviceProxy, wsHub, notifHandler)
 
 	// Server configuration
 	server := &http.Server{
@@ -147,10 +188,15 @@ func main() {
 		redisClient.Close()
 	}
 
+	// Close DB connection
+	if db != nil {
+		db.Close()
+	}
+
 	log.Println("✅ Server exited")
 }
 
-func setupRouter(cfg *config.Config, jwtManager *auth.JWTManager, rateLimiter middleware.RateLimiter, serviceProxy *proxy.ServiceProxy, wsHub *websocket.Hub) *gin.Engine {
+func setupRouter(cfg *config.Config, jwtManager *auth.JWTManager, rateLimiter middleware.RateLimiter, serviceProxy *proxy.ServiceProxy, wsHub *websocket.Hub, notifHandler *notification.Handler) *gin.Engine {
 	// Set Gin mode
 	if gin.Mode() != gin.DebugMode {
 		gin.SetMode(gin.ReleaseMode)
@@ -569,6 +615,22 @@ func setupRouter(cfg *config.Config, jwtManager *auth.JWTManager, rateLimiter mi
 		invitations := protected.Group("/invitations")
 		{
 			invitations.POST("/accept", serviceProxy.ProxyRequest("user"))
+		}
+
+		// Notification routes (handled directly by api-gateway)
+		if notifHandler != nil {
+			notifs := protected.Group("/notifications")
+			{
+				notifs.POST("/device-token", notifHandler.RegisterDeviceToken)
+				notifs.DELETE("/device-token", notifHandler.RemoveDeviceToken)
+				notifs.GET("/", notifHandler.GetNotifications)
+				notifs.GET("/unread-count", notifHandler.GetUnreadCount)
+				notifs.PUT("/:id/read", notifHandler.MarkAsRead)
+				notifs.PUT("/read-all", notifHandler.MarkAllAsRead)
+				notifs.DELETE("/:id", notifHandler.DeleteNotification)
+				notifs.GET("/preferences", notifHandler.GetPreferences)
+				notifs.PUT("/preferences", notifHandler.UpdatePreferences)
+			}
 		}
 	}
 

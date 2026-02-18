@@ -89,13 +89,13 @@ BEGIN
     BEGIN
         BLOCK "040904e4"
         BEGIN
-            VALUE "CompanyName", "com.example" "\0"
-            VALUE "FileDescription", "ui_flutter" "\0"
+            VALUE "CompanyName", "Rally Point" "\0"
+            VALUE "FileDescription", "Rally Point" "\0"
             VALUE "FileVersion", VERSION_AS_STRING "\0"
-            VALUE "InternalName", "ui_flutter" "\0"
-            VALUE "LegalCopyright", "Copyright (C) 2025 com.example. All rights reserved." "\0"
-            VALUE "OriginalFilename", "ui_flutter.exe" "\0"
-            VALUE "ProductName", "ui_flutter" "\0"
+            VALUE "InternalName", "rally_point" "\0"
+            VALUE "LegalCopyright", "Copyright (C) 2025 Rally Point. All rights reserved." "\0"
+            VALUE "OriginalFilename", "rally_point.exe" "\0"
+            VALUE "ProductName", "Rally Point" "\0"
             VALUE "ProductVersion", VERSION_AS_STRING "\0"
         END
     END

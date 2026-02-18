@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart';
 import 'core/theme/app_theme.dart';
 import 'core/constants/map_constants.dart';
@@ -15,9 +17,21 @@ import 'presentation/blocs/schedule/schedule_bloc.dart';
 import 'presentation/blocs/survey/survey_bloc.dart';
 import 'presentation/blocs/profile/profile_bloc.dart';
 import 'presentation/navigation/app_router.dart';
+import 'services/push_notification_service.dart';
+
+/// Background FCM handler — must be top-level
+@pragma('vm:entry-point')
+Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
+  await Firebase.initializeApp();
+  debugPrint('FCM background message: ${message.messageId}');
+}
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Initialize Firebase
+  await Firebase.initializeApp();
+  FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
 
   // Set preferred orientations
   await SystemChrome.setPreferredOrientations([

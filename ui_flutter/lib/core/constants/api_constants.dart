@@ -164,6 +164,13 @@ class ApiConstants {
   static const String donationsTeam = '/api/donations/team'; // + /{teamId}
   static const String donationsStats = '/api/donations/stats';
 
+  // Notification Endpoints
+  static const String notifications = '/api/notifications';
+  static const String notificationsDeviceToken = '/api/notifications/device-token';
+  static const String notificationsUnreadCount = '/api/notifications/unread-count';
+  static const String notificationsReadAll = '/api/notifications/read-all';
+  static const String notificationsPreferences = '/api/notifications/preferences';
+
   // WebSocket Endpoints
   static const String wsLocation = '/ws/location';
   static const String wsTerritory = '/ws/territory';
