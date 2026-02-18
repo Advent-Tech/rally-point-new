@@ -427,7 +427,7 @@ services:
       - ./backup/backup.sh:/backup.sh:ro
       - backup_data:/backups
     entrypoint: /bin/sh
-    command: -c "chmod +x /backup.sh && echo 'Backup service started. Running daily backups.' && while true; do /backup.sh; sleep 86400; done"
+    command: -c "echo 'Backup service started. Running daily backups.' && while true; do sh /backup.sh; sleep 86400; done"
     depends_on:
       postgres:
         condition: service_healthy
