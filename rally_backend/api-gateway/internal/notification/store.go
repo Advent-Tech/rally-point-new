@@ -24,7 +24,7 @@ func (s *Store) CreateNotification(n *Notification) error {
 	}
 	return s.db.QueryRow(`
 		INSERT INTO notifications (user_id, type, title, body, data, priority, group_key, actor_id)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, NULLIF($8, ''))
+		VALUES ($1, $2, $3, $4, $5, $6, $7, NULLIF($8, '')::uuid)
 		RETURNING id, created_at`,
 		n.UserID, n.Type, n.Title, n.Body, data, n.Priority, n.GroupKey, n.ActorID,
 	).Scan(&n.ID, &n.CreatedAt)
