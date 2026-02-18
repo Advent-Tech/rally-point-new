@@ -87,20 +87,34 @@ class _AppContent extends StatefulWidget {
 
 class _AppContentState extends State<_AppContent> {
   late final _router = AppRouter.router(context.read<AuthBloc>());
+  bool _pushInitialized = false;
 
   @override
   Widget build(BuildContext context) {
-    return BlocBuilder<ThemeBloc, ThemeState>(
-      builder: (context, themeState) {
-        return MaterialApp.router(
-          title: 'Rally Point',
-          debugShowCheckedModeBanner: false,
-          theme: AppTheme.lightTheme,
-          darkTheme: AppTheme.darkTheme,
-          themeMode: themeState.themeMode,
-          routerConfig: _router,
-        );
+    return BlocListener<AuthBloc, AuthState>(
+      listener: (context, state) {
+        if (state is AuthAuthenticated && !_pushInitialized) {
+          _pushInitialized = true;
+          PushNotificationService.instance.initialize();
+        } else if (state is AuthInitial || state is AuthError) {
+          if (_pushInitialized) {
+            _pushInitialized = false;
+            PushNotificationService.instance.removeToken();
+          }
+        }
       },
+      child: BlocBuilder<ThemeBloc, ThemeState>(
+        builder: (context, themeState) {
+          return MaterialApp.router(
+            title: 'Rally Point',
+            debugShowCheckedModeBanner: false,
+            theme: AppTheme.lightTheme,
+            darkTheme: AppTheme.darkTheme,
+            themeMode: themeState.themeMode,
+            routerConfig: _router,
+          );
+        },
+      ),
     );
   }
 }
