@@ -174,15 +174,21 @@ func (s *deliveryService) CreateDelivery(creatorID uuid.UUID, req *domain.Create
 		Items:    items,
 	}
 
-	// Publish notification for new delivery assignment
-	if delivery.WorkerID != uuid.Nil {
-		s.publishNotify("notify.delivery.assigned", map[string]interface{}{
-			"event_type":        "delivery.assigned",
-			"target_type":       "user",
-			"target_id":         delivery.WorkerID.String(),
+	// Publish notification — notify team leader about new donation/delivery recorded by worker
+	if delivery.TeamID != uuid.Nil {
+		notifTitle := fmt.Sprintf("New donation from %s", delivery.RecipientName)
+		notifBody := fmt.Sprintf("Recorded by %s", delivery.WorkerName)
+		if !isDonation {
+			notifTitle = fmt.Sprintf("New literature delivery: %s", delivery.RecipientName)
+			notifBody = fmt.Sprintf("Delivery to %s", delivery.Address)
+		}
+		s.publishNotify("notify.delivery.recorded", map[string]interface{}{
+			"event_type":        "delivery.recorded",
+			"target_type":       "team_leader",
+			"target_id":         delivery.TeamID.String(),
 			"actor_id":          creatorID.String(),
-			"title":             fmt.Sprintf("New delivery: %s", delivery.RecipientName),
-			"body":              fmt.Sprintf("Delivery to %s", delivery.Address),
+			"title":             notifTitle,
+			"body":              notifBody,
 			"data":              map[string]interface{}{"delivery_id": delivery.ID.String(), "team_id": delivery.TeamID.String()},
 			"priority":          "normal",
 			"notification_type": "delivery",
@@ -368,14 +374,14 @@ func (s *deliveryService) UpdateDeliveryStatus(deliveryID, userID uuid.UUID, req
 		return err
 	}
 
-	// Publish notification for delivery status change
+	// Publish notification — notify team leader about status change
 	s.publishNotify("notify.delivery.status_changed", map[string]interface{}{
 		"event_type":        "delivery.status_changed",
-		"target_type":       "user",
-		"target_id":         delivery.WorkerID.String(),
+		"target_type":       "team_leader",
+		"target_id":         delivery.TeamID.String(),
 		"actor_id":          userID.String(),
-		"title":             fmt.Sprintf("Delivery %s", req.Status),
-		"body":              fmt.Sprintf("Delivery to %s is now %s", delivery.RecipientName, req.Status),
+		"title":             fmt.Sprintf("Donation %s", req.Status),
+		"body":              fmt.Sprintf("Donation from %s is now %s", delivery.RecipientName, req.Status),
 		"data":              map[string]interface{}{"delivery_id": deliveryID.String(), "status": req.Status},
 		"priority":          "normal",
 		"notification_type": "delivery",

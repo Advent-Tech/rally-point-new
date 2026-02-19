@@ -91,10 +91,10 @@ func (s *PrayerRequestService) CreatePrayerRequest(workerID, teamID uuid.UUID, r
 		return nil, fmt.Errorf("failed to create prayer request: %w", err)
 	}
 
-	// Publish notification for new prayer request (target: team)
+	// Publish notification — notify team leader about new prayer request recorded by worker
 	s.publishNotify("notify.prayer.created", map[string]interface{}{
 		"event_type":        "prayer.created",
-		"target_type":       "team",
+		"target_type":       "team_leader",
 		"target_id":         teamID.String(),
 		"actor_id":          workerID.String(),
 		"title":             fmt.Sprintf("Prayer request: %s", req.PrayerSubject),
@@ -245,17 +245,17 @@ func (s *PrayerRequestService) UpdateStatus(id uuid.UUID, status string, complet
 		return err
 	}
 
-	// Publish notification for status change
+	// Publish notification — notify team leader about prayer request status change
 	request, _ := s.repo.GetByID(id)
-	if request != nil {
+	if request != nil && request.TeamID != nil {
 		actorID := ""
 		if completedBy != nil {
 			actorID = completedBy.String()
 		}
 		s.publishNotify("notify.prayer.status_changed", map[string]interface{}{
 			"event_type":        "prayer.status_changed",
-			"target_type":       "user",
-			"target_id":         request.WorkerID.String(),
+			"target_type":       "team_leader",
+			"target_id":         request.TeamID.String(),
 			"actor_id":          actorID,
 			"title":             fmt.Sprintf("Prayer request %s", status),
 			"body":              fmt.Sprintf("%s is now %s", request.PrayerSubject, status),

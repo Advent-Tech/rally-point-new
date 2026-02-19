@@ -143,21 +143,30 @@ func main() {
 					log.Printf("Geofence event via NATS: %s - Territory: %s, Worker: %s",
 						geofenceResult.EventType, geofenceResult.TerritoryName, event.WorkerID)
 
-					// Publish geofence notification
-					titleVerb := "Entered"
+					// Publish geofence notification — notify team leader about worker movement
+					titleVerb := "entered"
 					bodyText := "Work session started"
 					if geofenceResult.EventType == "exit" {
-						titleVerb = "Left"
+						titleVerb = "left"
 						bodyText = "Work session ended"
 					}
+
+					// Use team_leader if team_id available, else team_leader_of_user
+					targetType := "team_leader_of_user"
+					targetID := event.WorkerID.String()
+					if event.TeamID != nil {
+						targetType = "team_leader"
+						targetID = event.TeamID.String()
+					}
+
 					notifyEvent := map[string]interface{}{
 						"event_type":        "territory.geofence." + geofenceResult.EventType,
-						"target_type":       "user",
-						"target_id":         event.WorkerID.String(),
+						"target_type":       targetType,
+						"target_id":         targetID,
 						"actor_id":          event.WorkerID.String(),
-						"title":             fmt.Sprintf("%s %s", titleVerb, geofenceResult.TerritoryName),
+						"title":             fmt.Sprintf("Worker %s %s", titleVerb, geofenceResult.TerritoryName),
 						"body":              bodyText,
-						"data":              map[string]interface{}{"territory_id": geofenceResult.TerritoryID.String()},
+						"data":              map[string]interface{}{"territory_id": geofenceResult.TerritoryID.String(), "worker_id": event.WorkerID.String()},
 						"priority":          "normal",
 						"notification_type": "geofence",
 						"group_key":         "geofence:" + geofenceResult.TerritoryID.String(),

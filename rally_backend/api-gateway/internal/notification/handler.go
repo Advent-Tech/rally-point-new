@@ -59,6 +59,22 @@ func (h *Handler) processEvent(event NotifyEvent) {
 			return
 		}
 		targetUserIDs = ids
+	case "team_leader":
+		// target_id is a team_id — resolve to team leader
+		leaderID, err := h.store.GetTeamLeaderID(event.TargetID)
+		if err != nil {
+			log.Printf("Notification: failed to get team leader for team %s: %v", event.TargetID, err)
+			return
+		}
+		targetUserIDs = []string{leaderID}
+	case "team_leader_of_user":
+		// target_id is a user_id — find their team leader
+		leaderID, err := h.store.GetUserTeamLeaderID(event.TargetID)
+		if err != nil {
+			log.Printf("Notification: failed to get team leader for user %s: %v", event.TargetID, err)
+			return
+		}
+		targetUserIDs = []string{leaderID}
 	default:
 		log.Printf("Notification: unknown target_type: %s", event.TargetType)
 		return

@@ -191,3 +191,24 @@ func (s *Store) GetTeamMemberIDs(teamID string) ([]string, error) {
 	}
 	return ids, rows.Err()
 }
+
+// GetTeamLeaderID returns the user ID of the team leader for a given team
+func (s *Store) GetTeamLeaderID(teamID string) (string, error) {
+	var leaderID string
+	err := s.db.QueryRow(`
+		SELECT id::text FROM users
+		WHERE team_id = $1::uuid AND role = 'team_leader'
+		LIMIT 1`, teamID).Scan(&leaderID)
+	return leaderID, err
+}
+
+// GetUserTeamLeaderID returns the team leader's user ID given any team member's user ID
+func (s *Store) GetUserTeamLeaderID(userID string) (string, error) {
+	var leaderID string
+	err := s.db.QueryRow(`
+		SELECT l.id::text FROM users u
+		JOIN users l ON l.team_id = u.team_id AND l.role = 'team_leader'
+		WHERE u.id = $1::uuid
+		LIMIT 1`, userID).Scan(&leaderID)
+	return leaderID, err
+}

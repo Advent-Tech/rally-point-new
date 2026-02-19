@@ -252,15 +252,15 @@ func (s *geofenceService) CheckIn(req *domain.CheckInRequest) (*domain.Territory
 		return nil, fmt.Errorf("failed to create work session: %w", err)
 	}
 
-	// Publish check-in notification
+	// Publish check-in notification — notify team leader that worker checked in
 	s.publishNotify("notify.session.checkin", map[string]interface{}{
 		"event_type":        "session.checkin",
-		"target_type":       "user",
+		"target_type":       "team_leader_of_user",
 		"target_id":         req.WorkerID.String(),
 		"actor_id":          req.WorkerID.String(),
-		"title":             fmt.Sprintf("Checked in to %s", req.TerritoryName),
+		"title":             fmt.Sprintf("Worker checked in to %s", req.TerritoryName),
 		"body":              "Work session started",
-		"data":              map[string]interface{}{"territory_id": req.TerritoryID.String(), "session_id": createdSession.ID.String()},
+		"data":              map[string]interface{}{"territory_id": req.TerritoryID.String(), "session_id": createdSession.ID.String(), "worker_id": req.WorkerID.String()},
 		"priority":          "normal",
 		"notification_type": "session",
 		"group_key":         "session:" + createdSession.ID.String(),
@@ -288,19 +288,19 @@ func (s *geofenceService) CheckOut(req *domain.CheckOutRequest) (*domain.Territo
 		return nil, fmt.Errorf("failed to end work session: %w", err)
 	}
 
-	// Publish check-out notification
+	// Publish check-out notification — notify team leader that worker checked out
 	territoryName := ""
 	if endedSession != nil {
 		territoryName = endedSession.EntityName
 	}
 	s.publishNotify("notify.session.checkout", map[string]interface{}{
 		"event_type":        "session.checkout",
-		"target_type":       "user",
+		"target_type":       "team_leader_of_user",
 		"target_id":         req.WorkerID.String(),
 		"actor_id":          req.WorkerID.String(),
-		"title":             fmt.Sprintf("Checked out of %s", territoryName),
+		"title":             fmt.Sprintf("Worker checked out of %s", territoryName),
 		"body":              "Work session ended",
-		"data":              map[string]interface{}{"territory_id": activeSession.TerritoryID.String(), "session_id": activeSession.ID.String()},
+		"data":              map[string]interface{}{"territory_id": activeSession.TerritoryID.String(), "session_id": activeSession.ID.String(), "worker_id": req.WorkerID.String()},
 		"priority":          "normal",
 		"notification_type": "session",
 		"group_key":         "session:" + activeSession.ID.String(),
