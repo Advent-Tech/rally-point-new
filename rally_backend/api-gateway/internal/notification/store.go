@@ -36,7 +36,7 @@ func (s *Store) GetNotifications(userID string, limit, offset int) ([]Notificati
 		SELECT id, user_id, type, title, body, data, priority, is_read, read_at, group_key,
 		       COALESCE(actor_id::text, '') as actor_id, created_at
 		FROM notifications
-		WHERE user_id = $1
+		WHERE user_id = $1::uuid
 		ORDER BY created_at DESC
 		LIMIT $2 OFFSET $3`, userID, limit, offset)
 	if err != nil {
@@ -61,7 +61,7 @@ func (s *Store) GetUnreadCount(userID string) (int, error) {
 	var count int
 	err := s.db.QueryRow(`
 		SELECT COUNT(*) FROM notifications
-		WHERE user_id = $1 AND is_read = FALSE`, userID).Scan(&count)
+		WHERE user_id = $1::uuid AND is_read = FALSE`, userID).Scan(&count)
 	return count, err
 }
 
@@ -69,7 +69,7 @@ func (s *Store) GetUnreadCount(userID string) (int, error) {
 func (s *Store) MarkAsRead(notificationID, userID string) error {
 	_, err := s.db.Exec(`
 		UPDATE notifications SET is_read = TRUE, read_at = $1
-		WHERE id = $2 AND user_id = $3`,
+		WHERE id = $2::uuid AND user_id = $3::uuid`,
 		time.Now(), notificationID, userID)
 	return err
 }
@@ -78,14 +78,14 @@ func (s *Store) MarkAsRead(notificationID, userID string) error {
 func (s *Store) MarkAllAsRead(userID string) error {
 	_, err := s.db.Exec(`
 		UPDATE notifications SET is_read = TRUE, read_at = $1
-		WHERE user_id = $2 AND is_read = FALSE`,
+		WHERE user_id = $2::uuid AND is_read = FALSE`,
 		time.Now(), userID)
 	return err
 }
 
 // DeleteNotification deletes a notification
 func (s *Store) DeleteNotification(notificationID, userID string) error {
-	_, err := s.db.Exec(`DELETE FROM notifications WHERE id = $1 AND user_id = $2`,
+	_, err := s.db.Exec(`DELETE FROM notifications WHERE id = $1::uuid AND user_id = $2::uuid`,
 		notificationID, userID)
 	return err
 }
@@ -94,9 +94,9 @@ func (s *Store) DeleteNotification(notificationID, userID string) error {
 func (s *Store) SaveDeviceToken(token *DeviceToken) error {
 	_, err := s.db.Exec(`
 		INSERT INTO device_tokens (user_id, token, platform, device_id)
-		VALUES ($1, $2, $3, $4)
+		VALUES ($1::uuid, $2, $3, $4)
 		ON CONFLICT (token) DO UPDATE
-		SET user_id = $1, platform = $3, device_id = $4, is_active = TRUE, updated_at = NOW()`,
+		SET user_id = $1::uuid, platform = $3, device_id = $4, is_active = TRUE, updated_at = NOW()`,
 		token.UserID, token.Token, token.Platform, token.DeviceID)
 	return err
 }
@@ -105,7 +105,7 @@ func (s *Store) SaveDeviceToken(token *DeviceToken) error {
 func (s *Store) RemoveDeviceToken(token, userID string) error {
 	_, err := s.db.Exec(`
 		UPDATE device_tokens SET is_active = FALSE, updated_at = NOW()
-		WHERE token = $1 AND user_id = $2`, token, userID)
+		WHERE token = $1 AND user_id = $2::uuid`, token, userID)
 	return err
 }
 
@@ -114,7 +114,7 @@ func (s *Store) GetActiveTokens(userID string) ([]DeviceToken, error) {
 	rows, err := s.db.Query(`
 		SELECT id, user_id, token, platform, COALESCE(device_id, '') as device_id, is_active, created_at, updated_at
 		FROM device_tokens
-		WHERE user_id = $1 AND is_active = TRUE`, userID)
+		WHERE user_id = $1::uuid AND is_active = TRUE`, userID)
 	if err != nil {
 		return nil, err
 	}
@@ -143,7 +143,7 @@ func (s *Store) GetPreferences(userID string) ([]NotificationPreference, error) 
 	rows, err := s.db.Query(`
 		SELECT id, user_id, notification_type, in_app_enabled, push_enabled
 		FROM notification_preferences
-		WHERE user_id = $1`, userID)
+		WHERE user_id = $1::uuid`, userID)
 	if err != nil {
 		return nil, err
 	}
@@ -164,7 +164,7 @@ func (s *Store) GetPreferences(userID string) ([]NotificationPreference, error) 
 func (s *Store) UpdatePreference(userID, notificationType string, inApp, push bool) error {
 	_, err := s.db.Exec(`
 		INSERT INTO notification_preferences (user_id, notification_type, in_app_enabled, push_enabled)
-		VALUES ($1, $2, $3, $4)
+		VALUES ($1::uuid, $2, $3, $4)
 		ON CONFLICT (user_id, notification_type) DO UPDATE
 		SET in_app_enabled = $3, push_enabled = $4`,
 		userID, notificationType, inApp, push)
@@ -175,7 +175,7 @@ func (s *Store) UpdatePreference(userID, notificationType string, inApp, push bo
 func (s *Store) GetTeamMemberIDs(teamID string) ([]string, error) {
 	rows, err := s.db.Query(`
 		SELECT id::text FROM users
-		WHERE team_id = $1`, teamID)
+		WHERE team_id = $1::uuid`, teamID)
 	if err != nil {
 		return nil, err
 	}
