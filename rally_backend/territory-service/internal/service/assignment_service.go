@@ -1,9 +1,13 @@
 package service
 
 import (
+	"encoding/json"
 	"fmt"
+	"log"
+	"time"
 
 	"github.com/google/uuid"
+	"github.com/nats-io/nats.go"
 	"rally-point/territory-service/internal/domain"
 )
 
@@ -11,18 +15,35 @@ import (
 type assignmentService struct {
 	repo           domain.TerritoryAssignmentRepository
 	allocationRepo domain.LeaderTerritoryAllocationRepository
+	nc             *nats.Conn
 }
 
 // NewAssignmentService creates a new assignment service
-func NewAssignmentService(repo domain.TerritoryAssignmentRepository) domain.TerritoryAssignmentService {
-	return &assignmentService{repo: repo}
+func NewAssignmentService(repo domain.TerritoryAssignmentRepository, nc *nats.Conn) domain.TerritoryAssignmentService {
+	return &assignmentService{repo: repo, nc: nc}
 }
 
 // NewAssignmentServiceWithAllocation creates a new assignment service with allocation validation
-func NewAssignmentServiceWithAllocation(repo domain.TerritoryAssignmentRepository, allocationRepo domain.LeaderTerritoryAllocationRepository) domain.TerritoryAssignmentService {
+func NewAssignmentServiceWithAllocation(repo domain.TerritoryAssignmentRepository, allocationRepo domain.LeaderTerritoryAllocationRepository, nc *nats.Conn) domain.TerritoryAssignmentService {
 	return &assignmentService{
 		repo:           repo,
 		allocationRepo: allocationRepo,
+		nc:             nc,
+	}
+}
+
+// publishNotify publishes a notification event to NATS
+func (s *assignmentService) publishNotify(subject string, event map[string]interface{}) {
+	if s.nc == nil {
+		return
+	}
+	data, err := json.Marshal(event)
+	if err != nil {
+		log.Printf("Failed to marshal notification event: %v", err)
+		return
+	}
+	if err := s.nc.Publish(subject, data); err != nil {
+		log.Printf("Failed to publish %s: %v", subject, err)
 	}
 }
 
@@ -67,6 +88,23 @@ func (s *assignmentService) AssignTerritory(req *domain.CreateAssignmentRequest)
 	err := s.repo.Create(assignment)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create assignment: %w", err)
+	}
+
+	// Publish notification for territory assignment
+	if req.AssignedWorkerID != nil && *req.AssignedWorkerID != uuid.Nil {
+		s.publishNotify("notify.territory.assigned", map[string]interface{}{
+			"event_type":        "territory.assigned",
+			"target_type":       "user",
+			"target_id":         req.AssignedWorkerID.String(),
+			"actor_id":          req.AssignedBy.String(),
+			"title":             "New territory assigned",
+			"body":              fmt.Sprintf("You've been assigned a new territory"),
+			"data":              map[string]interface{}{"territory_id": req.TerritoryID.String(), "assignment_id": assignment.ID.String()},
+			"priority":          "high",
+			"notification_type": "territory",
+			"group_key":         "territory:" + req.TerritoryID.String(),
+			"created_at":        time.Now().Format(time.RFC3339),
+		})
 	}
 
 	return assignment, nil

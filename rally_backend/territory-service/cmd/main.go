@@ -74,7 +74,6 @@ func main() {
 
 	// Initialize assignment components
 	assignmentRepo := postgres.NewAssignmentRepository(db.DB)
-	assignmentService := service.NewAssignmentService(assignmentRepo)
 
 	// Connect to NATS for location events and notification publishing
 	var nc *nats.Conn
@@ -106,6 +105,9 @@ func main() {
 	// Initialize allocation components (admin → team leader territory allocations)
 	allocationRepo := postgres.NewAllocationRepository(db.DB)
 	allocationService := service.NewAllocationService(allocationRepo)
+
+	// Initialize assignment service (after NATS so it can publish notifications)
+	assignmentService := service.NewAssignmentService(assignmentRepo, nc)
 
 	// Subscribe to NATS location events for async geofence processing
 	if nc != nil {
