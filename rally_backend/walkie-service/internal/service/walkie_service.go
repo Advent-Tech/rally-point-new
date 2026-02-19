@@ -30,6 +30,20 @@ func NewWalkieService(walkieRepo domain.WalkieRepository, realtimeManager domain
 	}
 }
 
+func stringPtrValue(s *string) string {
+	if s != nil {
+		return *s
+	}
+	return ""
+}
+
+func intPtrValue(i *int) int {
+	if i != nil {
+		return *i
+	}
+	return 0
+}
+
 // publishNotify publishes a notification event to NATS
 func (s *walkieService) publishNotify(subject string, event map[string]interface{}) {
 	if s.nc == nil {
@@ -151,7 +165,7 @@ func (s *walkieService) EndTransmission(userID uuid.UUID, req *domain.EndTransmi
 		"actor_id":          userID.String(),
 		"title":             fmt.Sprintf("Voice message from %s", session.SpeakerName),
 		"body":              fmt.Sprintf("%ds voice message", req.Duration),
-		"data":              map[string]interface{}{"session_id": session.ID.String(), "team_id": session.TeamID.String()},
+		"data":              map[string]interface{}{"session_id": session.ID.String(), "team_id": session.TeamID.String(), "audio_url": stringPtrValue(req.AudioURL), "duration": intPtrValue(req.Duration)},
 		"priority":          "normal",
 		"notification_type": "walkie",
 		"group_key":         "walkie:" + session.TeamID.String(),

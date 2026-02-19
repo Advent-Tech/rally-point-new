@@ -1,7 +1,11 @@
+import 'dart:convert';
 import 'dart:io';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:flutter_sound/flutter_sound.dart';
+import 'package:go_router/go_router.dart';
+import '../presentation/navigation/app_router.dart';
 import 'notification_api_service.dart';
 import 'realtime_provider.dart';
 
@@ -19,6 +23,7 @@ class PushNotificationService {
       FlutterLocalNotificationsPlugin();
   NotificationApiService? _apiService;
   String? _currentToken;
+  FlutterSoundPlayer? _audioPlayer;
 
   PushNotificationService._();
 
@@ -79,10 +84,65 @@ class PushNotificationService {
     await _localNotifications.initialize(
       initSettings,
       onDidReceiveNotificationResponse: (response) {
-        // Handle local notification tap
+        // Handle action button tap
+        if (response.actionId == 'play_audio') {
+          _handlePlayAudioAction(response.payload);
+          return;
+        }
+        if (response.actionId == 'stop_audio') {
+          _stopAudioPlayback();
+          return;
+        }
+        // Handle normal notification tap — parse the JSON payload and navigate
         debugPrint('Local notification tapped: ${response.payload}');
+        if (response.payload != null && response.payload!.isNotEmpty) {
+          try {
+            final data = json.decode(response.payload!) as Map<String, dynamic>;
+            _navigateToNotification(data.map((k, v) => MapEntry(k, v.toString())));
+          } catch (e) {
+            debugPrint('Failed to parse notification payload: $e');
+          }
+        }
       },
     );
+  }
+
+  Future<void> _handlePlayAudioAction(String? payload) async {
+    if (payload == null) return;
+    try {
+      final data = json.decode(payload) as Map<String, dynamic>;
+      final audioUrl = data['audio_url']?.toString();
+      if (audioUrl == null || audioUrl.isEmpty) return;
+
+      _audioPlayer ??= FlutterSoundPlayer();
+      if (!_audioPlayer!.isOpen()) {
+        await _audioPlayer!.openPlayer();
+      }
+
+      if (_audioPlayer!.isPlaying) {
+        await _audioPlayer!.stopPlayer();
+      }
+
+      await _audioPlayer!.startPlayer(
+        fromURI: audioUrl,
+        whenFinished: () {
+          debugPrint('Walkie audio playback finished');
+        },
+      );
+      debugPrint('Playing walkie audio from notification: $audioUrl');
+    } catch (e) {
+      debugPrint('Failed to play audio from notification: $e');
+    }
+  }
+
+  Future<void> _stopAudioPlayback() async {
+    try {
+      if (_audioPlayer != null && _audioPlayer!.isPlaying) {
+        await _audioPlayer!.stopPlayer();
+      }
+    } catch (e) {
+      debugPrint('Failed to stop audio: $e');
+    }
   }
 
   Future<void> _createNotificationChannels() async {
@@ -152,24 +212,39 @@ class PushNotificationService {
     // Show local notification
     final notification = message.notification;
     if (notification != null) {
-      final channelId = message.data['notification_type'] != null
-          ? '${message.data['notification_type']}_channel'
+      final notificationType = message.data['notification_type']?.toString();
+      final channelId = notificationType != null
+          ? '${notificationType}_channel'
           : 'default_channel';
+
+      final isWalkie = notificationType == 'walkie' &&
+          message.data['audio_url'] != null &&
+          message.data['audio_url'].toString().isNotEmpty;
+
+      final androidDetails = AndroidNotificationDetails(
+        channelId,
+        channelId.replaceAll('_channel', '').replaceAll('_', ' '),
+        icon: '@mipmap/ic_launcher',
+        importance: Importance.high,
+        priority: Priority.high,
+        actions: isWalkie
+            ? <AndroidNotificationAction>[
+                const AndroidNotificationAction(
+                  'play_audio',
+                  '▶ Play',
+                  showsUserInterface: false,
+                ),
+              ]
+            : null,
+      );
 
       _localNotifications.show(
         notification.hashCode,
         notification.title,
         notification.body,
-        NotificationDetails(
-          android: AndroidNotificationDetails(
-            channelId,
-            channelId.replaceAll('_channel', '').replaceAll('_', ' '),
-            icon: '@mipmap/ic_launcher',
-            importance: Importance.high,
-            priority: Priority.high,
-          ),
-        ),
-        payload: message.data['notification_id'],
+        NotificationDetails(android: androidDetails),
+        // Pass full data as JSON so the tap/action handler can use it
+        payload: json.encode(message.data),
       );
     }
 
@@ -187,8 +262,52 @@ class PushNotificationService {
 
   void _handleMessageTap(RemoteMessage message) {
     debugPrint('FCM message tapped: ${message.data}');
-    // Deep-linking is handled by the notification center screen
-    // when the user taps on the notification in the app
+    _navigateToNotification(message.data);
+  }
+
+  /// Navigate to the appropriate screen based on notification type and data
+  void _navigateToNotification(Map<String, dynamic> data) {
+    final context = AppRouter.rootNavigatorKey.currentContext;
+    if (context == null) {
+      debugPrint('No navigator context for deep-link');
+      return;
+    }
+
+    final type = data['notification_type']?.toString();
+    debugPrint('Deep-linking for notification type: $type, data: $data');
+
+    switch (type) {
+      case 'chat':
+        final conversationId = data['conversation_id']?.toString();
+        if (conversationId != null && conversationId.isNotEmpty) {
+          GoRouter.of(context).push('/chat/$conversationId');
+        } else {
+          GoRouter.of(context).push('/chat');
+        }
+        break;
+      case 'walkie':
+        GoRouter.of(context).push('/walkie');
+        break;
+      case 'delivery':
+        GoRouter.of(context).push('/delivery');
+        break;
+      case 'prayer':
+        GoRouter.of(context).push('/prayer-requests');
+        break;
+      case 'team':
+        GoRouter.of(context).push('/notifications');
+        break;
+      case 'survey':
+        GoRouter.of(context).push('/survey');
+        break;
+      case 'geofence':
+      case 'session':
+        GoRouter.of(context).push('/territory');
+        break;
+      default:
+        GoRouter.of(context).push('/notifications');
+        break;
+    }
   }
 
   /// Remove token on logout
