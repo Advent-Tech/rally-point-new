@@ -102,6 +102,7 @@ func (s *PrayerRequestService) CreatePrayerRequest(workerID, teamID uuid.UUID, r
 		"data":              map[string]interface{}{"prayer_request_id": prayerRequest.ID.String()},
 		"priority":          "normal",
 		"notification_type": "prayer",
+		"group_key":         "prayer:" + prayerRequest.ID.String(),
 		"created_at":        time.Now().Format(time.RFC3339),
 	})
 
@@ -261,6 +262,7 @@ func (s *PrayerRequestService) UpdateStatus(id uuid.UUID, status string, complet
 			"data":              map[string]interface{}{"prayer_request_id": id.String(), "status": status},
 			"priority":          "normal",
 			"notification_type": "prayer",
+			"group_key":         "prayer:" + id.String(),
 			"created_at":        time.Now().Format(time.RFC3339),
 		})
 	}
@@ -295,6 +297,7 @@ func (s *PrayerRequestService) AssignPreacher(id uuid.UUID, preacherID uuid.UUID
 		"data":              map[string]interface{}{"prayer_request_id": id.String()},
 		"priority":          "high",
 		"notification_type": "prayer",
+		"group_key":         "prayer:" + id.String(),
 		"created_at":        time.Now().Format(time.RFC3339),
 	})
 

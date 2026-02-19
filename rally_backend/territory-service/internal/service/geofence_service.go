@@ -263,6 +263,7 @@ func (s *geofenceService) CheckIn(req *domain.CheckInRequest) (*domain.Territory
 		"data":              map[string]interface{}{"territory_id": req.TerritoryID.String(), "session_id": createdSession.ID.String()},
 		"priority":          "normal",
 		"notification_type": "session",
+		"group_key":         "session:" + createdSession.ID.String(),
 		"created_at":        time.Now().Format(time.RFC3339),
 	})
 
@@ -302,6 +303,7 @@ func (s *geofenceService) CheckOut(req *domain.CheckOutRequest) (*domain.Territo
 		"data":              map[string]interface{}{"territory_id": activeSession.TerritoryID.String(), "session_id": activeSession.ID.String()},
 		"priority":          "normal",
 		"notification_type": "session",
+		"group_key":         "session:" + activeSession.ID.String(),
 		"created_at":        time.Now().Format(time.RFC3339),
 	})
 

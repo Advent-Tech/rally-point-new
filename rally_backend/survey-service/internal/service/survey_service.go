@@ -637,6 +637,7 @@ func (s *surveyService) AssignSurvey(assignerID uuid.UUID, req *domain.AssignSur
 			"data":              map[string]interface{}{"survey_id": req.SurveyID.String(), "assignment_id": assignment.ID.String()},
 			"priority":          "normal",
 			"notification_type": "survey",
+			"group_key":         "survey:" + req.SurveyID.String(),
 			"created_at":        time.Now().Format(time.RFC3339),
 		})
 	}

@@ -186,6 +186,7 @@ func (s *deliveryService) CreateDelivery(creatorID uuid.UUID, req *domain.Create
 			"data":              map[string]interface{}{"delivery_id": delivery.ID.String(), "team_id": delivery.TeamID.String()},
 			"priority":          "normal",
 			"notification_type": "delivery",
+			"group_key":         "delivery:" + delivery.ID.String(),
 			"created_at":        time.Now().Format(time.RFC3339),
 		})
 	}
@@ -378,6 +379,7 @@ func (s *deliveryService) UpdateDeliveryStatus(deliveryID, userID uuid.UUID, req
 		"data":              map[string]interface{}{"delivery_id": deliveryID.String(), "status": req.Status},
 		"priority":          "normal",
 		"notification_type": "delivery",
+		"group_key":         "delivery:" + deliveryID.String(),
 		"created_at":        time.Now().Format(time.RFC3339),
 	})
 

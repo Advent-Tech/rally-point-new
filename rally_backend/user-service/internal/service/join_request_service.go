@@ -114,6 +114,7 @@ func (s *joinRequestService) CreateRequest(userID uuid.UUID, req *domain.CreateJ
 		"data":              map[string]interface{}{"team_id": req.TeamID.String(), "request_id": joinRequest.ID.String()},
 		"priority":          "high",
 		"notification_type": "team",
+		"group_key":         "team:" + req.TeamID.String(),
 		"created_at":        time.Now().Format(time.RFC3339),
 	})
 
@@ -214,6 +215,7 @@ func (s *joinRequestService) ApproveRequest(requestID, reviewerID uuid.UUID) err
 		"data":              map[string]interface{}{"team_id": request.TeamID.String()},
 		"priority":          "high",
 		"notification_type": "team",
+		"group_key":         "team:" + request.TeamID.String(),
 		"created_at":        time.Now().Format(time.RFC3339),
 	})
 
@@ -276,6 +278,7 @@ func (s *joinRequestService) RejectRequest(requestID, reviewerID uuid.UUID, reas
 		"data":              map[string]interface{}{"team_id": request.TeamID.String()},
 		"priority":          "normal",
 		"notification_type": "team",
+		"group_key":         "team:" + request.TeamID.String(),
 		"created_at":        time.Now().Format(time.RFC3339),
 	})
 

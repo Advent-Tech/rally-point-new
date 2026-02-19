@@ -158,6 +158,7 @@ func main() {
 						"data":              map[string]interface{}{"territory_id": geofenceResult.TerritoryID.String()},
 						"priority":          "normal",
 						"notification_type": "geofence",
+						"group_key":         "geofence:" + geofenceResult.TerritoryID.String(),
 						"created_at":        time.Now().Format(time.RFC3339),
 					}
 					if geofenceResult.SessionID != nil {

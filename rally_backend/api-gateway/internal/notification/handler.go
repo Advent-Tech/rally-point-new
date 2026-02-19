@@ -70,8 +70,10 @@ func (h *Handler) processEvent(event NotifyEvent) {
 	}
 
 	for _, userID := range targetUserIDs {
-		// Skip self-notifications
-		if userID == event.ActorID {
+		// Skip self-notifications only for team broadcasts (e.g. prayer created, walkie voice).
+		// For user-targeted notifications (checkin, checkout, geofence, delivery status,
+		// prayer assigned), the producer explicitly chose the recipient — deliver as intended.
+		if event.TargetType == "team" && userID == event.ActorID {
 			continue
 		}
 

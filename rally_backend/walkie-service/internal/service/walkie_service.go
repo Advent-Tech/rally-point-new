@@ -154,6 +154,7 @@ func (s *walkieService) EndTransmission(userID uuid.UUID, req *domain.EndTransmi
 		"data":              map[string]interface{}{"session_id": session.ID.String(), "team_id": session.TeamID.String()},
 		"priority":          "normal",
 		"notification_type": "walkie",
+		"group_key":         "walkie:" + session.TeamID.String(),
 		"created_at":        time.Now().Format(time.RFC3339),
 	})
 

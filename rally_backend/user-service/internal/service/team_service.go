@@ -149,6 +149,7 @@ func (t *TeamService) JoinTeam(userID uuid.UUID, req *domain.JoinTeamRequest) er
 			"data":              map[string]interface{}{"team_id": req.TeamID.String()},
 			"priority":          "normal",
 			"notification_type": "team",
+			"group_key":         "team:" + req.TeamID.String(),
 			"created_at":        time.Now().Format(time.RFC3339),
 		})
 	}

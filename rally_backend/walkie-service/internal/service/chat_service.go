@@ -376,6 +376,7 @@ func (s *chatService) SendMessage(userID uuid.UUID, req *domain.SendChatMessageR
 				"data":              map[string]interface{}{"conversation_id": req.ConversationID.String(), "message_id": message.ID.String()},
 				"priority":          "normal",
 				"notification_type": "chat",
+				"group_key":         "chat:" + req.ConversationID.String(),
 				"created_at":        time.Now().Format(time.RFC3339),
 			})
 		}
