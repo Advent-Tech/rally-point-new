@@ -37,6 +37,7 @@ type LocationSession struct {
 type WorkerLocation struct {
 	UserID    uuid.UUID `json:"user_id"`
 	UserName  string    `json:"user_name"`
+	TeamID    string    `json:"team_id,omitempty"`
 	Latitude  float64   `json:"latitude"`
 	Longitude float64   `json:"longitude"`
 	Accuracy  *float64  `json:"accuracy,omitempty"`
@@ -55,6 +56,7 @@ type LocationUpdate struct {
 	Speed     *float64   `json:"speed,omitempty"`
 	Heading   *float64   `json:"heading,omitempty"`
 	SessionID *uuid.UUID `json:"session_id,omitempty"`
+	TeamID    *uuid.UUID `json:"team_id,omitempty"`
 }
 
 // StartSessionRequest represents a request to start a tracking session
@@ -207,10 +209,11 @@ const (
 	AlertTypeBoundaryViolation = "boundary_violation"
 
 	// WebSocket message types
-	WSMessageTypeLocationUpdate = "location_update"
-	WSMessageTypeWorkerOnline   = "worker_online"
-	WSMessageTypeWorkerOffline  = "worker_offline"
-	WSMessageTypeGeofenceAlert  = "geofence_alert"
+	WSMessageTypeLocationUpdate          = "location_update"
+	WSMessageTypeWorkerOnline            = "worker_online"
+	WSMessageTypeWorkerOffline           = "worker_offline"
+	WSMessageTypeGeofenceAlert           = "geofence_alert"
+	WSMessageTypeWorkerLocationBroadcast = "worker_location_broadcast"
 
 	// Default values
 	DefaultLocationLimit = 100

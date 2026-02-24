@@ -93,6 +93,9 @@ func (s *locationService) UpdateLocation(userID uuid.UUID, update *domain.Locati
 		LastSeen:  time.Now(),
 		UpdatedAt: time.Now(),
 	}
+	if update.TeamID != nil {
+		workerLocation.TeamID = update.TeamID.String()
+	}
 
 	// Update real-time location in Redis cache
 	if s.workerCache != nil {
@@ -106,9 +109,12 @@ func (s *locationService) UpdateLocation(userID uuid.UUID, update *domain.Locati
 		fmt.Printf("Warning: failed to update real-time location: %v\n", err)
 	}
 
-	// Broadcast to subscribers - pass empty teamID for now (broadcast to all)
-	// TODO: Get worker's teamID from user service and pass it for team-based filtering
-	err = s.BroadcastLocationUpdate(workerLocation, "")
+	// Broadcast to subscribers filtered by worker's team
+	teamID := ""
+	if update.TeamID != nil {
+		teamID = update.TeamID.String()
+	}
+	err = s.BroadcastLocationUpdate(workerLocation, teamID)
 	if err != nil {
 		fmt.Printf("Warning: failed to broadcast location update: %v\n", err)
 	}

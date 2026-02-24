@@ -360,7 +360,7 @@ func (h *LocationHandler) handleWebSocketConnection(conn *websocket.Conn, userID
 		case location := <-locationCh:
 			// Send location update to client
 			message := domain.WebSocketMessage{
-				Type:      domain.WSMessageTypeLocationUpdate,
+				Type:      domain.WSMessageTypeWorkerLocationBroadcast,
 				UserID:    location.UserID,
 				Data:      location,
 				Timestamp: time.Now(),
