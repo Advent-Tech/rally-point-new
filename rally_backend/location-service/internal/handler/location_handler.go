@@ -1,6 +1,8 @@
 package handler
 
 import (
+	"fmt"
+	"math"
 	"net/http"
 	"strconv"
 	"time"
@@ -8,8 +10,8 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
-	"rally-point/location-service/internal/domain"
 	"github.com/rally-point/shared/auth"
+	"rally-point/location-service/internal/domain"
 )
 
 type LocationHandler struct {
@@ -298,8 +300,9 @@ func (h *LocationHandler) WebSocketHandler(c *gin.Context) {
 	}
 	defer conn.Close()
 
-	// Get user ID from query parameter or JWT token
+	// Get user ID and team ID from query parameter or JWT token
 	userIDStr := c.Query("user_id")
+	teamIDStr := c.Query("team_id") // Optional team_id for filtering
 	if userIDStr == "" {
 		// Try to get from JWT token in query
 		token := c.Query("token")
@@ -307,6 +310,9 @@ func (h *LocationHandler) WebSocketHandler(c *gin.Context) {
 			claims, err := h.jwtManager.VerifyToken(token)
 			if err == nil {
 				userIDStr = claims.UserID.String()
+				if claims.TeamID != nil {
+					teamIDStr = claims.TeamID.String()
+				}
 			}
 		}
 	}
@@ -322,8 +328,8 @@ func (h *LocationHandler) WebSocketHandler(c *gin.Context) {
 		return
 	}
 
-	// Subscribe to location updates
-	locationCh, err := h.locationService.SubscribeToLocationUpdates(userID)
+	// Subscribe to location updates - pass teamID for team-based filtering
+	locationCh, err := h.locationService.SubscribeToLocationUpdates(userID, teamIDStr)
 	if err != nil {
 		conn.WriteMessage(websocket.TextMessage, []byte(`{"error": "failed to subscribe"}`))
 		return
@@ -425,6 +431,46 @@ func (h *LocationHandler) HealthCheck(c *gin.Context) {
 	})
 }
 
+// filterOutlierPoints filters out GPS glitches (>100km jumps) from location track
+func filterOutlierPoints(tracks []*domain.LocationTrack) []*domain.LocationTrack {
+	if len(tracks) <= 1 {
+		return tracks
+	}
+
+	const maxJumpMeters = 100000.0 // 100km threshold
+
+	filtered := []*domain.LocationTrack{tracks[0]}
+	for i := 1; i < len(tracks); i++ {
+		distance := haversineDistance(
+			filtered[len(filtered)-1].Latitude, filtered[len(filtered)-1].Longitude,
+			tracks[i].Latitude, tracks[i].Longitude,
+		)
+		if distance <= maxJumpMeters {
+			filtered = append(filtered, tracks[i])
+		} else {
+			fmt.Printf("Filtered outlier point: %.2f km jump\n", distance/1000)
+		}
+	}
+	return filtered
+}
+
+// haversineDistance calculates distance between two points in meters
+func haversineDistance(lat1, lon1, lat2, lon2 float64) float64 {
+	const earthRadius = 6371000.0 // meters
+
+	lat1Rad := lat1 * math.Pi / 180
+	lat2Rad := lat2 * math.Pi / 180
+	deltaLatRad := (lat2 - lat1) * math.Pi / 180
+	deltaLonRad := (lon2 - lon1) * math.Pi / 180
+
+	a := math.Sin(deltaLatRad/2)*math.Sin(deltaLatRad/2) +
+		math.Cos(lat1Rad)*math.Cos(lat2Rad)*
+			math.Sin(deltaLonRad/2)*math.Sin(deltaLonRad/2)
+	c := 2 * math.Atan2(math.Sqrt(a), math.Sqrt(1-a))
+
+	return earthRadius * c
+}
+
 // GetWorkerPathHistory handles getting path history for a specific worker
 // Accessible by team leaders and admins
 func (h *LocationHandler) GetWorkerPathHistory(c *gin.Context) {
@@ -495,6 +541,9 @@ func (h *LocationHandler) GetWorkerPathHistory(c *gin.Context) {
 			return
 		}
 	}
+
+	// Filter out GPS glitches (>100km jumps)
+	tracks = filterOutlierPoints(tracks)
 
 	// Format response with path points
 	pathPoints := make([]gin.H, 0, len(tracks))

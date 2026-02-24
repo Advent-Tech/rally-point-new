@@ -106,8 +106,9 @@ func (s *locationService) UpdateLocation(userID uuid.UUID, update *domain.Locati
 		fmt.Printf("Warning: failed to update real-time location: %v\n", err)
 	}
 
-	// Broadcast to subscribers
-	err = s.BroadcastLocationUpdate(workerLocation)
+	// Broadcast to subscribers - pass empty teamID for now (broadcast to all)
+	// TODO: Get worker's teamID from user service and pass it for team-based filtering
+	err = s.BroadcastLocationUpdate(workerLocation, "")
 	if err != nil {
 		fmt.Printf("Warning: failed to broadcast location update: %v\n", err)
 	}
@@ -325,9 +326,9 @@ func (s *locationService) SetWorkerOffline(userID uuid.UUID) error {
 }
 
 // SubscribeToLocationUpdates subscribes to real-time location updates
-func (s *locationService) SubscribeToLocationUpdates(userID uuid.UUID) (<-chan *domain.WorkerLocation, error) {
+func (s *locationService) SubscribeToLocationUpdates(userID uuid.UUID, teamID string) (<-chan *domain.WorkerLocation, error) {
 	ch := make(chan *domain.WorkerLocation, 100)
-	err := s.realtimeManager.AddSubscriber(userID, ch)
+	err := s.realtimeManager.AddSubscriber(userID, ch, teamID)
 	if err != nil {
 		close(ch)
 		return nil, fmt.Errorf("failed to add subscriber: %w", err)
@@ -340,9 +341,9 @@ func (s *locationService) UnsubscribeFromLocationUpdates(userID uuid.UUID) error
 	return s.realtimeManager.RemoveSubscriber(userID)
 }
 
-// BroadcastLocationUpdate broadcasts a location update to all subscribers
-func (s *locationService) BroadcastLocationUpdate(location *domain.WorkerLocation) error {
-	return s.realtimeManager.Broadcast(location)
+// BroadcastLocationUpdate broadcasts a location update to subscribers in the same team
+func (s *locationService) BroadcastLocationUpdate(location *domain.WorkerLocation, teamID string) error {
+	return s.realtimeManager.Broadcast(location, teamID)
 }
 
 // DistanceCalculator implementation
@@ -381,12 +382,12 @@ func (dc *distanceCalculator) CalculateSessionDistance(tracks []*domain.Location
 	for i := 1; i < len(tracks); i++ {
 		prev := tracks[i-1]
 		curr := tracks[i]
-		
+
 		distance := dc.CalculateDistance(
 			prev.Latitude, prev.Longitude,
 			curr.Latitude, curr.Longitude,
 		)
-		
+
 		// Only add distance if it's reasonable (less than 1km between points)
 		if distance < 1000 {
 			totalDistance += distance

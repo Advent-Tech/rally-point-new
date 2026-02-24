@@ -7,24 +7,32 @@ import (
 	"rally-point/location-service/internal/domain"
 )
 
+type subscriber struct {
+	ch     chan<- *domain.WorkerLocation
+	teamID string
+}
+
 type realtimeManager struct {
-	subscribers map[uuid.UUID]chan<- *domain.WorkerLocation
+	subscribers map[uuid.UUID]*subscriber
 	mu          sync.RWMutex
 }
 
 // NewRealtimeManager creates a new realtime manager
 func NewRealtimeManager() domain.RealtimeManager {
 	return &realtimeManager{
-		subscribers: make(map[uuid.UUID]chan<- *domain.WorkerLocation),
+		subscribers: make(map[uuid.UUID]*subscriber),
 	}
 }
 
 // AddSubscriber adds a subscriber for location updates
-func (rm *realtimeManager) AddSubscriber(userID uuid.UUID, ch chan<- *domain.WorkerLocation) error {
+func (rm *realtimeManager) AddSubscriber(userID uuid.UUID, ch chan<- *domain.WorkerLocation, teamID string) error {
 	rm.mu.Lock()
 	defer rm.mu.Unlock()
-	
-	rm.subscribers[userID] = ch
+
+	rm.subscribers[userID] = &subscriber{
+		ch:     ch,
+		teamID: teamID,
+	}
 	return nil
 }
 
@@ -32,29 +40,32 @@ func (rm *realtimeManager) AddSubscriber(userID uuid.UUID, ch chan<- *domain.Wor
 func (rm *realtimeManager) RemoveSubscriber(userID uuid.UUID) error {
 	rm.mu.Lock()
 	defer rm.mu.Unlock()
-	
-	if ch, exists := rm.subscribers[userID]; exists {
-		close(ch)
+
+	if sub, exists := rm.subscribers[userID]; exists {
+		close(sub.ch)
 		delete(rm.subscribers, userID)
 	}
-	
+
 	return nil
 }
 
-// Broadcast broadcasts a location update to all subscribers
-func (rm *realtimeManager) Broadcast(location *domain.WorkerLocation) error {
+// Broadcast broadcasts a location update to subscribers in the same team
+func (rm *realtimeManager) Broadcast(location *domain.WorkerLocation, teamID string) error {
 	rm.mu.RLock()
 	defer rm.mu.RUnlock()
-	
-	for _, ch := range rm.subscribers {
-		select {
-		case ch <- location:
-			// Successfully sent
-		default:
-			// Channel is full, skip this subscriber
+
+	for _, sub := range rm.subscribers {
+		// Only send to subscribers in the same team, or if teamID is empty (broadcast to all)
+		if sub.teamID == teamID || teamID == "" {
+			select {
+			case sub.ch <- location:
+				// Successfully sent
+			default:
+				// Channel is full, skip this subscriber
+			}
 		}
 	}
-	
+
 	return nil
 }
 
@@ -62,11 +73,11 @@ func (rm *realtimeManager) Broadcast(location *domain.WorkerLocation) error {
 func (rm *realtimeManager) GetActiveSubscribers() []uuid.UUID {
 	rm.mu.RLock()
 	defer rm.mu.RUnlock()
-	
+
 	var subscribers []uuid.UUID
 	for userID := range rm.subscribers {
 		subscribers = append(subscribers, userID)
 	}
-	
+
 	return subscribers
 }

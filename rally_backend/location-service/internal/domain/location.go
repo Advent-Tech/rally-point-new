@@ -8,52 +8,52 @@ import (
 
 // LocationTrack represents a location tracking record
 type LocationTrack struct {
-	ID        uuid.UUID `json:"id" db:"id"`
-	UserID    uuid.UUID `json:"user_id" db:"user_id"`
-	Latitude  float64   `json:"latitude" db:"latitude"`
-	Longitude float64   `json:"longitude" db:"longitude"`
-	Accuracy  *float64  `json:"accuracy,omitempty" db:"accuracy"`
-	Speed     *float64  `json:"speed,omitempty" db:"speed"`
-	Heading   *float64  `json:"heading,omitempty" db:"heading"`
+	ID        uuid.UUID  `json:"id" db:"id"`
+	UserID    uuid.UUID  `json:"user_id" db:"user_id"`
+	Latitude  float64    `json:"latitude" db:"latitude"`
+	Longitude float64    `json:"longitude" db:"longitude"`
+	Accuracy  *float64   `json:"accuracy,omitempty" db:"accuracy"`
+	Speed     *float64   `json:"speed,omitempty" db:"speed"`
+	Heading   *float64   `json:"heading,omitempty" db:"heading"`
 	SessionID *uuid.UUID `json:"session_id,omitempty" db:"session_id"`
-	TrackedAt time.Time `json:"tracked_at" db:"tracked_at"`
-	CreatedAt time.Time `json:"created_at" db:"created_at"`
+	TrackedAt time.Time  `json:"tracked_at" db:"tracked_at"`
+	CreatedAt time.Time  `json:"created_at" db:"created_at"`
 }
 
 // LocationSession represents a location tracking session
 type LocationSession struct {
-	ID            uuid.UUID `json:"id" db:"id"`
-	UserID        uuid.UUID `json:"user_id" db:"user_id"`
-	StartTime     time.Time `json:"start_time" db:"start_time"`
+	ID            uuid.UUID  `json:"id" db:"id"`
+	UserID        uuid.UUID  `json:"user_id" db:"user_id"`
+	StartTime     time.Time  `json:"start_time" db:"start_time"`
 	EndTime       *time.Time `json:"end_time,omitempty" db:"end_time"`
-	TotalDistance float64   `json:"total_distance" db:"total_distance"`
-	LocationCount int       `json:"location_count" db:"location_count"`
-	IsActive      bool      `json:"is_active" db:"is_active"`
-	CreatedAt     time.Time `json:"created_at" db:"created_at"`
-	UpdatedAt     time.Time `json:"updated_at" db:"updated_at"`
+	TotalDistance float64    `json:"total_distance" db:"total_distance"`
+	LocationCount int        `json:"location_count" db:"location_count"`
+	IsActive      bool       `json:"is_active" db:"is_active"`
+	CreatedAt     time.Time  `json:"created_at" db:"created_at"`
+	UpdatedAt     time.Time  `json:"updated_at" db:"updated_at"`
 }
 
 // WorkerLocation represents real-time worker location data
 type WorkerLocation struct {
-	UserID      uuid.UUID `json:"user_id"`
-	UserName    string    `json:"user_name"`
-	Latitude    float64   `json:"latitude"`
-	Longitude   float64   `json:"longitude"`
-	Accuracy    *float64  `json:"accuracy,omitempty"`
-	Speed       *float64  `json:"speed,omitempty"`
-	Heading     *float64  `json:"heading,omitempty"`
-	IsActive    bool      `json:"is_active"`
-	LastSeen    time.Time `json:"last_seen"`
-	UpdatedAt   time.Time `json:"updated_at"`
+	UserID    uuid.UUID `json:"user_id"`
+	UserName  string    `json:"user_name"`
+	Latitude  float64   `json:"latitude"`
+	Longitude float64   `json:"longitude"`
+	Accuracy  *float64  `json:"accuracy,omitempty"`
+	Speed     *float64  `json:"speed,omitempty"`
+	Heading   *float64  `json:"heading,omitempty"`
+	IsActive  bool      `json:"is_active"`
+	LastSeen  time.Time `json:"last_seen"`
+	UpdatedAt time.Time `json:"updated_at"`
 }
 
 // LocationUpdate represents a location update request
 type LocationUpdate struct {
-	Latitude  float64  `json:"latitude" binding:"required"`
-	Longitude float64  `json:"longitude" binding:"required"`
-	Accuracy  *float64 `json:"accuracy,omitempty"`
-	Speed     *float64 `json:"speed,omitempty"`
-	Heading   *float64 `json:"heading,omitempty"`
+	Latitude  float64    `json:"latitude" binding:"required"`
+	Longitude float64    `json:"longitude" binding:"required"`
+	Accuracy  *float64   `json:"accuracy,omitempty"`
+	Speed     *float64   `json:"speed,omitempty"`
+	Heading   *float64   `json:"heading,omitempty"`
 	SessionID *uuid.UUID `json:"session_id,omitempty"`
 }
 
@@ -74,24 +74,24 @@ type LocationQuery struct {
 
 // LocationStats represents location statistics
 type LocationStats struct {
-	TotalDistance    float64 `json:"total_distance"`
-	TotalTime        int64   `json:"total_time_seconds"`
-	AverageSpeed     float64 `json:"average_speed"`
-	MaxSpeed         float64 `json:"max_speed"`
-	LocationCount    int     `json:"location_count"`
-	SessionCount     int     `json:"session_count"`
+	TotalDistance    float64    `json:"total_distance"`
+	TotalTime        int64      `json:"total_time_seconds"`
+	AverageSpeed     float64    `json:"average_speed"`
+	MaxSpeed         float64    `json:"max_speed"`
+	LocationCount    int        `json:"location_count"`
+	SessionCount     int        `json:"session_count"`
 	LastLocationTime *time.Time `json:"last_location_time,omitempty"`
 }
 
 // GeofenceAlert represents a geofence alert
 type GeofenceAlert struct {
-	ID          uuid.UUID `json:"id"`
-	UserID      uuid.UUID `json:"user_id"`
-	UserName    string    `json:"user_name"`
-	AlertType   string    `json:"alert_type"` // "entry", "exit", "boundary_violation"
-	Location    LocationTrack `json:"location"`
-	Message     string    `json:"message"`
-	Timestamp   time.Time `json:"timestamp"`
+	ID        uuid.UUID     `json:"id"`
+	UserID    uuid.UUID     `json:"user_id"`
+	UserName  string        `json:"user_name"`
+	AlertType string        `json:"alert_type"` // "entry", "exit", "boundary_violation"
+	Location  LocationTrack `json:"location"`
+	Message   string        `json:"message"`
+	Timestamp time.Time     `json:"timestamp"`
 }
 
 // WebSocketMessage represents a WebSocket message for real-time updates
@@ -128,27 +128,27 @@ type LocationRepository interface {
 type LocationService interface {
 	UpdateLocation(userID uuid.UUID, update *LocationUpdate) (*LocationTrack, error)
 	GetUserLocations(userID uuid.UUID, query *LocationQuery) ([]*LocationTrack, error)
-	
+
 	StartSession(userID uuid.UUID) (*LocationSession, error)
 	EndSession(userID, sessionID uuid.UUID) (*LocationSession, error)
 	GetActiveSession(userID uuid.UUID) (*LocationSession, error)
 	GetUserSessions(userID uuid.UUID, limit, offset int) ([]*LocationSession, error)
-	
+
 	GetLocationStats(userID uuid.UUID, days int) (*LocationStats, error)
 	GetActiveWorkers() ([]*WorkerLocation, error)
 	SetWorkerOffline(userID uuid.UUID) error
-	
+
 	// Real-time features
-	SubscribeToLocationUpdates(userID uuid.UUID) (<-chan *WorkerLocation, error)
+	SubscribeToLocationUpdates(userID uuid.UUID, teamID string) (<-chan *WorkerLocation, error)
 	UnsubscribeFromLocationUpdates(userID uuid.UUID) error
-	BroadcastLocationUpdate(location *WorkerLocation) error
+	BroadcastLocationUpdate(location *WorkerLocation, teamID string) error
 }
 
 // RealtimeManager defines the interface for real-time location management
 type RealtimeManager interface {
-	AddSubscriber(userID uuid.UUID, ch chan<- *WorkerLocation) error
+	AddSubscriber(userID uuid.UUID, ch chan<- *WorkerLocation, teamID string) error
 	RemoveSubscriber(userID uuid.UUID) error
-	Broadcast(location *WorkerLocation) error
+	Broadcast(location *WorkerLocation, teamID string) error
 	GetActiveSubscribers() []uuid.UUID
 }
 
@@ -202,16 +202,16 @@ type WorkerLocationCache interface {
 // Constants
 const (
 	// Alert types
-	AlertTypeEntry            = "entry"
-	AlertTypeExit             = "exit"
+	AlertTypeEntry             = "entry"
+	AlertTypeExit              = "exit"
 	AlertTypeBoundaryViolation = "boundary_violation"
-	
+
 	// WebSocket message types
 	WSMessageTypeLocationUpdate = "location_update"
 	WSMessageTypeWorkerOnline   = "worker_online"
 	WSMessageTypeWorkerOffline  = "worker_offline"
 	WSMessageTypeGeofenceAlert  = "geofence_alert"
-	
+
 	// Default values
 	DefaultLocationLimit = 100
 	DefaultSessionLimit  = 50
