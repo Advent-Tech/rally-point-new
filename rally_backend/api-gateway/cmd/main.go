@@ -285,7 +285,7 @@ func setupRouter(cfg *config.Config, jwtManager *auth.JWTManager, rateLimiter mi
 		// Team management routes (protected)
 		teams := protected.Group("/teams")
 		{
-			teams.GET("/", serviceProxy.ProxyRequest("user"))        // List teams (supports leader_id query param)
+			teams.GET("/", serviceProxy.ProxyRequest("user")) // List teams (supports leader_id query param)
 			teams.POST("/", serviceProxy.ProxyRequest("user"))
 			teams.PUT("/:id", serviceProxy.ProxyRequest("user"))
 			teams.DELETE("/:id", serviceProxy.ProxyRequest("user"))
@@ -313,6 +313,8 @@ func setupRouter(cfg *config.Config, jwtManager *auth.JWTManager, rateLimiter mi
 			locations.DELETE("/:id", serviceProxy.ProxyRequest("location"))
 			locations.GET("/workers/active", serviceProxy.ProxyRequest("location"))
 			locations.PUT("/workers/offline", serviceProxy.ProxyRequest("location"))
+			locations.GET("/workers/:workerId/path-history", serviceProxy.ProxyRequest("location"))
+			locations.GET("/workers/:workerId/location-stats", serviceProxy.ProxyRequest("location"))
 		}
 
 		// Singular location routes to match location-service API
