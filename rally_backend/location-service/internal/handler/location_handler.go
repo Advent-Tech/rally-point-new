@@ -53,6 +53,26 @@ func (h *LocationHandler) UpdateLocation(c *gin.Context) {
 		return
 	}
 
+	// Get filtering config
+	filterConfig := DefaultFilterConfig()
+
+	// Apply GPS filtering (accuracy check) before saving
+	valid, reason := validateLocationUpdate(&req, filterConfig)
+	if !valid {
+		// Log filtered location but don't fail - prevents retry spam
+		fmt.Printf("[GPS_FILTER] user_id=%s reason=%s lat=%.6f lng=%.6f\n",
+			userID, reason, req.Latitude, req.Longitude)
+
+		// Return success to prevent client from retrying immediately
+		// but don't save the filtered location
+		c.JSON(http.StatusAccepted, gin.H{
+			"message":  "location_filtered",
+			"reason":   reason,
+			"filtered": true,
+		})
+		return
+	}
+
 	track, err := h.locationService.UpdateLocation(id, &req)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
@@ -431,13 +451,33 @@ func (h *LocationHandler) HealthCheck(c *gin.Context) {
 	})
 }
 
-// filterOutlierPoints filters out GPS glitches (>100km jumps) from location track
+// LocationFilterConfig contains GPS filtering configuration
+type LocationFilterConfig struct {
+	MaxSpeedKmh        float64 // 80 km/h - allows both foot and car modes
+	MaxDistanceKm      float64 // 50 km outlier threshold
+	MinAccuracyMeters  float64 // 50m accuracy threshold
+	MinIntervalSeconds int     // 3 seconds minimum between updates
+	MinSpeedKmh        float64 // 0.5 km/h minimum (not completely stuck)
+}
+
+// DefaultFilterConfig returns the default filtering configuration
+func DefaultFilterConfig() LocationFilterConfig {
+	return LocationFilterConfig{
+		MaxSpeedKmh:        80.0,
+		MaxDistanceKm:      50.0,
+		MinAccuracyMeters:  50.0,
+		MinIntervalSeconds: 3,
+		MinSpeedKmh:        0.5,
+	}
+}
+
+// filterOutlierPoints filters out GPS glitches (>50km jumps) from location track
 func filterOutlierPoints(tracks []*domain.LocationTrack) []*domain.LocationTrack {
 	if len(tracks) <= 1 {
 		return tracks
 	}
 
-	const maxJumpMeters = 100000.0 // 100km threshold
+	const maxJumpMeters = 50000.0 // 50km threshold (updated from 100km)
 
 	filtered := []*domain.LocationTrack{tracks[0]}
 	for i := 1; i < len(tracks); i++ {
@@ -452,6 +492,16 @@ func filterOutlierPoints(tracks []*domain.LocationTrack) []*domain.LocationTrack
 		}
 	}
 	return filtered
+}
+
+// validateLocationUpdate validates incoming GPS data before saving
+func validateLocationUpdate(newLoc *domain.LocationUpdate, config LocationFilterConfig) (bool, string) {
+	// 1. Accuracy check - reject inaccurate GPS readings
+	if newLoc.Accuracy != nil && *newLoc.Accuracy > config.MinAccuracyMeters {
+		return false, fmt.Sprintf("accuracy_too_low: %.1fm > %.1fm", *newLoc.Accuracy, config.MinAccuracyMeters)
+	}
+
+	return true, ""
 }
 
 // haversineDistance calculates distance between two points in meters
