@@ -6,7 +6,8 @@ import '../../../core/network/api_client.dart';
 part 'worker_tracking_event.dart';
 part 'worker_tracking_state.dart';
 
-class WorkerTrackingBloc extends Bloc<WorkerTrackingEvent, WorkerTrackingState> {
+class WorkerTrackingBloc
+    extends Bloc<WorkerTrackingEvent, WorkerTrackingState> {
   ApiClient? _apiClient;
   bool _isInitialized = false;
   String? _currentTeamId;
@@ -37,7 +38,27 @@ class WorkerTrackingBloc extends Bloc<WorkerTrackingEvent, WorkerTrackingState> 
     try {
       await _initialize();
 
-      // Fetch active workers
+      // First, try to get live worker locations from Redis cache (immediate)
+      // This returns real-time positions of active workers
+      List<Map<String, dynamic>> liveWorkerData = [];
+      try {
+        final liveResponse = await _apiClient!.get(
+          '/api/locations/workers/team?team_id=${event.teamId}',
+        );
+        if (liveResponse.statusCode == 200 &&
+            liveResponse.data['workers'] != null) {
+          liveWorkerData = List<Map<String, dynamic>>.from(
+            liveResponse.data['workers'] ?? [],
+          );
+          debugPrint(
+            'WorkerTrackingBloc: Loaded ${liveWorkerData.length} live worker locations',
+          );
+        }
+      } catch (e) {
+        debugPrint('WorkerTrackingBloc: Live locations fetch failed: $e');
+      }
+
+      // Fetch active workers from geofence (work sessions with territory info)
       final response = await _apiClient!.get(
         '/api/geofence/teams/${event.teamId}/workers/active',
       );
@@ -56,7 +77,8 @@ class WorkerTrackingBloc extends Bloc<WorkerTrackingEvent, WorkerTrackingState> 
 
       // Fetch today's stats for each worker in parallel
       final statsFutures = workerJsonList.map((json) {
-        final workerId = json['worker_id']?.toString() ?? json['id']?.toString() ?? '';
+        final workerId =
+            json['worker_id']?.toString() ?? json['id']?.toString() ?? '';
         return _fetchWorkerStats(workerId, days: 1);
       }).toList();
 
@@ -65,19 +87,38 @@ class WorkerTrackingBloc extends Bloc<WorkerTrackingEvent, WorkerTrackingState> 
       final workers = <TrackedWorker>[];
       for (int i = 0; i < workerJsonList.length; i++) {
         final stats = statsResults[i];
-        workers.add(TrackedWorker.fromJson(
-          workerJsonList[i],
-          distanceKm: stats?['total_distance_km']?.toDouble(),
-          hours: stats?['total_hours']?.toDouble(),
-        ));
+        final json = workerJsonList[i];
+
+        // Try to get live location from Redis data
+        final workerId =
+            json['worker_id']?.toString() ?? json['id']?.toString() ?? '';
+        final liveData = liveWorkerData.firstWhere(
+          (w) => w['user_id']?.toString() == workerId,
+          orElse: () => <String, dynamic>{},
+        );
+
+        // Merge live location into worker data if available
+        if (liveData.isNotEmpty &&
+            liveData['latitude'] != null &&
+            liveData['longitude'] != null) {
+          json['latitude'] = liveData['latitude'];
+          json['longitude'] = liveData['longitude'];
+        }
+
+        workers.add(
+          TrackedWorker.fromJson(
+            json,
+            distanceKm: stats?['total_distance_km']?.toDouble(),
+            hours: stats?['total_hours']?.toDouble(),
+          ),
+        );
       }
 
-      debugPrint('WorkerTrackingBloc: Loaded ${workers.length} workers with stats');
+      debugPrint(
+        'WorkerTrackingBloc: Loaded ${workers.length} workers with stats',
+      );
 
-      emit(WorkerTrackingWorkersLoaded(
-        workers: workers,
-        teamId: event.teamId,
-      ));
+      emit(WorkerTrackingWorkersLoaded(workers: workers, teamId: event.teamId));
     } catch (e) {
       debugPrint('WorkerTrackingBloc: Error loading workers: $e');
       emit(WorkerTrackingError(message: e.toString()));
@@ -88,7 +129,9 @@ class WorkerTrackingBloc extends Bloc<WorkerTrackingEvent, WorkerTrackingState> 
     WorkerTrackingLoadTrail event,
     Emitter<WorkerTrackingState> emit,
   ) async {
-    debugPrint('WorkerTrackingBloc: Loading trail for worker ${event.workerId}');
+    debugPrint(
+      'WorkerTrackingBloc: Loading trail for worker ${event.workerId}',
+    );
     emit(WorkerTrackingTrailLoading());
     _currentWorkerId = event.workerId;
     _currentWorkerName = event.workerName;
@@ -97,10 +140,10 @@ class WorkerTrackingBloc extends Bloc<WorkerTrackingEvent, WorkerTrackingState> 
       await _initialize();
 
       final now = DateTime.now();
-      final startTime = event.startTime ??
-          DateTime(now.year, now.month, now.day);
-      final endTime = event.endTime ??
-          DateTime(now.year, now.month, now.day, 23, 59, 59);
+      final startTime =
+          event.startTime ?? DateTime(now.year, now.month, now.day);
+      final endTime =
+          event.endTime ?? DateTime(now.year, now.month, now.day, 23, 59, 59);
 
       // Fetch trail and stats in parallel
       final results = await Future.wait([
@@ -114,15 +157,19 @@ class WorkerTrackingBloc extends Bloc<WorkerTrackingEvent, WorkerTrackingState> 
           ? WorkerTrailStats.fromJson(statsJson)
           : const WorkerTrailStats();
 
-      debugPrint('WorkerTrackingBloc: Loaded ${trailPoints.length} trail points');
+      debugPrint(
+        'WorkerTrackingBloc: Loaded ${trailPoints.length} trail points',
+      );
 
-      emit(WorkerTrackingTrailLoaded(
-        trailPoints: trailPoints,
-        stats: stats,
-        workerId: event.workerId,
-        workerName: event.workerName,
-        selectedDate: startTime,
-      ));
+      emit(
+        WorkerTrackingTrailLoaded(
+          trailPoints: trailPoints,
+          stats: stats,
+          workerId: event.workerId,
+          workerName: event.workerName,
+          selectedDate: startTime,
+        ),
+      );
     } catch (e) {
       debugPrint('WorkerTrackingBloc: Error loading trail: $e');
       emit(WorkerTrackingError(message: e.toString()));
@@ -135,15 +182,28 @@ class WorkerTrackingBloc extends Bloc<WorkerTrackingEvent, WorkerTrackingState> 
   ) async {
     if (_currentWorkerId == null || _currentWorkerName == null) return;
 
-    final startTime = DateTime(event.date.year, event.date.month, event.date.day);
-    final endTime = DateTime(event.date.year, event.date.month, event.date.day, 23, 59, 59);
+    final startTime = DateTime(
+      event.date.year,
+      event.date.month,
+      event.date.day,
+    );
+    final endTime = DateTime(
+      event.date.year,
+      event.date.month,
+      event.date.day,
+      23,
+      59,
+      59,
+    );
 
-    add(WorkerTrackingLoadTrail(
-      workerId: _currentWorkerId!,
-      workerName: _currentWorkerName!,
-      startTime: startTime,
-      endTime: endTime,
-    ));
+    add(
+      WorkerTrackingLoadTrail(
+        workerId: _currentWorkerId!,
+        workerName: _currentWorkerName!,
+        startTime: startTime,
+        endTime: endTime,
+      ),
+    );
   }
 
   Future<void> _onRefreshWorkers(
@@ -170,7 +230,8 @@ class WorkerTrackingBloc extends Bloc<WorkerTrackingEvent, WorkerTrackingState> 
       final workerJsonList = data.cast<Map<String, dynamic>>();
 
       final statsFutures = workerJsonList.map((json) {
-        final workerId = json['worker_id']?.toString() ?? json['id']?.toString() ?? '';
+        final workerId =
+            json['worker_id']?.toString() ?? json['id']?.toString() ?? '';
         return _fetchWorkerStats(workerId, days: 1);
       }).toList();
 
@@ -178,18 +239,22 @@ class WorkerTrackingBloc extends Bloc<WorkerTrackingEvent, WorkerTrackingState> 
 
       final workers = <TrackedWorker>[];
       for (int i = 0; i < workerJsonList.length; i++) {
+        final json = workerJsonList[i];
         final stats = statsResults[i];
-        workers.add(TrackedWorker.fromJson(
-          workerJsonList[i],
+        final worker = TrackedWorker.fromJson(
+          json,
           distanceKm: stats?['total_distance_km']?.toDouble(),
           hours: stats?['total_hours']?.toDouble(),
-        ));
+        );
+        debugPrint(
+          '[WorkerTrackingBloc] Worker: ${worker.name}, lat=${worker.latitude}, lng=${worker.longitude}',
+        );
+        workers.add(worker);
       }
 
-      emit(WorkerTrackingWorkersLoaded(
-        workers: workers,
-        teamId: _currentTeamId!,
-      ));
+      emit(
+        WorkerTrackingWorkersLoaded(workers: workers, teamId: _currentTeamId!),
+      );
     } catch (e) {
       // On error, keep existing state
       debugPrint('WorkerTrackingBloc: Refresh error: $e');
@@ -233,9 +298,7 @@ class WorkerTrackingBloc extends Bloc<WorkerTrackingEvent, WorkerTrackingState> 
       );
 
       if (response.statusCode == 200) {
-        return response.data is Map<String, dynamic>
-            ? response.data
-            : null;
+        return response.data is Map<String, dynamic> ? response.data : null;
       }
     } catch (e) {
       debugPrint('WorkerTrackingBloc: Error fetching stats for $workerId: $e');
