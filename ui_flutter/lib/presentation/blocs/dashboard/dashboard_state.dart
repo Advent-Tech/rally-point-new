@@ -25,7 +25,12 @@ class DashboardLoaded extends DashboardState {
   });
 
   @override
-  List<Object?> get props => [stats, recentActivity, workerPerformance, territoryStats];
+  List<Object?> get props => [
+    stats,
+    recentActivity,
+    workerPerformance,
+    territoryStats,
+  ];
 }
 
 class DashboardError extends DashboardState {
@@ -63,8 +68,11 @@ class TeamDashboardStats extends Equatable {
     return TeamDashboardStats(
       totalMembers: json['total_members'] ?? json['totalMembers'] ?? 0,
       activeWorkers: json['active_workers'] ?? json['activeWorkers'] ?? 0,
-      totalTerritories: json['total_territories'] ?? json['totalTerritories'] ?? 0,
-      completionPercentage: (json['completion_percentage'] ?? json['completionPercentage'] ?? 0.0).toDouble(),
+      totalTerritories:
+          json['total_territories'] ?? json['totalTerritories'] ?? 0,
+      completionPercentage:
+          (json['completion_percentage'] ?? json['completionPercentage'] ?? 0.0)
+              .toDouble(),
       visitsToday: json['visits_today'] ?? json['visitsToday'] ?? 0,
       visitsThisWeek: json['visits_this_week'] ?? json['visitsThisWeek'] ?? 0,
       totalDeliveries: json['total_deliveries'] ?? json['totalDeliveries'] ?? 0,
@@ -74,15 +82,15 @@ class TeamDashboardStats extends Equatable {
 
   @override
   List<Object?> get props => [
-        totalMembers,
-        activeWorkers,
-        totalTerritories,
-        completionPercentage,
-        visitsToday,
-        visitsThisWeek,
-        totalDeliveries,
-        totalDonations,
-      ];
+    totalMembers,
+    activeWorkers,
+    totalTerritories,
+    completionPercentage,
+    visitsToday,
+    visitsThisWeek,
+    totalDeliveries,
+    totalDonations,
+  ];
 }
 
 /// Team activity item model
@@ -115,18 +123,28 @@ class TeamActivity extends Equatable {
     return TeamActivity(
       id: json['id']?.toString() ?? '',
       type: json['type']?.toString() ?? 'activity',
-      workerId: json['worker_id']?.toString() ?? json['workerId']?.toString() ?? '',
-      workerName: json['worker_name']?.toString() ?? json['workerName']?.toString() ?? 'Unknown',
-      workerAvatar: json['worker_avatar']?.toString() ?? json['workerAvatar']?.toString(),
+      workerId:
+          json['worker_id']?.toString() ?? json['workerId']?.toString() ?? '',
+      workerName:
+          json['worker_name']?.toString() ??
+          json['workerName']?.toString() ??
+          'Unknown',
+      workerAvatar:
+          json['worker_avatar']?.toString() ?? json['workerAvatar']?.toString(),
       description: json['description']?.toString() ?? '',
-      territoryName: json['territory_name']?.toString() ?? json['territoryName']?.toString(),
+      territoryName:
+          json['territory_name']?.toString() ??
+          json['territoryName']?.toString(),
       address: json['address']?.toString(),
       timestamp: json['timestamp'] != null
           ? DateTime.tryParse(json['timestamp'].toString()) ?? DateTime.now()
           : (json['created_at'] != null
-              ? DateTime.tryParse(json['created_at'].toString()) ?? DateTime.now()
-              : DateTime.now()),
-      metadata: json['metadata'] is Map ? Map<String, dynamic>.from(json['metadata']) : null,
+                ? DateTime.tryParse(json['created_at'].toString()) ??
+                      DateTime.now()
+                : DateTime.now()),
+      metadata: json['metadata'] is Map
+          ? Map<String, dynamic>.from(json['metadata'])
+          : null,
     );
   }
 
@@ -146,7 +164,14 @@ class TeamActivity extends Equatable {
   }
 
   @override
-  List<Object?> get props => [id, type, workerId, workerName, description, timestamp];
+  List<Object?> get props => [
+    id,
+    type,
+    workerId,
+    workerName,
+    description,
+    timestamp,
+  ];
 }
 
 /// Worker performance statistics
@@ -154,11 +179,11 @@ class WorkerPerformance extends Equatable {
   final String id;
   final String name;
   final String? avatarUrl;
-  final int totalVisits;
-  final int visitsToday;
-  final int visitsThisWeek;
+  final int donationsCount;
+  final double donationsTotal;
+  final int prayersCount;
   final int territoriesAssigned;
-  final double completionRate;
+  final double territoryCoverage;
   final bool isActive;
   final DateTime? lastActive;
 
@@ -166,11 +191,11 @@ class WorkerPerformance extends Equatable {
     required this.id,
     required this.name,
     this.avatarUrl,
-    this.totalVisits = 0,
-    this.visitsToday = 0,
-    this.visitsThisWeek = 0,
+    this.donationsCount = 0,
+    this.donationsTotal = 0.0,
+    this.prayersCount = 0,
     this.territoriesAssigned = 0,
-    this.completionRate = 0.0,
+    this.territoryCoverage = 0.0,
     this.isActive = false,
     this.lastActive,
   });
@@ -178,15 +203,21 @@ class WorkerPerformance extends Equatable {
   factory WorkerPerformance.fromJson(Map<String, dynamic> json) {
     return WorkerPerformance(
       id: json['id']?.toString() ?? json['user_id']?.toString() ?? '',
-      name: json['name']?.toString() ??
-            json['full_name']?.toString() ??
-            '${json['first_name'] ?? ''} ${json['last_name'] ?? ''}'.trim(),
-      avatarUrl: json['avatar_url']?.toString() ?? json['avatarUrl']?.toString(),
-      totalVisits: json['total_visits'] ?? json['totalVisits'] ?? 0,
-      visitsToday: json['visits_today'] ?? json['visitsToday'] ?? 0,
-      visitsThisWeek: json['visits_this_week'] ?? json['visitsThisWeek'] ?? 0,
-      territoriesAssigned: json['territories_assigned'] ?? json['territoriesAssigned'] ?? 0,
-      completionRate: (json['completion_rate'] ?? json['completionRate'] ?? 0.0).toDouble(),
+      name:
+          json['name']?.toString() ??
+          json['full_name']?.toString() ??
+          '${json['first_name'] ?? ''} ${json['last_name'] ?? ''}'.trim(),
+      avatarUrl:
+          json['avatar_url']?.toString() ?? json['avatarUrl']?.toString(),
+      donationsCount: json['donations_count'] ?? json['donationsCount'] ?? 0,
+      donationsTotal: (json['donations_total'] ?? json['donationsTotal'] ?? 0.0)
+          .toDouble(),
+      prayersCount: json['prayers_count'] ?? json['prayersCount'] ?? 0,
+      territoriesAssigned:
+          json['territories_assigned'] ?? json['territoriesAssigned'] ?? 0,
+      territoryCoverage:
+          (json['territory_coverage'] ?? json['territoryCoverage'] ?? 0.0)
+              .toDouble(),
       isActive: json['is_active'] ?? json['isActive'] ?? false,
       lastActive: json['last_active'] != null
           ? DateTime.tryParse(json['last_active'].toString())
@@ -195,7 +226,15 @@ class WorkerPerformance extends Equatable {
   }
 
   @override
-  List<Object?> get props => [id, name, totalVisits, completionRate, isActive];
+  List<Object?> get props => [
+    id,
+    name,
+    donationsCount,
+    donationsTotal,
+    prayersCount,
+    territoryCoverage,
+    isActive,
+  ];
 }
 
 /// Territory statistics with coverage info
@@ -226,8 +265,15 @@ class TerritoryStats extends Equatable {
 
   factory TerritoryStats.fromJson(Map<String, dynamic> json) {
     final housingUnits = json['housing_units'] ?? json['housingUnits'] ?? 0;
-    final visitedCount = json['visited_count'] ?? json['visitedCount'] ?? json['visits_count'] ?? 0;
-    final completionFromApi = json['completeness_percentage'] ?? json['completion_rate'] ?? json['completionRate'];
+    final visitedCount =
+        json['visited_count'] ??
+        json['visitedCount'] ??
+        json['visits_count'] ??
+        0;
+    final completionFromApi =
+        json['completeness_percentage'] ??
+        json['completion_rate'] ??
+        json['completionRate'];
 
     // Calculate completion rate: visited / housing_units or use API value
     double completionRate;
@@ -240,13 +286,25 @@ class TerritoryStats extends Equatable {
     }
 
     return TerritoryStats(
-      id: json['id']?.toString() ?? json['territory_id']?.toString() ?? json['entity_id']?.toString() ?? '',
-      name: json['name']?.toString() ?? json['entity_name']?.toString() ?? json['territory_name']?.toString() ?? 'Unknown',
-      assigneeName: json['assignee_name']?.toString() ?? json['worker_name']?.toString(),
-      assigneeId: json['assignee_id']?.toString() ?? json['worker_id']?.toString(),
+      id:
+          json['id']?.toString() ??
+          json['territory_id']?.toString() ??
+          json['entity_id']?.toString() ??
+          '',
+      name:
+          json['name']?.toString() ??
+          json['entity_name']?.toString() ??
+          json['territory_name']?.toString() ??
+          'Unknown',
+      assigneeName:
+          json['assignee_name']?.toString() ?? json['worker_name']?.toString(),
+      assigneeId:
+          json['assignee_id']?.toString() ?? json['worker_id']?.toString(),
       housingUnits: housingUnits,
       visitedCount: visitedCount,
-      pendingCount: housingUnits > visitedCount ? housingUnits - visitedCount : 0,
+      pendingCount: housingUnits > visitedCount
+          ? housingUnits - visitedCount
+          : 0,
       completionRate: completionRate,
       lastVisited: json['last_visited'] != null
           ? DateTime.tryParse(json['last_visited'].toString())
@@ -262,5 +320,11 @@ class TerritoryStats extends Equatable {
   int get remaining => pendingCount;
 
   @override
-  List<Object?> get props => [id, name, housingUnits, visitedCount, completionRate];
+  List<Object?> get props => [
+    id,
+    name,
+    housingUnits,
+    visitedCount,
+    completionRate,
+  ];
 }

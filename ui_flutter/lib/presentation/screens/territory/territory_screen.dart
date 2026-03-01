@@ -3,10 +3,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:go_router/go_router.dart';
+import 'package:showcaseview/showcaseview.dart';
 import '../../../core/theme/theme.dart';
 import '../../../data/models/territory_model.dart';
+import '../../../services/coach_marks_service.dart';
 import '../../blocs/territory/territory_bloc.dart';
 import '../../blocs/work_session/work_session_bloc.dart';
+import '../../widgets/territory_map_widget.dart';
 import '../../widgets/widgets.dart';
 
 class TerritoryScreen extends StatefulWidget {
@@ -21,6 +24,26 @@ class _TerritoryScreenState extends State<TerritoryScreen> with TickerProviderSt
   final _searchController = TextEditingController();
   bool _isFabExpanded = false;
   Timer? _searchDebounce;
+
+  // Coach mark keys
+  final _showcaseSearch = GlobalKey();
+  final _showcaseFab = GlobalKey();
+  bool _coachMarksChecked = false;
+
+  static const _tooltipTitleStyle = TextStyle(
+    fontSize: 16,
+    fontWeight: FontWeight.w700,
+    color: Color(0xFF1E293B),
+    letterSpacing: -0.2,
+  );
+  static const _tooltipDescStyle = TextStyle(
+    fontSize: 13,
+    fontWeight: FontWeight.w400,
+    color: Color(0xFF64748B),
+    height: 1.4,
+  );
+  static final _tooltipRadius = BorderRadius.circular(14);
+  static const _tooltipPadding = EdgeInsets.symmetric(horizontal: 18, vertical: 16);
 
   @override
   void initState() {
@@ -54,47 +77,83 @@ class _TerritoryScreenState extends State<TerritoryScreen> with TickerProviderSt
     });
   }
 
+  void _maybeShowCoachMarks() {
+    if (_coachMarksChecked) return;
+    _coachMarksChecked = true;
+    CoachMarksService.hasBeenShown('territory').then((shown) {
+      if (!shown && mounted) {
+        Future.delayed(const Duration(milliseconds: 800), () {
+          if (mounted) {
+            ShowcaseView.get().startShowCase([
+              _showcaseSearch,
+              _showcaseFab,
+            ]);
+            CoachMarksService.markAsShown('territory');
+          }
+        });
+      }
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Territory'),
-        bottom: TabBar(
-          controller: _tabController,
-          tabs: const [
-            Tab(text: 'My Areas'),
-            Tab(text: 'Map'),
-          ],
-        ),
-        actions: const [],
-      ),
-      body: Column(
-        children: [
-          // Search Bar
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: CustomSearchField(
-              controller: _searchController,
-              hint: 'Search territories...',
-              onChanged: _onSearchChanged,
-            ),
-          ),
-          // Tab Content - disable swipe to allow map panning
-          Expanded(
-            child: TabBarView(
+    // ignore: deprecated_member_use
+    return ShowCaseWidget(
+      onFinish: () {},
+      enableAutoScroll: true,
+      builder: (_) {
+        _maybeShowCoachMarks();
+        return Scaffold(
+          appBar: AppBar(
+            title: const Text('Territory'),
+            bottom: TabBar(
               controller: _tabController,
-              physics: const NeverScrollableScrollPhysics(),
-              children: [
-                _MyAreasTab(isDark: isDark, tabController: _tabController),
-                _MapTab(isDark: isDark, tabController: _tabController),
+              tabs: const [
+                Tab(text: 'My Areas'),
+                Tab(text: 'Map'),
               ],
             ),
+            actions: const [RoleBadge()],
           ),
-        ],
-      ),
-      floatingActionButton: _buildCommunicationFab(context, isDark),
+          body: Column(
+            children: [
+              // Search Bar
+              Showcase(
+                key: _showcaseSearch,
+                title: 'Search Territories',
+                description: 'Find territories by name or location. Results will appear on the map.',
+                titleTextStyle: _tooltipTitleStyle,
+                descTextStyle: _tooltipDescStyle,
+                tooltipBorderRadius: _tooltipRadius,
+                tooltipPadding: _tooltipPadding,
+                targetBorderRadius: BorderRadius.circular(12),
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: CustomSearchField(
+                    controller: _searchController,
+                    hint: 'Search territories...',
+                    onChanged: _onSearchChanged,
+                  ),
+                ),
+              ),
+              // Tab Content - disable swipe to allow map panning
+              Expanded(
+                child: TabBarView(
+                  controller: _tabController,
+                  physics: const NeverScrollableScrollPhysics(),
+                  children: [
+                    _MyAreasTab(isDark: isDark, tabController: _tabController),
+                    _MapTab(isDark: isDark, tabController: _tabController),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          floatingActionButton: _buildCommunicationFab(context, isDark),
+        );
+      },
     );
   }
 
@@ -131,16 +190,26 @@ class _TerritoryScreenState extends State<TerritoryScreen> with TickerProviderSt
             const SizedBox(height: 12),
           ],
           // Main FAB
-          FloatingActionButton(
-            heroTag: 'territory_fab',
-            onPressed: () => setState(() => _isFabExpanded = !_isFabExpanded),
-            backgroundColor: _isFabExpanded ? Colors.grey : AppColors.primary,
-            child: AnimatedRotation(
-              duration: const Duration(milliseconds: 200),
-              turns: _isFabExpanded ? 0.125 : 0,
-              child: Icon(
-                _isFabExpanded ? Icons.close : Icons.forum,
-                color: Colors.white,
+          Showcase(
+            key: _showcaseFab,
+            title: 'Team Communication',
+            description: 'Tap to access Chat or Walkie-Talkie to communicate with your team in the field.',
+            titleTextStyle: _tooltipTitleStyle,
+            descTextStyle: _tooltipDescStyle,
+            tooltipBorderRadius: _tooltipRadius,
+            tooltipPadding: _tooltipPadding,
+            targetBorderRadius: BorderRadius.circular(28),
+            child: FloatingActionButton(
+              heroTag: 'territory_fab',
+              onPressed: () => setState(() => _isFabExpanded = !_isFabExpanded),
+              backgroundColor: _isFabExpanded ? Colors.grey : AppColors.primary,
+              child: AnimatedRotation(
+                duration: const Duration(milliseconds: 200),
+                turns: _isFabExpanded ? 0.125 : 0,
+                child: Icon(
+                  _isFabExpanded ? Icons.close : Icons.forum,
+                  color: Colors.white,
+                ),
               ),
             ),
           ),
@@ -217,7 +286,9 @@ class _MyAreasTabState extends State<_MyAreasTab> {
               itemCount: state.assignments.length,
               itemBuilder: (context, index) {
                 final assignment = state.assignments[index];
-                return _AssignmentCard(
+                return StaggeredFadeIn(
+                  index: index,
+                  child: _AssignmentCard(
                   name: assignment.entityName ?? 'Territory ${index + 1}',
                   location: '${assignment.city ?? ''}, ${assignment.state ?? ''}'.trim(),
                   households: assignment.housingUnits ?? 0,
@@ -240,6 +311,7 @@ class _MyAreasTabState extends State<_MyAreasTab> {
                     );
                     _showTerritoryDetailSheet(context, geoTerritory);
                   },
+                ),
                 );
               },
             ),
@@ -421,16 +493,30 @@ class _MapTabState extends State<_MapTab> {
   final List<VisitMarker> _visitMarkers = [];
   double? _userLatitude;
   double? _userLongitude;
+  bool _showTapHint = false;
 
   @override
   void initState() {
     super.initState();
     widget.tabController.addListener(_onTabChange);
     _getUserLocation();
+    _checkTapHint();
     // Load data immediately on init to prevent blank map on first load
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
         _loadMapData();
+      }
+    });
+  }
+
+  void _checkTapHint() {
+    CoachMarksService.hasBeenShown('territory_map_hint').then((shown) {
+      if (!shown && mounted) {
+        setState(() => _showTapHint = true);
+        CoachMarksService.markAsShown('territory_map_hint');
+        Future.delayed(const Duration(seconds: 3), () {
+          if (mounted) setState(() => _showTapHint = false);
+        });
       }
     });
   }
@@ -576,7 +662,7 @@ class _MapTabState extends State<_MapTab> {
           fitToTerritories: true,
           userLatitude: _userLatitude,
           userLongitude: _userLongitude,
-          dotOnly: true, // Show territories as dots only
+          dotOnly: true,
         ),
         // Territory count badge
         Positioned(
@@ -627,38 +713,120 @@ class _MapTabState extends State<_MapTab> {
             ),
           ),
         ),
-        // Visit outcome legend
-        const Positioned(
-          left: 16,
-          bottom: 56,
-          child: _VisitLegend(),
-        ),
-        // Tap hint
+        // Visit outcome legend (always visible)
         Positioned(
-          left: AppSpacing.md,
-          bottom: AppSpacing.md,
+          left: 16,
+          bottom: 16,
           child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.smd, vertical: AppSpacing.sm),
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
             decoration: BoxDecoration(
-              color: Colors.black.withValues(alpha: 0.7),
-              borderRadius: AppSpacing.borderRadiusFull,
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(10),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withAlpha(30),
+                  blurRadius: 6,
+                  offset: const Offset(0, 2),
+                ),
+              ],
             ),
-            child: const Row(
+            child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(Icons.touch_app, size: 14, color: Colors.white),
-                SizedBox(width: 6),
-                Text(
-                  'Tap a dot to view territory',
-                  style: TextStyle(
-                    fontSize: 11,
-                    color: Colors.white,
-                  ),
-                ),
+                _legendDot(AppColors.warning, 'Not Home'),
+                const SizedBox(width: 10),
+                _legendDot(AppColors.success, 'Interested'),
+                const SizedBox(width: 10),
+                _legendDot(AppColors.error, 'Declined'),
+                const SizedBox(width: 10),
+                _legendDot(AppColors.info, 'Callback'),
               ],
             ),
           ),
         ),
+        // My Location button
+        if (_userLatitude != null && _userLongitude != null)
+          Positioned(
+            right: 16,
+            bottom: 56,
+            child: GestureDetector(
+              onTap: () {
+                // The map widget handles centering via userLatitude/userLongitude
+                // Force a rebuild to recenter
+                setState(() {});
+              },
+              child: Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  shape: BoxShape.circle,
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withAlpha(30),
+                      blurRadius: 6,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: const Icon(
+                  Icons.my_location,
+                  color: AppColors.primary,
+                  size: 22,
+                ),
+              ),
+            ),
+          ),
+        // Auto-dismiss tap hint (first visit only)
+        if (_showTapHint)
+          Positioned(
+            left: 0,
+            right: 0,
+            top: 60,
+            child: Center(
+              child: AnimatedOpacity(
+                opacity: _showTapHint ? 1.0 : 0.0,
+                duration: const Duration(milliseconds: 300),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: Colors.black.withValues(alpha: 0.75),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.touch_app, size: 18, color: Colors.white),
+                      SizedBox(width: 8),
+                      Text(
+                        'Tap a territory to see details',
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: Colors.white,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+
+  Widget _legendDot(Color color, String label) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 8,
+          height: 8,
+          decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+        ),
+        const SizedBox(width: 4),
+        Text(label, style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w500)),
       ],
     );
   }
@@ -832,33 +1000,44 @@ class _MapTabState extends State<_MapTab> {
     );
   }
 
-  /// Opens a bottom sheet showing the territory detail map with polygon fencing
+  /// Opens a bottom sheet showing territory details; main map handles the polygon
   void _showTerritoryDetailMap(BuildContext context, GeoTerritory territory) {
-    _showTerritoryDetailSheet(context, territory);
+    _showTerritoryDetailSheet(context, territory, onDismiss: () {
+      setState(() => _selectedTerritory = null);
+    });
   }
 }
 
 /// Shared bottom sheet for territory detail - used by both list and map tabs
-void _showTerritoryDetailSheet(BuildContext context, GeoTerritory territory) {
+void _showTerritoryDetailSheet(BuildContext context, GeoTerritory territory, {VoidCallback? onDismiss}) {
   final workSessionBloc = WorkSessionBloc();
 
   showModalBottomSheet(
     context: context,
     isScrollControlled: true,
+    backgroundColor: Colors.transparent,
+    barrierColor: Colors.transparent,
     shape: const RoundedRectangleBorder(
       borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
     ),
     builder: (sheetContext) => BlocProvider.value(
       value: workSessionBloc,
       child: DraggableScrollableSheet(
-        initialChildSize: 0.75,
-        minChildSize: 0.5,
-        maxChildSize: 0.95,
+        initialChildSize: 0.32,
+        minChildSize: 0.2,
+        maxChildSize: 0.5,
         expand: false,
-        builder: (context, scrollController) => SingleChildScrollView(
+        builder: (context, scrollController) => Container(
+          decoration: BoxDecoration(
+            color: Theme.of(context).brightness == Brightness.dark
+                ? AppColors.backgroundDark.withValues(alpha: 0.92)
+                : Colors.white.withValues(alpha: 0.92),
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+          ),
+          child: SingleChildScrollView(
           controller: scrollController,
           child: Padding(
-            padding: const EdgeInsets.only(left: 24, right: 24, top: 16, bottom: 40),
+            padding: const EdgeInsets.only(left: 20, right: 20, top: 10, bottom: 24),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -866,7 +1045,7 @@ void _showTerritoryDetailSheet(BuildContext context, GeoTerritory territory) {
                 // Drag handle
                 Center(
                   child: Container(
-                    width: 40,
+                    width: 36,
                     height: 4,
                     decoration: BoxDecoration(
                       color: Colors.grey[300],
@@ -874,20 +1053,20 @@ void _showTerritoryDetailSheet(BuildContext context, GeoTerritory territory) {
                     ),
                   ),
                 ),
-                const SizedBox(height: 16),
-                // Header
+                const SizedBox(height: 12),
+                // Header row with name, ID, and close button
                 Row(
                   children: [
                     Container(
-                      width: AppSpacing.avatarLg,
-                      height: AppSpacing.avatarLg,
+                      width: 40,
+                      height: 40,
                       decoration: BoxDecoration(
                         color: AppColors.primary.withValues(alpha: 0.12),
-                        borderRadius: AppSpacing.borderRadiusMd,
+                        borderRadius: BorderRadius.circular(10),
                       ),
-                      child: const Icon(Icons.location_on, color: AppColors.primary),
+                      child: const Icon(Icons.location_on, color: AppColors.primary, size: 22),
                     ),
-                    const SizedBox(width: AppSpacing.smd),
+                    const SizedBox(width: 12),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -907,228 +1086,124 @@ void _showTerritoryDetailSheet(BuildContext context, GeoTerritory territory) {
                         ],
                       ),
                     ),
-                    IconButton(
-                      icon: const Icon(Icons.close),
-                      onPressed: () => Navigator.pop(sheetContext),
+                    SizedBox(
+                      width: 32,
+                      height: 32,
+                      child: IconButton(
+                        padding: EdgeInsets.zero,
+                        iconSize: 20,
+                        icon: const Icon(Icons.close),
+                        onPressed: () => Navigator.pop(sheetContext),
+                      ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 16),
-                // Territory fencing map
-                if (territory.geometry != null)
-                  TerritoryDetailMapWidget(
-                    territory: territory,
-                    height: 300,
-                  ),
-                const SizedBox(height: 16),
-                // Territory details
-                _DetailRow(
-                  icon: Icons.location_city,
-                  label: 'Location',
-                  value: territory.displayLocation.isNotEmpty
-                      ? territory.displayLocation
-                      : 'Not specified',
-                ),
-                if (territory.unionName != null)
-                  _DetailRow(
-                    icon: Icons.account_balance,
-                    label: 'Union',
-                    value: territory.unionName!,
-                  ),
-                if (territory.housingUnits != null)
-                  _DetailRow(
-                    icon: Icons.home,
-                    label: 'Housing Units',
-                    value: '${territory.housingUnits}',
-                  ),
-                if (territory.population != null)
-                  _DetailRow(
-                    icon: Icons.people,
-                    label: 'Population',
-                    value: '${territory.population}',
-                  ),
-                const SizedBox(height: 16),
-                // Assigned status
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(AppSpacing.smd),
-                  decoration: BoxDecoration(
-                    color: AppColors.success.withValues(alpha: 0.1),
-                    borderRadius: AppSpacing.borderRadiusMd,
-                    border: Border.all(color: AppColors.success.withValues(alpha: 0.3)),
-                  ),
-                  child: const Row(
-                    children: [
-                      Icon(Icons.check_circle, color: AppColors.success, size: 20),
-                      SizedBox(width: 8),
-                      Text(
-                        'Assigned to you',
-                        style: TextStyle(
-                          color: AppColors.success,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ],
-                  ),
+                const SizedBox(height: 12),
+                // Compact detail chips
+                Wrap(
+                  spacing: 12,
+                  runSpacing: 8,
+                  children: [
+                    if (territory.displayLocation.isNotEmpty)
+                      _InfoChip(icon: Icons.location_city, text: territory.displayLocation),
+                    if (territory.unionName != null)
+                      _InfoChip(icon: Icons.account_balance, text: territory.unionName!),
+                    if (territory.housingUnits != null)
+                      _InfoChip(icon: Icons.home, text: '${territory.housingUnits} units'),
+                    if (territory.population != null)
+                      _InfoChip(icon: Icons.people, text: '${territory.population} pop'),
+                  ],
                 ),
                 const SizedBox(height: 12),
-                // Start Working button
-                BlocConsumer<WorkSessionBloc, WorkSessionState>(
-                  listener: (context, state) {
-                    if (state is WorkSessionActive) {
-                      Navigator.pop(sheetContext);
-                      AppSnackbar.success(context, message: 'Started working in ${territory.entityName}');
-                    } else if (state is WorkSessionError) {
-                      AppSnackbar.error(context, message: state.message);
-                    }
-                  },
-                  builder: (context, state) {
-                    final isLoading = state is WorkSessionLoading;
-                    return SizedBox(
-                      width: double.infinity,
-                      child: CustomButton(
-                        text: isLoading ? 'Starting...' : 'Start Working',
-                        icon: Icons.play_arrow,
-                        isLoading: isLoading,
-                        onPressed: isLoading
-                            ? null
-                            : () {
-                                context.read<WorkSessionBloc>().add(
-                                  WorkSessionCheckIn(
-                                    territoryId: territory.id,
-                                    territoryName: territory.entityName,
-                                  ),
-                                );
-                              },
+                // Assigned badge + Start Working button in a row
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: AppColors.success.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: AppColors.success.withValues(alpha: 0.3)),
                       ),
-                    );
-                  },
+                      child: const Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.check_circle, color: AppColors.success, size: 16),
+                          SizedBox(width: 4),
+                          Text(
+                            'Assigned',
+                            style: TextStyle(
+                              color: AppColors.success,
+                              fontWeight: FontWeight.w600,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: BlocConsumer<WorkSessionBloc, WorkSessionState>(
+                        listener: (context, state) {
+                          if (state is WorkSessionActive) {
+                            Navigator.pop(sheetContext);
+                            AppSnackbar.success(context, message: 'Started working in ${territory.entityName}');
+                          } else if (state is WorkSessionError) {
+                            AppSnackbar.error(context, message: state.message);
+                          }
+                        },
+                        builder: (context, state) {
+                          final isLoading = state is WorkSessionLoading;
+                          return CustomButton(
+                            text: isLoading ? 'Starting...' : 'Start Working',
+                            icon: Icons.play_arrow,
+                            isLoading: isLoading,
+                            onPressed: isLoading
+                                ? null
+                                : () {
+                                    context.read<WorkSessionBloc>().add(
+                                      WorkSessionCheckIn(
+                                        territoryId: territory.id,
+                                        territoryName: territory.entityName,
+                                      ),
+                                    );
+                                  },
+                          );
+                        },
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
           ),
         ),
+        ),
       ),
     ),
   ).whenComplete(() {
     workSessionBloc.close();
+    onDismiss?.call();
   });
 }
 
-class _DetailRow extends StatelessWidget {
+class _InfoChip extends StatelessWidget {
   final IconData icon;
-  final String label;
-  final String value;
+  final String text;
 
-  const _DetailRow({
-    required this.icon,
-    required this.label,
-    required this.value,
-  });
+  const _InfoChip({required this.icon, required this.text});
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
-      child: Row(
-        children: [
-          Icon(icon, size: 18, color: AppColors.textSecondaryLight),
-          const SizedBox(width: 12),
-          Text(
-            '$label: ',
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-              color: AppColors.textSecondaryLight,
-            ),
-          ),
-          Text(
-            value,
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _VisitLegend extends StatefulWidget {
-  const _VisitLegend();
-
-  @override
-  State<_VisitLegend> createState() => _VisitLegendState();
-}
-
-class _VisitLegendState extends State<_VisitLegend> {
-  bool _expanded = false;
-
-  @override
-  Widget build(BuildContext context) {
-    if (!_expanded) {
-      return GestureDetector(
-        onTap: () => setState(() => _expanded = true),
-        child: Container(
-          width: 36,
-          height: 36,
-          decoration: BoxDecoration(
-            color: Colors.white,
-            shape: BoxShape.circle,
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withAlpha(40),
-                blurRadius: 4,
-                offset: const Offset(0, 2),
-              ),
-            ],
-          ),
-          child: const Icon(Icons.info_outline, size: 20, color: AppColors.textSecondaryLight),
-        ),
-      );
-    }
-
-    return GestureDetector(
-      onTap: () => setState(() => _expanded = false),
-      child: Container(
-        padding: const EdgeInsets.all(10),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(10),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withAlpha(40),
-              blurRadius: 6,
-              offset: const Offset(0, 2),
-            ),
-          ],
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            _legendDot(AppColors.warning, 'Not Home'),
-            const SizedBox(height: 6),
-            _legendDot(AppColors.success, 'Interested'),
-            const SizedBox(height: 6),
-            _legendDot(AppColors.error, 'Not Interested'),
-            const SizedBox(height: 6),
-            _legendDot(AppColors.info, 'Callback'),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _legendDot(Color color, String label) {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Container(
-          width: 10,
-          height: 10,
-          decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+        Icon(icon, size: 14, color: AppColors.textSecondaryLight),
+        const SizedBox(width: 4),
+        Text(
+          text,
+          style: const TextStyle(fontSize: 12, color: AppColors.textSecondaryLight, fontWeight: FontWeight.w500),
         ),
-        const SizedBox(width: 6),
-        Text(label, style: const TextStyle(fontSize: 11)),
       ],
     );
   }

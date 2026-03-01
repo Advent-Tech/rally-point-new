@@ -42,7 +42,13 @@ class WorkerTrackingTrailLoaded extends WorkerTrackingState {
   });
 
   @override
-  List<Object?> get props => [trailPoints, stats, workerId, workerName, selectedDate];
+  List<Object?> get props => [
+    trailPoints,
+    stats,
+    workerId,
+    workerName,
+    selectedDate,
+  ];
 }
 
 class WorkerTrackingError extends WorkerTrackingState {
@@ -79,12 +85,21 @@ class TrackedWorker {
     this.todayHours,
   });
 
-  factory TrackedWorker.fromJson(Map<String, dynamic> json, {double? distanceKm, double? hours}) {
+  factory TrackedWorker.fromJson(
+    Map<String, dynamic> json, {
+    double? distanceKm,
+    double? hours,
+  }) {
     return TrackedWorker(
       id: json['worker_id']?.toString() ?? json['id']?.toString() ?? '',
       name: json['worker_name'] ?? json['name'] ?? 'Unknown',
       status: json['status'] ?? 'working',
-      territoryName: json['territory_name'] ?? 'Unknown Territory',
+      // API returns entity_name, also try city + state for full territory info
+      territoryName:
+          json['entity_name'] ??
+          (json['city'] != null && json['state'] != null
+              ? '${json['city']}, ${json['state']}'
+              : json['territory_name'] ?? 'Unknown Territory'),
       latitude: (json['latitude'] ?? json['entry_lat'] ?? 0.0).toDouble(),
       longitude: (json['longitude'] ?? json['entry_lng'] ?? 0.0).toDouble(),
       lastUpdate: json['last_update'] != null
@@ -120,10 +135,13 @@ class TrailPoint {
       trackedAt: json['tracked_at'] != null
           ? DateTime.tryParse(json['tracked_at'].toString()) ?? DateTime.now()
           : json['timestamp'] != null
-              ? DateTime.fromMillisecondsSinceEpoch(
-                  (json['timestamp'] is int ? json['timestamp'] : (json['timestamp'] as num).toInt()) * 1000,
-                )
-              : DateTime.now(),
+          ? DateTime.fromMillisecondsSinceEpoch(
+              (json['timestamp'] is int
+                      ? json['timestamp']
+                      : (json['timestamp'] as num).toInt()) *
+                  1000,
+            )
+          : DateTime.now(),
       speed: (json['speed'] as num?)?.toDouble(),
       accuracy: (json['accuracy'] as num?)?.toDouble(),
       sessionId: json['session_id']?.toString(),

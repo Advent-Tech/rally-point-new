@@ -9,6 +9,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../data/models/chat_model.dart';
 import '../../blocs/auth/auth_bloc.dart';
 import '../../blocs/chat/chat_bloc.dart';
+import '../../widgets/role_badge.dart';
 
 class ConversationsScreen extends StatefulWidget {
   const ConversationsScreen({super.key});
@@ -59,6 +60,7 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
         appBar: AppBar(
           title: const Text('Messages'),
           actions: [
+            const RoleBadge(),
             IconButton(
               icon: const Icon(Icons.group_add),
               onPressed: () => _showNewChatDialog(context),

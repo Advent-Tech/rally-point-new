@@ -6,6 +6,8 @@ import '../../../data/models/survey_model.dart';
 import '../../blocs/auth/auth_bloc.dart';
 import '../../blocs/survey/survey_bloc.dart';
 import '../../widgets/custom_button.dart';
+import '../../widgets/role_badge.dart';
+import '../../widgets/states/empty_state.dart';
 import 'survey_form_screen.dart';
 // NOTE: Survey creation is now admin-only (via admin panel)
 // Team leaders can only view surveys and see responses, not create them
@@ -164,6 +166,7 @@ class _SurveyScreenState extends State<SurveyScreen> with SingleTickerProviderSt
                 ],
               ),
         actions: [
+          const RoleBadge(),
           IconButton(
             icon: const Icon(Icons.refresh),
             onPressed: _loadSurveys,
@@ -238,43 +241,10 @@ class _AvailableSurveysTab extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (surveys.isEmpty) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(32),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Container(
-                width: 80,
-                height: 80,
-                decoration: BoxDecoration(
-                  color: AppColors.primary.withAlpha(30),
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(
-                  Icons.assignment_outlined,
-                  size: 40,
-                  color: AppColors.primary,
-                ),
-              ),
-              const SizedBox(height: 24),
-              Text(
-                'No Surveys Available',
-                style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'Check back later for new surveys',
-                textAlign: TextAlign.center,
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
-                ),
-              ),
-            ],
-          ),
-        ),
+      return const EmptyState(
+        icon: Icons.assignment_outlined,
+        title: 'No Surveys Available',
+        description: 'Your team leader will create surveys for you to complete. Check back later.',
       );
     }
 
@@ -499,43 +469,12 @@ class _MyResponsesTab extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (responses.isEmpty) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(32),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Container(
-                width: 80,
-                height: 80,
-                decoration: BoxDecoration(
-                  color: AppColors.warning.withAlpha(30),
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(
-                  Icons.assignment_outlined,
-                  size: 40,
-                  color: AppColors.warning,
-                ),
-              ),
-              const SizedBox(height: 24),
-              Text(
-                'No Responses Yet',
-                style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'Complete a survey to see your responses here',
-                textAlign: TextAlign.center,
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
-                ),
-              ),
-            ],
-          ),
-        ),
+      return const EmptyState(
+        icon: Icons.assignment_turned_in_outlined,
+        title: 'No Responses Yet',
+        description: 'Complete a survey to see your responses here.',
+        iconColor: AppColors.warning,
+        secondaryColor: AppColors.warning,
       );
     }
 

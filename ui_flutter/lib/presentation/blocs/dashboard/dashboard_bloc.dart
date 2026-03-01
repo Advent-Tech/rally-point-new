@@ -42,6 +42,7 @@ class DashboardBloc extends Bloc<DashboardEvent, DashboardState> {
         _fetchTeamAssignments(event.teamId),
         _fetchDeliveries(event.teamId),
         _fetchDonations(event.teamId),
+        _fetchPrayerRequests(event.teamId),
       ]);
 
       final members = results[0] as List<dynamic>;
@@ -49,6 +50,7 @@ class DashboardBloc extends Bloc<DashboardEvent, DashboardState> {
       final assignments = results[2] as List<dynamic>;
       final deliveries = results[3] as List<dynamic>;
       final donations = results[4] as List<dynamic>;
+      final prayers = results[5] as List<dynamic>;
 
       // Calculate completion percentage based on deliveries vs total housing units
       // This is more accurate than using completeness_percentage from API which may not update with deliveries
@@ -60,7 +62,8 @@ class DashboardBloc extends Bloc<DashboardEvent, DashboardState> {
       for (var delivery in deliveries) {
         final territoryId = delivery['territory_id']?.toString();
         if (territoryId != null && territoryId.isNotEmpty) {
-          deliveryCountByTerritory[territoryId] = (deliveryCountByTerritory[territoryId] ?? 0) + 1;
+          deliveryCountByTerritory[territoryId] =
+              (deliveryCountByTerritory[territoryId] ?? 0) + 1;
         }
       }
 
@@ -74,23 +77,39 @@ class DashboardBloc extends Bloc<DashboardEvent, DashboardState> {
         final territoryId = assignment['territory_id']?.toString();
         totalHousingUnits += housingUnits;
         if (territoryId != null) {
-          totalDeliveriesInTerritories += deliveryCountByTerritory[territoryId] ?? 0;
+          totalDeliveriesInTerritories +=
+              deliveryCountByTerritory[territoryId] ?? 0;
         }
       }
 
       // Calculate completion as percentage of housing units covered by deliveries
       final avgCompletion = totalHousingUnits > 0
-          ? (totalDeliveriesInTerritories / totalHousingUnits * 100).clamp(0.0, 100.0)
+          ? (totalDeliveriesInTerritories / totalHousingUnits * 100).clamp(
+              0.0,
+              100.0,
+            )
           : 0.0;
 
       // Debug logging
-      print('DashboardBloc: Deliveries: ${deliveries.length}, Housing Units: $totalHousingUnits, Deliveries in territories: $totalDeliveriesInTerritories, Completion: $avgCompletion%');
+      print(
+        'DashboardBloc: Deliveries: ${deliveries.length}, Housing Units: $totalHousingUnits, Deliveries in territories: $totalDeliveriesInTerritories, Completion: $avgCompletion%',
+      );
 
       // Build activities from deliveries and donations (these are the actual "visits")
-      final activities = _buildActivitiesFromDeliveriesAndDonations(deliveries, donations);
+      final activities = _buildActivitiesFromDeliveriesAndDonations(
+        deliveries,
+        donations,
+      );
 
       // Build worker performance from deliveries and assignments
-      final workerPerformance = _buildWorkerPerformanceFromDeliveries(deliveries, members, activeWorkers, assignments);
+      final workerPerformance = _buildWorkerPerformance(
+        deliveries,
+        donations,
+        prayers,
+        members,
+        activeWorkers,
+        assignments,
+      );
 
       final stats = TeamDashboardStats(
         totalMembers: members.length,
@@ -104,14 +123,21 @@ class DashboardBloc extends Bloc<DashboardEvent, DashboardState> {
       );
 
       // Build territory stats from assignments with delivery counts
-      final territoryStats = _buildTerritoryStats(assignments, members, deliveries, donations);
+      final territoryStats = _buildTerritoryStats(
+        assignments,
+        members,
+        deliveries,
+        donations,
+      );
 
-      emit(DashboardLoaded(
-        stats: stats,
-        recentActivity: activities,
-        workerPerformance: workerPerformance,
-        territoryStats: territoryStats,
-      ));
+      emit(
+        DashboardLoaded(
+          stats: stats,
+          recentActivity: activities,
+          workerPerformance: workerPerformance,
+          territoryStats: territoryStats,
+        ),
+      );
     } catch (e) {
       emit(DashboardError(message: e.toString()));
     }
@@ -190,6 +216,20 @@ class DashboardBloc extends Bloc<DashboardEvent, DashboardState> {
     return [];
   }
 
+  Future<List<dynamic>> _fetchPrayerRequests(String teamId) async {
+    try {
+      final response = await _api.get('/api/prayer-requests/team/$teamId');
+      if (response.statusCode == 200) {
+        return response.data is List
+            ? response.data
+            : (response.data['prayer_requests'] ??
+                  response.data['items'] ??
+                  []);
+      }
+    } catch (_) {}
+    return [];
+  }
+
   List<TeamActivity> _buildActivitiesFromDeliveriesAndDonations(
     List<dynamic> deliveries,
     List<dynamic> donations,
@@ -198,36 +238,49 @@ class DashboardBloc extends Bloc<DashboardEvent, DashboardState> {
 
     // Add delivery activities
     for (var delivery in deliveries) {
-      activities.add(TeamActivity(
-        id: delivery['id']?.toString() ?? '',
-        type: 'delivery',
-        workerId: delivery['worker_id']?.toString() ?? '',
-        workerName: delivery['worker_name']?.toString() ?? 'Worker',
-        description: 'Delivered to ${delivery['recipient_name'] ?? 'recipient'}',
-        territoryName: delivery['address']?.toString(),
-        address: delivery['address']?.toString(),
-        timestamp: delivery['created_at'] != null
-            ? DateTime.tryParse(delivery['created_at'].toString()) ?? DateTime.now()
-            : DateTime.now(),
-        metadata: {'status': delivery['status'], 'type': 'delivery'},
-      ));
+      activities.add(
+        TeamActivity(
+          id: delivery['id']?.toString() ?? '',
+          type: 'delivery',
+          workerId: delivery['worker_id']?.toString() ?? '',
+          workerName: delivery['worker_name']?.toString() ?? 'Worker',
+          description:
+              'Delivered to ${delivery['recipient_name'] ?? 'recipient'}',
+          territoryName: delivery['address']?.toString(),
+          address: delivery['address']?.toString(),
+          timestamp: delivery['created_at'] != null
+              ? DateTime.tryParse(delivery['created_at'].toString()) ??
+                    DateTime.now()
+              : DateTime.now(),
+          metadata: {'status': delivery['status'], 'type': 'delivery'},
+        ),
+      );
     }
 
     // Add donation activities
     for (var donation in donations) {
-      activities.add(TeamActivity(
-        id: donation['id']?.toString() ?? '',
-        type: 'donation',
-        workerId: donation['worker_id']?.toString() ?? donation['collected_by_id']?.toString() ?? '',
-        workerName: donation['worker_name']?.toString() ?? donation['collected_by_name']?.toString() ?? 'Worker',
-        description: 'Collected donation: \$${donation['amount'] ?? 0}',
-        territoryName: donation['location']?.toString(),
-        address: donation['location']?.toString(),
-        timestamp: donation['created_at'] != null
-            ? DateTime.tryParse(donation['created_at'].toString()) ?? DateTime.now()
-            : DateTime.now(),
-        metadata: {'amount': donation['amount'], 'type': 'donation'},
-      ));
+      activities.add(
+        TeamActivity(
+          id: donation['id']?.toString() ?? '',
+          type: 'donation',
+          workerId:
+              donation['worker_id']?.toString() ??
+              donation['collected_by_id']?.toString() ??
+              '',
+          workerName:
+              donation['worker_name']?.toString() ??
+              donation['collected_by_name']?.toString() ??
+              'Worker',
+          description: 'Collected donation: \$${donation['amount'] ?? 0}',
+          territoryName: donation['location']?.toString(),
+          address: donation['location']?.toString(),
+          timestamp: donation['created_at'] != null
+              ? DateTime.tryParse(donation['created_at'].toString()) ??
+                    DateTime.now()
+              : DateTime.now(),
+          metadata: {'amount': donation['amount'], 'type': 'donation'},
+        ),
+      );
     }
 
     // Sort by timestamp descending
@@ -268,7 +321,11 @@ class DashboardBloc extends Bloc<DashboardEvent, DashboardState> {
 
   int _countVisitsThisWeek(List<dynamic> deliveries, List<dynamic> donations) {
     final now = DateTime.now();
-    final weekStart = DateTime(now.year, now.month, now.day).subtract(Duration(days: now.weekday - 1));
+    final weekStart = DateTime(
+      now.year,
+      now.month,
+      now.day,
+    ).subtract(Duration(days: now.weekday - 1));
     int count = 0;
 
     for (var delivery in deliveries) {
@@ -292,15 +349,15 @@ class DashboardBloc extends Bloc<DashboardEvent, DashboardState> {
     return count;
   }
 
-  List<WorkerPerformance> _buildWorkerPerformanceFromDeliveries(
+  List<WorkerPerformance> _buildWorkerPerformance(
     List<dynamic> deliveries,
+    List<dynamic> donations,
+    List<dynamic> prayers,
     List<dynamic> members,
     List<dynamic> activeWorkers,
     List<dynamic> assignments,
   ) {
     final performanceList = <WorkerPerformance>[];
-    final workerDeliveryCount = <String, int>{};
-    final workerTerritoryCount = <String, int>{};
     final activeWorkerIds = <String>{};
 
     // Count active workers
@@ -309,52 +366,97 @@ class DashboardBloc extends Bloc<DashboardEvent, DashboardState> {
       if (id != null) activeWorkerIds.add(id);
     }
 
-    // Count deliveries per worker
-    for (var delivery in deliveries) {
-      final workerId = delivery['worker_id']?.toString();
+    // Count donations per worker
+    final workerDonationsCount = <String, int>{};
+    final workerDonationsTotal = <String, double>{};
+    for (var donation in donations) {
+      final workerId =
+          donation['worker_id']?.toString() ??
+          donation['collected_by_id']?.toString();
       if (workerId != null) {
-        workerDeliveryCount[workerId] = (workerDeliveryCount[workerId] ?? 0) + 1;
+        workerDonationsCount[workerId] =
+            (workerDonationsCount[workerId] ?? 0) + 1;
+        final amount = (donation['amount'] ?? 0).toDouble();
+        workerDonationsTotal[workerId] =
+            (workerDonationsTotal[workerId] ?? 0) + amount;
       }
     }
 
-    // Count territory assignments per worker
-    for (var assignment in assignments) {
-      final workerId = assignment['assigned_worker_id']?.toString() ?? assignment['worker_id']?.toString();
+    // Count prayers per worker
+    final workerPrayersCount = <String, int>{};
+    for (var prayer in prayers) {
+      final workerId = prayer['worker_id']?.toString();
       if (workerId != null) {
-        workerTerritoryCount[workerId] = (workerTerritoryCount[workerId] ?? 0) + 1;
+        workerPrayersCount[workerId] = (workerPrayersCount[workerId] ?? 0) + 1;
+      }
+    }
+
+    // Group assignments by worker and calculate weighted coverage
+    final workerAssignments = <String, List<Map<String, dynamic>>>{};
+    for (var assignment in assignments) {
+      final workerId =
+          assignment['assigned_worker_id']?.toString() ??
+          assignment['worker_id']?.toString();
+      if (workerId != null) {
+        workerAssignments.putIfAbsent(workerId, () => []).add(assignment);
       }
     }
 
     // Build performance list from members
     for (var member in members) {
-      final id = member['id']?.toString() ?? member['user_id']?.toString() ?? '';
+      final id =
+          member['id']?.toString() ?? member['user_id']?.toString() ?? '';
       final firstName = member['first_name']?.toString() ?? '';
       final lastName = member['last_name']?.toString() ?? '';
-      final fullName = member['display_name']?.toString() ??
+      final fullName =
+          member['display_name']?.toString() ??
           member['name']?.toString() ??
           member['full_name']?.toString() ??
           '$firstName $lastName'.trim();
 
-      final deliveryCount = workerDeliveryCount[id] ?? 0;
-      final territoryCount = workerTerritoryCount[id] ?? 0;
+      final assignmentsForMember = workerAssignments[id] ?? [];
+      final territoryCoverage = _calculateWeightedCoverage(
+        assignmentsForMember,
+      );
 
-      // Calculate completion rate based on deliveries made
-      final completionRate = deliveryCount > 0 ? (deliveryCount * 10.0).clamp(0.0, 100.0) : 0.0;
-
-      performanceList.add(WorkerPerformance(
-        id: id,
-        name: fullName.isNotEmpty ? fullName : 'Unknown Worker',
-        avatarUrl: member['avatar_url']?.toString() ?? member['avatarUrl']?.toString(),
-        totalVisits: deliveryCount,
-        territoriesAssigned: territoryCount,
-        completionRate: completionRate,
-        isActive: activeWorkerIds.contains(id),
-      ));
+      performanceList.add(
+        WorkerPerformance(
+          id: id,
+          name: fullName.isNotEmpty ? fullName : 'Unknown Worker',
+          avatarUrl:
+              member['avatar_url']?.toString() ??
+              member['avatarUrl']?.toString(),
+          donationsCount: workerDonationsCount[id] ?? 0,
+          donationsTotal: workerDonationsTotal[id] ?? 0.0,
+          prayersCount: workerPrayersCount[id] ?? 0,
+          territoriesAssigned: assignmentsForMember.length,
+          territoryCoverage: territoryCoverage,
+          isActive: activeWorkerIds.contains(id),
+        ),
+      );
     }
 
-    // Sort by total visits (deliveries) descending
-    performanceList.sort((a, b) => b.totalVisits.compareTo(a.totalVisits));
+    // Sort by donations total descending
+    performanceList.sort(
+      (a, b) => b.donationsTotal.compareTo(a.donationsTotal),
+    );
     return performanceList;
+  }
+
+  double _calculateWeightedCoverage(List<Map<String, dynamic>> assignments) {
+    double totalHousingUnits = 0;
+    double weightedSum = 0;
+
+    for (var assignment in assignments) {
+      final housingUnits = (assignment['housing_units'] ?? 0).toDouble();
+      final completeness = (assignment['completeness_percentage'] ?? 0)
+          .toDouble();
+
+      totalHousingUnits += housingUnits;
+      weightedSum += housingUnits * completeness;
+    }
+
+    return totalHousingUnits > 0 ? weightedSum / totalHousingUnits : 0;
   }
 
   List<TerritoryStats> _buildTerritoryStats(
@@ -372,10 +474,11 @@ class DashboardBloc extends Bloc<DashboardEvent, DashboardState> {
       if (id != null) {
         final firstName = member['first_name']?.toString() ?? '';
         final lastName = member['last_name']?.toString() ?? '';
-        final fullName = member['display_name']?.toString() ??
-                         member['name']?.toString() ??
-                         member['full_name']?.toString() ??
-                         '$firstName $lastName'.trim();
+        final fullName =
+            member['display_name']?.toString() ??
+            member['name']?.toString() ??
+            member['full_name']?.toString() ??
+            '$firstName $lastName'.trim();
         memberNames[id] = fullName.isNotEmpty ? fullName : 'Unknown';
       }
     }
@@ -388,24 +491,30 @@ class DashboardBloc extends Bloc<DashboardEvent, DashboardState> {
       // Use territory_id directly from delivery if available
       final territoryId = delivery['territory_id']?.toString();
       if (territoryId != null && territoryId.isNotEmpty) {
-        deliveriesPerTerritory[territoryId] = (deliveriesPerTerritory[territoryId] ?? 0) + 1;
-        totalVisitsPerTerritory[territoryId] = (totalVisitsPerTerritory[territoryId] ?? 0) + 1;
+        deliveriesPerTerritory[territoryId] =
+            (deliveriesPerTerritory[territoryId] ?? 0) + 1;
+        totalVisitsPerTerritory[territoryId] =
+            (totalVisitsPerTerritory[territoryId] ?? 0) + 1;
       }
     }
 
     for (var donation in donations) {
       final territoryId = donation['territory_id']?.toString();
       if (territoryId != null && territoryId.isNotEmpty) {
-        totalVisitsPerTerritory[territoryId] = (totalVisitsPerTerritory[territoryId] ?? 0) + 1;
+        totalVisitsPerTerritory[territoryId] =
+            (totalVisitsPerTerritory[territoryId] ?? 0) + 1;
       }
     }
 
     for (var assignment in assignments) {
       final assignmentId = assignment['id']?.toString() ?? '';
       // Use territory_id for matching with deliveries
-      final territoryId = assignment['territory_id']?.toString() ?? assignmentId;
+      final territoryId =
+          assignment['territory_id']?.toString() ?? assignmentId;
       // Use assigned_worker_id (not worker_id) - this is the correct field name from API
-      final workerId = assignment['assigned_worker_id']?.toString() ?? assignment['worker_id']?.toString();
+      final workerId =
+          assignment['assigned_worker_id']?.toString() ??
+          assignment['worker_id']?.toString();
       final workerName = assignment['worker_name']?.toString();
 
       // Get assignee name from member lookup or assignment data
@@ -423,24 +532,29 @@ class DashboardBloc extends Bloc<DashboardEvent, DashboardState> {
       // Calculate completion rate based on deliveries
       double completionRate;
       if (housingUnits > 0) {
-        completionRate = (visitedFromDeliveries / housingUnits * 100).clamp(0.0, 100.0).toDouble();
+        completionRate = (visitedFromDeliveries / housingUnits * 100)
+            .clamp(0.0, 100.0)
+            .toDouble();
       } else {
         // If no housing units defined, use delivery count as indicator
         completionRate = visitedFromDeliveries > 0 ? 50.0 : 0.0;
       }
 
-      territoryStats.add(TerritoryStats(
-        id: assignmentId,
-        name: assignment['entity_name']?.toString() ??
+      territoryStats.add(
+        TerritoryStats(
+          id: assignmentId,
+          name:
+              assignment['entity_name']?.toString() ??
               assignment['territory_name']?.toString() ??
               'Unknown Territory',
-        assigneeName: assigneeName,
-        assigneeId: workerId,
-        housingUnits: housingUnits > 0 ? housingUnits : visitedFromDeliveries,
-        visitedCount: visitedFromDeliveries,
-        completionRate: completionRate,
-        status: assignment['status']?.toString(),
-      ));
+          assigneeName: assigneeName,
+          assigneeId: workerId,
+          housingUnits: housingUnits > 0 ? housingUnits : visitedFromDeliveries,
+          visitedCount: visitedFromDeliveries,
+          completionRate: completionRate,
+          status: assignment['status']?.toString(),
+        ),
+      );
     }
 
     // Sort by completion rate ascending (least complete first)
@@ -470,13 +584,18 @@ class DashboardBloc extends Bloc<DashboardEvent, DashboardState> {
         await _initialize();
         final deliveries = await _fetchDeliveries(event.teamId);
         final donations = await _fetchDonations(event.teamId);
-        final activities = _buildActivitiesFromDeliveriesAndDonations(deliveries, donations);
-        emit(DashboardLoaded(
-          stats: currentState.stats,
-          recentActivity: activities,
-          workerPerformance: currentState.workerPerformance,
-          territoryStats: currentState.territoryStats,
-        ));
+        final activities = _buildActivitiesFromDeliveriesAndDonations(
+          deliveries,
+          donations,
+        );
+        emit(
+          DashboardLoaded(
+            stats: currentState.stats,
+            recentActivity: activities,
+            workerPerformance: currentState.workerPerformance,
+            territoryStats: currentState.territoryStats,
+          ),
+        );
       } catch (e) {
         // Keep current state on error
       }

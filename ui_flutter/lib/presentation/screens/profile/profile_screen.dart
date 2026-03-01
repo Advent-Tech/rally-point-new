@@ -6,6 +6,7 @@ import '../../blocs/theme/theme_bloc.dart';
 import '../../blocs/profile/profile_bloc.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../widgets/custom_button.dart';
+import '../../widgets/help/help_mode_provider.dart';
 
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
@@ -484,14 +485,7 @@ class _SettingsSection extends StatelessWidget {
             },
           ),
           _buildDivider(isDark),
-          _SettingsTile(
-            icon: Icons.help_outline,
-            title: 'Help & Support',
-            isDark: isDark,
-            onTap: () {
-              // TODO: Help
-            },
-          ),
+          _HelpModeTile(isDark: isDark),
           _buildDivider(isDark),
           _SettingsTile(
             icon: Icons.info_outline,
@@ -553,6 +547,35 @@ class _SettingsTile extends StatelessWidget {
         color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
       ),
       onTap: onTap,
+    );
+  }
+}
+
+class _HelpModeTile extends StatelessWidget {
+  final bool isDark;
+  const _HelpModeTile({required this.isDark});
+
+  @override
+  Widget build(BuildContext context) {
+    final helpNotifier = HelpModeProvider.of(context);
+
+    return ValueListenableBuilder<bool>(
+      valueListenable: helpNotifier,
+      builder: (context, isEnabled, _) {
+        return _SettingsTile(
+          icon: Icons.help_outline,
+          title: 'Help Mode',
+          isDark: isDark,
+          trailing: Switch(
+            value: isEnabled,
+            onChanged: (value) {
+              helpNotifier.value = value;
+              saveHelpMode(value);
+            },
+            activeColor: AppColors.primary,
+          ),
+        );
+      },
     );
   }
 }

@@ -5,6 +5,9 @@ import 'package:cached_network_image/cached_network_image.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../data/models/blog_model.dart';
 import '../../blocs/blog/blog_bloc.dart';
+import '../../widgets/role_badge.dart';
+import '../../widgets/animations/staggered_fade_in.dart';
+import '../../widgets/states/empty_state.dart';
 
 class BlogScreen extends StatefulWidget {
   const BlogScreen({super.key});
@@ -63,6 +66,7 @@ class _BlogScreenState extends State<BlogScreen> {
             icon: const Icon(Icons.arrow_back),
             onPressed: () => context.go('/home'),
           ),
+          actions: const [RoleBadge()],
         ),
         body: BlocBuilder<BlogBloc, BlogState>(
           builder: (context, state) {
@@ -131,33 +135,10 @@ class _BlogScreenState extends State<BlogScreen> {
   }
 
   Widget _buildEmptyState(bool isDark) {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(
-            Icons.article_outlined,
-            size: 80,
-            color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
-          ),
-          const SizedBox(height: 16),
-          Text(
-            'No blogs yet',
-            style: TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.w600,
-              color: isDark ? Colors.white : AppColors.textPrimaryLight,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'Check back later for news and updates',
-            style: TextStyle(
-              color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
-            ),
-          ),
-        ],
-      ),
+    return const EmptyState(
+      icon: Icons.article_outlined,
+      title: 'No posts yet',
+      description: 'Check back later for news and updates from your team.',
     );
   }
 
@@ -185,10 +166,16 @@ class _BlogScreenState extends State<BlogScreen> {
 
           // Featured card for the first item
           if (index == 0) {
-            return _buildFeaturedBlogCard(blog, isDark);
+            return StaggeredFadeIn(
+              index: index,
+              child: _buildFeaturedBlogCard(blog, isDark),
+            );
           }
 
-          return _buildBlogCard(blog, isDark);
+          return StaggeredFadeIn(
+            index: index,
+            child: _buildBlogCard(blog, isDark),
+          );
         },
       ),
     );

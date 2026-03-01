@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
+import '../animations/counting_text.dart';
 
 /// Overview stat card for Ministry/Team overview sections.
 ///
@@ -47,9 +48,7 @@ class OverviewStatCard extends StatelessWidget {
                   offset: const Offset(0, 2),
                 ),
               ],
-        border: isDark
-            ? Border.all(color: AppColors.borderDark)
-            : null,
+        border: isDark ? Border.all(color: AppColors.borderDark) : null,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -65,11 +64,7 @@ class OverviewStatCard extends StatelessWidget {
                   color: iconBackgroundColor.withValues(alpha: 0.15),
                   borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
                 ),
-                child: Icon(
-                  icon,
-                  color: iconBackgroundColor,
-                  size: 20,
-                ),
+                child: Icon(icon, color: iconBackgroundColor, size: 20),
               ),
               if (onMoreTap != null)
                 GestureDetector(
@@ -102,8 +97,8 @@ class OverviewStatCard extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.baseline,
             textBaseline: TextBaseline.alphabetic,
             children: [
-              Text(
-                value,
+              CountingText(
+                value: value,
                 style: Theme.of(context).textTheme.headlineMedium?.copyWith(
                   fontWeight: FontWeight.bold,
                 ),
@@ -218,9 +213,9 @@ class OverviewSectionHeader extends StatelessWidget {
         children: [
           Text(
             title,
-            style: Theme.of(context).textTheme.titleLarge?.copyWith(
-              fontWeight: FontWeight.bold,
-            ),
+            style: Theme.of(
+              context,
+            ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
           ),
           if (trailing != null)
             trailing!
@@ -245,12 +240,14 @@ class OverviewSectionHeader extends StatelessWidget {
 /// Location status banner shown at top of home screen
 class LocationStatusBanner extends StatelessWidget {
   final bool isActive;
+  final bool isGpsTracking;
   final String? statusText;
   final VoidCallback? onTap;
 
   const LocationStatusBanner({
     super.key,
     this.isActive = false,
+    this.isGpsTracking = false,
     this.statusText,
     this.onTap,
   });
@@ -258,8 +255,13 @@ class LocationStatusBanner extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final color = isActive ? AppColors.success : AppColors.warning;
-    final text = statusText ?? (isActive ? 'Location Active' : 'Location Inactive');
+
+    // GPS tracking takes priority, then session status
+    final bool showActive = isGpsTracking || isActive;
+    final Color color = showActive ? AppColors.success : AppColors.warning;
+    final String text = isGpsTracking
+        ? 'GPS Tracking Active'
+        : (statusText ?? (isActive ? 'Location Active' : 'Location Inactive'));
 
     return GestureDetector(
       onTap: onTap,
@@ -283,24 +285,84 @@ class LocationStatusBanner extends StatelessWidget {
           mainAxisAlignment: MainAxisAlignment.center,
           mainAxisSize: MainAxisSize.min,
           children: [
-            Container(
-              width: 10,
-              height: 10,
-              decoration: BoxDecoration(
-                color: color,
-                shape: BoxShape.circle,
+            // Pulsing dot when GPS is tracking
+            if (isGpsTracking)
+              _PulsingDot(color: color)
+            else
+              Container(
+                width: 10,
+                height: 10,
+                decoration: BoxDecoration(color: color, shape: BoxShape.circle),
               ),
-            ),
             const SizedBox(width: AppSpacing.sm),
             Text(
               text,
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                fontWeight: FontWeight.w500,
-              ),
+              style: Theme.of(
+                context,
+              ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w500),
             ),
+            if (isGpsTracking) ...[
+              const SizedBox(width: AppSpacing.sm),
+              Icon(Icons.gps_fixed, size: 16, color: color),
+            ],
           ],
         ),
       ),
+    );
+  }
+}
+
+class _PulsingDot extends StatefulWidget {
+  final Color color;
+
+  const _PulsingDot({required this.color});
+
+  @override
+  State<_PulsingDot> createState() => _PulsingDotState();
+}
+
+class _PulsingDotState extends State<_PulsingDot>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  late Animation<double> _animation;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      duration: const Duration(milliseconds: 1000),
+      vsync: this,
+    )..repeat(reverse: true);
+    _animation = Tween<double>(begin: 0.3, end: 1.0).animate(_controller);
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _animation,
+      builder: (context, child) {
+        return Container(
+          width: 10,
+          height: 10,
+          decoration: BoxDecoration(
+            color: widget.color.withOpacity(_animation.value),
+            shape: BoxShape.circle,
+            boxShadow: [
+              BoxShadow(
+                color: widget.color.withOpacity(_animation.value * 0.5),
+                blurRadius: 6,
+                spreadRadius: 2,
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 }

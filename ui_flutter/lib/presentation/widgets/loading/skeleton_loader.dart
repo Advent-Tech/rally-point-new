@@ -7,10 +7,7 @@ import '../../../core/theme/app_spacing.dart';
 class ShimmerEffect extends StatelessWidget {
   final Widget child;
 
-  const ShimmerEffect({
-    super.key,
-    required this.child,
-  });
+  const ShimmerEffect({super.key, required this.child});
 
   @override
   Widget build(BuildContext context) {
@@ -30,12 +27,7 @@ class SkeletonBox extends StatelessWidget {
   final double? height;
   final BorderRadius? borderRadius;
 
-  const SkeletonBox({
-    super.key,
-    this.width,
-    this.height,
-    this.borderRadius,
-  });
+  const SkeletonBox({super.key, this.width, this.height, this.borderRadius});
 
   @override
   Widget build(BuildContext context) {
@@ -78,10 +70,7 @@ class SkeletonLine extends StatelessWidget {
 class SkeletonCircle extends StatelessWidget {
   final double size;
 
-  const SkeletonCircle({
-    super.key,
-    this.size = AppSpacing.avatarMd,
-  });
+  const SkeletonCircle({super.key, this.size = AppSpacing.avatarMd});
 
   @override
   Widget build(BuildContext context) {
@@ -249,10 +238,7 @@ class SkeletonQuickActionGrid extends StatelessWidget {
 class SkeletonStatRow extends StatelessWidget {
   final int itemCount;
 
-  const SkeletonStatRow({
-    super.key,
-    this.itemCount = 2,
-  });
+  const SkeletonStatRow({super.key, this.itemCount = 2});
 
   @override
   Widget build(BuildContext context) {
@@ -305,10 +291,7 @@ class SkeletonStatRow extends StatelessWidget {
 class SkeletonTerritoryCard extends StatelessWidget {
   final EdgeInsetsGeometry? margin;
 
-  const SkeletonTerritoryCard({
-    super.key,
-    this.margin,
-  });
+  const SkeletonTerritoryCard({super.key, this.margin});
 
   @override
   Widget build(BuildContext context) {
@@ -422,6 +405,69 @@ class SkeletonHeader extends StatelessWidget {
           const SkeletonLine(width: 150, height: 24),
         ],
       ),
+    );
+  }
+}
+
+class SkeletonOverviewCard extends StatelessWidget {
+  const SkeletonOverviewCard({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: isDark ? AppColors.surfaceDark : AppColors.surfaceLight,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: isDark ? AppColors.borderDark : AppColors.borderLight,
+        ),
+      ),
+      child: ShimmerEffect(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const SkeletonBox(
+              width: 40,
+              height: 40,
+              borderRadius: BorderRadius.all(Radius.circular(10)),
+            ),
+            const SizedBox(height: 12),
+            const SkeletonLine(width: 50, height: 24),
+            const SizedBox(height: 4),
+            const SkeletonLine(width: 80, height: 12),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class SkeletonOverviewGrid extends StatelessWidget {
+  const SkeletonOverviewGrid({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        Row(
+          children: const [
+            Expanded(child: SkeletonOverviewCard()),
+            SizedBox(width: 12),
+            Expanded(child: SkeletonOverviewCard()),
+          ],
+        ),
+        const SizedBox(height: 12),
+        Row(
+          children: const [
+            Expanded(child: SkeletonOverviewCard()),
+            SizedBox(width: 12),
+            Expanded(child: SkeletonOverviewCard()),
+          ],
+        ),
+      ],
     );
   }
 }

@@ -34,7 +34,8 @@ class LocationTrack {
     this.createdAt,
   });
 
-  factory LocationTrack.fromJson(Map<String, dynamic> json) => _$LocationTrackFromJson(json);
+  factory LocationTrack.fromJson(Map<String, dynamic> json) =>
+      _$LocationTrackFromJson(json);
   Map<String, dynamic> toJson() => _$LocationTrackToJson(this);
 }
 
@@ -82,7 +83,8 @@ class LocationSession {
     this.createdAt,
   });
 
-  factory LocationSession.fromJson(Map<String, dynamic> json) => _$LocationSessionFromJson(json);
+  factory LocationSession.fromJson(Map<String, dynamic> json) =>
+      _$LocationSessionFromJson(json);
   Map<String, dynamic> toJson() => _$LocationSessionToJson(this);
 
   Duration get duration {
@@ -118,6 +120,8 @@ class LocationUpdate {
   final double? heading;
   @JsonKey(name: 'session_id')
   final String? sessionId;
+  @JsonKey(name: 'team_id')
+  final String? teamId;
 
   const LocationUpdate({
     required this.latitude,
@@ -127,9 +131,11 @@ class LocationUpdate {
     this.speed,
     this.heading,
     this.sessionId,
+    this.teamId,
   });
 
-  factory LocationUpdate.fromJson(Map<String, dynamic> json) => _$LocationUpdateFromJson(json);
+  factory LocationUpdate.fromJson(Map<String, dynamic> json) =>
+      _$LocationUpdateFromJson(json);
   Map<String, dynamic> toJson() => _$LocationUpdateToJson(this);
 }
 
@@ -161,7 +167,8 @@ class WorkerLocation {
     this.sessionId,
   });
 
-  factory WorkerLocation.fromJson(Map<String, dynamic> json) => _$WorkerLocationFromJson(json);
+  factory WorkerLocation.fromJson(Map<String, dynamic> json) =>
+      _$WorkerLocationFromJson(json);
   Map<String, dynamic> toJson() => _$WorkerLocationToJson(this);
 }
 
@@ -189,7 +196,8 @@ class LocationStats {
     required this.locationCount,
   });
 
-  factory LocationStats.fromJson(Map<String, dynamic> json) => _$LocationStatsFromJson(json);
+  factory LocationStats.fromJson(Map<String, dynamic> json) =>
+      _$LocationStatsFromJson(json);
   Map<String, dynamic> toJson() => _$LocationStatsToJson(this);
 
   // Convert km to meters for backwards compatibility

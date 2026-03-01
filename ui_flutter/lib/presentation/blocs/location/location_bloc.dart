@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:math';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:equatable/equatable.dart';
+import 'package:flutter/foundation.dart';
 import 'package:geolocator/geolocator.dart';
 import '../../../data/models/location_model.dart';
 import '../../../core/network/api_client.dart';
@@ -19,6 +20,7 @@ class LocationBloc extends Bloc<LocationEvent, LocationState> {
   Timer? _uploadTimer;
   List<LocationUpdate> _pendingUpdates = [];
   String? _currentSessionId;
+  String? _teamId;
 
   LocationBloc() : super(LocationInitial()) {
     on<LocationCheckPermission>(_onCheckPermission);
@@ -35,6 +37,13 @@ class LocationBloc extends Bloc<LocationEvent, LocationState> {
   Future<void> _initialize() async {
     _apiClient = await ApiClient.getInstance();
     _localStorage = await LocalStorage.getInstance();
+
+    // Load team_id from user data
+    final userData = _localStorage.getUserData();
+    if (userData != null) {
+      _teamId = userData['team_id']?.toString();
+      debugPrint('[LocationBloc] Loaded team_id: $_teamId');
+    }
   }
 
   @override
@@ -50,36 +59,45 @@ class LocationBloc extends Bloc<LocationEvent, LocationState> {
   ) async {
     final serviceEnabled = await Geolocator.isLocationServiceEnabled();
     if (!serviceEnabled) {
-      emit(LocationPermissionDenied(
-        message: 'Location services are disabled',
-        canRequestAgain: false,
-      ));
+      emit(
+        LocationPermissionDenied(
+          message: 'Location services are disabled',
+          canRequestAgain: false,
+        ),
+      );
       return;
     }
 
     final permission = await Geolocator.checkPermission();
     switch (permission) {
       case LocationPermission.denied:
-        emit(LocationPermissionDenied(
-          message: 'Location permission is required for tracking',
-          canRequestAgain: true,
-        ));
+        emit(
+          LocationPermissionDenied(
+            message: 'Location permission is required for tracking',
+            canRequestAgain: true,
+          ),
+        );
         break;
       case LocationPermission.deniedForever:
-        emit(LocationPermissionDenied(
-          message: 'Location permission is permanently denied. Please enable it in settings.',
-          canRequestAgain: false,
-        ));
+        emit(
+          LocationPermissionDenied(
+            message:
+                'Location permission is permanently denied. Please enable it in settings.',
+            canRequestAgain: false,
+          ),
+        );
         break;
       case LocationPermission.whileInUse:
       case LocationPermission.always:
         emit(LocationPermissionGranted());
         break;
       case LocationPermission.unableToDetermine:
-        emit(LocationPermissionDenied(
-          message: 'Unable to determine location permission status',
-          canRequestAgain: true,
-        ));
+        emit(
+          LocationPermissionDenied(
+            message: 'Unable to determine location permission status',
+            canRequestAgain: true,
+          ),
+        );
         break;
     }
   }
@@ -92,10 +110,12 @@ class LocationBloc extends Bloc<LocationEvent, LocationState> {
 
     final serviceEnabled = await Geolocator.isLocationServiceEnabled();
     if (!serviceEnabled) {
-      emit(LocationPermissionDenied(
-        message: 'Please enable location services',
-        canRequestAgain: false,
-      ));
+      emit(
+        LocationPermissionDenied(
+          message: 'Please enable location services',
+          canRequestAgain: false,
+        ),
+      );
       return;
     }
 
@@ -105,15 +125,20 @@ class LocationBloc extends Bloc<LocationEvent, LocationState> {
     }
 
     if (permission == LocationPermission.denied) {
-      emit(LocationPermissionDenied(
-        message: 'Location permission denied',
-        canRequestAgain: true,
-      ));
+      emit(
+        LocationPermissionDenied(
+          message: 'Location permission denied',
+          canRequestAgain: true,
+        ),
+      );
     } else if (permission == LocationPermission.deniedForever) {
-      emit(LocationPermissionDenied(
-        message: 'Location permission permanently denied. Please enable in settings.',
-        canRequestAgain: false,
-      ));
+      emit(
+        LocationPermissionDenied(
+          message:
+              'Location permission permanently denied. Please enable in settings.',
+          canRequestAgain: false,
+        ),
+      );
     } else {
       emit(LocationPermissionGranted());
     }
@@ -136,44 +161,46 @@ class LocationBloc extends Bloc<LocationEvent, LocationState> {
       // Start session on server
       final response = await _apiClient.post(
         ApiConstants.sessionsStart,
-        data: {
-          'start_lat': position.latitude,
-          'start_lng': position.longitude,
-        },
+        data: {'start_lat': position.latitude, 'start_lng': position.longitude},
       );
 
       if (response.statusCode == 200 || response.statusCode == 201) {
         _currentSessionId = response.data['id'] ?? response.data['session_id'];
 
-        emit(LocationTracking(
-          latitude: position.latitude,
-          longitude: position.longitude,
-          accuracy: position.accuracy,
-          speed: position.speed,
-          heading: position.heading,
-          altitude: position.altitude,
-          sessionId: _currentSessionId,
-          startTime: DateTime.now(),
-          distance: 0,
-          duration: Duration.zero,
-        ));
-
-        // Start listening to position updates
-        _positionSubscription = Geolocator.getPositionStream(
-          locationSettings: const LocationSettings(
-            accuracy: LocationAccuracy.high,
-            distanceFilter: 10,
-          ),
-        ).listen((position) {
-          add(LocationUpdatePosition(
+        emit(
+          LocationTracking(
             latitude: position.latitude,
             longitude: position.longitude,
             accuracy: position.accuracy,
             speed: position.speed,
             heading: position.heading,
             altitude: position.altitude,
-          ));
-        });
+            sessionId: _currentSessionId,
+            startTime: DateTime.now(),
+            distance: 0,
+            duration: Duration.zero,
+          ),
+        );
+
+        // Start listening to position updates
+        _positionSubscription =
+            Geolocator.getPositionStream(
+              locationSettings: const LocationSettings(
+                accuracy: LocationAccuracy.high,
+                distanceFilter: 10,
+              ),
+            ).listen((position) {
+              add(
+                LocationUpdatePosition(
+                  latitude: position.latitude,
+                  longitude: position.longitude,
+                  accuracy: position.accuracy,
+                  speed: position.speed,
+                  heading: position.heading,
+                  altitude: position.altitude,
+                ),
+              );
+            });
 
         // Start upload timer with jitter to prevent thundering herd
         _startJitteredUploadTimer();
@@ -208,10 +235,7 @@ class LocationBloc extends Bloc<LocationEvent, LocationState> {
 
         await _apiClient.put(
           '${ApiConstants.locationSessions}/$_currentSessionId/end',
-          data: {
-            'end_lat': position.latitude,
-            'end_lng': position.longitude,
-          },
+          data: {'end_lat': position.latitude, 'end_lng': position.longitude},
         );
       }
 
@@ -227,13 +251,10 @@ class LocationBloc extends Bloc<LocationEvent, LocationState> {
   void _startJitteredUploadTimer() {
     // Random interval between 25-35 seconds to spread load across users
     final jitter = 25 + Random().nextInt(11);
-    _uploadTimer = Timer(
-      Duration(seconds: jitter),
-      () {
-        add(const LocationSyncPending());
-        _startJitteredUploadTimer();
-      },
-    );
+    _uploadTimer = Timer(Duration(seconds: jitter), () {
+      add(const LocationSyncPending());
+      _startJitteredUploadTimer();
+    });
   }
 
   Future<void> _onUpdatePosition(
@@ -254,28 +275,33 @@ class LocationBloc extends Bloc<LocationEvent, LocationState> {
       final duration = DateTime.now().difference(currentState.startTime);
 
       // Add to pending updates
-      _pendingUpdates.add(LocationUpdate(
-        latitude: event.latitude,
-        longitude: event.longitude,
-        accuracy: event.accuracy,
-        speed: event.speed,
-        heading: event.heading,
-        altitude: event.altitude,
-        sessionId: _currentSessionId,
-      ));
+      _pendingUpdates.add(
+        LocationUpdate(
+          latitude: event.latitude,
+          longitude: event.longitude,
+          accuracy: event.accuracy,
+          speed: event.speed,
+          heading: event.heading,
+          altitude: event.altitude,
+          sessionId: _currentSessionId,
+          teamId: _teamId,
+        ),
+      );
 
-      emit(LocationTracking(
-        latitude: event.latitude,
-        longitude: event.longitude,
-        accuracy: event.accuracy,
-        speed: event.speed,
-        heading: event.heading,
-        altitude: event.altitude,
-        sessionId: _currentSessionId,
-        startTime: currentState.startTime,
-        distance: totalDistance,
-        duration: duration,
-      ));
+      emit(
+        LocationTracking(
+          latitude: event.latitude,
+          longitude: event.longitude,
+          accuracy: event.accuracy,
+          speed: event.speed,
+          heading: event.heading,
+          altitude: event.altitude,
+          sessionId: _currentSessionId,
+          startTime: currentState.startTime,
+          distance: totalDistance,
+          duration: duration,
+        ),
+      );
     }
   }
 
@@ -290,25 +316,26 @@ class LocationBloc extends Bloc<LocationEvent, LocationState> {
 
       final response = await _apiClient.get(
         ApiConstants.locationSessions,
-        queryParameters: {
-          'limit': event.limit,
-          'offset': event.offset,
-        },
+        queryParameters: {'limit': event.limit, 'offset': event.offset},
       );
 
       if (response.statusCode == 200) {
         final List<dynamic> data = response.data is List
             ? response.data
             : response.data['sessions'] ?? [];
-        final sessions = data.map((json) => LocationSession.fromJson(json)).toList();
+        final sessions = data
+            .map((json) => LocationSession.fromJson(json))
+            .toList();
 
         // Cache for offline
         await _localStorage.saveLocationSessions(data);
 
-        emit(LocationSessionsLoaded(
-          sessions: sessions,
-          hasMore: sessions.length == event.limit,
-        ));
+        emit(
+          LocationSessionsLoaded(
+            sessions: sessions,
+            hasMore: sessions.length == event.limit,
+          ),
+        );
       } else {
         emit(LocationError(message: 'Failed to load sessions'));
       }
@@ -316,12 +343,16 @@ class LocationBloc extends Bloc<LocationEvent, LocationState> {
       // Try loading from cache
       final cached = _localStorage.getLocationSessions();
       if (cached != null && cached.isNotEmpty) {
-        final sessions = cached.map((json) => LocationSession.fromJson(json)).toList();
-        emit(LocationSessionsLoaded(
-          sessions: sessions,
-          hasMore: false,
-          isOffline: true,
-        ));
+        final sessions = cached
+            .map((json) => LocationSession.fromJson(json))
+            .toList();
+        emit(
+          LocationSessionsLoaded(
+            sessions: sessions,
+            hasMore: false,
+            isOffline: true,
+          ),
+        );
       } else {
         emit(LocationError(message: e.toString()));
       }
@@ -366,7 +397,9 @@ class LocationBloc extends Bloc<LocationEvent, LocationState> {
         final List<dynamic> data = response.data is List
             ? response.data
             : response.data['workers'] ?? [];
-        final workers = data.map((json) => WorkerLocation.fromJson(json)).toList();
+        final workers = data
+            .map((json) => WorkerLocation.fromJson(json))
+            .toList();
 
         emit(LocationNearbyWorkersLoaded(workers: workers));
       }
@@ -396,14 +429,21 @@ class LocationBloc extends Bloc<LocationEvent, LocationState> {
     final updates = List<LocationUpdate>.from(_pendingUpdates);
     _pendingUpdates.clear();
 
+    debugPrint('[LocationBloc] Uploading ${updates.length} location updates');
+
     // Send each update individually since /api/location/batch doesn't exist
     for (final update in updates) {
       try {
+        debugPrint(
+          '[LocationBloc] Sending location: lat=${update.latitude}, lng=${update.longitude}',
+        );
         await _apiClient.post(
           ApiConstants.locationUpdate,
           data: update.toJson(),
         );
-      } catch (_) {
+        debugPrint('[LocationBloc] Location sent successfully');
+      } catch (e) {
+        debugPrint('[LocationBloc] Error sending location: $e');
         // If one fails, continue with the rest
       }
     }

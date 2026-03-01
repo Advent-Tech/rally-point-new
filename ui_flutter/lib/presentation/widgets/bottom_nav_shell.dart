@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import '../../core/theme/app_colors.dart';
 import '../blocs/auth/auth_bloc.dart';
+import 'help/help_fab.dart';
 
 class BottomNavShell extends StatelessWidget {
   final Widget child;
@@ -28,13 +29,13 @@ class BottomNavShell extends StatelessWidget {
     if (isLeader) {
       // Leader navigation: Dashboard, Team, Surveys, Reports
       switch (location) {
-        case '/home':
+        case '/leader/dashboard':
           return 0;
-        case '/team':
+        case '/leader/team-members':
           return 1;
-        case '/survey':
+        case '/leader/survey':
           return 2;
-        case '/reports':
+        case '/leader/reports':
           return 3;
         default:
           return 0;
@@ -61,16 +62,16 @@ class BottomNavShell extends StatelessWidget {
       // Leader navigation
       switch (index) {
         case 0:
-          context.go('/home');
+          context.go('/leader/dashboard');
           break;
         case 1:
-          context.go('/team');
+          context.go('/leader/team-members');
           break;
         case 2:
-          context.go('/survey');
+          context.go('/leader/survey');
           break;
         case 3:
-          context.go('/reports');
+          context.go('/leader/reports');
           break;
       }
     } else {
@@ -99,7 +100,12 @@ class BottomNavShell extends StatelessWidget {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
-      body: child,
+      body: Stack(
+        children: [
+          child,
+          const HelpFab(),
+        ],
+      ),
       extendBody: true,
       bottomNavigationBar: Container(
         margin: const EdgeInsets.only(left: 16, right: 16, bottom: 16),

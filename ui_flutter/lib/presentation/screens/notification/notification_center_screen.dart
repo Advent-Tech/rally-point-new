@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
+import '../../blocs/auth/auth_bloc.dart';
 import '../../blocs/notification/notification_bloc.dart';
+import '../../widgets/role_badge.dart';
+import '../../widgets/animations/staggered_fade_in.dart';
 import '../../widgets/notification/notification_tile.dart';
 import '../../../data/models/notification_model.dart';
 
@@ -44,6 +47,7 @@ class _NotificationCenterScreenState extends State<NotificationCenterScreen> {
         appBar: AppBar(
           title: const Text('Notifications'),
           actions: [
+            const RoleBadge(),
             IconButton(
               icon: const Icon(Icons.settings_outlined),
               onPressed: () => context.push('/notifications/settings'),
@@ -93,17 +97,25 @@ class _NotificationCenterScreenState extends State<NotificationCenterScreen> {
                     return _buildSectionHeader(context, item);
                   }
                   final notification = item as NotificationModel;
-                  return NotificationTile(
-                    notification: notification,
-                    onTap: () {
-                      if (!notification.isRead) {
-                        _bloc.add(NotificationMarkRead(notification.id));
-                      }
-                      _navigateToContext(notification);
-                    },
-                    onDismiss: () {
-                      _bloc.add(NotificationDelete(notification.id));
-                    },
+                  return StaggeredFadeIn(
+                    index: index,
+                    child: NotificationTile(
+                      notification: notification,
+                      onTap: () {
+                        if (!notification.isRead) {
+                          _bloc.add(NotificationMarkRead(notification.id));
+                        }
+                        _navigateToContext(notification);
+                      },
+                      onDismiss: () {
+                        _bloc.add(NotificationDelete(notification.id));
+                      },
+                      onMarkRead: notification.isRead
+                          ? null
+                          : () {
+                              _bloc.add(NotificationMarkRead(notification.id));
+                            },
+                    ),
                   );
                 },
               ),
@@ -191,40 +203,51 @@ class _NotificationCenterScreenState extends State<NotificationCenterScreen> {
     return grouped;
   }
 
+  bool _isUserLeader() {
+    try {
+      final authState = context.read<AuthBloc>().state;
+      if (authState is AuthAuthenticated) {
+        return authState.user.isTeamLeader;
+      }
+    } catch (_) {}
+    return false;
+  }
+
+  /// Navigate using go() to avoid GlobalKey conflicts with ShellRoute.
+  /// Routes are role-aware to avoid redirect loops.
   void _navigateToContext(NotificationModel notification) {
+    final isLeader = _isUserLeader();
+
     switch (notification.type) {
-      case 'geofence':
-      case 'session':
-        context.push('/territory');
-        break;
-      case 'prayer':
-        final id = notification.data['prayer_request_id']?.toString();
-        if (id != null) {
-          context.push('/prayer-requests/$id');
-        } else {
-          context.push('/prayer-requests');
-        }
-        break;
-      case 'delivery':
-        context.push('/delivery');
-        break;
-      case 'survey':
-        context.push('/survey');
-        break;
-      case 'team':
-        // Team leaders go to team members, workers stay on home
-        context.push('/home');
-        break;
-      case 'walkie':
-        context.push('/walkie');
-        break;
       case 'chat':
         final conversationId = notification.data['conversation_id']?.toString();
-        if (conversationId != null) {
-          context.push('/chat/$conversationId');
+        if (conversationId != null && conversationId.isNotEmpty) {
+          context.go(isLeader ? '/leader/chat/$conversationId' : '/chat/$conversationId');
         } else {
-          context.push('/chat');
+          context.go(isLeader ? '/leader/chat' : '/chat');
         }
+        break;
+      case 'walkie':
+        context.go(isLeader ? '/leader/walkie' : '/walkie');
+        break;
+      case 'delivery':
+        context.go(isLeader ? '/leader/reports' : '/delivery');
+        break;
+      case 'prayer':
+        context.go(isLeader ? '/leader/prayer-requests' : '/home');
+        break;
+      case 'team':
+        context.go(isLeader ? '/leader/worker-verification' : '/home');
+        break;
+      case 'survey':
+        context.go(isLeader ? '/leader/survey' : '/survey');
+        break;
+      case 'geofence':
+      case 'session':
+        context.go(isLeader ? '/leader/command-center?mode=workers' : '/territory');
+        break;
+      case 'territory':
+        context.go(isLeader ? '/leader/command-center?mode=territories' : '/territory');
         break;
       default:
         break;

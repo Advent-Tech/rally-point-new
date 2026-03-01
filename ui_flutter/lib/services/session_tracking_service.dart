@@ -7,10 +7,13 @@ import '../core/storage/local_storage.dart';
 import '../data/models/territory_model.dart';
 
 /// Callback types for session tracking events
-typedef OnTerritoryEntered = void Function(TerritoryAssignment territory, Position position);
-typedef OnTerritoryExited = void Function(TerritoryAssignment territory, Position position);
+typedef OnTerritoryEntered =
+    void Function(TerritoryAssignment territory, Position position);
+typedef OnTerritoryExited =
+    void Function(TerritoryAssignment territory, Position position);
 typedef OnLocationUpdated = void Function(Position position);
-typedef OnAutoSessionStarted = void Function(String sessionId, TerritoryAssignment territory);
+typedef OnAutoSessionStarted =
+    void Function(String sessionId, TerritoryAssignment territory);
 typedef OnAutoSessionEnded = void Function(String sessionId);
 typedef OnTrackingError = void Function(String error);
 
@@ -27,6 +30,8 @@ class SessionTrackingService {
   Timer? _geofenceCheckTimer;
 
   // Current state
+  String? _userId;
+  String? _teamId;
   TerritoryAssignment? _currentTerritory;
   String? _currentSessionId;
   Position? _lastPosition;
@@ -64,6 +69,16 @@ class SessionTrackingService {
     if (_isInitialized) return;
     _apiClient = await ApiClient.getInstance();
     _localStorage = await LocalStorage.getInstance();
+
+    // Load user data
+    final userData = _localStorage?.getUserData();
+    debugPrint('[SessionTracking] User data loaded: $userData');
+    if (userData != null) {
+      _userId = userData['id']?.toString() ?? userData['user_id']?.toString();
+      _teamId = userData['team_id']?.toString();
+      debugPrint('[SessionTracking] Set userId=$_userId, teamId=$_teamId');
+    }
+
     _isInitialized = true;
 
     // Load assigned territories
@@ -75,12 +90,18 @@ class SessionTrackingService {
     try {
       final response = await _apiClient!.get(ApiConstants.myAssignments);
       if (response.statusCode == 200) {
-        final data = response.data is List ? response.data : (response.data['assignments'] ?? []);
+        final data = response.data is List
+            ? response.data
+            : (response.data['assignments'] ?? []);
         _assignedTerritories = data
-            .map<TerritoryAssignment>((json) => TerritoryAssignment.fromJson(json))
+            .map<TerritoryAssignment>(
+              (json) => TerritoryAssignment.fromJson(json),
+            )
             .where((a) => a.isActive)
             .toList();
-        debugPrint('SessionTracking: Loaded ${_assignedTerritories.length} active assignments');
+        debugPrint(
+          'SessionTracking: Loaded ${_assignedTerritories.length} active assignments',
+        );
       }
     } catch (e) {
       debugPrint('SessionTracking: Error loading assignments: $e');
@@ -105,7 +126,8 @@ class SessionTrackingService {
     bool? autoCheckIn,
     bool? autoCheckOut,
   }) {
-    if (geofenceCheckInterval != null) _geofenceCheckInterval = geofenceCheckInterval;
+    if (geofenceCheckInterval != null)
+      _geofenceCheckInterval = geofenceCheckInterval;
     if (autoCheckIn != null) _autoCheckIn = autoCheckIn;
     if (autoCheckOut != null) _autoCheckOut = autoCheckOut;
   }
@@ -115,10 +137,14 @@ class SessionTrackingService {
     if (_isTracking) return true;
 
     try {
+      debugPrint(
+        '[SessionTracking] Starting tracking... userId=$_userId, teamId=$_teamId',
+      );
       await _initialize();
 
       // Check location permissions
       final permission = await _checkLocationPermission();
+      debugPrint('[SessionTracking] Location permission: $permission');
       if (!permission) {
         onTrackingError?.call('Location permission denied');
         return false;
@@ -126,6 +152,7 @@ class SessionTrackingService {
 
       // Start location updates
       await _startLocationUpdates();
+      debugPrint('[SessionTracking] Location updates started');
 
       // Start geofence check timer
       _geofenceCheckTimer = Timer.periodic(_geofenceCheckInterval, (_) {
@@ -133,10 +160,10 @@ class SessionTrackingService {
       });
 
       _isTracking = true;
-      debugPrint('SessionTracking: Started tracking');
+      debugPrint('[SessionTracking] Started tracking successfully');
       return true;
     } catch (e) {
-      debugPrint('SessionTracking: Error starting tracking: $e');
+      debugPrint('[SessionTracking] Error starting tracking: $e');
       onTrackingError?.call(e.toString());
       return false;
     }
@@ -185,25 +212,29 @@ class SessionTrackingService {
       distanceFilter: 10, // Minimum distance in meters
     );
 
-    _positionSubscription = Geolocator.getPositionStream(
-      locationSettings: locationSettings,
-    ).listen(
-      (Position position) {
-        _lastPosition = position;
-        onLocationUpdated?.call(position);
-        _sendLocationUpdate(position);
-      },
-      onError: (error) {
-        debugPrint('SessionTracking: Location error: $error');
-        onTrackingError?.call(error.toString());
-      },
-    );
+    _positionSubscription =
+        Geolocator.getPositionStream(locationSettings: locationSettings).listen(
+          (Position position) {
+            _lastPosition = position;
+            onLocationUpdated?.call(position);
+            _sendLocationUpdate(position);
+          },
+          onError: (error) {
+            debugPrint('SessionTracking: Location error: $error');
+            onTrackingError?.call(error.toString());
+          },
+        );
   }
 
   /// Send location update to server
   Future<void> _sendLocationUpdate(Position position) async {
     try {
-      await _apiClient!.post(
+      debugPrint(
+        '[SessionTracking] Sending location: lat=${position.latitude}, lng=${position.longitude}, teamId=$_teamId, userId=$_userId',
+      );
+
+      // 1. Send to location service (stores in location_tracks table)
+      final locationResponse = await _apiClient!.post(
         ApiConstants.locationUpdate,
         data: {
           'latitude': position.latitude,
@@ -213,10 +244,30 @@ class SessionTrackingService {
           'speed': position.speed,
           'heading': position.heading,
           if (_currentSessionId != null) 'session_id': _currentSessionId,
+          if (_teamId != null) 'team_id': _teamId,
         },
       );
+      debugPrint(
+        '[SessionTracking] Location update response: ${locationResponse.statusCode}',
+      );
+
+      // 2. Send to geofence service (triggers territory entry/exit detection)
+      if (_userId != null) {
+        final geofenceResponse = await _apiClient!.post(
+          ApiConstants.geofenceLocationUpdate,
+          data: {
+            'worker_id': _userId,
+            if (_teamId != null) 'team_id': _teamId,
+            'latitude': position.latitude,
+            'longitude': position.longitude,
+          },
+        );
+        debugPrint(
+          '[SessionTracking] Geofence update response: ${geofenceResponse.statusCode}',
+        );
+      }
     } catch (e) {
-      debugPrint('SessionTracking: Error sending location: $e');
+      debugPrint('[SessionTracking] Error sending location: $e');
     }
   }
 
@@ -253,7 +304,10 @@ class SessionTrackingService {
   }
 
   /// Handle when user is inside a territory
-  Future<void> _handleInsideTerritory(String territoryId, String territorySolid) async {
+  Future<void> _handleInsideTerritory(
+    String territoryId,
+    String territorySolid,
+  ) async {
     // Find if this is an assigned territory
     final assignment = _assignedTerritories.firstWhere(
       (a) => a.territoryId == territoryId || a.territorySolid == territorySolid,
@@ -280,7 +334,8 @@ class SessionTrackingService {
     }
 
     // If we're in a different territory, handle exit first
-    if (_currentTerritory != null && _currentTerritory!.territoryId != territoryId) {
+    if (_currentTerritory != null &&
+        _currentTerritory!.territoryId != territoryId) {
       await _handleTerritoryExit();
     }
 
@@ -317,22 +372,42 @@ class SessionTrackingService {
   /// Auto check-in to a territory
   Future<void> _autoCheckInToTerritory(TerritoryAssignment territory) async {
     try {
+      // Get fresh position if not available
+      Position? position = _lastPosition;
+      if (position == null) {
+        try {
+          position = await Geolocator.getCurrentPosition(
+            desiredAccuracy: LocationAccuracy.high,
+            timeLimit: const Duration(seconds: 5),
+          );
+          _lastPosition = position;
+        } catch (e) {
+          debugPrint('SessionTracking: Could not get position for checkin: $e');
+        }
+      }
+
       final response = await _apiClient!.post(
         '${ApiConstants.workSessions}/checkin',
         data: {
+          'worker_id': _userId,
           'territory_id': territory.territoryId,
-          'territory_name': territory.entityName ?? 'Territory ${territory.territorySolid}',
-          'latitude': _lastPosition?.latitude,
-          'longitude': _lastPosition?.longitude,
+          'territory_name':
+              territory.entityName ?? 'Territory ${territory.territorySolid}',
+          if (position != null) 'latitude': position.latitude,
+          if (position != null) 'longitude': position.longitude,
           'auto_checkin': true,
         },
       );
 
       if (response.statusCode == 200 || response.statusCode == 201) {
-        _currentSessionId = response.data['id']?.toString();
+        _currentSessionId =
+            response.data['id']?.toString() ??
+            response.data['session']?['id']?.toString();
         await _localStorage?.saveCurrentWorkSession(response.data);
         onAutoSessionStarted?.call(_currentSessionId!, territory);
-        debugPrint('SessionTracking: Auto check-in successful, session: $_currentSessionId');
+        debugPrint(
+          'SessionTracking: Auto check-in successful, session: $_currentSessionId',
+        );
       }
     } catch (e) {
       debugPrint('SessionTracking: Auto check-in error: $e');
@@ -345,12 +420,28 @@ class SessionTrackingService {
     if (_currentSessionId == null) return;
 
     try {
+      // Get fresh position for checkout
+      Position? position = _lastPosition;
+      if (position == null) {
+        try {
+          position = await Geolocator.getCurrentPosition(
+            desiredAccuracy: LocationAccuracy.high,
+            timeLimit: const Duration(seconds: 5),
+          );
+        } catch (e) {
+          debugPrint(
+            'SessionTracking: Could not get position for checkout: $e',
+          );
+        }
+      }
+
       final response = await _apiClient!.post(
         '${ApiConstants.workSessions}/checkout',
         data: {
+          'worker_id': _userId,
           'session_id': _currentSessionId,
-          'latitude': _lastPosition?.latitude,
-          'longitude': _lastPosition?.longitude,
+          if (position != null) 'latitude': position.latitude,
+          if (position != null) 'longitude': position.longitude,
           'auto_checkout': true,
         },
       );
@@ -377,14 +468,20 @@ class SessionTrackingService {
       try {
         position = await Geolocator.getCurrentPosition(
           desiredAccuracy: LocationAccuracy.high,
+          timeLimit: const Duration(seconds: 5),
         );
-      } catch (_) {}
+        _lastPosition = position;
+      } catch (e) {
+        debugPrint('SessionTracking: Could not get position: $e');
+      }
 
       final response = await _apiClient!.post(
         '${ApiConstants.workSessions}/checkin',
         data: {
+          'worker_id': _userId,
           'territory_id': territory.territoryId,
-          'territory_name': territory.entityName ?? 'Territory ${territory.territorySolid}',
+          'territory_name':
+              territory.entityName ?? 'Territory ${territory.territorySolid}',
           if (position != null) 'latitude': position.latitude,
           if (position != null) 'longitude': position.longitude,
           'auto_checkin': false,
@@ -392,7 +489,9 @@ class SessionTrackingService {
       );
 
       if (response.statusCode == 200 || response.statusCode == 201) {
-        _currentSessionId = response.data['id']?.toString();
+        _currentSessionId =
+            response.data['id']?.toString() ??
+            response.data['session']?['id']?.toString();
         _currentTerritory = territory;
         await _localStorage?.saveCurrentWorkSession(response.data);
         return _currentSessionId;
@@ -412,12 +511,17 @@ class SessionTrackingService {
       try {
         position = await Geolocator.getCurrentPosition(
           desiredAccuracy: LocationAccuracy.high,
+          timeLimit: const Duration(seconds: 5),
         );
-      } catch (_) {}
+        _lastPosition = position;
+      } catch (e) {
+        debugPrint('SessionTracking: Could not get position: $e');
+      }
 
       final response = await _apiClient!.post(
         '${ApiConstants.workSessions}/checkout',
         data: {
+          'worker_id': _userId,
           'session_id': _currentSessionId,
           if (position != null) 'latitude': position.latitude,
           if (position != null) 'longitude': position.longitude,

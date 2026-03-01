@@ -198,7 +198,7 @@ func (sp *ServiceProxy) HealthCheckProxy() gin.HandlerFunc {
 
 		for serviceName, serviceURL := range sp.services {
 			healthURL := serviceURL + "/health"
-			
+
 			req, err := http.NewRequest("GET", healthURL, nil)
 			if err != nil {
 				results[serviceName] = map[string]interface{}{
@@ -296,6 +296,10 @@ func (sp *ServiceProxy) ProxyWebSocket(serviceName string, targetPath string) gi
 			if query.Get("team_id") == "" {
 				query.Set("team_id", teamID.(string))
 			}
+		}
+		// Pass the original token for the location service to verify
+		if token := c.Query("token"); token != "" {
+			query.Set("token", token)
 		}
 
 		wsURL := fmt.Sprintf("%s://%s%s", wsScheme, targetURL.Host, targetPath)

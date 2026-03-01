@@ -34,9 +34,9 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
 
   void _handleSubmit() {
     if (_formKey.currentState?.validate() ?? false) {
-      context.read<AuthBloc>().add(AuthForgotPassword(
-        email: _emailController.text.trim(),
-      ));
+      context.read<AuthBloc>().add(
+        AuthForgotPassword(email: _emailController.text.trim()),
+      );
     }
   }
 
@@ -57,11 +57,18 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
           }
         },
         child: Center(
-          child: SingleChildScrollView(
-            child: Container(
-              constraints: const BoxConstraints(maxWidth: 400),
-              padding: const EdgeInsets.all(32),
-              child: _emailSent ? _buildSuccessView() : _buildFormView(),
+          child: Builder(
+            builder: (context) => SingleChildScrollView(
+              child: Container(
+                constraints: const BoxConstraints(maxWidth: 400),
+                padding: EdgeInsets.fromLTRB(
+                  32,
+                  32,
+                  32,
+                  32 + MediaQuery.of(context).viewInsets.bottom,
+                ),
+                child: _emailSent ? _buildSuccessView() : _buildFormView(),
+              ),
             ),
           ),
         ),
@@ -90,9 +97,9 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
         const SizedBox(height: 24),
         Text(
           'Check Your Email',
-          style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-            fontWeight: FontWeight.bold,
-          ),
+          style: Theme.of(
+            context,
+          ).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
           textAlign: TextAlign.center,
         ),
         const SizedBox(height: 16),
@@ -101,9 +108,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
           decoration: BoxDecoration(
             color: AppColors.info.withAlpha(20),
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(
-              color: AppColors.info.withAlpha(50),
-            ),
+            border: Border.all(color: AppColors.info.withAlpha(50)),
           ),
           child: Column(
             children: [
@@ -203,17 +208,17 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
           // Title
           Text(
             'Forgot Password?',
-            style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-              fontWeight: FontWeight.bold,
-            ),
+            style: Theme.of(
+              context,
+            ).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: 8),
           Text(
             'No worries! Enter your email address and we\'ll send you a link to reset your password.',
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-              color: AppColors.textSecondary,
-            ),
+            style: Theme.of(
+              context,
+            ).textTheme.bodyMedium?.copyWith(color: AppColors.textSecondary),
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: 32),
@@ -230,7 +235,9 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
               if (value == null || value.isEmpty) {
                 return 'Please enter your email';
               }
-              if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(value)) {
+              if (!RegExp(
+                r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$',
+              ).hasMatch(value)) {
                 return 'Please enter a valid email';
               }
               return null;

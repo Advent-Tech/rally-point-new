@@ -9,6 +9,10 @@ class AppColors {
   static const Color primaryLight = Color(0xFF60A5FA);
   static const Color primaryDark = Color(0xFF2563EB);
 
+  // Navy Blue (for active session cards)
+  static const Color navyBlue = Color(0xFF1E3A5F);
+  static const Color navyBlueLight = Color(0xFF2D4A6F);
+
   // Secondary Colors
   static const Color secondary = Color(0xFF8B5CF6); // Purple
   static const Color secondaryLight = Color(0xFFA78BFA);

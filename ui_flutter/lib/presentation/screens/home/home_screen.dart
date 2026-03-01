@@ -26,6 +26,9 @@ class _HomeScreenState extends State<HomeScreen> {
   late PrayerRequestBloc _prayerRequestBloc;
   late LocationBloc _locationBloc;
 
+  bool _showAllTiles = false;
+  bool _showStats = false;
+
   @override
   void initState() {
     super.initState();
@@ -74,13 +77,16 @@ class _HomeScreenState extends State<HomeScreen> {
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (context) => _TerritorySelectionSheet(
+      builder: (ctx) => _TerritorySelectionSheet(
         onTerritorySelected: (territoryId, territoryName) {
-          _workSessionBloc.add(WorkSessionCheckIn(
-            territoryId: territoryId,
-            territoryName: territoryName,
-          ));
-          Navigator.pop(context);
+          _workSessionBloc.add(
+            WorkSessionCheckIn(
+              territoryId: territoryId,
+              territoryName: territoryName,
+            ),
+          );
+          Navigator.pop(ctx);
+          context.go('/territory');
         },
       ),
     );
@@ -91,7 +97,9 @@ class _HomeScreenState extends State<HomeScreen> {
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('End Session'),
-        content: const Text('Are you sure you want to end your current work session?'),
+        content: const Text(
+          'Are you sure you want to end your current work session?',
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
@@ -134,11 +142,16 @@ class _HomeScreenState extends State<HomeScreen> {
           FilledButton(
             onPressed: () {
               Navigator.pop(ctx);
-              _scheduleBloc.add(WorkerScheduleStartSession(scheduleId: schedule.id));
-              _workSessionBloc.add(WorkSessionCheckIn(
-                territoryId: schedule.territoryId ?? '',
-                territoryName: schedule.territoryName ?? 'Unknown Territory',
-              ));
+              _scheduleBloc.add(
+                WorkerScheduleStartSession(scheduleId: schedule.id),
+              );
+              _workSessionBloc.add(
+                WorkSessionCheckIn(
+                  territoryId: schedule.territoryId ?? '',
+                  territoryName: schedule.territoryName ?? 'Unknown Territory',
+                ),
+              );
+              ctx.go('/territory');
             },
             child: const Text('Start Session'),
           ),
@@ -166,7 +179,7 @@ class _HomeScreenState extends State<HomeScreen> {
           // If both are authenticated, only rebuild if role changed
           if (previous is AuthAuthenticated && current is AuthAuthenticated) {
             return previous.user.role != current.user.role ||
-                   previous.user.id != current.user.id;
+                previous.user.id != current.user.id;
           }
           return false;
         },
@@ -182,7 +195,11 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   // Leader Dashboard
-  Widget _buildLeaderDashboard(BuildContext context, AuthAuthenticated authState, bool isDark) {
+  Widget _buildLeaderDashboard(
+    BuildContext context,
+    AuthAuthenticated authState,
+    bool isDark,
+  ) {
     final userName = authState.user.displayName ?? 'Leader';
 
     return Scaffold(
@@ -193,10 +210,7 @@ class _HomeScreenState extends State<HomeScreen> {
             SliverAppBar(
               floating: true,
               centerTitle: false,
-              title: const SizedBox(
-                height: 36,
-                child: AppHorizontalLogo(),
-              ),
+              title: const SizedBox(height: 36, child: AppHorizontalLogo()),
               actions: [
                 RealtimeNotificationBadge(
                   onTap: () => context.push('/notifications'),
@@ -235,22 +249,29 @@ class _HomeScreenState extends State<HomeScreen> {
                             children: [
                               Text(
                                 'Team Dashboard',
-                                style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                                  color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
-                                ),
+                                style: Theme.of(context).textTheme.bodyLarge
+                                    ?.copyWith(
+                                      color: isDark
+                                          ? AppColors.textSecondaryDark
+                                          : AppColors.textSecondaryLight,
+                                    ),
                               ),
                               const SizedBox(height: 4),
                               Text(
                                 userName,
-                                style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                                  fontWeight: FontWeight.bold,
-                                ),
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .headlineMedium
+                                    ?.copyWith(fontWeight: FontWeight.bold),
                               ),
                             ],
                           ),
                         ),
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 6,
+                          ),
                           decoration: BoxDecoration(
                             color: AppColors.primary.withValues(alpha: 0.12),
                             borderRadius: BorderRadius.circular(20),
@@ -258,7 +279,11 @@ class _HomeScreenState extends State<HomeScreen> {
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              const Icon(Icons.shield, size: 16, color: AppColors.primary),
+                              const Icon(
+                                Icons.shield,
+                                size: 16,
+                                color: AppColors.primary,
+                              ),
                               const SizedBox(width: 4),
                               Text(
                                 'Team Leader',
@@ -308,6 +333,11 @@ class _HomeScreenState extends State<HomeScreen> {
                 padding: const EdgeInsets.symmetric(horizontal: 20),
                 child: BlocBuilder<TerritoryBloc, TerritoryState>(
                   builder: (context, territoryState) {
+                    // Show shimmer loading while territory is loading
+                    if (territoryState is TerritoryLoading) {
+                      return const SkeletonOverviewGrid();
+                    }
+
                     int territoryCount = 0;
                     if (territoryState is TerritoryAllocationsLoaded) {
                       territoryCount = territoryState.territories.length;
@@ -364,7 +394,8 @@ class _HomeScreenState extends State<HomeScreen> {
                                 builder: (context, deliveryState) {
                                   int deliveryCount = 0;
                                   if (deliveryState is DeliveryListLoaded) {
-                                    deliveryCount = deliveryState.deliveries.length;
+                                    deliveryCount =
+                                        deliveryState.deliveries.length;
                                   }
                                   return OverviewStatCard(
                                     icon: Icons.local_shipping_outlined,
@@ -374,7 +405,9 @@ class _HomeScreenState extends State<HomeScreen> {
                                     unit: 'books',
                                     description: 'Delivered today',
                                     trendText: '$deliveryCount total',
-                                    trendColor: deliveryCount > 0 ? AppColors.success : AppColors.error,
+                                    trendColor: deliveryCount > 0
+                                        ? AppColors.success
+                                        : AppColors.error,
                                   );
                                 },
                               ),
@@ -396,7 +429,9 @@ class _HomeScreenState extends State<HomeScreen> {
                                 trendColor: AppColors.success,
                               ),
                             ),
-                            const Expanded(child: SizedBox()), // Empty space for odd number
+                            const Expanded(
+                              child: SizedBox(),
+                            ), // Empty space for odd number
                           ],
                         ),
                       ],
@@ -429,7 +464,8 @@ class _HomeScreenState extends State<HomeScreen> {
                           label: 'Verify Workers',
                           description: 'Approve or reject join requests',
                           color: AppColors.accent,
-                          onTap: () => context.go('/leader/worker-verification'),
+                          onTap: () =>
+                              context.go('/leader/worker-verification'),
                         ),
                         _ManagementItem(
                           icon: Icons.assignment,
@@ -476,7 +512,6 @@ class _HomeScreenState extends State<HomeScreen> {
             const SliverToBoxAdapter(child: SizedBox(height: 24)),
 
             // Quick Actions for Leaders - removed since Management section covers these
-
             const SliverToBoxAdapter(child: SizedBox(height: 24)),
 
             // Recent Team Activity
@@ -491,9 +526,8 @@ class _HomeScreenState extends State<HomeScreen> {
                       children: [
                         Text(
                           'Recent Team Activity',
-                          style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.bold,
-                          ),
+                          style: Theme.of(context).textTheme.titleMedium
+                              ?.copyWith(fontWeight: FontWeight.bold),
                         ),
                         TextButton(
                           onPressed: () => context.go('/reports'),
@@ -504,10 +538,14 @@ class _HomeScreenState extends State<HomeScreen> {
                     const SizedBox(height: 12),
                     Container(
                       decoration: BoxDecoration(
-                        color: isDark ? AppColors.surfaceDark : AppColors.surfaceLight,
+                        color: isDark
+                            ? AppColors.surfaceDark
+                            : AppColors.surfaceLight,
                         borderRadius: BorderRadius.circular(16),
                         border: Border.all(
-                          color: isDark ? AppColors.borderDark : AppColors.borderLight,
+                          color: isDark
+                              ? AppColors.borderDark
+                              : AppColors.borderLight,
                         ),
                       ),
                       child: Column(
@@ -520,7 +558,13 @@ class _HomeScreenState extends State<HomeScreen> {
                             color: AppColors.success,
                             isDark: isDark,
                           ),
-                          Divider(height: 1, indent: 72, color: isDark ? AppColors.borderDark : AppColors.borderLight),
+                          Divider(
+                            height: 1,
+                            indent: 72,
+                            color: isDark
+                                ? AppColors.borderDark
+                                : AppColors.borderLight,
+                          ),
                           _ActivityItem(
                             icon: Icons.login,
                             title: 'Session Started',
@@ -529,7 +573,13 @@ class _HomeScreenState extends State<HomeScreen> {
                             color: AppColors.primary,
                             isDark: isDark,
                           ),
-                          Divider(height: 1, indent: 72, color: isDark ? AppColors.borderDark : AppColors.borderLight),
+                          Divider(
+                            height: 1,
+                            indent: 72,
+                            color: isDark
+                                ? AppColors.borderDark
+                                : AppColors.borderLight,
+                          ),
                           _ActivityItem(
                             icon: Icons.local_shipping,
                             title: 'Delivery Made',
@@ -554,7 +604,11 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   // Worker Home Screen
-  Widget _buildWorkerHome(BuildContext context, AuthState authState, bool isDark) {
+  Widget _buildWorkerHome(
+    BuildContext context,
+    AuthState authState,
+    bool isDark,
+  ) {
     final userName = authState is AuthAuthenticated
         ? authState.user.displayName ?? 'User'
         : 'User';
@@ -567,10 +621,7 @@ class _HomeScreenState extends State<HomeScreen> {
             SliverAppBar(
               floating: true,
               centerTitle: false,
-              title: const SizedBox(
-                height: 36,
-                child: AppHorizontalLogo(),
-              ),
+              title: const SizedBox(height: 36, child: AppHorizontalLogo()),
               actions: [
                 RealtimeNotificationBadge(
                   onTap: () => context.push('/notifications'),
@@ -583,8 +634,8 @@ class _HomeScreenState extends State<HomeScreen> {
                     child: Text(
                       authState is AuthAuthenticated
                           ? (authState.user.displayName?.isNotEmpty == true
-                              ? authState.user.displayName![0].toUpperCase()
-                              : 'U')
+                                ? authState.user.displayName![0].toUpperCase()
+                                : 'U')
                           : 'U',
                       style: const TextStyle(
                         color: AppColors.primary,
@@ -608,17 +659,54 @@ class _HomeScreenState extends State<HomeScreen> {
                     Text(
                       'Welcome back,',
                       style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                        color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                        color: isDark
+                            ? AppColors.textSecondaryDark
+                            : AppColors.textSecondaryLight,
                       ),
                     ),
                     const SizedBox(height: 4),
                     Text(
                       userName,
-                      style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
+                      style: Theme.of(context).textTheme.headlineMedium
+                          ?.copyWith(fontWeight: FontWeight.bold),
                     ),
                   ],
+                ),
+              ),
+            ),
+
+            // Target Banner
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.only(top: 8, bottom: 16),
+                child: TargetBanner(
+                  targets: [
+                    TargetBannerData(
+                      label: 'Territory',
+                      current: '2',
+                      target: '5',
+                      icon: Icons.map_outlined,
+                      progress: 0.4,
+                      color: AppColors.success,
+                    ),
+                    TargetBannerData(
+                      label: 'Donations',
+                      current: '\$150',
+                      target: '\$500',
+                      icon: Icons.volunteer_activism_outlined,
+                      progress: 0.3,
+                      color: AppColors.accent,
+                    ),
+                    TargetBannerData(
+                      label: 'Prayers',
+                      current: '3',
+                      target: '5',
+                      icon: Icons.volunteer_activism,
+                      progress: 0.6,
+                      color: AppColors.secondary,
+                    ),
+                  ],
+                  onTap: () => context.push('/targets'),
                 ),
               ),
             ),
@@ -634,14 +722,19 @@ class _HomeScreenState extends State<HomeScreen> {
                         schedule: currentSchedule,
                         onViewAll: () => context.go('/my-schedule'),
                         onStartSession: currentSchedule.status == 'scheduled'
-                            ? () => _showScheduleStartDialog(context, currentSchedule)
+                            ? () => _showScheduleStartDialog(
+                                context,
+                                currentSchedule,
+                              )
                             : null,
                       );
                     }
                   }
                   return Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 20),
-                    child: _NoScheduleCard(onViewSchedule: () => context.go('/my-schedule')),
+                    child: _NoScheduleCard(
+                      onViewSchedule: () => context.go('/my-schedule'),
+                    ),
                   );
                 },
               ),
@@ -678,9 +771,9 @@ class _HomeScreenState extends State<HomeScreen> {
                 padding: const EdgeInsets.symmetric(horizontal: 20),
                 child: Text(
                   'Quick Action',
-                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
+                  style: Theme.of(
+                    context,
+                  ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
                 ),
               ),
             ),
@@ -693,62 +786,73 @@ class _HomeScreenState extends State<HomeScreen> {
                 padding: const EdgeInsets.symmetric(horizontal: 20),
                 child: BlocBuilder<WorkSessionBloc, WorkSessionState>(
                   builder: (context, sessionState) {
-                    return QuickActionGrid(
-                      actions: [
-                        QuickActionTileData(
-                          icon: Icons.map_outlined,
-                          label: 'My Territory',
-                          backgroundColor: QuickActionColors.territory,
-                          onTap: () => context.go('/territory'),
-                        ),
-                        QuickActionTileData(
-                          icon: Icons.volunteer_activism_outlined,
-                          label: 'Donation',
-                          backgroundColor: QuickActionColors.delivery,
-                          onTap: () => context.go('/delivery'),
-                        ),
-                        QuickActionTileData(
-                          icon: Icons.assignment_outlined,
-                          label: 'Survey Form',
-                          backgroundColor: QuickActionColors.survey,
-                          onTap: () => context.go('/survey'),
-                        ),
-                        QuickActionTileData(
-                          icon: Icons.volunteer_activism,
-                          label: 'Prayer Request',
-                          backgroundColor: QuickActionColors.prayer,
-                          onTap: () => context.go('/prayer-requests/new'),
-                        ),
-                        QuickActionTileData(
-                          icon: Icons.groups_outlined,
-                          label: 'Team Group',
-                          backgroundColor: QuickActionColors.team,
-                          onTap: () => context.go('/chat'),
-                        ),
-                        QuickActionTileData(
-                          icon: Icons.gps_fixed,
-                          label: 'GPS Tracking',
-                          backgroundColor: QuickActionColors.tracking,
-                          onTap: () {
-                            if (sessionState is WorkSessionActive) {
-                              _showEndSessionDialog(context);
-                            } else {
-                              _showTerritorySelectionSheet(context);
-                            }
-                          },
-                        ),
-                        QuickActionTileData(
-                          icon: Icons.article_outlined,
-                          label: 'News',
-                          backgroundColor: QuickActionColors.news,
-                          onTap: () => context.go('/blogs'),
-                        ),
-                        QuickActionTileData(
-                          icon: Icons.emoji_events_outlined,
-                          label: 'Achievements',
-                          backgroundColor: QuickActionColors.achievements,
-                          onTap: () {}, // TODO: Navigate to achievements
-                        ),
+                    final allActions = [
+                      QuickActionTileData(
+                        icon: Icons.map_outlined,
+                        label: 'My Territory',
+                        backgroundColor: QuickActionColors.territory,
+                        onTap: () => context.go('/territory'),
+                      ),
+                      QuickActionTileData(
+                        icon: Icons.volunteer_activism_outlined,
+                        label: 'Donation',
+                        backgroundColor: QuickActionColors.delivery,
+                        onTap: () => context.go('/delivery'),
+                      ),
+                      QuickActionTileData(
+                        icon: Icons.assignment_outlined,
+                        label: 'Survey Form',
+                        backgroundColor: QuickActionColors.survey,
+                        onTap: () => context.go('/survey'),
+                      ),
+                      QuickActionTileData(
+                        icon: Icons.volunteer_activism,
+                        label: 'Prayer Request',
+                        backgroundColor: QuickActionColors.prayer,
+                        onTap: () => context.go('/prayer-requests/new'),
+                      ),
+                      QuickActionTileData(
+                        icon: Icons.groups_outlined,
+                        label: 'Team Group',
+                        backgroundColor: QuickActionColors.team,
+                        onTap: () => context.go('/chat'),
+                      ),
+                      QuickActionTileData(
+                        icon: Icons.article_outlined,
+                        label: 'News',
+                        backgroundColor: QuickActionColors.news,
+                        onTap: () => context.go('/blogs'),
+                      ),
+                      QuickActionTileData(
+                        icon: Icons.emoji_events_outlined,
+                        label: 'Achievements',
+                        backgroundColor: QuickActionColors.achievements,
+                        onTap: () => context.push('/achievements'),
+                      ),
+                    ];
+
+                    final displayedActions = _showAllTiles
+                        ? allActions
+                        : allActions.take(4).toList();
+
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        QuickActionGrid(actions: displayedActions),
+                        if (!_showAllTiles) ...[
+                          const SizedBox(height: 8),
+                          Center(
+                            child: TextButton.icon(
+                              onPressed: () {
+                                setState(() {
+                                  _showAllTiles = true;
+                                });
+                              },
+                              icon: const Icon(Icons.expand_more),
+                              label: const Text('View All'),
+                            ),
+                          ),
+                        ],
                       ],
                     );
                   },
@@ -780,120 +884,166 @@ class _HomeScreenState extends State<HomeScreen> {
 
             const SliverToBoxAdapter(child: SizedBox(height: 24)),
 
-            // Ministry Overview Section
+            // Ministry Overview Section - Hidden by default, show on button press
             SliverToBoxAdapter(
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 20),
-                child: Text(
-                  'Ministry Overview',
-                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'Ministry Overview',
+                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    TextButton.icon(
+                      onPressed: () {
+                        setState(() {
+                          _showStats = !_showStats;
+                        });
+                      },
+                      icon: Icon(
+                        _showStats ? Icons.visibility_off : Icons.visibility,
+                      ),
+                      label: Text(_showStats ? 'Hide' : 'Show'),
+                    ),
+                  ],
                 ),
               ),
             ),
 
-            const SliverToBoxAdapter(child: SizedBox(height: 16)),
+            // Ministry Stats Grid - Only show when _showStats is true
+            if (_showStats) ...[
+              const SliverToBoxAdapter(child: SizedBox(height: 16)),
 
-            // Ministry Stats Grid
-            SliverToBoxAdapter(
-              child: BlocBuilder<LocationBloc, LocationState>(
-                builder: (context, locationState) {
-                  // Get stats from LocationBloc
-                  double distanceKm = 0.0;
-                  double hoursActive = 0.0;
+              SliverToBoxAdapter(
+                child: BlocBuilder<LocationBloc, LocationState>(
+                  builder: (context, locationState) {
+                    // Get stats from LocationBloc
+                    double distanceKm = 0.0;
+                    double hoursActive = 0.0;
 
-                  if (locationState is LocationStatsLoaded) {
-                    distanceKm = locationState.stats.totalDistanceMeters / 1000;
-                    hoursActive = locationState.stats.totalDurationSeconds / 3600;
-                  }
+                    if (locationState is LocationStatsLoaded) {
+                      distanceKm =
+                          locationState.stats.totalDistanceMeters / 1000;
+                      hoursActive =
+                          locationState.stats.totalDurationSeconds / 3600;
+                    }
 
-                  return Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 20),
-                    child: Column(
-                      children: [
-                        Row(
-                          children: [
-                            Expanded(
-                              child: OverviewStatCard(
-                                icon: Icons.route_outlined,
-                                iconBackgroundColor: AppColors.primary,
-                                title: 'Distance Covered',
-                                value: distanceKm.toStringAsFixed(1),
-                                unit: 'km',
-                                description: 'Total distance',
-                                trendText: distanceKm > 0 ? '${distanceKm.toStringAsFixed(2)} km total' : 'No data',
-                                trendColor: distanceKm > 0 ? AppColors.success : AppColors.error,
+                    return Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 20),
+                      child: Column(
+                        children: [
+                          Row(
+                            children: [
+                              Expanded(
+                                child: OverviewStatCard(
+                                  icon: Icons.route_outlined,
+                                  iconBackgroundColor: AppColors.primary,
+                                  title: 'Distance Covered',
+                                  value: distanceKm.toStringAsFixed(1),
+                                  unit: 'km',
+                                  description: 'Total distance',
+                                  trendText: distanceKm > 0
+                                      ? '${distanceKm.toStringAsFixed(2)} km total'
+                                      : 'No data',
+                                  trendColor: distanceKm > 0
+                                      ? AppColors.success
+                                      : AppColors.error,
+                                ),
                               ),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: BlocBuilder<PrayerRequestBloc, PrayerRequestState>(
-                                builder: (context, prayerState) {
-                                  int prayerCount = 0;
-                                  if (prayerState is PrayerRequestLoaded) {
-                                    prayerCount = prayerState.prayerRequests.length;
-                                  }
-                                  return OverviewStatCard(
-                                    icon: Icons.volunteer_activism,
-                                    iconBackgroundColor: AppColors.secondary,
-                                    title: 'Prayer Requests',
-                                    value: '$prayerCount',
-                                    unit: 'prayers',
-                                    description: 'Submitted prayers',
-                                    trendText: prayerCount > 0 ? '$prayerCount total' : 'No activity',
-                                    trendColor: prayerCount > 0 ? AppColors.success : AppColors.error,
-                                  );
-                                },
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child:
+                                    BlocBuilder<
+                                      PrayerRequestBloc,
+                                      PrayerRequestState
+                                    >(
+                                      builder: (context, prayerState) {
+                                        int prayerCount = 0;
+                                        if (prayerState
+                                            is PrayerRequestLoaded) {
+                                          prayerCount =
+                                              prayerState.prayerRequests.length;
+                                        }
+                                        return OverviewStatCard(
+                                          icon: Icons.volunteer_activism,
+                                          iconBackgroundColor:
+                                              AppColors.secondary,
+                                          title: 'Prayer Requests',
+                                          value: '$prayerCount',
+                                          unit: 'prayers',
+                                          description: 'Submitted prayers',
+                                          trendText: prayerCount > 0
+                                              ? '$prayerCount total'
+                                              : 'No activity',
+                                          trendColor: prayerCount > 0
+                                              ? AppColors.success
+                                              : AppColors.error,
+                                        );
+                                      },
+                                    ),
                               ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 12),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: OverviewStatCard(
-                                icon: Icons.schedule_outlined,
-                                iconBackgroundColor: AppColors.accent,
-                                title: 'Hours Active',
-                                value: hoursActive.toStringAsFixed(1),
-                                unit: 'hours',
-                                description: 'Total ministry time',
-                                trendText: hoursActive > 0 ? '${hoursActive.toStringAsFixed(1)}h total' : 'No activity',
-                                trendColor: hoursActive > 0 ? AppColors.success : AppColors.error,
+                            ],
+                          ),
+                          const SizedBox(height: 12),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: OverviewStatCard(
+                                  icon: Icons.schedule_outlined,
+                                  iconBackgroundColor: AppColors.accent,
+                                  title: 'Hours Active',
+                                  value: hoursActive.toStringAsFixed(1),
+                                  unit: 'hours',
+                                  description: 'Total ministry time',
+                                  trendText: hoursActive > 0
+                                      ? '${hoursActive.toStringAsFixed(1)}h total'
+                                      : 'No activity',
+                                  trendColor: hoursActive > 0
+                                      ? AppColors.success
+                                      : AppColors.error,
+                                ),
                               ),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: BlocBuilder<DeliveryBloc, DeliveryState>(
-                                builder: (context, deliveryState) {
-                                  double totalDonations = 0;
-                                  if (deliveryState is DeliveryListLoaded) {
-                                    for (final delivery in deliveryState.deliveries) {
-                                      totalDonations += delivery.donationAmount ?? 0;
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: BlocBuilder<DeliveryBloc, DeliveryState>(
+                                  builder: (context, deliveryState) {
+                                    double totalDonations = 0;
+                                    if (deliveryState is DeliveryListLoaded) {
+                                      for (final delivery
+                                          in deliveryState.deliveries) {
+                                        totalDonations +=
+                                            delivery.donationAmount ?? 0;
+                                      }
                                     }
-                                  }
-                                  return OverviewStatCard(
-                                    icon: Icons.attach_money,
-                                    iconBackgroundColor: AppColors.success,
-                                    title: 'Donations Collected',
-                                    value: '\$${totalDonations.toStringAsFixed(0)}',
-                                    description: 'Total donations',
-                                    trendText: totalDonations > 0 ? '\$${totalDonations.toStringAsFixed(2)} total' : 'No donations',
-                                    trendColor: totalDonations > 0 ? AppColors.success : AppColors.error,
-                                  );
-                                },
+                                    return OverviewStatCard(
+                                      icon: Icons.attach_money,
+                                      iconBackgroundColor: AppColors.success,
+                                      title: 'Donations Collected',
+                                      value:
+                                          '\$${totalDonations.toStringAsFixed(0)}',
+                                      description: 'Total donations',
+                                      trendText: totalDonations > 0
+                                          ? '\$${totalDonations.toStringAsFixed(2)} total'
+                                          : 'No donations',
+                                      trendColor: totalDonations > 0
+                                          ? AppColors.success
+                                          : AppColors.error,
+                                    );
+                                  },
+                                ),
                               ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  );
-                },
+                            ],
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                ),
               ),
-            ),
+            ],
 
             const SliverToBoxAdapter(child: SizedBox(height: 24)),
 
@@ -909,9 +1059,8 @@ class _HomeScreenState extends State<HomeScreen> {
                       children: [
                         Text(
                           'My Territory',
-                          style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.bold,
-                          ),
+                          style: Theme.of(context).textTheme.titleMedium
+                              ?.copyWith(fontWeight: FontWeight.bold),
                         ),
                         TextButton(
                           onPressed: () => context.go('/territory'),
@@ -926,30 +1075,44 @@ class _HomeScreenState extends State<HomeScreen> {
                           return Container(
                             height: 120,
                             decoration: BoxDecoration(
-                              color: isDark ? AppColors.surfaceDark : AppColors.surfaceLight,
+                              color: isDark
+                                  ? AppColors.surfaceDark
+                                  : AppColors.surfaceLight,
                               borderRadius: BorderRadius.circular(16),
                               border: Border.all(
-                                color: isDark ? AppColors.borderDark : AppColors.borderLight,
+                                color: isDark
+                                    ? AppColors.borderDark
+                                    : AppColors.borderLight,
                               ),
                             ),
-                            child: const Center(child: CircularProgressIndicator()),
+                            child: const Center(
+                              child: CircularProgressIndicator(),
+                            ),
                           );
                         }
 
-                        if (state is TerritoryAssignmentsLoaded && state.assignments.isNotEmpty) {
+                        if (state is TerritoryAssignmentsLoaded &&
+                            state.assignments.isNotEmpty) {
                           final assignment = state.assignments.first;
-                          final territoryName = assignment.entityName ?? 'Territory ${assignment.entityId}';
-                          final completeness = assignment.completenessPercentage;
+                          final territoryName =
+                              assignment.entityName ??
+                              'Territory ${assignment.entityId}';
+                          final completeness =
+                              assignment.completenessPercentage;
 
                           return GestureDetector(
                             onTap: () => context.go('/territory'),
                             child: Container(
                               padding: const EdgeInsets.all(16),
                               decoration: BoxDecoration(
-                                color: isDark ? AppColors.surfaceDark : AppColors.surfaceLight,
+                                color: isDark
+                                    ? AppColors.surfaceDark
+                                    : AppColors.surfaceLight,
                                 borderRadius: BorderRadius.circular(16),
                                 border: Border.all(
-                                  color: isDark ? AppColors.borderDark : AppColors.borderLight,
+                                  color: isDark
+                                      ? AppColors.borderDark
+                                      : AppColors.borderLight,
                                 ),
                               ),
                               child: Row(
@@ -958,7 +1121,9 @@ class _HomeScreenState extends State<HomeScreen> {
                                     width: 56,
                                     height: 56,
                                     decoration: BoxDecoration(
-                                      color: AppColors.primary.withValues(alpha: 0.12),
+                                      color: AppColors.primary.withValues(
+                                        alpha: 0.12,
+                                      ),
                                       borderRadius: BorderRadius.circular(12),
                                     ),
                                     child: const Icon(
@@ -970,22 +1135,32 @@ class _HomeScreenState extends State<HomeScreen> {
                                   const SizedBox(width: 16),
                                   Expanded(
                                     child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
                                       children: [
                                         Text(
                                           territoryName,
-                                          style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                                            fontWeight: FontWeight.bold,
-                                          ),
+                                          style: Theme.of(context)
+                                              .textTheme
+                                              .titleMedium
+                                              ?.copyWith(
+                                                fontWeight: FontWeight.bold,
+                                              ),
                                         ),
                                         const SizedBox(height: 4),
                                         Row(
                                           children: [
                                             Container(
-                                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                    horizontal: 8,
+                                                    vertical: 2,
+                                                  ),
                                               decoration: BoxDecoration(
-                                                color: AppColors.success.withValues(alpha: 0.12),
-                                                borderRadius: BorderRadius.circular(4),
+                                                color: AppColors.success
+                                                    .withValues(alpha: 0.12),
+                                                borderRadius:
+                                                    BorderRadius.circular(4),
                                               ),
                                               child: Text(
                                                 assignment.status.toUpperCase(),
@@ -999,9 +1174,16 @@ class _HomeScreenState extends State<HomeScreen> {
                                             const SizedBox(width: 8),
                                             Text(
                                               '${completeness.toStringAsFixed(0)}% complete',
-                                              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                                color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
-                                              ),
+                                              style: Theme.of(context)
+                                                  .textTheme
+                                                  .bodySmall
+                                                  ?.copyWith(
+                                                    color: isDark
+                                                        ? AppColors
+                                                              .textSecondaryDark
+                                                        : AppColors
+                                                              .textSecondaryLight,
+                                                  ),
                                             ),
                                           ],
                                         ),
@@ -1009,10 +1191,13 @@ class _HomeScreenState extends State<HomeScreen> {
                                           const SizedBox(height: 4),
                                           Text(
                                             '+${state.assignments.length - 1} more territories',
-                                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                              color: AppColors.primary,
-                                              fontWeight: FontWeight.w500,
-                                            ),
+                                            style: Theme.of(context)
+                                                .textTheme
+                                                .bodySmall
+                                                ?.copyWith(
+                                                  color: AppColors.primary,
+                                                  fontWeight: FontWeight.w500,
+                                                ),
                                           ),
                                         ],
                                       ],
@@ -1020,7 +1205,9 @@ class _HomeScreenState extends State<HomeScreen> {
                                   ),
                                   Icon(
                                     Icons.chevron_right,
-                                    color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                                    color: isDark
+                                        ? AppColors.textSecondaryDark
+                                        : AppColors.textSecondaryLight,
                                   ),
                                 ],
                               ),
@@ -1032,10 +1219,14 @@ class _HomeScreenState extends State<HomeScreen> {
                         return Container(
                           height: 160,
                           decoration: BoxDecoration(
-                            color: isDark ? AppColors.surfaceDark : AppColors.surfaceLight,
+                            color: isDark
+                                ? AppColors.surfaceDark
+                                : AppColors.surfaceLight,
                             borderRadius: BorderRadius.circular(16),
                             border: Border.all(
-                              color: isDark ? AppColors.borderDark : AppColors.borderLight,
+                              color: isDark
+                                  ? AppColors.borderDark
+                                  : AppColors.borderLight,
                             ),
                           ),
                           child: Center(
@@ -1045,14 +1236,19 @@ class _HomeScreenState extends State<HomeScreen> {
                                 Icon(
                                   Icons.map_outlined,
                                   size: 48,
-                                  color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                                  color: isDark
+                                      ? AppColors.textSecondaryDark
+                                      : AppColors.textSecondaryLight,
                                 ),
                                 const SizedBox(height: 8),
                                 Text(
                                   'No territory assigned',
-                                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                    color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
-                                  ),
+                                  style: Theme.of(context).textTheme.bodyMedium
+                                      ?.copyWith(
+                                        color: isDark
+                                            ? AppColors.textSecondaryDark
+                                            : AppColors.textSecondaryLight,
+                                      ),
                                 ),
                                 const SizedBox(height: 8),
                                 CustomButton(
@@ -1086,9 +1282,8 @@ class _HomeScreenState extends State<HomeScreen> {
                       children: [
                         Text(
                           'Recent Activity',
-                          style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.bold,
-                          ),
+                          style: Theme.of(context).textTheme.titleMedium
+                              ?.copyWith(fontWeight: FontWeight.bold),
                         ),
                         TextButton(
                           onPressed: () => context.go('/delivery'),
@@ -1103,34 +1298,50 @@ class _HomeScreenState extends State<HomeScreen> {
                           return Container(
                             height: 100,
                             decoration: BoxDecoration(
-                              color: isDark ? AppColors.surfaceDark : AppColors.surfaceLight,
+                              color: isDark
+                                  ? AppColors.surfaceDark
+                                  : AppColors.surfaceLight,
                               borderRadius: BorderRadius.circular(16),
                               border: Border.all(
-                                color: isDark ? AppColors.borderDark : AppColors.borderLight,
+                                color: isDark
+                                    ? AppColors.borderDark
+                                    : AppColors.borderLight,
                               ),
                             ),
-                            child: const Center(child: CircularProgressIndicator()),
+                            child: const Center(
+                              child: CircularProgressIndicator(),
+                            ),
                           );
                         }
 
-                        if (state is DeliveryListLoaded && state.deliveries.isNotEmpty) {
+                        if (state is DeliveryListLoaded &&
+                            state.deliveries.isNotEmpty) {
                           // Show up to 3 recent activities
-                          final recentDeliveries = state.deliveries.take(3).toList();
+                          final recentDeliveries = state.deliveries
+                              .take(3)
+                              .toList();
 
                           return Container(
                             decoration: BoxDecoration(
-                              color: isDark ? AppColors.surfaceDark : AppColors.surfaceLight,
+                              color: isDark
+                                  ? AppColors.surfaceDark
+                                  : AppColors.surfaceLight,
                               borderRadius: BorderRadius.circular(16),
                               border: Border.all(
-                                color: isDark ? AppColors.borderDark : AppColors.borderLight,
+                                color: isDark
+                                    ? AppColors.borderDark
+                                    : AppColors.borderLight,
                               ),
                             ),
                             child: Column(
-                              children: recentDeliveries.asMap().entries.map((entry) {
+                              children: recentDeliveries.asMap().entries.map((
+                                entry,
+                              ) {
                                 final index = entry.key;
                                 final delivery = entry.value;
                                 const color = AppColors.success;
-                                final time = delivery.createdAt ?? delivery.completedAt;
+                                final time =
+                                    delivery.createdAt ?? delivery.completedAt;
 
                                 return Column(
                                   children: [
@@ -1140,7 +1351,9 @@ class _HomeScreenState extends State<HomeScreen> {
                                         height: 40,
                                         decoration: BoxDecoration(
                                           color: color.withValues(alpha: 0.12),
-                                          borderRadius: BorderRadius.circular(10),
+                                          borderRadius: BorderRadius.circular(
+                                            10,
+                                          ),
                                         ),
                                         child: const Icon(
                                           Icons.volunteer_activism,
@@ -1150,17 +1363,23 @@ class _HomeScreenState extends State<HomeScreen> {
                                       ),
                                       title: Text(
                                         delivery.recipientName,
-                                        style: const TextStyle(fontWeight: FontWeight.w600),
+                                        style: const TextStyle(
+                                          fontWeight: FontWeight.w600,
+                                        ),
                                         maxLines: 1,
                                         overflow: TextOverflow.ellipsis,
                                       ),
                                       subtitle: Text(
                                         time != null
-                                            ? DateFormat('MMM d, h:mm a').format(time)
+                                            ? DateFormat(
+                                                'MMM d, h:mm a',
+                                              ).format(time)
                                             : 'Donation',
                                         style: TextStyle(
                                           fontSize: 12,
-                                          color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                                          color: isDark
+                                              ? AppColors.textSecondaryDark
+                                              : AppColors.textSecondaryLight,
                                         ),
                                       ),
                                       trailing: Text(
@@ -1176,7 +1395,9 @@ class _HomeScreenState extends State<HomeScreen> {
                                       Divider(
                                         height: 1,
                                         indent: 72,
-                                        color: isDark ? AppColors.borderDark : AppColors.borderLight,
+                                        color: isDark
+                                            ? AppColors.borderDark
+                                            : AppColors.borderLight,
                                       ),
                                   ],
                                 );
@@ -1189,10 +1410,14 @@ class _HomeScreenState extends State<HomeScreen> {
                         return Container(
                           padding: const EdgeInsets.all(24),
                           decoration: BoxDecoration(
-                            color: isDark ? AppColors.surfaceDark : AppColors.surfaceLight,
+                            color: isDark
+                                ? AppColors.surfaceDark
+                                : AppColors.surfaceLight,
                             borderRadius: BorderRadius.circular(16),
                             border: Border.all(
-                              color: isDark ? AppColors.borderDark : AppColors.borderLight,
+                              color: isDark
+                                  ? AppColors.borderDark
+                                  : AppColors.borderLight,
                             ),
                           ),
                           child: Center(
@@ -1201,14 +1426,19 @@ class _HomeScreenState extends State<HomeScreen> {
                                 Icon(
                                   Icons.history,
                                   size: 48,
-                                  color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                                  color: isDark
+                                      ? AppColors.textSecondaryDark
+                                      : AppColors.textSecondaryLight,
                                 ),
                                 const SizedBox(height: 8),
                                 Text(
                                   'No recent activity',
-                                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                    color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
-                                  ),
+                                  style: Theme.of(context).textTheme.bodyMedium
+                                      ?.copyWith(
+                                        color: isDark
+                                            ? AppColors.textSecondaryDark
+                                            : AppColors.textSecondaryLight,
+                                      ),
                                 ),
                               ],
                             ),
@@ -1232,9 +1462,7 @@ class _HomeScreenState extends State<HomeScreen> {
 class _TerritorySelectionSheet extends StatelessWidget {
   final Function(String territoryId, String territoryName) onTerritorySelected;
 
-  const _TerritorySelectionSheet({
-    required this.onTerritorySelected,
-  });
+  const _TerritorySelectionSheet({required this.onTerritorySelected});
 
   @override
   Widget build(BuildContext context) {
@@ -1268,10 +1496,7 @@ class _TerritorySelectionSheet extends StatelessWidget {
                 padding: const EdgeInsets.all(20),
                 child: Row(
                   children: [
-                    Icon(
-                      Icons.location_on,
-                      color: AppColors.primary,
-                    ),
+                    Icon(Icons.location_on, color: AppColors.primary),
                     const SizedBox(width: 12),
                     Text(
                       'Select Territory',
@@ -1301,21 +1526,29 @@ class _TerritorySelectionSheet extends StatelessWidget {
                               Icon(
                                 Icons.map_outlined,
                                 size: 64,
-                                color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                                color: isDark
+                                    ? AppColors.textSecondaryDark
+                                    : AppColors.textSecondaryLight,
                               ),
                               const SizedBox(height: 16),
                               Text(
                                 'No territories assigned',
-                                style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                                  color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
-                                ),
+                                style: Theme.of(context).textTheme.bodyLarge
+                                    ?.copyWith(
+                                      color: isDark
+                                          ? AppColors.textSecondaryDark
+                                          : AppColors.textSecondaryLight,
+                                    ),
                               ),
                               const SizedBox(height: 8),
                               Text(
                                 'Contact your team leader for assignments',
-                                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                  color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
-                                ),
+                                style: Theme.of(context).textTheme.bodySmall
+                                    ?.copyWith(
+                                      color: isDark
+                                          ? AppColors.textSecondaryDark
+                                          : AppColors.textSecondaryLight,
+                                    ),
                               ),
                             ],
                           ),
@@ -1330,14 +1563,17 @@ class _TerritorySelectionSheet extends StatelessWidget {
                           final assignment = assignments[index];
                           // Use territoryId (UUID) for API calls, entityId for display
                           final territoryUuid = assignment.territoryId;
-                          final displayId = assignment.entityId ?? assignment.territorySolid;
-                          final entityName = assignment.entityName ?? 'Territory $displayId';
+                          final displayId =
+                              assignment.entityId ?? assignment.territorySolid;
+                          final entityName =
+                              assignment.entityName ?? 'Territory $displayId';
                           return _TerritoryListItem(
                             name: entityName,
                             id: displayId,
                             status: assignment.status,
                             completeness: assignment.completenessPercentage,
-                            onTap: () => onTerritorySelected(territoryUuid, entityName),
+                            onTap: () =>
+                                onTerritorySelected(territoryUuid, entityName),
                           );
                         },
                       );
@@ -1360,7 +1596,9 @@ class _TerritorySelectionSheet extends StatelessWidget {
                           const SizedBox(height: 16),
                           TextButton(
                             onPressed: () {
-                              context.read<TerritoryBloc>().add(const TerritoryLoadAssignments());
+                              context.read<TerritoryBloc>().add(
+                                const TerritoryLoadAssignments(),
+                              );
                             },
                             child: const Text('Retry'),
                           ),
@@ -1408,16 +1646,13 @@ class _TerritoryListItem extends StatelessWidget {
           color: AppColors.primary.withValues(alpha: 0.12),
           borderRadius: BorderRadius.circular(12),
         ),
-        child: const Icon(
-          Icons.map,
-          color: AppColors.primary,
-        ),
+        child: const Icon(Icons.map, color: AppColors.primary),
       ),
       title: Text(
         name,
-        style: Theme.of(context).textTheme.titleMedium?.copyWith(
-          fontWeight: FontWeight.w600,
-        ),
+        style: Theme.of(
+          context,
+        ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
       ),
       subtitle: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1444,7 +1679,9 @@ class _TerritoryListItem extends StatelessWidget {
               Text(
                 '${completionPercent.toStringAsFixed(0)}% complete',
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                  color: isDark
+                      ? AppColors.textSecondaryDark
+                      : AppColors.textSecondaryLight,
                 ),
               ),
             ],
@@ -1453,7 +1690,9 @@ class _TerritoryListItem extends StatelessWidget {
       ),
       trailing: Icon(
         Icons.chevron_right,
-        color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+        color: isDark
+            ? AppColors.textSecondaryDark
+            : AppColors.textSecondaryLight,
       ),
     );
   }
@@ -1517,10 +1756,14 @@ class _TodayScheduleCard extends StatelessWidget {
                   end: Alignment.bottomRight,
                 )
               : null,
-          color: isNow ? null : (isDark ? AppColors.surfaceDark : AppColors.surfaceLight),
+          color: isNow
+              ? null
+              : (isDark ? AppColors.surfaceDark : AppColors.surfaceLight),
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
-            color: isNow ? AppColors.success : (isDark ? AppColors.borderDark : AppColors.borderLight),
+            color: isNow
+                ? AppColors.success
+                : (isDark ? AppColors.borderDark : AppColors.borderLight),
             width: isNow ? 2 : 1,
           ),
         ),
@@ -1536,17 +1779,16 @@ class _TodayScheduleCard extends StatelessWidget {
                     children: [
                       Row(
                         children: [
-                          Icon(
-                            Icons.schedule,
-                            color: statusColor,
-                            size: 20,
-                          ),
+                          Icon(Icons.schedule, color: statusColor, size: 20),
                           const SizedBox(width: 8),
                           Text(
-                            isNow ? "Current Shift" : (isUpcoming ? "Upcoming Shift" : "Today's Schedule"),
-                            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                              fontWeight: FontWeight.bold,
-                            ),
+                            isNow
+                                ? "Current Shift"
+                                : (isUpcoming
+                                      ? "Upcoming Shift"
+                                      : "Today's Schedule"),
+                            style: Theme.of(context).textTheme.titleMedium
+                                ?.copyWith(fontWeight: FontWeight.bold),
                           ),
                         ],
                       ),
@@ -1560,7 +1802,10 @@ class _TodayScheduleCard extends StatelessWidget {
                   Row(
                     children: [
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 8,
+                        ),
                         decoration: BoxDecoration(
                           color: statusColor.withValues(alpha: 0.2),
                           borderRadius: BorderRadius.circular(8),
@@ -1584,13 +1829,17 @@ class _TodayScheduleCard extends StatelessWidget {
                                   Icon(
                                     Icons.location_on,
                                     size: 16,
-                                    color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                                    color: isDark
+                                        ? AppColors.textSecondaryDark
+                                        : AppColors.textSecondaryLight,
                                   ),
                                   const SizedBox(width: 4),
                                   Expanded(
                                     child: Text(
                                       schedule.territoryName!,
-                                      style: Theme.of(context).textTheme.bodyMedium,
+                                      style: Theme.of(
+                                        context,
+                                      ).textTheme.bodyMedium,
                                       overflow: TextOverflow.ellipsis,
                                     ),
                                   ),
@@ -1598,13 +1847,19 @@ class _TodayScheduleCard extends StatelessWidget {
                               ),
                             const SizedBox(height: 4),
                             Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 6,
+                                vertical: 2,
+                              ),
                               decoration: BoxDecoration(
                                 color: statusColor.withValues(alpha: 0.2),
                                 borderRadius: BorderRadius.circular(4),
                               ),
                               child: Text(
-                                schedule.status.toUpperCase().replaceAll('_', ' '),
+                                schedule.status.toUpperCase().replaceAll(
+                                  '_',
+                                  ' ',
+                                ),
                                 style: TextStyle(
                                   fontSize: 10,
                                   fontWeight: FontWeight.bold,
@@ -1676,10 +1931,7 @@ class _NoScheduleCard extends StatelessWidget {
                 color: AppColors.secondary.withValues(alpha: 0.2),
                 borderRadius: BorderRadius.circular(12),
               ),
-              child: Icon(
-                Icons.event_available,
-                color: AppColors.secondary,
-              ),
+              child: Icon(Icons.event_available, color: AppColors.secondary),
             ),
             const SizedBox(width: 16),
             Expanded(
@@ -1696,7 +1948,9 @@ class _NoScheduleCard extends StatelessWidget {
                   Text(
                     'Tap to view your full schedule',
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                      color: isDark
+                          ? AppColors.textSecondaryDark
+                          : AppColors.textSecondaryLight,
                     ),
                   ),
                 ],
@@ -1704,7 +1958,9 @@ class _NoScheduleCard extends StatelessWidget {
             ),
             Icon(
               Icons.chevron_right,
-              color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+              color: isDark
+                  ? AppColors.textSecondaryDark
+                  : AppColors.textSecondaryLight,
             ),
           ],
         ),
@@ -1784,18 +2040,18 @@ class _ManagementListCard extends StatelessWidget {
                             children: [
                               Text(
                                 item.label,
-                                style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                                  fontWeight: FontWeight.w600,
-                                ),
+                                style: Theme.of(context).textTheme.titleSmall
+                                    ?.copyWith(fontWeight: FontWeight.w600),
                               ),
                               const SizedBox(height: 2),
                               Text(
                                 item.description,
-                                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                  color: isDark
-                                      ? AppColors.textSecondaryDark
-                                      : AppColors.textSecondaryLight,
-                                ),
+                                style: Theme.of(context).textTheme.bodySmall
+                                    ?.copyWith(
+                                      color: isDark
+                                          ? AppColors.textSecondaryDark
+                                          : AppColors.textSecondaryLight,
+                                    ),
                               ),
                             ],
                           ),
@@ -1855,15 +2111,14 @@ class _ActivityItem extends StatelessWidget {
         ),
         child: Icon(icon, color: color, size: 20),
       ),
-      title: Text(
-        title,
-        style: const TextStyle(fontWeight: FontWeight.w600),
-      ),
+      title: Text(title, style: const TextStyle(fontWeight: FontWeight.w600)),
       subtitle: Text(
         subtitle,
         style: TextStyle(
           fontSize: 12,
-          color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+          color: isDark
+              ? AppColors.textSecondaryDark
+              : AppColors.textSecondaryLight,
         ),
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
@@ -1872,7 +2127,9 @@ class _ActivityItem extends StatelessWidget {
         time,
         style: TextStyle(
           fontSize: 11,
-          color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+          color: isDark
+              ? AppColors.textSecondaryDark
+              : AppColors.textSecondaryLight,
         ),
       ),
     );

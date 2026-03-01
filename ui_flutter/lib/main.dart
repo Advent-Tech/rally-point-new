@@ -6,6 +6,8 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart';
 import 'core/theme/app_theme.dart';
 import 'core/constants/map_constants.dart';
+import 'core/storage/local_storage.dart';
+import 'presentation/navigation/app_router.dart';
 import 'presentation/blocs/auth/auth_bloc.dart';
 import 'presentation/blocs/theme/theme_bloc.dart';
 import 'presentation/blocs/territory/territory_bloc.dart';
@@ -16,7 +18,7 @@ import 'presentation/blocs/team_map/team_map_bloc.dart';
 import 'presentation/blocs/schedule/schedule_bloc.dart';
 import 'presentation/blocs/survey/survey_bloc.dart';
 import 'presentation/blocs/profile/profile_bloc.dart';
-import 'presentation/navigation/app_router.dart';
+import 'presentation/widgets/help/help_mode_provider.dart';
 import 'services/push_notification_service.dart';
 
 /// Background FCM handler — must be top-level
@@ -51,29 +53,42 @@ void main() async {
   // Initialize Mapbox access token
   MapboxOptions.setAccessToken(MapConstants.mapboxAccessToken);
 
-  runApp(const RallyPointApp());
+  // Pre-initialize LocalStorage and load onboarding status for sync router access
+  final localStorage = await LocalStorage.getInstance();
+  AppRouter.onboardingCompleted = localStorage.isOnboardingCompleted();
+  print('🚀 main: onboardingCompleted=${AppRouter.onboardingCompleted}');
+
+  // Load persisted help mode setting
+  final helpEnabled = await loadHelpMode();
+
+  runApp(RallyPointApp(helpModeEnabled: helpEnabled));
 }
 
 class RallyPointApp extends StatelessWidget {
-  const RallyPointApp({super.key});
+  final bool helpModeEnabled;
+
+  const RallyPointApp({super.key, this.helpModeEnabled = false});
 
   @override
   Widget build(BuildContext context) {
-    return MultiBlocProvider(
-      providers: [
-        BlocProvider<AuthBloc>(create: (context) => AuthBloc()),
-        BlocProvider<ThemeBloc>(
-          create: (context) => ThemeBloc()..add(const ThemeInitialize()),
-        ),
-        BlocProvider<TerritoryBloc>(create: (context) => TerritoryBloc()),
-        BlocProvider<LocationBloc>(create: (context) => LocationBloc()),
-        BlocProvider<DeliveryBloc>(create: (context) => DeliveryBloc()),
-        BlocProvider<TeamMapBloc>(create: (context) => TeamMapBloc()),
-        BlocProvider<ScheduleBloc>(create: (context) => ScheduleBloc()),
-        BlocProvider<SurveyBloc>(create: (context) => SurveyBloc()),
-        BlocProvider<ProfileBloc>(create: (context) => ProfileBloc()),
-      ],
-      child: const _AppContent(),
+    return HelpModeProvider(
+      notifier: ValueNotifier<bool>(helpModeEnabled),
+      child: MultiBlocProvider(
+        providers: [
+          BlocProvider<AuthBloc>(create: (context) => AuthBloc()),
+          BlocProvider<ThemeBloc>(
+            create: (context) => ThemeBloc()..add(const ThemeInitialize()),
+          ),
+          BlocProvider<TerritoryBloc>(create: (context) => TerritoryBloc()),
+          BlocProvider<LocationBloc>(create: (context) => LocationBloc()),
+          BlocProvider<DeliveryBloc>(create: (context) => DeliveryBloc()),
+          BlocProvider<TeamMapBloc>(create: (context) => TeamMapBloc()),
+          BlocProvider<ScheduleBloc>(create: (context) => ScheduleBloc()),
+          BlocProvider<SurveyBloc>(create: (context) => SurveyBloc()),
+          BlocProvider<ProfileBloc>(create: (context) => ProfileBloc()),
+        ],
+        child: const _AppContent(),
+      ),
     );
   }
 }

@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/constants/map_constants.dart';
 import '../../../core/network/api_client.dart';
+import '../../widgets/role_badge.dart';
 
 /// Worker Activity Screen - Shows all activity for a specific worker
 /// Used by team leaders to view detailed worker performance and activity history
@@ -96,15 +97,15 @@ class _WorkerActivityScreenState extends State<WorkerActivityScreen>
       try {
         final deliveriesResponse = await apiClient.get(
           '/api/workers/${widget.workerId}/deliveries',
-          queryParameters: {
-            'date': dateStr,
-          },
+          queryParameters: {'date': dateStr},
         );
         if (deliveriesResponse.statusCode == 200) {
           final List<dynamic> data = deliveriesResponse.data is List
               ? deliveriesResponse.data
               : deliveriesResponse.data['deliveries'] ?? [];
-          _deliveries = data.map((json) => WorkerDelivery.fromJson(json)).toList();
+          _deliveries = data
+              .map((json) => WorkerDelivery.fromJson(json))
+              .toList();
         }
       } catch (e) {
         debugPrint('Failed to load deliveries: $e');
@@ -114,15 +115,15 @@ class _WorkerActivityScreenState extends State<WorkerActivityScreen>
       try {
         final donationsResponse = await apiClient.get(
           '/api/donations/worker/${widget.workerId}',
-          queryParameters: {
-            'date': dateStr,
-          },
+          queryParameters: {'date': dateStr},
         );
         if (donationsResponse.statusCode == 200) {
           final List<dynamic> data = donationsResponse.data is List
               ? donationsResponse.data
               : donationsResponse.data['donations'] ?? [];
-          _donations = data.map((json) => WorkerDonation.fromJson(json)).toList();
+          _donations = data
+              .map((json) => WorkerDonation.fromJson(json))
+              .toList();
         }
       } catch (e) {
         debugPrint('Failed to load donations: $e');
@@ -156,19 +157,9 @@ class _WorkerActivityScreenState extends State<WorkerActivityScreen>
 
     return Scaffold(
       appBar: AppBar(
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(widget.workerName),
-            Text(
-              'Activity Details',
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
-              ),
-            ),
-          ],
-        ),
+        title: const Text('Worker Activity'),
         actions: [
+          const RoleBadge(),
           TextButton.icon(
             onPressed: _selectDate,
             icon: const Icon(Icons.calendar_today, size: 16),
@@ -189,55 +180,66 @@ class _WorkerActivityScreenState extends State<WorkerActivityScreen>
           ],
         ),
       ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : _error != null
-              ? Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
+      body: Column(
+        children: [
+          WorkerContextBanner(workerName: widget.workerName),
+          Expanded(
+            child: _isLoading
+                ? const Center(child: CircularProgressIndicator())
+                : _error != null
+                ? Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.error_outline,
+                          size: 48,
+                          color: AppColors.error,
+                        ),
+                        const SizedBox(height: 16),
+                        Text('Error: $_error'),
+                        const SizedBox(height: 16),
+                        ElevatedButton(
+                          onPressed: _loadWorkerActivity,
+                          child: const Text('Retry'),
+                        ),
+                      ],
+                    ),
+                  )
+                : TabBarView(
+                    controller: _tabController,
                     children: [
-                      Icon(Icons.error_outline, size: 48, color: AppColors.error),
-                      const SizedBox(height: 16),
-                      Text('Error: $_error'),
-                      const SizedBox(height: 16),
-                      ElevatedButton(
-                        onPressed: _loadWorkerActivity,
-                        child: const Text('Retry'),
+                      _OverviewTab(
+                        sessions: _sessions,
+                        visits: _visits,
+                        deliveries: _deliveries,
+                        donations: _donations,
+                        isDark: isDark,
+                      ),
+                      _MapTab(
+                        visits: _visits,
+                        donations: _donations,
+                        isDark: isDark,
+                      ),
+                      _TimelineTab(
+                        sessions: _sessions,
+                        visits: _visits,
+                        deliveries: _deliveries,
+                        donations: _donations,
+                        isDark: isDark,
+                      ),
+                      _StatsTab(
+                        sessions: _sessions,
+                        visits: _visits,
+                        deliveries: _deliveries,
+                        donations: _donations,
+                        isDark: isDark,
                       ),
                     ],
                   ),
-                )
-              : TabBarView(
-                  controller: _tabController,
-                  children: [
-                    _OverviewTab(
-                      sessions: _sessions,
-                      visits: _visits,
-                      deliveries: _deliveries,
-                      donations: _donations,
-                      isDark: isDark,
-                    ),
-                    _MapTab(
-                      visits: _visits,
-                      deliveries: _deliveries,
-                      isDark: isDark,
-                    ),
-                    _TimelineTab(
-                      sessions: _sessions,
-                      visits: _visits,
-                      deliveries: _deliveries,
-                      donations: _donations,
-                      isDark: isDark,
-                    ),
-                    _StatsTab(
-                      sessions: _sessions,
-                      visits: _visits,
-                      deliveries: _deliveries,
-                      donations: _donations,
-                      isDark: isDark,
-                    ),
-                  ],
-                ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -268,13 +270,17 @@ class _OverviewTab extends StatelessWidget {
             Icon(
               Icons.inbox,
               size: 64,
-              color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+              color: isDark
+                  ? AppColors.textSecondaryDark
+                  : AppColors.textSecondaryLight,
             ),
             const SizedBox(height: 16),
             Text(
               'No activity recorded for this day',
               style: TextStyle(
-                color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                color: isDark
+                    ? AppColors.textSecondaryDark
+                    : AppColors.textSecondaryLight,
               ),
             ),
           ],
@@ -316,10 +322,10 @@ class _OverviewTab extends StatelessWidget {
             children: [
               Expanded(
                 child: _SummaryCard(
-                  icon: Icons.local_shipping,
-                  label: 'Deliveries',
-                  value: deliveries.length.toString(),
-                  color: AppColors.success,
+                  icon: Icons.volunteer_activism,
+                  label: 'Donations',
+                  value: donations.length.toString(),
+                  color: AppColors.warning,
                   isDark: isDark,
                 ),
               ),
@@ -341,12 +347,14 @@ class _OverviewTab extends StatelessWidget {
           if (sessions.isNotEmpty) ...[
             Text(
               'Sessions',
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.bold,
-              ),
+              style: Theme.of(
+                context,
+              ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 12),
-            ...sessions.map((session) => _SessionCard(session: session, isDark: isDark)),
+            ...sessions.map(
+              (session) => _SessionCard(session: session, isDark: isDark),
+            ),
           ],
 
           // Recent Visits
@@ -354,25 +362,32 @@ class _OverviewTab extends StatelessWidget {
             const SizedBox(height: 16),
             Text(
               'Recent Visits',
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.bold,
-              ),
+              style: Theme.of(
+                context,
+              ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 12),
-            ...visits.take(5).map((visit) => _VisitCard(visit: visit, isDark: isDark)),
+            ...visits
+                .take(5)
+                .map((visit) => _VisitCard(visit: visit, isDark: isDark)),
           ],
 
-          // Recent Deliveries
-          if (deliveries.isNotEmpty) ...[
+          // Recent Donations
+          if (donations.isNotEmpty) ...[
             const SizedBox(height: 16),
             Text(
-              'Deliveries',
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.bold,
-              ),
+              'Donations',
+              style: Theme.of(
+                context,
+              ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 12),
-            ...deliveries.take(5).map((delivery) => _DeliveryCard(delivery: delivery, isDark: isDark)),
+            ...donations
+                .take(5)
+                .map(
+                  (donation) =>
+                      _DonationCard(donation: donation, isDark: isDark),
+                ),
           ],
         ],
       ),
@@ -383,7 +398,9 @@ class _OverviewTab extends StatelessWidget {
     int totalMinutes = 0;
     for (final session in sessions) {
       if (session.endTime != null) {
-        totalMinutes += session.endTime!.difference(session.startTime).inMinutes;
+        totalMinutes += session.endTime!
+            .difference(session.startTime)
+            .inMinutes;
       } else {
         totalMinutes += DateTime.now().difference(session.startTime).inMinutes;
       }
@@ -453,7 +470,9 @@ class _SummaryCard extends StatelessWidget {
                 Text(
                   label,
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                    color: isDark
+                        ? AppColors.textSecondaryDark
+                        : AppColors.textSecondaryLight,
                   ),
                 ),
               ],
@@ -479,10 +498,14 @@ class _SessionCard extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 8),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: isActive ? AppColors.success.withAlpha(20) : (isDark ? AppColors.surfaceDark : AppColors.surfaceLight),
+        color: isActive
+            ? AppColors.success.withAlpha(20)
+            : (isDark ? AppColors.surfaceDark : AppColors.surfaceLight),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: isActive ? AppColors.success : (isDark ? AppColors.borderDark : AppColors.borderLight),
+          color: isActive
+              ? AppColors.success
+              : (isDark ? AppColors.borderDark : AppColors.borderLight),
         ),
       ),
       child: Row(
@@ -503,7 +526,9 @@ class _SessionCard extends StatelessWidget {
                 Text(
                   '${DateFormat('HH:mm').format(session.startTime)} - ${session.endTime != null ? DateFormat('HH:mm').format(session.endTime!) : 'Active'}',
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                    color: isDark
+                        ? AppColors.textSecondaryDark
+                        : AppColors.textSecondaryLight,
                   ),
                 ),
               ],
@@ -512,7 +537,9 @@ class _SessionCard extends StatelessWidget {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
             decoration: BoxDecoration(
-              color: isActive ? AppColors.success.withAlpha(30) : AppColors.primary.withAlpha(30),
+              color: isActive
+                  ? AppColors.success.withAlpha(30)
+                  : AppColors.primary.withAlpha(30),
               borderRadius: BorderRadius.circular(8),
             ),
             child: Text(
@@ -557,7 +584,8 @@ class _VisitCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  visit.address ?? 'Visit at ${DateFormat('HH:mm').format(visit.timestamp)}',
+                  visit.address ??
+                      'Visit at ${DateFormat('HH:mm').format(visit.timestamp)}',
                   style: const TextStyle(fontWeight: FontWeight.w500),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
@@ -566,7 +594,9 @@ class _VisitCard extends StatelessWidget {
                   Text(
                     visit.notes!,
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                      color: isDark
+                          ? AppColors.textSecondaryDark
+                          : AppColors.textSecondaryLight,
                     ),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
@@ -577,7 +607,9 @@ class _VisitCard extends StatelessWidget {
           Text(
             DateFormat('HH:mm').format(visit.timestamp),
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
-              color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+              color: isDark
+                  ? AppColors.textSecondaryDark
+                  : AppColors.textSecondaryLight,
             ),
           ),
         ],
@@ -634,7 +666,9 @@ class _DeliveryCard extends StatelessWidget {
                 Text(
                   delivery.address,
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                    color: isDark
+                        ? AppColors.textSecondaryDark
+                        : AppColors.textSecondaryLight,
                   ),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
@@ -663,15 +697,89 @@ class _DeliveryCard extends StatelessWidget {
   }
 }
 
+class _DonationCard extends StatelessWidget {
+  final WorkerDonation donation;
+  final bool isDark;
+
+  const _DonationCard({required this.donation, required this.isDark});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: isDark ? AppColors.surfaceDark : AppColors.surfaceLight,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: isDark ? AppColors.borderDark : AppColors.borderLight,
+        ),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              color: AppColors.warning.withAlpha(30),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Icon(
+              Icons.volunteer_activism,
+              color: AppColors.warning,
+              size: 20,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  donation.donorName ?? 'Anonymous',
+                  style: const TextStyle(fontWeight: FontWeight.w500),
+                ),
+                Text(
+                  DateFormat('MMM d, HH:mm').format(donation.timestamp),
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: isDark
+                        ? AppColors.textSecondaryDark
+                        : AppColors.textSecondaryLight,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            decoration: BoxDecoration(
+              color: AppColors.success.withAlpha(30),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Text(
+              '\$${donation.amount.toStringAsFixed(0)}',
+              style: const TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.bold,
+                color: AppColors.success,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 // Map Tab
 class _MapTab extends StatefulWidget {
   final List<WorkerVisit> visits;
-  final List<WorkerDelivery> deliveries;
+  final List<WorkerDonation> donations;
   final bool isDark;
 
   const _MapTab({
     required this.visits,
-    required this.deliveries,
+    required this.donations,
     required this.isDark,
   });
 
@@ -685,37 +793,27 @@ class _MapTabState extends State<_MapTab> {
 
   void _onMapCreated(MapboxMap mapboxMap) async {
     _mapboxMap = mapboxMap;
-    _circleManager = await mapboxMap.annotations.createCircleAnnotationManager();
+    _circleManager = await mapboxMap.annotations
+        .createCircleAnnotationManager();
     await _addMarkers();
   }
 
   Future<void> _addMarkers() async {
     if (_circleManager == null) return;
 
-    // Add visit markers
     for (final visit in widget.visits) {
       if (visit.latitude != null && visit.longitude != null) {
-        await _circleManager!.create(CircleAnnotationOptions(
-          geometry: Point(coordinates: Position(visit.longitude!, visit.latitude!)),
-          circleColor: AppColors.accent.toARGB32(),
-          circleRadius: 10,
-          circleStrokeColor: Colors.white.toARGB32(),
-          circleStrokeWidth: 2,
-        ));
-      }
-    }
-
-    // Add delivery markers
-    for (final delivery in widget.deliveries) {
-      if (delivery.latitude != null && delivery.longitude != null) {
-        final color = delivery.status == 'delivered' ? AppColors.success : AppColors.warning;
-        await _circleManager!.create(CircleAnnotationOptions(
-          geometry: Point(coordinates: Position(delivery.longitude!, delivery.latitude!)),
-          circleColor: color.toARGB32(),
-          circleRadius: 10,
-          circleStrokeColor: Colors.white.toARGB32(),
-          circleStrokeWidth: 2,
-        ));
+        await _circleManager!.create(
+          CircleAnnotationOptions(
+            geometry: Point(
+              coordinates: Position(visit.longitude!, visit.latitude!),
+            ),
+            circleColor: AppColors.accent.toARGB32(),
+            circleRadius: 10,
+            circleStrokeColor: Colors.white.toARGB32(),
+            circleStrokeWidth: 2,
+          ),
+        );
       }
     }
   }
@@ -732,16 +830,13 @@ class _MapTabState extends State<_MapTab> {
       }
     }
 
-    for (final delivery in widget.deliveries) {
-      if (delivery.latitude != null && delivery.longitude != null) {
-        avgLat += delivery.latitude!;
-        avgLng += delivery.longitude!;
-        count++;
-      }
-    }
-
     if (count == 0) {
-      return Point(coordinates: Position(MapConstants.defaultLongitude, MapConstants.defaultLatitude));
+      return Point(
+        coordinates: Position(
+          MapConstants.defaultLongitude,
+          MapConstants.defaultLatitude,
+        ),
+      );
     }
 
     return Point(coordinates: Position(avgLng / count, avgLat / count));
@@ -750,9 +845,6 @@ class _MapTabState extends State<_MapTab> {
   bool _hasData() {
     for (final visit in widget.visits) {
       if (visit.latitude != null && visit.longitude != null) return true;
-    }
-    for (final delivery in widget.deliveries) {
-      if (delivery.latitude != null && delivery.longitude != null) return true;
     }
     return false;
   }
@@ -767,13 +859,17 @@ class _MapTabState extends State<_MapTab> {
             Icon(
               Icons.map_outlined,
               size: 64,
-              color: widget.isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+              color: widget.isDark
+                  ? AppColors.textSecondaryDark
+                  : AppColors.textSecondaryLight,
             ),
             const SizedBox(height: 16),
             Text(
               'No location data available',
               style: TextStyle(
-                color: widget.isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                color: widget.isDark
+                    ? AppColors.textSecondaryDark
+                    : AppColors.textSecondaryLight,
               ),
             ),
           ],
@@ -786,22 +882,21 @@ class _MapTabState extends State<_MapTab> {
         MapWidget(
           key: const ValueKey('workerActivityMap'),
           styleUri: MapConstants.getThemedStyleUri(widget.isDark),
-          cameraOptions: CameraOptions(
-            center: _calculateCenter(),
-            zoom: 13,
-          ),
+          cameraOptions: CameraOptions(center: _calculateCenter(), zoom: 13),
           onMapCreated: (mapboxMap) async {
             // Enable all gestures
-            await mapboxMap.gestures.updateSettings(GesturesSettings(
-              scrollEnabled: true,
-              rotateEnabled: true,
-              pinchToZoomEnabled: true,
-              doubleTapToZoomInEnabled: true,
-              doubleTouchToZoomOutEnabled: true,
-              quickZoomEnabled: true,
-              pitchEnabled: true,
-              simultaneousRotateAndPinchToZoomEnabled: true,
-            ));
+            await mapboxMap.gestures.updateSettings(
+              GesturesSettings(
+                scrollEnabled: true,
+                rotateEnabled: true,
+                pinchToZoomEnabled: true,
+                doubleTapToZoomInEnabled: true,
+                doubleTouchToZoomOutEnabled: true,
+                quickZoomEnabled: true,
+                pitchEnabled: true,
+                simultaneousRotateAndPinchToZoomEnabled: true,
+              ),
+            );
             _onMapCreated(mapboxMap);
           },
         ),
@@ -824,9 +919,15 @@ class _MapTabState extends State<_MapTab> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                _MapLegendItem(color: AppColors.accent, label: '${widget.visits.length} Visits'),
+                _MapLegendItem(
+                  color: AppColors.accent,
+                  label: '${widget.visits.length} Visits',
+                ),
                 const SizedBox(height: 4),
-                _MapLegendItem(color: AppColors.success, label: '${widget.deliveries.length} Deliveries'),
+                _MapLegendItem(
+                  color: AppColors.warning,
+                  label: '${widget.donations.length} Donations',
+                ),
               ],
             ),
           ),
@@ -850,10 +951,7 @@ class _MapLegendItem extends StatelessWidget {
         Container(
           width: 12,
           height: 12,
-          decoration: BoxDecoration(
-            color: color,
-            shape: BoxShape.circle,
-          ),
+          decoration: BoxDecoration(color: color, shape: BoxShape.circle),
         ),
         const SizedBox(width: 6),
         Text(label, style: const TextStyle(fontSize: 12)),
@@ -884,62 +982,57 @@ class _TimelineTab extends StatelessWidget {
     final activities = <_TimelineItem>[];
 
     for (final session in sessions) {
-      activities.add(_TimelineItem(
-        time: session.startTime,
-        type: 'session_start',
-        title: 'Session Started',
-        subtitle: session.territoryName ?? 'Unknown Territory',
-        icon: Icons.play_arrow,
-        color: AppColors.success,
-      ));
-      if (session.endTime != null) {
-        activities.add(_TimelineItem(
-          time: session.endTime!,
-          type: 'session_end',
-          title: 'Session Ended',
+      activities.add(
+        _TimelineItem(
+          time: session.startTime,
+          type: 'session_start',
+          title: 'Session Started',
           subtitle: session.territoryName ?? 'Unknown Territory',
-          icon: Icons.stop,
-          color: AppColors.primary,
-        ));
+          icon: Icons.play_arrow,
+          color: AppColors.success,
+        ),
+      );
+      if (session.endTime != null) {
+        activities.add(
+          _TimelineItem(
+            time: session.endTime!,
+            type: 'session_end',
+            title: 'Session Ended',
+            subtitle: session.territoryName ?? 'Unknown Territory',
+            icon: Icons.stop,
+            color: AppColors.primary,
+          ),
+        );
       }
     }
 
     for (final visit in visits) {
-      activities.add(_TimelineItem(
-        time: visit.timestamp,
-        type: 'visit',
-        title: 'Visit Logged',
-        subtitle: visit.address ?? 'Location recorded',
-        icon: Icons.home,
-        color: AppColors.accent,
-      ));
-    }
-
-    for (final delivery in deliveries) {
-      if (delivery.completedAt != null) {
-        activities.add(_TimelineItem(
-          time: delivery.completedAt!,
-          type: 'delivery',
-          title: 'Delivery ${delivery.status == 'delivered' ? 'Completed' : 'Failed'}',
-          subtitle: delivery.recipientName,
-          icon: Icons.local_shipping,
-          color: delivery.status == 'delivered' ? AppColors.success : AppColors.error,
-        ));
-      }
+      activities.add(
+        _TimelineItem(
+          time: visit.timestamp,
+          type: 'visit',
+          title: 'Visit Logged',
+          subtitle: visit.address ?? 'Location recorded',
+          icon: Icons.home,
+          color: AppColors.accent,
+        ),
+      );
     }
 
     for (final donation in donations) {
-      activities.add(_TimelineItem(
-        time: donation.timestamp,
-        type: 'donation',
-        title: 'Donation Collected',
-        subtitle: '\$${donation.amount.toStringAsFixed(2)}',
-        icon: Icons.volunteer_activism,
-        color: AppColors.warning,
-      ));
+      activities.add(
+        _TimelineItem(
+          time: donation.timestamp,
+          type: 'donation',
+          title: 'Donation Collected',
+          subtitle:
+              '\$${donation.amount.toStringAsFixed(2)}${donation.donorName != null ? ' from ${donation.donorName}' : ''}',
+          icon: Icons.volunteer_activism,
+          color: AppColors.warning,
+        ),
+      );
     }
 
-    // Sort by time descending (most recent first)
     activities.sort((a, b) => b.time.compareTo(a.time));
 
     if (activities.isEmpty) {
@@ -950,13 +1043,17 @@ class _TimelineTab extends StatelessWidget {
             Icon(
               Icons.timeline,
               size: 64,
-              color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+              color: isDark
+                  ? AppColors.textSecondaryDark
+                  : AppColors.textSecondaryLight,
             ),
             const SizedBox(height: 16),
             Text(
               'No activity timeline available',
               style: TextStyle(
-                color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                color: isDark
+                    ? AppColors.textSecondaryDark
+                    : AppColors.textSecondaryLight,
               ),
             ),
           ],
@@ -989,7 +1086,9 @@ class _TimelineTab extends StatelessWidget {
                   Container(
                     width: 2,
                     height: 40,
-                    color: isDark ? AppColors.borderDark : AppColors.borderLight,
+                    color: isDark
+                        ? AppColors.borderDark
+                        : AppColors.borderLight,
                   ),
               ],
             ),
@@ -1009,9 +1108,12 @@ class _TimelineTab extends StatelessWidget {
                         ),
                         Text(
                           DateFormat('HH:mm').format(item.time),
-                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
-                          ),
+                          style: Theme.of(context).textTheme.bodySmall
+                              ?.copyWith(
+                                color: isDark
+                                    ? AppColors.textSecondaryDark
+                                    : AppColors.textSecondaryLight,
+                              ),
                         ),
                       ],
                     ),
@@ -1019,7 +1121,9 @@ class _TimelineTab extends StatelessWidget {
                     Text(
                       item.subtitle,
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                        color: isDark
+                            ? AppColors.textSecondaryDark
+                            : AppColors.textSecondaryLight,
                       ),
                     ),
                   ],
@@ -1069,18 +1173,16 @@ class _StatsTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Calculate stats
     int totalMinutes = 0;
     for (final session in sessions) {
       if (session.endTime != null) {
-        totalMinutes += session.endTime!.difference(session.startTime).inMinutes;
+        totalMinutes += session.endTime!
+            .difference(session.startTime)
+            .inMinutes;
       } else {
         totalMinutes += DateTime.now().difference(session.startTime).inMinutes;
       }
     }
-
-    final completedDeliveries = deliveries.where((d) => d.status == 'delivered').length;
-    final failedDeliveries = deliveries.where((d) => d.status == 'failed').length;
 
     double totalDonations = 0;
     for (final d in donations) {
@@ -1094,41 +1196,51 @@ class _StatsTab extends StatelessWidget {
         children: [
           Text(
             'Performance Summary',
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-              fontWeight: FontWeight.bold,
-            ),
+            style: Theme.of(
+              context,
+            ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 16),
-          _StatRow(label: 'Total Work Time', value: '${totalMinutes ~/ 60}h ${totalMinutes % 60}m', isDark: isDark),
-          _StatRow(label: 'Sessions', value: sessions.length.toString(), isDark: isDark),
-          _StatRow(label: 'Visits Logged', value: visits.length.toString(), isDark: isDark),
-          const Divider(height: 32),
-          Text(
-            'Deliveries',
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-              fontWeight: FontWeight.bold,
-            ),
+          _StatRow(
+            label: 'Total Work Time',
+            value: '${totalMinutes ~/ 60}h ${totalMinutes % 60}m',
+            isDark: isDark,
           ),
-          const SizedBox(height: 16),
-          _StatRow(label: 'Total Deliveries', value: deliveries.length.toString(), isDark: isDark),
-          _StatRow(label: 'Completed', value: completedDeliveries.toString(), valueColor: AppColors.success, isDark: isDark),
-          _StatRow(label: 'Failed', value: failedDeliveries.toString(), valueColor: AppColors.error, isDark: isDark),
-          if (deliveries.isNotEmpty)
-            _StatRow(
-              label: 'Success Rate',
-              value: '${(completedDeliveries / deliveries.length * 100).toStringAsFixed(0)}%',
-              isDark: isDark,
-            ),
+          _StatRow(
+            label: 'Sessions',
+            value: sessions.length.toString(),
+            isDark: isDark,
+          ),
+          _StatRow(
+            label: 'Visits Logged',
+            value: visits.length.toString(),
+            isDark: isDark,
+          ),
           const Divider(height: 32),
           Text(
             'Donations',
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-              fontWeight: FontWeight.bold,
-            ),
+            style: Theme.of(
+              context,
+            ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 16),
-          _StatRow(label: 'Total Collected', value: '\$${totalDonations.toStringAsFixed(2)}', isDark: isDark),
-          _StatRow(label: 'Number of Donations', value: donations.length.toString(), isDark: isDark),
+          _StatRow(
+            label: 'Total Collected',
+            value: '\$${totalDonations.toStringAsFixed(2)}',
+            isDark: isDark,
+          ),
+          _StatRow(
+            label: 'Number of Donations',
+            value: donations.length.toString(),
+            isDark: isDark,
+          ),
+          if (donations.isNotEmpty)
+            _StatRow(
+              label: 'Average Donation',
+              value:
+                  '\$${(totalDonations / donations.length).toStringAsFixed(2)}',
+              isDark: isDark,
+            ),
         ],
       ),
     );
@@ -1158,15 +1270,14 @@ class _StatRow extends StatelessWidget {
           Text(
             label,
             style: TextStyle(
-              color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+              color: isDark
+                  ? AppColors.textSecondaryDark
+                  : AppColors.textSecondaryLight,
             ),
           ),
           Text(
             value,
-            style: TextStyle(
-              fontWeight: FontWeight.bold,
-              color: valueColor,
-            ),
+            style: TextStyle(fontWeight: FontWeight.bold, color: valueColor),
           ),
         ],
       ),
@@ -1197,16 +1308,17 @@ class WorkerSession {
       startTime: json['entry_time'] != null
           ? DateTime.parse(json['entry_time'].toString())
           : (json['check_in_time'] != null
-              ? DateTime.parse(json['check_in_time'].toString())
-              : DateTime.now()),
+                ? DateTime.parse(json['check_in_time'].toString())
+                : DateTime.now()),
       endTime: json['exit_time'] != null
           ? DateTime.tryParse(json['exit_time'].toString())
           : (json['check_out_time'] != null
-              ? DateTime.tryParse(json['check_out_time'].toString())
-              : null),
+                ? DateTime.tryParse(json['check_out_time'].toString())
+                : null),
       territoryId: json['territory_id']?.toString(),
       // Territory name can be in entity_name or territory_name
-      territoryName: json['entity_name']?.toString() ?? json['territory_name']?.toString(),
+      territoryName:
+          json['entity_name']?.toString() ?? json['territory_name']?.toString(),
     );
   }
 }
@@ -1234,8 +1346,12 @@ class WorkerVisit {
       timestamp: json['visited_at'] != null
           ? DateTime.parse(json['visited_at'].toString())
           : DateTime.now(),
-      latitude: json['latitude'] != null ? double.tryParse(json['latitude'].toString()) : null,
-      longitude: json['longitude'] != null ? double.tryParse(json['longitude'].toString()) : null,
+      latitude: json['latitude'] != null
+          ? double.tryParse(json['latitude'].toString())
+          : null,
+      longitude: json['longitude'] != null
+          ? double.tryParse(json['longitude'].toString())
+          : null,
       address: json['address']?.toString(),
       notes: json['notes']?.toString(),
     );
@@ -1269,14 +1385,18 @@ class WorkerDelivery {
       recipientName: delivery['recipient_name']?.toString() ?? 'Unknown',
       address: delivery['address']?.toString() ?? '',
       status: delivery['status']?.toString() ?? 'pending',
-      latitude: delivery['latitude'] != null ? double.tryParse(delivery['latitude'].toString()) : null,
-      longitude: delivery['longitude'] != null ? double.tryParse(delivery['longitude'].toString()) : null,
+      latitude: delivery['latitude'] != null
+          ? double.tryParse(delivery['latitude'].toString())
+          : null,
+      longitude: delivery['longitude'] != null
+          ? double.tryParse(delivery['longitude'].toString())
+          : null,
       // Backend uses completed_at not delivered_at
       completedAt: delivery['completed_at'] != null
           ? DateTime.tryParse(delivery['completed_at'].toString())
           : (delivery['delivered_at'] != null
-              ? DateTime.tryParse(delivery['delivered_at'].toString())
-              : null),
+                ? DateTime.tryParse(delivery['delivered_at'].toString())
+                : null),
     );
   }
 }

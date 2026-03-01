@@ -4,64 +4,123 @@ import '../../../core/theme/app_spacing.dart';
 /// Large colorful quick action tile for home screen.
 ///
 /// Based on the ministry app design with large rounded colored backgrounds
-/// and centered white icons.
+/// and centered white icons. Supports an optional subtitle and badge count.
 class QuickActionTile extends StatelessWidget {
   final IconData icon;
   final String label;
+  final String? subtitle;
   final Color backgroundColor;
   final VoidCallback onTap;
   final bool isSmall;
+  final int? badgeCount;
 
   const QuickActionTile({
     super.key,
     required this.icon,
     required this.label,
+    this.subtitle,
     required this.backgroundColor,
     required this.onTap,
     this.isSmall = false,
+    this.badgeCount,
   });
 
   @override
   Widget build(BuildContext context) {
-    final iconSize = isSmall ? 48.0 : 56.0;
+    final iconSize = isSmall ? 36.0 : 56.0;
     final borderRadius = isSmall ? 20.0 : 24.0;
+    final hasBadge = badgeCount != null && badgeCount! > 0;
 
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        decoration: BoxDecoration(
-          color: backgroundColor,
-          borderRadius: BorderRadius.circular(borderRadius),
-          boxShadow: [
-            BoxShadow(
-              color: backgroundColor.withValues(alpha: 0.3),
-              blurRadius: 12,
-              offset: const Offset(0, 4),
-            ),
-          ],
-        ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
+    return SizedBox.expand(
+      child: GestureDetector(
+        onTap: onTap,
+        child: Stack(
+          clipBehavior: Clip.none,
           children: [
-            Icon(
-              icon,
-              color: Colors.white,
-              size: iconSize,
-            ),
-            const SizedBox(height: AppSpacing.smd),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm),
-              child: Text(
-                label,
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.w600,
-                  color: Colors.white,
+            Positioned.fill(
+              child: Container(
+                decoration: BoxDecoration(
+                  color: backgroundColor,
+                  borderRadius: BorderRadius.circular(borderRadius),
+                  boxShadow: [
+                    BoxShadow(
+                      color: backgroundColor.withValues(alpha: 0.3),
+                      blurRadius: 12,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
                 ),
-                textAlign: TextAlign.center,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: AppSpacing.sm,
+                  vertical: AppSpacing.sm,
+                ),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(icon, color: Colors.white, size: iconSize),
+                    const SizedBox(height: 6),
+                    Text(
+                      label,
+                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.w600,
+                        color: Colors.white,
+                      ),
+                      textAlign: TextAlign.center,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    if (subtitle != null) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        subtitle!,
+                        style: TextStyle(
+                          color: Colors.white.withValues(alpha: 0.7),
+                          fontSize: 10,
+                        ),
+                        textAlign: TextAlign.center,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ],
+                ),
               ),
             ),
+            if (hasBadge)
+              Positioned(
+                right: 8,
+                top: 8,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 6,
+                    vertical: 2,
+                  ),
+                  constraints: const BoxConstraints(
+                    minWidth: 22,
+                    minHeight: 22,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(11),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.2),
+                        blurRadius: 4,
+                        offset: const Offset(0, 1),
+                      ),
+                    ],
+                  ),
+                  alignment: Alignment.center,
+                  child: Text(
+                    badgeCount! > 99 ? '99+' : '$badgeCount',
+                    style: TextStyle(
+                      color: backgroundColor,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+              ),
           ],
         ),
       ),
@@ -100,9 +159,11 @@ class QuickActionGrid extends StatelessWidget {
         return QuickActionTile(
           icon: action.icon,
           label: action.label,
+          subtitle: action.subtitle,
           backgroundColor: action.backgroundColor,
           onTap: action.onTap,
           isSmall: true,
+          badgeCount: action.badgeCount,
         );
       },
     );
@@ -113,14 +174,18 @@ class QuickActionGrid extends StatelessWidget {
 class QuickActionTileData {
   final IconData icon;
   final String label;
+  final String? subtitle;
   final Color backgroundColor;
   final VoidCallback onTap;
+  final int? badgeCount;
 
   const QuickActionTileData({
     required this.icon,
     required this.label,
+    this.subtitle,
     required this.backgroundColor,
     required this.onTap,
+    this.badgeCount,
   });
 }
 
@@ -162,5 +227,8 @@ class QuickActionColors {
   static const Color news = Color(0xFF5C6BC0);
 
   /// Amber - Walkie
+
+  /// Navy Blue - Targets
+  static const Color targets = Color(0xFF1E3A5F);
   static const Color walkie = Color(0xFFFFB300);
 }

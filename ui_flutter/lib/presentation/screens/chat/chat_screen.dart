@@ -21,6 +21,9 @@ class _ChatScreenState extends State<ChatScreen> {
   final FocusNode _focusNode = FocusNode();
   bool _isTyping = false;
   String _currentUserId = '';
+  bool _isAtBottom = true;
+  int _unreadCount = 0;
+  List<ChatMessage> _previousMessages = [];
 
   @override
   void initState() {
@@ -30,22 +33,63 @@ class _ChatScreenState extends State<ChatScreen> {
     final authState = context.read<AuthBloc>().state;
     if (authState is AuthAuthenticated) {
       _currentUserId = authState.user.id;
-      _chatBloc.setCurrentUser(authState.user.id, authState.user.displayName ?? 'User');
+      _chatBloc.setCurrentUser(
+        authState.user.id,
+        authState.user.displayName ?? 'User',
+      );
     }
 
-    _chatBloc.add(ChatSelectConversation(conversationId: widget.conversationId));
+    _chatBloc.add(
+      ChatSelectConversation(conversationId: widget.conversationId),
+    );
 
     _messageController.addListener(_onTextChanged);
+
+    _scrollController.addListener(_onScrollChanged);
+  }
+
+  void _onScrollChanged() {
+    if (_scrollController.hasClients) {
+      final maxScroll = _scrollController.position.maxScrollExtent;
+      final currentScroll = _scrollController.position.pixels;
+      const threshold = 100.0;
+
+      final isAtBottom = (maxScroll - currentScroll) <= threshold;
+      if (isAtBottom != _isAtBottom) {
+        setState(() {
+          _isAtBottom = isAtBottom;
+          if (isAtBottom) {
+            _unreadCount = 0;
+          }
+        });
+      }
+    }
+  }
+
+  void _scrollToBottom() {
+    if (_scrollController.hasClients) {
+      _scrollController.animateTo(
+        _scrollController.position.maxScrollExtent,
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeOut,
+      );
+      setState(() {
+        _unreadCount = 0;
+        _isAtBottom = true;
+      });
+    }
   }
 
   void _onTextChanged() {
     final hasText = _messageController.text.isNotEmpty;
     if (hasText != _isTyping) {
       _isTyping = hasText;
-      _chatBloc.add(ChatSendTyping(
-        conversationId: widget.conversationId,
-        isTyping: hasText,
-      ));
+      _chatBloc.add(
+        ChatSendTyping(
+          conversationId: widget.conversationId,
+          isTyping: hasText,
+        ),
+      );
     }
   }
 
@@ -63,10 +107,9 @@ class _ChatScreenState extends State<ChatScreen> {
     final text = _messageController.text.trim();
     if (text.isEmpty) return;
 
-    _chatBloc.add(ChatSendMessage(
-      conversationId: widget.conversationId,
-      content: text,
-    ));
+    _chatBloc.add(
+      ChatSendMessage(conversationId: widget.conversationId, content: text),
+    );
 
     _messageController.clear();
     _isTyping = false;
@@ -89,95 +132,187 @@ class _ChatScreenState extends State<ChatScreen> {
 
     return BlocProvider.value(
       value: _chatBloc,
-      child: BlocBuilder<ChatBloc, ChatState>(
-        builder: (context, state) {
-          String title = 'Chat';
-          String? subtitle;
-          List<ChatMessage> messages = [];
-          String? typingText;
-
+      child: BlocListener<ChatBloc, ChatState>(
+        listener: (context, state) {
           if (state is ChatInConversation) {
-            title = state.conversation.getDisplayName(_currentUserId);
-            messages = state.messages;
-            typingText = state.typingText;
-
-            // Show online status for direct chats
-            if (state.conversation.type == ConversationType.direct) {
-              final otherUser = state.conversation.participants.firstWhere(
-                (p) => p.userId != _currentUserId,
-                orElse: () => state.conversation.participants.first,
-              );
-              subtitle = otherUser.isOnline ? 'Online' : null;
-            } else {
-              subtitle = '${state.conversation.participants.length} members';
+            final newMessages = state.messages;
+            if (newMessages.length > _previousMessages.length) {
+              if (_isAtBottom) {
+                Future.delayed(const Duration(milliseconds: 100), () {
+                  if (_scrollController.hasClients) {
+                    _scrollController.animateTo(
+                      _scrollController.position.maxScrollExtent,
+                      duration: const Duration(milliseconds: 200),
+                      curve: Curves.easeOut,
+                    );
+                  }
+                });
+              } else {
+                final newCount = newMessages.length - _previousMessages.length;
+                setState(() {
+                  _unreadCount += newCount;
+                });
+              }
             }
+            _previousMessages = List.from(newMessages);
           }
+        },
+        child: BlocBuilder<ChatBloc, ChatState>(
+          builder: (context, state) {
+            String title = 'Chat';
+            String? subtitle;
+            List<ChatMessage> messages = [];
+            String? typingText;
 
-          return Scaffold(
-            appBar: AppBar(
-              title: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+            if (state is ChatInConversation) {
+              title = state.conversation.getDisplayName(_currentUserId);
+              messages = state.messages;
+              typingText = state.typingText;
+
+              // Show online status for direct chats
+              if (state.conversation.type == ConversationType.direct) {
+                final otherUser = state.conversation.participants.firstWhere(
+                  (p) => p.userId != _currentUserId,
+                  orElse: () => state.conversation.participants.first,
+                );
+                subtitle = otherUser.isOnline ? 'Online' : null;
+              } else {
+                subtitle = '${state.conversation.participants.length} members';
+              }
+            }
+
+            return Scaffold(
+              appBar: AppBar(
+                title: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(title),
+                    if (subtitle != null)
+                      Text(
+                        subtitle,
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: isDark
+                              ? AppColors.textSecondaryDark
+                              : AppColors.textSecondaryLight,
+                        ),
+                      ),
+                  ],
+                ),
+                actions: [
+                  if (state is ChatInConversation &&
+                      state.conversation.type == ConversationType.team)
+                    IconButton(
+                      icon: const Icon(Icons.group),
+                      onPressed: () =>
+                          _showParticipants(context, state.conversation),
+                    ),
+                  PopupMenuButton<String>(
+                    onSelected: (value) {
+                      // Handle menu actions
+                    },
+                    itemBuilder: (context) => [
+                      const PopupMenuItem(value: 'mute', child: Text('Mute')),
+                      const PopupMenuItem(
+                        value: 'clear',
+                        child: Text('Clear chat'),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+              body: Stack(
                 children: [
-                  Text(title),
-                  if (subtitle != null)
-                    Text(
-                      subtitle,
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                  Column(
+                    children: [
+                      // Messages list
+                      Expanded(
+                        child:
+                            (state is ChatLoading ||
+                                state is ChatInitial ||
+                                (state is ChatInConversation &&
+                                    state.isLoadingMessages))
+                            ? _buildMessageShimmer(isDark)
+                            : messages.isEmpty
+                            ? _buildEmptyMessages(context, isDark)
+                            : _buildMessagesList(messages, isDark),
+                      ),
+
+                      // Typing indicator
+                      if (typingText != null)
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 8,
+                          ),
+                          alignment: Alignment.centerLeft,
+                          child: Text(
+                            typingText,
+                            style: TextStyle(
+                              color: isDark
+                                  ? AppColors.textSecondaryDark
+                                  : AppColors.textSecondaryLight,
+                              fontStyle: FontStyle.italic,
+                              fontSize: 13,
+                            ),
+                          ),
+                        ),
+
+                      // Message input
+                      _buildMessageInput(context, isDark),
+                    ],
+                  ),
+
+                  // Unread messages indicator
+                  if (_unreadCount > 0)
+                    Positioned(
+                      bottom: 100,
+                      right: 16,
+                      child: GestureDetector(
+                        onTap: _scrollToBottom,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 14,
+                            vertical: 8,
+                          ),
+                          decoration: BoxDecoration(
+                            color: AppColors.primary,
+                            borderRadius: BorderRadius.circular(20),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withAlpha(30),
+                                blurRadius: 8,
+                                offset: const Offset(0, 2),
+                              ),
+                            ],
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                '$_unreadCount new message${_unreadCount > 1 ? 's' : ''}',
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                              const SizedBox(width: 6),
+                              const Icon(
+                                Icons.keyboard_arrow_down,
+                                color: Colors.white,
+                                size: 18,
+                              ),
+                            ],
+                          ),
+                        ),
                       ),
                     ),
                 ],
               ),
-              actions: [
-                if (state is ChatInConversation && state.conversation.type == ConversationType.team)
-                  IconButton(
-                    icon: const Icon(Icons.group),
-                    onPressed: () => _showParticipants(context, state.conversation),
-                  ),
-                PopupMenuButton<String>(
-                  onSelected: (value) {
-                    // Handle menu actions
-                  },
-                  itemBuilder: (context) => [
-                    const PopupMenuItem(value: 'mute', child: Text('Mute')),
-                    const PopupMenuItem(value: 'clear', child: Text('Clear chat')),
-                  ],
-                ),
-              ],
-            ),
-            body: Column(
-              children: [
-                // Messages list
-                Expanded(
-                  child: (state is ChatLoading || state is ChatInitial || (state is ChatInConversation && state.isLoadingMessages))
-                      ? _buildMessageShimmer(isDark)
-                      : messages.isEmpty
-                          ? _buildEmptyMessages(context, isDark)
-                          : _buildMessagesList(messages, isDark),
-                ),
-
-                // Typing indicator
-                if (typingText != null)
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                    alignment: Alignment.centerLeft,
-                    child: Text(
-                      typingText,
-                      style: TextStyle(
-                        color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
-                        fontStyle: FontStyle.italic,
-                        fontSize: 13,
-                      ),
-                    ),
-                  ),
-
-                // Message input
-                _buildMessageInput(context, isDark),
-              ],
-            ),
-          );
-        },
+            );
+          },
+        ),
       ),
     );
   }
@@ -218,21 +353,27 @@ class _ChatScreenState extends State<ChatScreen> {
           Icon(
             Icons.chat_bubble_outline,
             size: 64,
-            color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+            color: isDark
+                ? AppColors.textSecondaryDark
+                : AppColors.textSecondaryLight,
           ),
           const SizedBox(height: 16),
           Text(
             'No messages yet',
             style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                  color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
-                ),
+              color: isDark
+                  ? AppColors.textSecondaryDark
+                  : AppColors.textSecondaryLight,
+            ),
           ),
           const SizedBox(height: 8),
           Text(
             'Start the conversation!',
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
-                ),
+              color: isDark
+                  ? AppColors.textSecondaryDark
+                  : AppColors.textSecondaryLight,
+            ),
           ),
         ],
       ),
@@ -247,10 +388,17 @@ class _ChatScreenState extends State<ChatScreen> {
       itemBuilder: (context, index) {
         final message = messages[index];
         final isMe = message.senderId == _currentUserId;
-        final showAvatar = !isMe && (index == 0 || messages[index - 1].senderId != message.senderId);
-        final showTime = index == messages.length - 1 ||
+        final showAvatar =
+            !isMe &&
+            (index == 0 || messages[index - 1].senderId != message.senderId);
+        final showTime =
+            index == messages.length - 1 ||
             messages[index + 1].senderId != message.senderId ||
-            (messages[index + 1].createdAt?.difference(message.createdAt ?? DateTime.now()).inMinutes ?? 0) > 5;
+            (messages[index + 1].createdAt
+                        ?.difference(message.createdAt ?? DateTime.now())
+                        .inMinutes ??
+                    0) >
+                5;
 
         return _MessageBubble(
           message: message,
@@ -287,7 +435,9 @@ class _ChatScreenState extends State<ChatScreen> {
             onPressed: () {
               // TODO: Implement file attachment
             },
-            color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+            color: isDark
+                ? AppColors.textSecondaryDark
+                : AppColors.textSecondaryLight,
           ),
           Expanded(
             child: TextField(
@@ -304,7 +454,10 @@ class _ChatScreenState extends State<ChatScreen> {
                 ),
                 filled: true,
                 fillColor: isDark ? Colors.grey[800] : Colors.grey[200],
-                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 10,
+                ),
               ),
               onSubmitted: (_) => _sendMessage(),
             ),
@@ -336,9 +489,9 @@ class _ChatScreenState extends State<ChatScreen> {
           children: [
             Text(
               'Participants (${conversation.participants.length})',
-              style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
+              style: Theme.of(
+                context,
+              ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 16),
             Flexible(
@@ -378,7 +531,11 @@ class _ChatScreenState extends State<ChatScreen> {
     );
   }
 
-  void _showMessageOptions(BuildContext context, ChatMessage message, bool isMe) {
+  void _showMessageOptions(
+    BuildContext context,
+    ChatMessage message,
+    bool isMe,
+  ) {
     showModalBottomSheet(
       context: context,
       shape: const RoundedRectangleBorder(
@@ -408,7 +565,10 @@ class _ChatScreenState extends State<ChatScreen> {
               ),
               ListTile(
                 leading: const Icon(Icons.delete, color: AppColors.error),
-                title: const Text('Delete', style: TextStyle(color: AppColors.error)),
+                title: const Text(
+                  'Delete',
+                  style: TextStyle(color: AppColors.error),
+                ),
                 onTap: () {
                   Navigator.pop(context);
                   _chatBloc.add(ChatDeleteMessage(messageId: message.id));
@@ -431,9 +591,7 @@ class _ChatScreenState extends State<ChatScreen> {
         content: TextField(
           controller: controller,
           maxLines: 4,
-          decoration: const InputDecoration(
-            border: OutlineInputBorder(),
-          ),
+          decoration: const InputDecoration(border: OutlineInputBorder()),
         ),
         actions: [
           TextButton(
@@ -442,10 +600,12 @@ class _ChatScreenState extends State<ChatScreen> {
           ),
           ElevatedButton(
             onPressed: () {
-              _chatBloc.add(ChatEditMessage(
-                messageId: message.id,
-                newContent: controller.text,
-              ));
+              _chatBloc.add(
+                ChatEditMessage(
+                  messageId: message.id,
+                  newContent: controller.text,
+                ),
+              );
               Navigator.pop(context);
             },
             child: const Text('Save'),
@@ -486,7 +646,9 @@ class _MessageBubble extends StatelessWidget {
         bottom: showTime ? 8 : 2,
       ),
       child: Row(
-        mainAxisAlignment: isMe ? MainAxisAlignment.end : MainAxisAlignment.start,
+        mainAxisAlignment: isMe
+            ? MainAxisAlignment.end
+            : MainAxisAlignment.start,
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
           if (!isMe && showAvatar)
@@ -514,7 +676,10 @@ class _MessageBubble extends StatelessWidget {
                 constraints: BoxConstraints(
                   maxWidth: MediaQuery.of(context).size.width * 0.75,
                 ),
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 10,
+                ),
                 decoration: BoxDecoration(
                   color: isMe
                       ? AppColors.primary
@@ -537,14 +702,18 @@ class _MessageBubble extends StatelessWidget {
                           style: TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.bold,
-                            color: isDark ? AppColors.textSecondaryDark : AppColors.primary,
+                            color: isDark
+                                ? AppColors.textSecondaryDark
+                                : AppColors.primary,
                           ),
                         ),
                       ),
                     Text(
                       message.content,
                       style: TextStyle(
-                        color: isMe ? Colors.white : (isDark ? Colors.white : Colors.black87),
+                        color: isMe
+                            ? Colors.white
+                            : (isDark ? Colors.white : Colors.black87),
                       ),
                     ),
                     if (showTime || message.isEdited || message.isSending)
@@ -559,7 +728,9 @@ class _MessageBubble extends StatelessWidget {
                                 fontSize: 11,
                                 color: isMe
                                     ? Colors.white70
-                                    : (isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight),
+                                    : (isDark
+                                          ? AppColors.textSecondaryDark
+                                          : AppColors.textSecondaryLight),
                               ),
                             ),
                             if (message.isEdited)
@@ -570,7 +741,9 @@ class _MessageBubble extends StatelessWidget {
                                   fontStyle: FontStyle.italic,
                                   color: isMe
                                       ? Colors.white70
-                                      : (isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight),
+                                      : (isDark
+                                            ? AppColors.textSecondaryDark
+                                            : AppColors.textSecondaryLight),
                                 ),
                               ),
                             if (message.isSending)
@@ -581,14 +754,20 @@ class _MessageBubble extends StatelessWidget {
                                   height: 12,
                                   child: CircularProgressIndicator(
                                     strokeWidth: 2,
-                                    color: isMe ? Colors.white70 : AppColors.primary,
+                                    color: isMe
+                                        ? Colors.white70
+                                        : AppColors.primary,
                                   ),
                                 ),
                               ),
                             if (message.hasFailed)
                               const Padding(
                                 padding: EdgeInsets.only(left: 4),
-                                child: Icon(Icons.error_outline, size: 14, color: AppColors.error),
+                                child: Icon(
+                                  Icons.error_outline,
+                                  size: 14,
+                                  color: AppColors.error,
+                                ),
                               ),
                           ],
                         ),

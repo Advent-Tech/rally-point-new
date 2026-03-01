@@ -203,16 +203,13 @@ class WebSocketService {
     _isInitialized = true;
   }
 
-  /// Get the WebSocket URL based on environment
+  /// Get the WebSocket URL for location service (via API gateway proxy)
   String get _wsUrl {
     if (kReleaseMode) {
-      return 'wss://api.rallypoint.app${ApiConstants.wsGeneric}';
+      return 'wss://api.rallypoint.app${ApiConstants.wsLocation}';
     }
-    // Development - use production server for real devices
-    // Convert http://18.188.1.122:8080 to ws://18.188.1.122:8080
-    final baseUrl = ApiConstants.prodBaseUrl;
-    final wsBase = baseUrl.replaceFirst('http://', 'ws://').replaceFirst('https://', 'wss://');
-    return '$wsBase${ApiConstants.wsGeneric}';
+    // Development - use API gateway proxy at port 8080
+    return 'ws://18.188.1.122:8080${ApiConstants.wsLocation}';
   }
 
   /// Message stream for reactive updates
@@ -318,25 +315,26 @@ class WebSocketService {
 
   /// Subscribe to a specific channel (e.g., walkie channel, team channel)
   void subscribeToChannel(String channelId, {String? channelType}) {
-    send(WsMessage(
-      type: WsMessageType.unknown,
-      data: {
-        'action': 'subscribe',
-        'channel_id': channelId,
-        if (channelType != null) 'channel_type': channelType,
-      },
-    ));
+    send(
+      WsMessage(
+        type: WsMessageType.unknown,
+        data: {
+          'action': 'subscribe',
+          'channel_id': channelId,
+          if (channelType != null) 'channel_type': channelType,
+        },
+      ),
+    );
   }
 
   /// Unsubscribe from a channel
   void unsubscribeFromChannel(String channelId) {
-    send(WsMessage(
-      type: WsMessageType.unknown,
-      data: {
-        'action': 'unsubscribe',
-        'channel_id': channelId,
-      },
-    ));
+    send(
+      WsMessage(
+        type: WsMessageType.unknown,
+        data: {'action': 'unsubscribe', 'channel_id': channelId},
+      ),
+    );
   }
 
   /// Register a message handler for a specific type
@@ -389,6 +387,10 @@ class WebSocketService {
       // Broadcast to stream
       _messageController.add(message);
 
+      debugPrint(
+        'WebSocket: ALL received: type=${json["type"]}, data=${json["data"]}',
+      );
+
       // Call type-specific handlers
       final handlers = _messageHandlers[message.type];
       if (handlers != null) {
@@ -398,6 +400,7 @@ class WebSocketService {
       }
 
       debugPrint('WebSocket: Received ${message.type}');
+      debugPrint('WebSocket: Message data: $json');
     } catch (e) {
       debugPrint('WebSocket: Parse error: $e');
     }
@@ -477,15 +480,17 @@ extension WebSocketLocationExtension on WebSocketService {
     double? accuracy,
     String? sessionId,
   }) {
-    send(WsMessage(
-      type: WsMessageType.locationUpdate,
-      data: {
-        'latitude': latitude,
-        'longitude': longitude,
-        if (accuracy != null) 'accuracy': accuracy,
-        if (sessionId != null) 'session_id': sessionId,
-      },
-    ));
+    send(
+      WsMessage(
+        type: WsMessageType.locationUpdate,
+        data: {
+          'latitude': latitude,
+          'longitude': longitude,
+          if (accuracy != null) 'accuracy': accuracy,
+          if (sessionId != null) 'session_id': sessionId,
+        },
+      ),
+    );
   }
 }
 
@@ -493,36 +498,44 @@ extension WebSocketLocationExtension on WebSocketService {
 extension WebSocketWalkieExtension on WebSocketService {
   void joinWalkieChannel(String channelId) {
     subscribeToChannel(channelId, channelType: 'walkie');
-    send(WsMessage(
-      type: WsMessageType.walkieParticipantJoined,
-      data: {'channel_id': channelId},
-      channelId: channelId,
-    ));
+    send(
+      WsMessage(
+        type: WsMessageType.walkieParticipantJoined,
+        data: {'channel_id': channelId},
+        channelId: channelId,
+      ),
+    );
   }
 
   void leaveWalkieChannel(String channelId) {
-    send(WsMessage(
-      type: WsMessageType.walkieParticipantLeft,
-      data: {'channel_id': channelId},
-      channelId: channelId,
-    ));
+    send(
+      WsMessage(
+        type: WsMessageType.walkieParticipantLeft,
+        data: {'channel_id': channelId},
+        channelId: channelId,
+      ),
+    );
     unsubscribeFromChannel(channelId);
   }
 
   void startSpeaking(String channelId) {
-    send(WsMessage(
-      type: WsMessageType.walkieSpeakingStart,
-      data: {'channel_id': channelId},
-      channelId: channelId,
-    ));
+    send(
+      WsMessage(
+        type: WsMessageType.walkieSpeakingStart,
+        data: {'channel_id': channelId},
+        channelId: channelId,
+      ),
+    );
   }
 
   void stopSpeaking(String channelId) {
-    send(WsMessage(
-      type: WsMessageType.walkieSpeakingEnd,
-      data: {'channel_id': channelId},
-      channelId: channelId,
-    ));
+    send(
+      WsMessage(
+        type: WsMessageType.walkieSpeakingEnd,
+        data: {'channel_id': channelId},
+        channelId: channelId,
+      ),
+    );
   }
 }
 
@@ -539,19 +552,21 @@ extension WebSocketTeamExtension on WebSocketService {
   Stream<WsMessage> get teamActivityStream =>
       messagesOfType(WsMessageType.teamActivityUpdate);
 
-  Stream<WsMessage> get teamMemberStatusStream =>
-      messageStream.where((msg) =>
-          msg.type == WsMessageType.teamMemberOnline ||
-          msg.type == WsMessageType.teamMemberOffline);
+  Stream<WsMessage> get teamMemberStatusStream => messageStream.where(
+    (msg) =>
+        msg.type == WsMessageType.teamMemberOnline ||
+        msg.type == WsMessageType.teamMemberOffline,
+  );
 }
 
 /// Extension for delivery updates
 extension WebSocketDeliveryExtension on WebSocketService {
-  Stream<WsMessage> get deliveryUpdatesStream =>
-      messageStream.where((msg) =>
-          msg.type == WsMessageType.deliveryCreated ||
-          msg.type == WsMessageType.deliveryUpdated ||
-          msg.type == WsMessageType.deliveryStatusChanged);
+  Stream<WsMessage> get deliveryUpdatesStream => messageStream.where(
+    (msg) =>
+        msg.type == WsMessageType.deliveryCreated ||
+        msg.type == WsMessageType.deliveryUpdated ||
+        msg.type == WsMessageType.deliveryStatusChanged,
+  );
 }
 
 /// Extension for chat functionality
@@ -572,15 +587,17 @@ extension WebSocketChatExtension on WebSocketService {
     required String content,
     String? tempId,
   }) {
-    send(WsMessage(
-      type: WsMessageType.chatMessage,
-      data: {
-        'conversation_id': conversationId,
-        'content': content,
-        if (tempId != null) 'temp_id': tempId,
-      },
-      channelId: conversationId,
-    ));
+    send(
+      WsMessage(
+        type: WsMessageType.chatMessage,
+        data: {
+          'conversation_id': conversationId,
+          'content': content,
+          if (tempId != null) 'temp_id': tempId,
+        },
+        channelId: conversationId,
+      ),
+    );
   }
 
   /// Send typing indicator
@@ -588,50 +605,55 @@ extension WebSocketChatExtension on WebSocketService {
     required String conversationId,
     required bool isTyping,
   }) {
-    send(WsMessage(
-      type: WsMessageType.chatTyping,
-      data: {
-        'conversation_id': conversationId,
-        'is_typing': isTyping,
-      },
-      channelId: conversationId,
-    ));
+    send(
+      WsMessage(
+        type: WsMessageType.chatTyping,
+        data: {'conversation_id': conversationId, 'is_typing': isTyping},
+        channelId: conversationId,
+      ),
+    );
   }
 
   /// Mark messages as read
   void markChatAsRead(String conversationId) {
-    send(WsMessage(
-      type: WsMessageType.chatRead,
-      data: {'conversation_id': conversationId},
-      channelId: conversationId,
-    ));
+    send(
+      WsMessage(
+        type: WsMessageType.chatRead,
+        data: {'conversation_id': conversationId},
+        channelId: conversationId,
+      ),
+    );
   }
 
   /// Stream of chat messages for a specific conversation
   Stream<WsMessage> chatMessagesFor(String conversationId) {
-    return messageStream.where((msg) =>
-        msg.type == WsMessageType.chatMessage &&
-        msg.channelId == conversationId);
+    return messageStream.where(
+      (msg) =>
+          msg.type == WsMessageType.chatMessage &&
+          msg.channelId == conversationId,
+    );
   }
 
   /// Stream of all chat-related events
-  Stream<WsMessage> get chatStream =>
-      messageStream.where((msg) =>
-          msg.type == WsMessageType.chatMessage ||
-          msg.type == WsMessageType.chatMessageUpdated ||
-          msg.type == WsMessageType.chatMessageDeleted ||
-          msg.type == WsMessageType.chatTyping ||
-          msg.type == WsMessageType.chatRead ||
-          msg.type == WsMessageType.chatParticipantOnline ||
-          msg.type == WsMessageType.chatParticipantOffline);
+  Stream<WsMessage> get chatStream => messageStream.where(
+    (msg) =>
+        msg.type == WsMessageType.chatMessage ||
+        msg.type == WsMessageType.chatMessageUpdated ||
+        msg.type == WsMessageType.chatMessageDeleted ||
+        msg.type == WsMessageType.chatTyping ||
+        msg.type == WsMessageType.chatRead ||
+        msg.type == WsMessageType.chatParticipantOnline ||
+        msg.type == WsMessageType.chatParticipantOffline,
+  );
 
   /// Stream of typing indicators
   Stream<WsMessage> get typingStream =>
       messagesOfType(WsMessageType.chatTyping);
 
   /// Stream of participant status changes
-  Stream<WsMessage> get chatParticipantStatusStream =>
-      messageStream.where((msg) =>
-          msg.type == WsMessageType.chatParticipantOnline ||
-          msg.type == WsMessageType.chatParticipantOffline);
+  Stream<WsMessage> get chatParticipantStatusStream => messageStream.where(
+    (msg) =>
+        msg.type == WsMessageType.chatParticipantOnline ||
+        msg.type == WsMessageType.chatParticipantOffline,
+  );
 }

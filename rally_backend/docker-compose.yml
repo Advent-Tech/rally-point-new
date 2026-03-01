@@ -218,7 +218,7 @@ services:
       - SMTP_PASSWORD=ehehkcforlbrjcld
       - SMTP_FROM=brichhaliya@gmail.com
       - SMTP_FROM_NAME=Rally Point
-      - FRONTEND_URL=http://18.188.1.122:3000
+      - FRONTEND_URL=http://18.188.1.122
       - GO_ENV=production
     volumes:
       - blog_uploads:/app/uploads

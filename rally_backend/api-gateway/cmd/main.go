@@ -697,6 +697,20 @@ func setupRouter(cfg *config.Config, jwtManager *auth.JWTManager, rateLimiter mi
 		admin.DELETE("/territories/allocations/:id", serviceProxy.ProxyRequest("territory"))
 		admin.GET("/territories/allocations/leader/:leaderId", serviceProxy.ProxyRequest("territory"))
 
+		// Target templates (admin can create organization-wide targets)
+		admin.POST("/targets", serviceProxy.ProxyRequest("delivery"))
+		admin.GET("/targets", serviceProxy.ProxyRequest("delivery"))
+		admin.PUT("/targets/:id", serviceProxy.ProxyRequest("delivery"))
+		admin.DELETE("/targets/:id", serviceProxy.ProxyRequest("delivery"))
+		admin.POST("/targets/:id/assign-team", serviceProxy.ProxyRequest("delivery"))
+		admin.POST("/targets/:id/assign-worker", serviceProxy.ProxyRequest("delivery"))
+
+		// Achievement management (admin)
+		admin.GET("/achievements", serviceProxy.ProxyRequest("delivery"))
+		admin.POST("/achievements", serviceProxy.ProxyRequest("delivery"))
+		admin.PUT("/achievements/:id", serviceProxy.ProxyRequest("delivery"))
+		admin.DELETE("/achievements/:id", serviceProxy.ProxyRequest("delivery"))
+
 		// Proxy admin routes to all services
 		// Note: territories routes handled explicitly above to avoid catch-all conflict
 		admin.Any("/users/*path", serviceProxy.ProxyRequest("user"))
@@ -727,6 +741,19 @@ func setupRouter(cfg *config.Config, jwtManager *auth.JWTManager, rateLimiter mi
 		teamLeaderRoutes.GET("/:id/invitations", serviceProxy.ProxyRequest("user"))
 		teamLeaderRoutes.DELETE("/:id/invitations/:invitationId", serviceProxy.ProxyRequest("user"))
 		teamLeaderRoutes.POST("/:id/invitations/:invitationId/resend", serviceProxy.ProxyRequest("user"))
+
+		// Target management for team leaders
+		teamLeaderRoutes.POST("/targets", serviceProxy.ProxyRequest("delivery"))
+		teamLeaderRoutes.GET("/targets", serviceProxy.ProxyRequest("delivery"))
+		teamLeaderRoutes.PUT("/targets/:id", serviceProxy.ProxyRequest("delivery"))
+		teamLeaderRoutes.DELETE("/targets/:id", serviceProxy.ProxyRequest("delivery"))
+		teamLeaderRoutes.POST("/targets/:id/assign-worker", serviceProxy.ProxyRequest("delivery"))
+		teamLeaderRoutes.GET("/targets/assigned", serviceProxy.ProxyRequest("delivery"))
+		teamLeaderRoutes.DELETE("/assignments/:id", serviceProxy.ProxyRequest("delivery"))
+
+		// Team progress overview
+		teamLeaderRoutes.GET("/team-progress", serviceProxy.ProxyRequest("delivery"))
+		teamLeaderRoutes.GET("/team-leaderboard", serviceProxy.ProxyRequest("delivery"))
 	}
 
 	// =====================================================
@@ -742,6 +769,28 @@ func setupRouter(cfg *config.Config, jwtManager *auth.JWTManager, rateLimiter mi
 		workerTeamRoutes.GET("/my-request", serviceProxy.ProxyRequest("user"))
 		workerTeamRoutes.GET("/my-requests", serviceProxy.ProxyRequest("user"))
 		workerTeamRoutes.DELETE("/my-request", serviceProxy.ProxyRequest("user"))
+	}
+
+	// =====================================================
+	// TARGETS ROUTES (accessible to all authenticated users)
+	// =====================================================
+	targetsRoutes := protected.Group("/targets")
+	{
+		// Worker: Get my targets
+		targetsRoutes.GET("/me", serviceProxy.ProxyRequest("delivery"))
+		targetsRoutes.GET("/me/progress", serviceProxy.ProxyRequest("delivery"))
+		targetsRoutes.GET("/:assignmentId/progress", serviceProxy.ProxyRequest("delivery"))
+	}
+
+	// =====================================================
+	// ACHIEVEMENTS ROUTES (accessible to all authenticated users)
+	// =====================================================
+	achievementsRoutes := protected.Group("/achievements")
+	{
+		// Worker: Get my achievements
+		achievementsRoutes.GET("/me", serviceProxy.ProxyRequest("delivery"))
+		achievementsRoutes.GET("/me/:category", serviceProxy.ProxyRequest("delivery"))
+		achievementsRoutes.GET("/me/level", serviceProxy.ProxyRequest("delivery"))
 	}
 
 	// =====================================================

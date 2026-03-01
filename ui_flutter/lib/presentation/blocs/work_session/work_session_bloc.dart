@@ -1,5 +1,6 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:equatable/equatable.dart';
+import 'package:flutter/foundation.dart';
 import '../../../core/network/api_client.dart';
 import '../../../core/constants/api_constants.dart';
 import '../../../core/storage/local_storage.dart';
@@ -49,7 +50,8 @@ class WorkSessionBloc extends Bloc<WorkSessionEvent, WorkSessionState> {
 
       // Get worker ID
       final userData = _localStorage?.getUserData();
-      final workerId = userData?['id']?.toString() ?? userData?['user_id']?.toString();
+      final workerId =
+          userData?['id']?.toString() ?? userData?['user_id']?.toString();
 
       // Try to get current session from server first (source of truth)
       try {
@@ -71,10 +73,9 @@ class WorkSessionBloc extends Bloc<WorkSessionEvent, WorkSessionState> {
 
           if (_currentSession!.isActive) {
             final visits = await _fetchTodayVisits();
-            emit(WorkSessionActive(
-              session: _currentSession!,
-              todayVisits: visits,
-            ));
+            emit(
+              WorkSessionActive(session: _currentSession!, todayVisits: visits),
+            );
             return;
           } else {
             // Session exists but not active - clear and show inactive
@@ -93,10 +94,9 @@ class WorkSessionBloc extends Bloc<WorkSessionEvent, WorkSessionState> {
         _currentSession = WorkSession.fromJson(cachedSession);
         if (_currentSession!.isActive) {
           final visits = await _fetchTodayVisits();
-          emit(WorkSessionActive(
-            session: _currentSession!,
-            todayVisits: visits,
-          ));
+          emit(
+            WorkSessionActive(session: _currentSession!, todayVisits: visits),
+          );
           return;
         }
       }
@@ -124,7 +124,8 @@ class WorkSessionBloc extends Bloc<WorkSessionEvent, WorkSessionState> {
 
       // Get worker ID from local storage
       final userData = _localStorage?.getUserData();
-      final workerId = userData?['id']?.toString() ?? userData?['user_id']?.toString();
+      final workerId =
+          userData?['id']?.toString() ?? userData?['user_id']?.toString();
 
       if (workerId == null || workerId.isEmpty) {
         emit(const WorkSessionError(message: 'User not authenticated'));
@@ -148,10 +149,12 @@ class WorkSessionBloc extends Bloc<WorkSessionEvent, WorkSessionState> {
         _currentSession = WorkSession.fromJson(sessionData);
         await _localStorage?.saveCurrentWorkSession(sessionData);
 
-        emit(WorkSessionActive(
-          session: _currentSession!,
-          todayVisits: [],
-        ));
+        // Auto-start GPS tracking after check-in
+        _autoTrackingEnabled = true;
+        _trackingService ??= await SessionTrackingService.getInstance();
+        await _startTrackingService();
+
+        emit(WorkSessionActive(session: _currentSession!, todayVisits: []));
       } else {
         emit(WorkSessionError(message: 'Failed to check in'));
       }
@@ -171,7 +174,8 @@ class WorkSessionBloc extends Bloc<WorkSessionEvent, WorkSessionState> {
 
       // Get worker ID from local storage
       final userData = _localStorage?.getUserData();
-      final workerId = userData?['id']?.toString() ?? userData?['user_id']?.toString();
+      final workerId =
+          userData?['id']?.toString() ?? userData?['user_id']?.toString();
 
       if (workerId == null || workerId.isEmpty) {
         emit(const WorkSessionError(message: 'User not authenticated'));
@@ -182,7 +186,9 @@ class WorkSessionBloc extends Bloc<WorkSessionEvent, WorkSessionState> {
       String? sessionId = _currentSession?.id;
       if (sessionId == null || sessionId.isEmpty) {
         final cachedSession = _localStorage?.getCurrentWorkSession();
-        sessionId = cachedSession?['id']?.toString() ?? cachedSession?['session_id']?.toString();
+        sessionId =
+            cachedSession?['id']?.toString() ??
+            cachedSession?['session_id']?.toString();
       }
 
       if (sessionId == null || sessionId.isEmpty) {
@@ -248,10 +254,7 @@ class WorkSessionBloc extends Bloc<WorkSessionEvent, WorkSessionState> {
       if (response.statusCode == 200 || response.statusCode == 201) {
         // Refresh today's visits
         final visits = await _fetchTodayVisits();
-        emit(WorkSessionActive(
-          session: _currentSession!,
-          todayVisits: visits,
-        ));
+        emit(WorkSessionActive(session: _currentSession!, todayVisits: visits));
       } else {
         emit(const WorkSessionError(message: 'Failed to log visit'));
       }
@@ -277,7 +280,9 @@ class WorkSessionBloc extends Bloc<WorkSessionEvent, WorkSessionState> {
         final data = response.data is List
             ? response.data
             : (response.data['visits'] ?? []);
-        return data.map<VisitRecord>((json) => VisitRecord.fromJson(json)).toList();
+        return data
+            .map<VisitRecord>((json) => VisitRecord.fromJson(json))
+            .toList();
       }
     } catch (_) {
       // Silently handle errors - visits are not critical for session display
@@ -298,38 +303,17 @@ class WorkSessionBloc extends Bloc<WorkSessionEvent, WorkSessionState> {
     WorkSessionToggleAutoTracking event,
     Emitter<WorkSessionState> emit,
   ) async {
+    debugPrint('[WorkSessionBloc] Toggle auto-tracking: ${event.enabled}');
     await _initialize();
     _trackingService ??= await SessionTrackingService.getInstance();
+    debugPrint(
+      '[WorkSessionBloc] Tracking service initialized: $_trackingService',
+    );
 
     _autoTrackingEnabled = event.enabled;
 
     if (event.enabled) {
-      // Set up callbacks
-      _trackingService!.onAutoSessionStarted = (sessionId, territory) {
-        add(WorkSessionAutoCheckIn(
-          territoryId: territory.territoryId,
-          territoryName: territory.entityName ?? 'Territory ${territory.territorySolid}',
-          latitude: _trackingService!.lastPosition?.latitude ?? 0,
-          longitude: _trackingService!.lastPosition?.longitude ?? 0,
-        ));
-      };
-
-      _trackingService!.onAutoSessionEnded = (sessionId) {
-        add(WorkSessionAutoCheckOut(
-          latitude: _trackingService!.lastPosition?.latitude,
-          longitude: _trackingService!.lastPosition?.longitude,
-        ));
-      };
-
-      _trackingService!.onLocationUpdated = (position) {
-        add(WorkSessionLocationUpdated(
-          latitude: position.latitude,
-          longitude: position.longitude,
-          accuracy: position.accuracy,
-        ));
-      };
-
-      await _trackingService!.startTracking();
+      await _startTrackingService();
     } else {
       await _trackingService!.stopTracking();
     }
@@ -343,6 +327,47 @@ class WorkSessionBloc extends Bloc<WorkSessionEvent, WorkSessionState> {
     }
   }
 
+  /// Start the tracking service with all callbacks
+  Future<void> _startTrackingService() async {
+    if (_trackingService == null) return;
+
+    debugPrint('[WorkSessionBloc] Starting tracking...');
+    // Set up callbacks
+    _trackingService!.onAutoSessionStarted = (sessionId, territory) {
+      add(
+        WorkSessionAutoCheckIn(
+          territoryId: territory.territoryId,
+          territoryName:
+              territory.entityName ?? 'Territory ${territory.territorySolid}',
+          latitude: _trackingService!.lastPosition?.latitude ?? 0,
+          longitude: _trackingService!.lastPosition?.longitude ?? 0,
+        ),
+      );
+    };
+
+    _trackingService!.onAutoSessionEnded = (sessionId) {
+      add(
+        WorkSessionAutoCheckOut(
+          latitude: _trackingService!.lastPosition?.latitude,
+          longitude: _trackingService!.lastPosition?.longitude,
+        ),
+      );
+    };
+
+    _trackingService!.onLocationUpdated = (position) {
+      add(
+        WorkSessionLocationUpdated(
+          latitude: position.latitude,
+          longitude: position.longitude,
+          accuracy: position.accuracy,
+        ),
+      );
+    };
+
+    await _trackingService!.startTracking();
+    debugPrint('[WorkSessionBloc] Tracking started');
+  }
+
   /// Handle auto check-in from geofence
   Future<void> _onAutoCheckIn(
     WorkSessionAutoCheckIn event,
@@ -354,7 +379,8 @@ class WorkSessionBloc extends Bloc<WorkSessionEvent, WorkSessionState> {
 
       // Get worker ID from local storage
       final userData = _localStorage?.getUserData();
-      final workerId = userData?['id']?.toString() ?? userData?['user_id']?.toString();
+      final workerId =
+          userData?['id']?.toString() ?? userData?['user_id']?.toString();
 
       if (workerId == null || workerId.isEmpty) {
         return; // Can't auto check-in without worker ID
@@ -378,13 +404,15 @@ class WorkSessionBloc extends Bloc<WorkSessionEvent, WorkSessionState> {
         _currentSession = WorkSession.fromJson(sessionData);
         await _localStorage?.saveCurrentWorkSession(sessionData);
 
-        emit(WorkSessionActive(
-          session: _currentSession!,
-          todayVisits: [],
-          autoTrackingEnabled: _autoTrackingEnabled,
-          currentLatitude: event.latitude,
-          currentLongitude: event.longitude,
-        ));
+        emit(
+          WorkSessionActive(
+            session: _currentSession!,
+            todayVisits: [],
+            autoTrackingEnabled: _autoTrackingEnabled,
+            currentLatitude: event.latitude,
+            currentLongitude: event.longitude,
+          ),
+        );
       }
     } catch (e) {
       // Silent failure for auto check-in
@@ -403,7 +431,8 @@ class WorkSessionBloc extends Bloc<WorkSessionEvent, WorkSessionState> {
 
       // Get worker ID from local storage
       final userData = _localStorage?.getUserData();
-      final workerId = userData?['id']?.toString() ?? userData?['user_id']?.toString();
+      final workerId =
+          userData?['id']?.toString() ?? userData?['user_id']?.toString();
 
       if (workerId == null || workerId.isEmpty) {
         return; // Can't auto check-out without worker ID
@@ -427,10 +456,12 @@ class WorkSessionBloc extends Bloc<WorkSessionEvent, WorkSessionState> {
         _currentSession = null;
         await _localStorage?.clearCurrentWorkSession();
 
-        emit(WorkSessionInactive(
-          lastSession: lastSession,
-          autoTrackingEnabled: _autoTrackingEnabled,
-        ));
+        emit(
+          WorkSessionInactive(
+            lastSession: lastSession,
+            autoTrackingEnabled: _autoTrackingEnabled,
+          ),
+        );
       }
     } catch (e) {
       // Silent failure for auto check-out
@@ -444,10 +475,12 @@ class WorkSessionBloc extends Bloc<WorkSessionEvent, WorkSessionState> {
   ) async {
     final currentState = state;
     if (currentState is WorkSessionActive) {
-      emit(currentState.copyWith(
-        currentLatitude: event.latitude,
-        currentLongitude: event.longitude,
-      ));
+      emit(
+        currentState.copyWith(
+          currentLatitude: event.latitude,
+          currentLongitude: event.longitude,
+        ),
+      );
     }
   }
 

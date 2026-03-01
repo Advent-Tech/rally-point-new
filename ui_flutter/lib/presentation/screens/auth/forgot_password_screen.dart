@@ -77,9 +77,16 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
         elevation: 0,
       ),
       body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24),
-          child: _emailSent ? _buildSuccessView() : _buildFormView(isDark),
+        child: Builder(
+          builder: (context) => SingleChildScrollView(
+            padding: EdgeInsets.fromLTRB(
+              24,
+              24,
+              24,
+              24 + MediaQuery.of(context).viewInsets.bottom,
+            ),
+            child: _emailSent ? _buildSuccessView() : _buildFormView(isDark),
+          ),
         ),
       ),
     );
@@ -112,9 +119,9 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
         const SizedBox(height: 32),
         Text(
           'Check Your Email',
-          style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-            fontWeight: FontWeight.bold,
-          ),
+          style: Theme.of(
+            context,
+          ).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
           textAlign: TextAlign.center,
         ),
         const SizedBox(height: 16),
@@ -123,9 +130,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
           decoration: BoxDecoration(
             color: AppColors.info.withValues(alpha: 0.1),
             borderRadius: BorderRadius.circular(16),
-            border: Border.all(
-              color: AppColors.info.withValues(alpha: 0.2),
-            ),
+            border: Border.all(color: AppColors.info.withValues(alpha: 0.2)),
           ),
           child: Column(
             children: [
@@ -232,16 +237,18 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
           // Title
           Text(
             'Forgot Password?',
-            style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-              fontWeight: FontWeight.bold,
-            ),
+            style: Theme.of(
+              context,
+            ).textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.bold),
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: 8),
           Text(
             'No worries! Enter your email address and we\'ll send you a link to reset your password.',
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-              color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+              color: isDark
+                  ? AppColors.textSecondaryDark
+                  : AppColors.textSecondaryLight,
             ),
             textAlign: TextAlign.center,
           ),
@@ -257,7 +264,9 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
               if (value == null || value.isEmpty) {
                 return 'Please enter your email';
               }
-              if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(value)) {
+              if (!RegExp(
+                r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$',
+              ).hasMatch(value)) {
                 return 'Please enter a valid email';
               }
               return null;
