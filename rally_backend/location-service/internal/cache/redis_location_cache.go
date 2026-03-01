@@ -12,9 +12,9 @@ import (
 )
 
 const (
-	workerKeyPrefix = "worker:location:"
+	workerKeyPrefix  = "worker:location:"
 	activeWorkersKey = "active_workers"
-	workerTTL       = 5 * time.Minute
+	workerTTL        = 5 * time.Minute
 )
 
 // RedisLocationCache implements WorkerLocationCache using Redis
@@ -100,6 +100,51 @@ func (c *RedisLocationCache) GetActiveWorkers() ([]*domain.WorkerLocation, error
 	// Clean up expired entries from the set
 	if len(expiredIDs) > 0 {
 		c.client.SRem(ctx, activeWorkersKey, expiredIDs...)
+	}
+
+	return workers, nil
+}
+
+// GetActiveWorkersByTeam returns all workers with recent cached locations for a specific team
+func (c *RedisLocationCache) GetActiveWorkersByTeam(teamID string) ([]*domain.WorkerLocation, error) {
+	ctx := context.Background()
+	memberIDs, err := c.client.SMembers(ctx, activeWorkersKey).Result()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get active worker set: %w", err)
+	}
+
+	if len(memberIDs) == 0 {
+		return nil, nil
+	}
+
+	// Build keys for MGET
+	keys := make([]string, len(memberIDs))
+	for i, id := range memberIDs {
+		keys[i] = workerKeyPrefix + id
+	}
+
+	values, err := c.client.MGet(ctx, keys...).Result()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get worker locations: %w", err)
+	}
+
+	var workers []*domain.WorkerLocation
+
+	for _, val := range values {
+		if val == nil {
+			continue
+		}
+		str, ok := val.(string)
+		if !ok {
+			continue
+		}
+		var worker domain.WorkerLocation
+		if json.Unmarshal([]byte(str), &worker) == nil {
+			// Filter by team ID
+			if teamID == "" || worker.TeamID == teamID {
+				workers = append(workers, &worker)
+			}
+		}
 	}
 
 	return workers, nil

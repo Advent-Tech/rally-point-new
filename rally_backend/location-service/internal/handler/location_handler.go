@@ -287,6 +287,26 @@ func (h *LocationHandler) GetActiveWorkers(c *gin.Context) {
 	})
 }
 
+// GetTeamActiveWorkers handles getting active workers for a specific team with their live locations
+func (h *LocationHandler) GetTeamActiveWorkers(c *gin.Context) {
+	teamID := c.Query("team_id")
+	if teamID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "team_id is required"})
+		return
+	}
+
+	workers, err := h.locationService.GetActiveWorkersByTeam(teamID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"workers": workers,
+		"count":   len(workers),
+	})
+}
+
 // SetWorkerOffline handles setting a worker offline
 func (h *LocationHandler) SetWorkerOffline(c *gin.Context) {
 	userID := c.GetString("user_id")

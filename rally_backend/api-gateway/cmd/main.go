@@ -232,6 +232,9 @@ func setupRouter(cfg *config.Config, jwtManager *auth.JWTManager, rateLimiter mi
 	// WebSocket proxy to chat service (handled by walkie-service)
 	router.GET("/ws/chat", middleware.OptionalAuthMiddleware(jwtManager), serviceProxy.ProxyWebSocket("walkie", "/ws/chat"))
 
+	// WebSocket proxy to location service (for real-time worker tracking)
+	router.GET("/ws/location", middleware.OptionalAuthMiddleware(jwtManager), serviceProxy.ProxyWebSocket("location", "/ws/location"))
+
 	// API routes
 	api := router.Group("/api")
 	api.Use(middleware.RateLimitMiddleware(rateLimiter))
@@ -312,6 +315,7 @@ func setupRouter(cfg *config.Config, jwtManager *auth.JWTManager, rateLimiter mi
 			locations.GET("/team/:teamId/history", serviceProxy.ProxyRequest("location"))
 			locations.DELETE("/:id", serviceProxy.ProxyRequest("location"))
 			locations.GET("/workers/active", serviceProxy.ProxyRequest("location"))
+			locations.GET("/workers/team", serviceProxy.ProxyRequest("location")) // New: Get workers by team with live locations
 			locations.PUT("/workers/offline", serviceProxy.ProxyRequest("location"))
 			locations.GET("/workers/:workerId/path-history", serviceProxy.ProxyRequest("location"))
 			locations.GET("/workers/:workerId/location-stats", serviceProxy.ProxyRequest("location"))

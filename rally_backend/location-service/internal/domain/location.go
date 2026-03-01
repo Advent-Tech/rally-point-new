@@ -124,6 +124,7 @@ type LocationRepository interface {
 
 	GetLocationStats(userID uuid.UUID, days int) (*LocationStats, error)
 	GetActiveWorkers() ([]*WorkerLocation, error)
+	GetActiveWorkersByTeam(teamID string) ([]*WorkerLocation, error)
 	UpdateWorkerLocation(location *WorkerLocation) error
 	SetWorkerOffline(userID uuid.UUID) error
 }
@@ -140,6 +141,7 @@ type LocationService interface {
 
 	GetLocationStats(userID uuid.UUID, days int) (*LocationStats, error)
 	GetActiveWorkers() ([]*WorkerLocation, error)
+	GetActiveWorkersByTeam(teamID string) ([]*WorkerLocation, error)
 	SetWorkerOffline(userID uuid.UUID) error
 
 	// Real-time features
@@ -200,6 +202,7 @@ type LocationEventPublisher interface {
 type WorkerLocationCache interface {
 	SetWorkerLocation(location *WorkerLocation) error
 	GetActiveWorkers() ([]*WorkerLocation, error)
+	GetActiveWorkersByTeam(teamID string) ([]*WorkerLocation, error)
 	RemoveWorker(userID uuid.UUID) error
 }
 

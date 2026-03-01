@@ -185,6 +185,7 @@ func setupRouter(locationHandler *handler.LocationHandler) *gin.Engine {
 		workers := protected.Group("/workers")
 		{
 			workers.GET("/active", locationHandler.GetActiveWorkers)
+			workers.GET("/team", locationHandler.GetTeamActiveWorkers) // New: Get workers by team with live locations
 			workers.PUT("/offline", locationHandler.SetWorkerOffline)
 			// Worker-specific endpoints (for team leaders/admins)
 			workers.GET("/:workerId/path-history", locationHandler.GetWorkerPathHistory)

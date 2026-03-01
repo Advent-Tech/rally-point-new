@@ -339,6 +339,21 @@ func (s *locationService) GetActiveWorkers() ([]*domain.WorkerLocation, error) {
 	return s.locationRepo.GetActiveWorkers()
 }
 
+// GetActiveWorkersByTeam retrieves active workers for a specific team from Redis cache
+func (s *locationService) GetActiveWorkersByTeam(teamID string) ([]*domain.WorkerLocation, error) {
+	if s.workerCache != nil {
+		workers, err := s.workerCache.GetActiveWorkersByTeam(teamID)
+		if err == nil && len(workers) > 0 {
+			return workers, nil
+		}
+		if err != nil {
+			fmt.Printf("Warning: Redis cache error for team workers: %v\n", err)
+		}
+	}
+	// Fallback to database
+	return s.locationRepo.GetActiveWorkersByTeam(teamID)
+}
+
 // SetWorkerOffline sets a worker as offline
 func (s *locationService) SetWorkerOffline(userID uuid.UUID) error {
 	if s.workerCache != nil {
