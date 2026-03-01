@@ -16,6 +16,8 @@ type locationService struct {
 	geofenceClient  domain.GeofenceClient
 	natsPublisher   domain.LocationEventPublisher
 	workerCache     domain.WorkerLocationCache
+	gpsSmoother     *GPSSmoother
+	kalmanFilter    *KalmanFilter
 }
 
 // NewLocationService creates a new location service
@@ -24,7 +26,9 @@ func NewLocationService(locationRepo domain.LocationRepository, realtimeManager 
 		locationRepo:    locationRepo,
 		realtimeManager: realtimeManager,
 		distanceCalc:    distanceCalc,
-		geofenceClient:  nil, // Optional geofence client
+		geofenceClient:  nil,                 // Optional geofence client
+		gpsSmoother:     NewGPSSmoother(0.2), // Alpha 0.2 for moderate smoothing
+		kalmanFilter:    NewKalmanFilter(3.0, 100.0),
 	}
 }
 
@@ -35,6 +39,8 @@ func NewLocationServiceWithGeofence(locationRepo domain.LocationRepository, real
 		realtimeManager: realtimeManager,
 		distanceCalc:    distanceCalc,
 		geofenceClient:  geofenceClient,
+		gpsSmoother:     NewGPSSmoother(0.2),
+		kalmanFilter:    NewKalmanFilter(3.0, 100.0),
 	}
 }
 
@@ -46,23 +52,30 @@ func NewLocationServiceWithNATS(locationRepo domain.LocationRepository, realtime
 		distanceCalc:    distanceCalc,
 		natsPublisher:   publisher,
 		workerCache:     workerCache,
+		gpsSmoother:     NewGPSSmoother(0.2),
+		kalmanFilter:    NewKalmanFilter(3.0, 100.0),
 	}
 }
 
 // UpdateLocation updates a user's location
 func (s *locationService) UpdateLocation(userID uuid.UUID, update *domain.LocationUpdate) (*domain.LocationTrack, error) {
-	// Create location track
+	// Apply GPS smoothing using Kalman filter (better for varying accuracy)
+	smoothedLat, smoothedLng := s.kalmanFilter.Smooth(userID, update.Latitude, update.Longitude, update.Accuracy)
+
+	// Create location track with both raw and smoothed coordinates
 	track := &domain.LocationTrack{
-		ID:        uuid.New(),
-		UserID:    userID,
-		Latitude:  update.Latitude,
-		Longitude: update.Longitude,
-		Accuracy:  update.Accuracy,
-		Speed:     update.Speed,
-		Heading:   update.Heading,
-		SessionID: update.SessionID,
-		TrackedAt: time.Now(),
-		CreatedAt: time.Now(),
+		ID:                uuid.New(),
+		UserID:            userID,
+		Latitude:          update.Latitude,
+		Longitude:         update.Longitude,
+		SmoothedLatitude:  &smoothedLat,
+		SmoothedLongitude: &smoothedLng,
+		Accuracy:          update.Accuracy,
+		Speed:             update.Speed,
+		Heading:           update.Heading,
+		SessionID:         update.SessionID,
+		TrackedAt:         time.Now(),
+		CreatedAt:         time.Now(),
 	}
 
 	// Save to database
@@ -221,6 +234,11 @@ func (s *locationService) GetUserLocations(userID uuid.UUID, query *domain.Locat
 
 // StartSession starts a new location tracking session
 func (s *locationService) StartSession(userID uuid.UUID) (*domain.LocationSession, error) {
+	// Reset Kalman filter state for new session (start fresh smoothing)
+	if s.kalmanFilter != nil {
+		s.kalmanFilter.Reset(userID)
+	}
+
 	// Check if there's already an active session
 	activeSession, err := s.locationRepo.GetActiveSession(userID)
 	if err != nil {

@@ -595,14 +595,24 @@ func (h *LocationHandler) GetWorkerPathHistory(c *gin.Context) {
 	// Filter out GPS glitches (>100km jumps)
 	tracks = filterOutlierPoints(tracks)
 
-	// Format response with path points
+	// Format response with path points - use smoothed coordinates if available
 	pathPoints := make([]gin.H, 0, len(tracks))
 	for _, track := range tracks {
+		// Use smoothed coordinates if available, otherwise use raw
+		lat := track.Latitude
+		lng := track.Longitude
+		if track.SmoothedLatitude != nil && track.SmoothedLongitude != nil {
+			lat = *track.SmoothedLatitude
+			lng = *track.SmoothedLongitude
+		}
+
 		point := gin.H{
-			"latitude":   track.Latitude,
-			"longitude":  track.Longitude,
-			"timestamp":  track.TrackedAt.Unix(),
-			"tracked_at": track.TrackedAt.Format(time.RFC3339),
+			"latitude":      lat,
+			"longitude":     lng,
+			"raw_latitude":  track.Latitude,
+			"raw_longitude": track.Longitude,
+			"timestamp":     track.TrackedAt.Unix(),
+			"tracked_at":    track.TrackedAt.Format(time.RFC3339),
 		}
 		if track.Accuracy != nil {
 			point["accuracy"] = *track.Accuracy
