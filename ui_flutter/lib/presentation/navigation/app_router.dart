@@ -17,6 +17,7 @@ import '../screens/team_leader/team_leader_dashboard.dart';
 import '../screens/team_leader/team_members_screen.dart';
 import '../screens/team_leader/reports_screen.dart';
 import '../screens/team_leader/schedule_screen.dart';
+import '../screens/team_leader/leader_targets_screen.dart';
 import '../screens/team_leader/worker_detail_screen.dart';
 import '../screens/team_leader/command_center/command_center_screen.dart';
 import '../screens/team_leader/command_center/command_center_state.dart';
@@ -343,6 +344,11 @@ class AppRouter {
               path: '/leader/survey',
               pageBuilder: (context, state) =>
                   const NoTransitionPage(child: SurveyScreen()),
+            ),
+            GoRoute(
+              path: '/leader/targets',
+              pageBuilder: (context, state) =>
+                  const NoTransitionPage(child: LeaderTargetsScreen()),
             ),
             GoRoute(
               path: '/leader/reports',

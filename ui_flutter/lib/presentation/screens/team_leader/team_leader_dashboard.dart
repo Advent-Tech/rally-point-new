@@ -117,6 +117,14 @@ class _TeamLeaderDashboardState extends State<TeamLeaderDashboard> {
         onTap: () => context.push('/leader/survey'),
       ),
       _ManagementTile(
+        icon: Icons.flag_outlined,
+        title: 'Targets',
+        subtitle: 'Set team & worker goals',
+        color: AppColors.navyBlue,
+        isDark: isDark,
+        onTap: () => context.push('/leader/targets'),
+      ),
+      _ManagementTile(
         icon: Icons.chat_bubble_outline,
         title: 'Team Chat',
         subtitle: 'Message team members',
