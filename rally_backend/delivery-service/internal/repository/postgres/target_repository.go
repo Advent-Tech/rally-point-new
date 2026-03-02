@@ -126,21 +126,32 @@ func (r *TargetRepository) GetWorkerTargetsWithProgress(ctx context.Context, wor
 	for rows.Next() {
 		var wt domain.WorkerTarget
 		var target domain.Target
-		var progress domain.TargetProgress
+		var progressID *uuid.UUID
+		var currentValue sql.NullFloat64
+		var progressLastUpdated sql.NullTime
+		var progressPeriodStart, progressPeriodEnd *time.Time
 
 		err := rows.Scan(
 			&wt.Assignment.ID, &wt.Assignment.TargetID, &wt.Assignment.AssignedToType, &wt.Assignment.AssignedToID, &wt.Assignment.AssignedBy,
 			&wt.Assignment.PeriodStart, &wt.Assignment.PeriodEnd, &wt.Assignment.Status, &wt.Assignment.CreatedAt,
 			&target.ID, &target.Name, &target.Description, &target.TargetType, &target.TargetUnit, &target.TargetValue, &target.PeriodType,
-			&progress.ID, &progress.CurrentValue, &progress.LastUpdated, &progress.PeriodStart, &progress.PeriodEnd,
+			&progressID, &currentValue, &progressLastUpdated, &progressPeriodStart, &progressPeriodEnd,
 		)
 		if err != nil {
 			return nil, err
 		}
 		wt.Assignment.Target = &target
-		wt.Progress = progress
-		if target.TargetValue > 0 && progress.CurrentValue > 0 {
-			wt.Percentage = (progress.CurrentValue / target.TargetValue) * 100
+		if progressID != nil {
+			wt.Progress = domain.TargetProgress{
+				ID:           *progressID,
+				CurrentValue: currentValue.Float64,
+				LastUpdated:  progressLastUpdated.Time,
+				PeriodStart:  progressPeriodStart,
+				PeriodEnd:    progressPeriodEnd,
+			}
+		}
+		if target.TargetValue > 0 && currentValue.Valid && currentValue.Float64 > 0 {
+			wt.Percentage = (currentValue.Float64 / target.TargetValue) * 100
 		}
 		wt.IsCompleted = wt.Percentage >= 100
 		results = append(results, wt)
@@ -169,21 +180,32 @@ func (r *TargetRepository) GetTeamTargetsWithProgress(ctx context.Context, teamI
 	for rows.Next() {
 		var wt domain.WorkerTarget
 		var target domain.Target
-		var progress domain.TargetProgress
+		var progressID *uuid.UUID
+		var currentValue sql.NullFloat64
+		var progressLastUpdated sql.NullTime
+		var progressPeriodStart, progressPeriodEnd *time.Time
 
 		err := rows.Scan(
 			&wt.Assignment.ID, &wt.Assignment.TargetID, &wt.Assignment.AssignedToType, &wt.Assignment.AssignedToID, &wt.Assignment.AssignedBy,
 			&wt.Assignment.PeriodStart, &wt.Assignment.PeriodEnd, &wt.Assignment.Status, &wt.Assignment.CreatedAt,
 			&target.ID, &target.Name, &target.Description, &target.TargetType, &target.TargetUnit, &target.TargetValue, &target.PeriodType,
-			&progress.ID, &progress.CurrentValue, &progress.LastUpdated, &progress.PeriodStart, &progress.PeriodEnd,
+			&progressID, &currentValue, &progressLastUpdated, &progressPeriodStart, &progressPeriodEnd,
 		)
 		if err != nil {
 			return nil, err
 		}
 		wt.Assignment.Target = &target
-		wt.Progress = progress
-		if target.TargetValue > 0 && progress.CurrentValue > 0 {
-			wt.Percentage = (progress.CurrentValue / target.TargetValue) * 100
+		if progressID != nil {
+			wt.Progress = domain.TargetProgress{
+				ID:           *progressID,
+				CurrentValue: currentValue.Float64,
+				LastUpdated:  progressLastUpdated.Time,
+				PeriodStart:  progressPeriodStart,
+				PeriodEnd:    progressPeriodEnd,
+			}
+		}
+		if target.TargetValue > 0 && currentValue.Valid && currentValue.Float64 > 0 {
+			wt.Percentage = (currentValue.Float64 / target.TargetValue) * 100
 		}
 		wt.IsCompleted = wt.Percentage >= 100
 		results = append(results, wt)
