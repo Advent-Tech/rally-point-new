@@ -162,7 +162,7 @@ func (r *deliveryRepository) GetItemsByDeliveryID(deliveryID uuid.UUID) ([]*doma
 		return nil, err
 	}
 	defer rows.Close()
-	
+
 	var items []*domain.DeliveryItem
 	for rows.Next() {
 		item := &domain.DeliveryItem{}
@@ -202,7 +202,7 @@ func (r *deliveryRepository) GetUpdatesByDeliveryID(deliveryID uuid.UUID) ([]*do
 		return nil, err
 	}
 	defer rows.Close()
-	
+
 	var updates []*domain.DeliveryUpdate
 	for rows.Next() {
 		update := &domain.DeliveryUpdate{}
@@ -261,7 +261,7 @@ func (r *deliveryRepository) scanRoutes(rows *sql.Rows, err error) ([]*domain.De
 		return nil, err
 	}
 	defer rows.Close()
-	
+
 	var routes []*domain.DeliveryRoute
 	for rows.Next() {
 		route := &domain.DeliveryRoute{}
@@ -303,7 +303,7 @@ func (r *deliveryRepository) GetStopsByRouteID(routeID uuid.UUID) ([]*domain.Rou
 		return nil, err
 	}
 	defer rows.Close()
-	
+
 	var stops []*domain.RouteStop
 	for rows.Next() {
 		stop := &domain.RouteStop{}
@@ -504,4 +504,24 @@ func (r *deliveryRepository) GetTeamWorkerStats(teamID uuid.UUID, days int) ([]*
 		workerStats = append(workerStats, stats)
 	}
 	return workerStats, nil
+}
+
+// GetCompletedVisitCount returns the count of completed deliveries (visits) for a worker
+func (r *deliveryRepository) GetCompletedVisitCount(workerID uuid.UUID) (int, error) {
+	var count int
+	err := r.db.QueryRow(
+		"SELECT COUNT(*) FROM deliveries WHERE worker_id = $1 AND status = 'completed'",
+		workerID,
+	).Scan(&count)
+	return count, err
+}
+
+// GetCompletedTerritoryCount returns the count of completed deliveries with territory for a worker
+func (r *deliveryRepository) GetCompletedTerritoryCount(workerID uuid.UUID) (int, error) {
+	var count int
+	err := r.db.QueryRow(
+		"SELECT COUNT(*) FROM deliveries WHERE worker_id = $1 AND status = 'completed' AND territory_id IS NOT NULL",
+		workerID,
+	).Scan(&count)
+	return count, err
 }

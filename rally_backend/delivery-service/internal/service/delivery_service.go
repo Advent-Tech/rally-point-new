@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -12,10 +13,11 @@ import (
 )
 
 type deliveryService struct {
-	deliveryRepo    domain.DeliveryRepository
-	routeOptimizer  domain.RouteOptimizer
-	territoryClient domain.TerritoryClient
-	nc              *nats.Conn
+	deliveryRepo       domain.DeliveryRepository
+	routeOptimizer     domain.RouteOptimizer
+	territoryClient    domain.TerritoryClient
+	nc                 *nats.Conn
+	achievementService *AchievementService
 }
 
 // NewDeliveryService creates a new delivery service
@@ -25,6 +27,17 @@ func NewDeliveryService(deliveryRepo domain.DeliveryRepository, routeOptimizer d
 		routeOptimizer:  routeOptimizer,
 		territoryClient: territoryClient,
 		nc:              nc,
+	}
+}
+
+// NewDeliveryServiceWithAchievements creates a delivery service with achievement checking
+func NewDeliveryServiceWithAchievements(deliveryRepo domain.DeliveryRepository, routeOptimizer domain.RouteOptimizer, territoryClient domain.TerritoryClient, nc *nats.Conn, achievementSvc *AchievementService) domain.DeliveryService {
+	return &deliveryService{
+		deliveryRepo:       deliveryRepo,
+		routeOptimizer:     routeOptimizer,
+		territoryClient:    territoryClient,
+		nc:                 nc,
+		achievementService: achievementSvc,
 	}
 }
 
@@ -394,9 +407,40 @@ func (s *deliveryService) UpdateDeliveryStatus(deliveryID, userID uuid.UUID, req
 	if req.Status == domain.StatusCompleted && delivery.TerritoryID != nil && s.territoryClient != nil {
 		// Best effort - don't fail the delivery if territory service is unavailable
 		_ = s.territoryClient.RecordVisit(*delivery.TerritoryID, delivery.WorkerID)
+
+		// Check achievements for visit in background
+		if s.achievementService != nil {
+			go func() {
+				s.checkVisitAchievements(context.Background(), delivery.WorkerID)
+			}()
+		}
 	}
 
 	return nil
+}
+
+func (s *deliveryService) checkVisitAchievements(ctx context.Context, workerID uuid.UUID) {
+	if s.achievementService == nil {
+		return
+	}
+
+	// Get worker's completed visit count from delivery repo
+	count, err := s.deliveryRepo.GetCompletedVisitCount(workerID)
+	if err != nil {
+		return
+	}
+
+	// Check visit count achievements
+	s.achievementService.CheckAndAwardAchievements(ctx, workerID, "visit", float64(count))
+
+	// Also check territory completion achievements (when a delivery with territory is completed)
+	territoryCount, err := s.deliveryRepo.GetCompletedTerritoryCount(workerID)
+	if err != nil {
+		return
+	}
+
+	// Check territory count achievements
+	s.achievementService.CheckAndAwardAchievements(ctx, workerID, "territory", float64(territoryCount))
 }
 
 // AssignDelivery assigns a delivery to a worker (optional - worker can self-assign)
@@ -471,18 +515,18 @@ func (s *deliveryService) CreateRoute(creatorID uuid.UUID, req *domain.CreateRou
 
 	// Create route
 	route := &domain.DeliveryRoute{
-		ID:          uuid.New(),
-		TeamID:      req.TeamID,
-		WorkerID:    req.WorkerID,
-		WorkerName:  "Worker", // Would fetch from user service
-		RouteName:   req.RouteName,
-		RouteDate:   req.RouteDate,
-		Status:      domain.RouteStatusPlanned,
-		TotalStops:  len(deliveries),
+		ID:            uuid.New(),
+		TeamID:        req.TeamID,
+		WorkerID:      req.WorkerID,
+		WorkerName:    "Worker", // Would fetch from user service
+		RouteName:     req.RouteName,
+		RouteDate:     req.RouteDate,
+		Status:        domain.RouteStatusPlanned,
+		TotalStops:    len(deliveries),
 		EstimatedTime: req.EstimatedTime,
-		CreatedBy:   creatorID,
-		CreatedAt:   time.Now(),
-		UpdatedAt:   time.Now(),
+		CreatedBy:     creatorID,
+		CreatedAt:     time.Now(),
+		UpdatedAt:     time.Now(),
 	}
 
 	// Calculate estimated time if not provided

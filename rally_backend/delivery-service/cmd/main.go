@@ -78,28 +78,28 @@ func main() {
 		}
 	}
 
+	// Initialize achievement components
+	achievementRepo := postgres.NewAchievementRepository(db.DB)
+	achievementService := service.NewAchievementService(achievementRepo)
+	achievementHandler := handler.NewAchievementHandler(achievementService)
+
 	// Initialize components
 	deliveryRepo := postgres.NewDeliveryRepository(db.DB)
 	routeOptimizer := service.NewRouteOptimizer()
-	deliveryService := service.NewDeliveryService(deliveryRepo, routeOptimizer, territoryClient, nc)
+	deliveryService := service.NewDeliveryServiceWithAchievements(deliveryRepo, routeOptimizer, territoryClient, nc, achievementService)
 
 	// Initialize receipt components
 	receiptRepo := postgres.NewReceiptRepository(db.DB)
-	receiptService := service.NewReceiptService(receiptRepo)
+	receiptService := service.NewReceiptServiceWithAchievements(receiptRepo, achievementService)
 
 	// Initialize prayer request components
 	prayerRepo := postgres.NewPrayerRequestRepository(db.DB)
-	prayerService := service.NewPrayerRequestService(prayerRepo, nc)
+	prayerService := service.NewPrayerRequestServiceWithAchievements(prayerRepo, nc, achievementService)
 
 	// Initialize target components
 	targetRepo := postgres.NewTargetRepository(db.DB)
 	targetService := service.NewTargetService(targetRepo)
 	targetHandler := handler.NewTargetHandler(targetService)
-
-	// Initialize achievement components
-	achievementRepo := postgres.NewAchievementRepository(db.DB)
-	achievementService := service.NewAchievementService(achievementRepo)
-	achievementHandler := handler.NewAchievementHandler(achievementService)
 
 	// Initialize handlers
 	deliveryHandler := handler.NewDeliveryHandler(deliveryService, jwtManager)

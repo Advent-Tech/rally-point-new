@@ -31,17 +31,17 @@ type Delivery struct {
 	HouseholdID   *uuid.UUID `json:"household_id,omitempty" db:"household_id"`
 
 	// Donation-specific fields (only for delivery_type = "donation")
-	DonationAmount  *float64 `json:"donation_amount,omitempty" db:"donation_amount"`   // Amount in cents
-	PaymentMethod   *string  `json:"payment_method,omitempty" db:"payment_method"`     // "cash", "card", "online"
-	PaymentStatus   *string  `json:"payment_status,omitempty" db:"payment_status"`     // "pending", "completed", "failed"
+	DonationAmount  *float64 `json:"donation_amount,omitempty" db:"donation_amount"` // Amount in cents
+	PaymentMethod   *string  `json:"payment_method,omitempty" db:"payment_method"`   // "cash", "card", "online"
+	PaymentStatus   *string  `json:"payment_status,omitempty" db:"payment_status"`   // "pending", "completed", "failed"
 	StripePaymentID *string  `json:"stripe_payment_id,omitempty" db:"stripe_payment_id"`
 	ReceiptNumber   *string  `json:"receipt_number,omitempty" db:"receipt_number"`
 	ReceiptURL      *string  `json:"receipt_url,omitempty" db:"receipt_url"`
 
 	// Offline sync support
-	IsOffline  bool       `json:"is_offline" db:"is_offline"`
-	SyncedAt   *time.Time `json:"synced_at,omitempty" db:"synced_at"`
-	OfflineID  *string    `json:"offline_id,omitempty" db:"offline_id"` // Client-generated ID for offline records
+	IsOffline bool       `json:"is_offline" db:"is_offline"`
+	SyncedAt  *time.Time `json:"synced_at,omitempty" db:"synced_at"`
+	OfflineID *string    `json:"offline_id,omitempty" db:"offline_id"` // Client-generated ID for offline records
 
 	CreatedBy uuid.UUID `json:"created_by" db:"created_by"`
 	CreatedAt time.Time `json:"created_at" db:"created_at"`
@@ -74,34 +74,34 @@ type DeliveryUpdate struct {
 
 // DeliveryRoute represents optimized delivery routes
 type DeliveryRoute struct {
-	ID          uuid.UUID `json:"id" db:"id"`
-	TeamID      uuid.UUID `json:"team_id" db:"team_id"`
-	WorkerID    uuid.UUID `json:"worker_id" db:"worker_id"`
-	WorkerName  string    `json:"worker_name" db:"worker_name"`
-	RouteName   string    `json:"route_name" db:"route_name"`
-	RouteDate   time.Time `json:"route_date" db:"route_date"`
-	Status      string    `json:"status" db:"status"` // "planned", "active", "completed", "cancelled"
-	TotalStops  int       `json:"total_stops" db:"total_stops"`
-	CompletedStops int    `json:"completed_stops" db:"completed_stops"`
-	EstimatedTime int     `json:"estimated_time" db:"estimated_time"` // minutes
-	ActualTime    *int    `json:"actual_time,omitempty" db:"actual_time"` // minutes
-	StartedAt     *time.Time `json:"started_at,omitempty" db:"started_at"`
-	CompletedAt   *time.Time `json:"completed_at,omitempty" db:"completed_at"`
-	CreatedBy     uuid.UUID `json:"created_by" db:"created_by"`
-	CreatedAt     time.Time `json:"created_at" db:"created_at"`
-	UpdatedAt     time.Time `json:"updated_at" db:"updated_at"`
+	ID             uuid.UUID  `json:"id" db:"id"`
+	TeamID         uuid.UUID  `json:"team_id" db:"team_id"`
+	WorkerID       uuid.UUID  `json:"worker_id" db:"worker_id"`
+	WorkerName     string     `json:"worker_name" db:"worker_name"`
+	RouteName      string     `json:"route_name" db:"route_name"`
+	RouteDate      time.Time  `json:"route_date" db:"route_date"`
+	Status         string     `json:"status" db:"status"` // "planned", "active", "completed", "cancelled"
+	TotalStops     int        `json:"total_stops" db:"total_stops"`
+	CompletedStops int        `json:"completed_stops" db:"completed_stops"`
+	EstimatedTime  int        `json:"estimated_time" db:"estimated_time"`     // minutes
+	ActualTime     *int       `json:"actual_time,omitempty" db:"actual_time"` // minutes
+	StartedAt      *time.Time `json:"started_at,omitempty" db:"started_at"`
+	CompletedAt    *time.Time `json:"completed_at,omitempty" db:"completed_at"`
+	CreatedBy      uuid.UUID  `json:"created_by" db:"created_by"`
+	CreatedAt      time.Time  `json:"created_at" db:"created_at"`
+	UpdatedAt      time.Time  `json:"updated_at" db:"updated_at"`
 }
 
 // RouteStop represents stops in a delivery route
 type RouteStop struct {
-	ID         uuid.UUID `json:"id" db:"id"`
-	RouteID    uuid.UUID `json:"route_id" db:"route_id"`
-	DeliveryID uuid.UUID `json:"delivery_id" db:"delivery_id"`
-	StopOrder  int       `json:"stop_order" db:"stop_order"`
-	Status     string    `json:"status" db:"status"` // "pending", "completed", "skipped"
-	ArrivedAt  *time.Time `json:"arrived_at,omitempty" db:"arrived_at"`
+	ID          uuid.UUID  `json:"id" db:"id"`
+	RouteID     uuid.UUID  `json:"route_id" db:"route_id"`
+	DeliveryID  uuid.UUID  `json:"delivery_id" db:"delivery_id"`
+	StopOrder   int        `json:"stop_order" db:"stop_order"`
+	Status      string     `json:"status" db:"status"` // "pending", "completed", "skipped"
+	ArrivedAt   *time.Time `json:"arrived_at,omitempty" db:"arrived_at"`
 	CompletedAt *time.Time `json:"completed_at,omitempty" db:"completed_at"`
-	CreatedAt  time.Time `json:"created_at" db:"created_at"`
+	CreatedAt   time.Time  `json:"created_at" db:"created_at"`
 }
 
 // CreateDeliveryRequest represents the request to create a delivery
@@ -189,27 +189,27 @@ type DeliveryWithItems struct {
 
 // RouteWithStops represents a route with its stops and deliveries
 type RouteWithStops struct {
-	Route     *DeliveryRoute    `json:"route"`
-	Stops     []*RouteStopWithDelivery `json:"stops"`
+	Route *DeliveryRoute           `json:"route"`
+	Stops []*RouteStopWithDelivery `json:"stops"`
 }
 
 // RouteStopWithDelivery represents a route stop with delivery details
 type RouteStopWithDelivery struct {
-	Stop     *RouteStop        `json:"stop"`
+	Stop     *RouteStop         `json:"stop"`
 	Delivery *DeliveryWithItems `json:"delivery"`
 }
 
 // DeliveryStats represents delivery statistics
 type DeliveryStats struct {
-	TotalDeliveries    int     `json:"total_deliveries"`
-	PendingDeliveries  int     `json:"pending_deliveries"`
-	InProgressDeliveries int   `json:"in_progress_deliveries"`
-	CompletedDeliveries int    `json:"completed_deliveries"`
-	FailedDeliveries   int     `json:"failed_deliveries"`
-	CompletionRate     float64 `json:"completion_rate"`
-	AverageDeliveryTime float64 `json:"average_delivery_time"`
-	TotalRoutes        int     `json:"total_routes"`
-	ActiveRoutes       int     `json:"active_routes"`
+	TotalDeliveries      int     `json:"total_deliveries"`
+	PendingDeliveries    int     `json:"pending_deliveries"`
+	InProgressDeliveries int     `json:"in_progress_deliveries"`
+	CompletedDeliveries  int     `json:"completed_deliveries"`
+	FailedDeliveries     int     `json:"failed_deliveries"`
+	CompletionRate       float64 `json:"completion_rate"`
+	AverageDeliveryTime  float64 `json:"average_delivery_time"`
+	TotalRoutes          int     `json:"total_routes"`
+	ActiveRoutes         int     `json:"active_routes"`
 }
 
 // WorkerStats represents worker delivery statistics
@@ -278,17 +278,17 @@ type DeliveryRepository interface {
 	GetDeliveriesByStatus(teamID uuid.UUID, status string, limit, offset int) ([]*Delivery, error)
 	UpdateDelivery(delivery *Delivery) error
 	DeleteDelivery(id uuid.UUID) error
-	
+
 	// Delivery items
 	CreateDeliveryItem(item *DeliveryItem) error
 	GetItemsByDeliveryID(deliveryID uuid.UUID) ([]*DeliveryItem, error)
 	UpdateDeliveryItem(item *DeliveryItem) error
 	DeleteDeliveryItem(id uuid.UUID) error
-	
+
 	// Delivery updates
 	CreateDeliveryUpdate(update *DeliveryUpdate) error
 	GetUpdatesByDeliveryID(deliveryID uuid.UUID) ([]*DeliveryUpdate, error)
-	
+
 	// Route management
 	CreateRoute(route *DeliveryRoute) error
 	GetRouteByID(id uuid.UUID) (*DeliveryRoute, error)
@@ -296,12 +296,12 @@ type DeliveryRepository interface {
 	GetRoutesByWorkerID(workerID uuid.UUID, limit, offset int) ([]*DeliveryRoute, error)
 	UpdateRoute(route *DeliveryRoute) error
 	DeleteRoute(id uuid.UUID) error
-	
+
 	// Route stops
 	CreateRouteStop(stop *RouteStop) error
 	GetStopsByRouteID(routeID uuid.UUID) ([]*RouteStop, error)
 	UpdateRouteStop(stop *RouteStop) error
-	
+
 	// Statistics
 	GetDeliveryStats(teamID uuid.UUID, days int) (*DeliveryStats, error)
 	GetWorkerStats(workerID uuid.UUID, days int) (*WorkerStats, error)
@@ -312,6 +312,10 @@ type DeliveryRepository interface {
 	GetTeamDonationDeliveries(teamID uuid.UUID, limit, offset int) ([]*Delivery, error)
 	GetGlobalDonationDeliveryStats(days int) (*DonationDeliveryStats, error)
 	GetTeamDonationDeliveryStats(teamID uuid.UUID, days int) (*DonationDeliveryStats, error)
+
+	// Visit counting for achievements
+	GetCompletedVisitCount(workerID uuid.UUID) (int, error)
+	GetCompletedTerritoryCount(workerID uuid.UUID) (int, error)
 }
 
 // DeliveryService defines the interface for delivery business logic
@@ -323,13 +327,13 @@ type DeliveryService interface {
 	DeleteDelivery(id uuid.UUID) error
 	GetTeamDeliveries(teamID uuid.UUID, status string, limit, offset int) ([]*DeliveryWithItems, error)
 	GetWorkerDeliveries(workerID uuid.UUID, limit, offset int) ([]*DeliveryWithItems, error)
-	
+
 	// Delivery status management
 	UpdateDeliveryStatus(deliveryID, userID uuid.UUID, req *UpdateDeliveryStatusRequest) error
 	AssignDelivery(deliveryID, workerID, assignerID uuid.UUID) error
 	StartDelivery(deliveryID, workerID uuid.UUID) error
 	CompleteDelivery(deliveryID, workerID uuid.UUID, req *UpdateDeliveryStatusRequest) error
-	
+
 	// Route management
 	CreateRoute(creatorID uuid.UUID, req *CreateRouteRequest) (*RouteWithStops, error)
 	GetRoute(id uuid.UUID) (*RouteWithStops, error)
@@ -338,7 +342,7 @@ type DeliveryService interface {
 	StartRoute(routeID, workerID uuid.UUID) error
 	CompleteRoute(routeID, workerID uuid.UUID) error
 	OptimizeRoute(routeID uuid.UUID) (*RouteWithStops, error)
-	
+
 	// Statistics and analytics
 	GetDeliveryStats(teamID uuid.UUID, days int) (*DeliveryStats, error)
 	GetWorkerStats(workerID uuid.UUID, days int) (*WorkerStats, error)
@@ -384,17 +388,17 @@ const (
 	PriorityUrgent = "urgent"
 
 	// Delivery statuses (simplified - worker-centric)
-	StatusPending    = "pending"   // Created, waiting to be done
-	StatusCompleted  = "completed" // Delivery/donation completed
-	StatusFailed     = "failed"    // Couldn't complete
-	StatusCancelled  = "cancelled" // Cancelled by user
-	
+	StatusPending   = "pending"   // Created, waiting to be done
+	StatusCompleted = "completed" // Delivery/donation completed
+	StatusFailed    = "failed"    // Couldn't complete
+	StatusCancelled = "cancelled" // Cancelled by user
+
 	// Route statuses
 	RouteStatusPlanned   = "planned"
 	RouteStatusActive    = "active"
 	RouteStatusCompleted = "completed"
 	RouteStatusCancelled = "cancelled"
-	
+
 	// Stop statuses
 	StopStatusPending   = "pending"
 	StopStatusCompleted = "completed"
@@ -414,13 +418,13 @@ const (
 	PaymentStatusRefunded  = "refunded"
 
 	// Payment methods are defined in receipt.go
-	
+
 	// Default values
 	DefaultDeliveryLimit = 50
 	DefaultRouteLimit    = 20
 	MaxDeliveryLimit     = 200
 	MaxRouteLimit        = 100
-	
+
 	// Statistics
 	DefaultStatsDays = 30
 	MaxStatsDays     = 365

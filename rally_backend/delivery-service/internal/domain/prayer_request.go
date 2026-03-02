@@ -42,8 +42,8 @@ const (
 
 // PrayerRequest represents a prayer request collected by workers
 type PrayerRequest struct {
-	ID          uuid.UUID `json:"id" db:"id"`
-	WorkerID    uuid.UUID `json:"worker_id" db:"worker_id"`
+	ID          uuid.UUID  `json:"id" db:"id"`
+	WorkerID    uuid.UUID  `json:"worker_id" db:"worker_id"`
 	TeamID      *uuid.UUID `json:"team_id,omitempty" db:"team_id"`
 	TerritoryID *uuid.UUID `json:"territory_id,omitempty" db:"territory_id"`
 
@@ -200,6 +200,7 @@ type PrayerRequestRepository interface {
 	GetStats(filter *PrayerRequestFilter) (*PrayerRequestStats, error)
 	UpdateStatus(id uuid.UUID, status string, completedBy *uuid.UUID, notes *string) error
 	AssignPreacher(id uuid.UUID, preacherID uuid.UUID, scheduledAt *time.Time, notes *string) error
+	GetCompletedPrayerCount(workerID uuid.UUID) (int, error)
 }
 
 // PrayerRequestService interface

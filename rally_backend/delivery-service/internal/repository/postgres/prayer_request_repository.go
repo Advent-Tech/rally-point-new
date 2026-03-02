@@ -472,3 +472,13 @@ func (r *PrayerRequestRepository) AssignPreacher(id uuid.UUID, preacherID uuid.U
 func calculateTotalPages(total int64, pageSize int) int {
 	return int(math.Ceil(float64(total) / float64(pageSize)))
 }
+
+// GetCompletedPrayerCount returns the count of completed prayer requests for a worker
+func (r *PrayerRequestRepository) GetCompletedPrayerCount(workerID uuid.UUID) (int, error) {
+	var count int
+	err := r.db.QueryRow(
+		"SELECT COUNT(*) FROM prayer_requests WHERE worker_id = $1 AND status = $2",
+		workerID, domain.PrayerStatusCompleted,
+	).Scan(&count)
+	return count, err
+}
