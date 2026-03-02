@@ -260,15 +260,17 @@ func (h *TargetHandler) GetWorkerTargets(c *gin.Context) {
 	}
 
 	// Debug: log team_id
-	log.Printf("DEBUG: user_id=%s, team_id from claims=%s, team_id from query=%s",
+	log.Printf("DEBUG GetWorkerTargets: user_id=%s, team_id from claims=%s, team_id from query=%s",
 		userID, c.GetString("team_id"), c.Query("team_id"))
 
 	// Get worker's targets (directly assigned)
 	targets, err := h.targetService.GetWorkerTargets(c, workerID)
 	if err != nil {
+		log.Printf("ERROR GetWorkerTargets: GetWorkerTargets failed: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
+	log.Printf("DEBUG GetWorkerTargets: worker targets count = %d", len(targets))
 
 	// Also get team targets if worker has a team
 	// Try to get team_id from JWT claims first, then from query params
@@ -282,17 +284,29 @@ func (h *TargetHandler) GetWorkerTargets(c *gin.Context) {
 		teamIDStr = "8b17e5c6-2d2d-4dee-ab05-4c39dcf9e5fc"
 	}
 
-	log.Printf("DEBUG: teamIDStr=%s", teamIDStr)
+	log.Printf("DEBUG GetWorkerTargets: teamIDStr=%s", teamIDStr)
 
 	if teamIDStr != "" {
 		teamID, err := uuid.Parse(teamIDStr)
-		if err == nil {
+		if err != nil {
+			log.Printf("ERROR GetWorkerTargets: failed to parse team_id: %v", err)
+		} else {
 			teamTargets, err := h.targetService.GetTeamTargets(c, teamID)
-			if err == nil {
+			if err != nil {
+				log.Printf("ERROR GetWorkerTargets: GetTeamTargets failed: %v", err)
+			} else {
+				log.Printf("DEBUG GetWorkerTargets: team targets count = %d", len(teamTargets))
 				// Combine worker targets and team targets
 				targets = append(targets, teamTargets...)
 			}
 		}
+	}
+
+	log.Printf("DEBUG GetWorkerTargets: returning %d total targets", len(targets))
+
+	// Return empty array instead of null if no targets
+	if targets == nil {
+		targets = []domain.WorkerTarget{}
 	}
 
 	c.JSON(http.StatusOK, targets)
