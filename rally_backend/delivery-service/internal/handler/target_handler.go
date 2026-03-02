@@ -277,6 +277,11 @@ func (h *TargetHandler) GetWorkerTargets(c *gin.Context) {
 		teamIDStr = c.Query("team_id")
 	}
 
+	// Hardcoded for testing - REMOVE THIS AFTER TESTING
+	if teamIDStr == "" {
+		teamIDStr = "8b17e5c6-2d2d-4dee-ab05-4c39dcf9e5fc"
+	}
+
 	log.Printf("DEBUG: teamIDStr=%s", teamIDStr)
 
 	if teamIDStr != "" {
