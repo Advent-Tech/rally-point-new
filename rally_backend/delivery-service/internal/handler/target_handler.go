@@ -258,10 +258,24 @@ func (h *TargetHandler) GetWorkerTargets(c *gin.Context) {
 		return
 	}
 
+	// Get worker's targets (directly assigned)
 	targets, err := h.targetService.GetWorkerTargets(c, workerID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
+	}
+
+	// Also get team targets if worker has a team
+	teamIDStr := c.GetString("team_id")
+	if teamIDStr != "" {
+		teamID, err := uuid.Parse(teamIDStr)
+		if err == nil {
+			teamTargets, err := h.targetService.GetTeamTargets(c, teamID)
+			if err == nil {
+				// Combine worker targets and team targets
+				targets = append(targets, teamTargets...)
+			}
+		}
 	}
 
 	c.JSON(http.StatusOK, targets)
