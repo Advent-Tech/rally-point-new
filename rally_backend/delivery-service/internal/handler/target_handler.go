@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"log"
 	"net/http"
 	"time"
 
@@ -258,6 +259,10 @@ func (h *TargetHandler) GetWorkerTargets(c *gin.Context) {
 		return
 	}
 
+	// Debug: log team_id
+	log.Printf("DEBUG: user_id=%s, team_id from claims=%s, team_id from query=%s",
+		userID, c.GetString("team_id"), c.Query("team_id"))
+
 	// Get worker's targets (directly assigned)
 	targets, err := h.targetService.GetWorkerTargets(c, workerID)
 	if err != nil {
@@ -271,6 +276,8 @@ func (h *TargetHandler) GetWorkerTargets(c *gin.Context) {
 	if teamIDStr == "" {
 		teamIDStr = c.Query("team_id")
 	}
+
+	log.Printf("DEBUG: teamIDStr=%s", teamIDStr)
 
 	if teamIDStr != "" {
 		teamID, err := uuid.Parse(teamIDStr)
