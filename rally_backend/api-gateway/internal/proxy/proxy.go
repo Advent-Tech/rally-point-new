@@ -66,7 +66,20 @@ func (sp *ServiceProxy) proxyWithPath(serviceName string, targetPath string) gin
 		} else {
 			targetURL.Path = c.Request.URL.Path
 		}
-		targetURL.RawQuery = c.Request.URL.RawQuery
+
+		// Add user context to query string
+		query := c.Request.URL.Query()
+		if userID, exists := c.Get("user_id"); exists {
+			if query.Get("user_id") == "" {
+				query.Set("user_id", userID.(string))
+			}
+		}
+		if teamID, exists := c.Get("team_id"); exists {
+			if query.Get("team_id") == "" {
+				query.Set("team_id", teamID.(string))
+			}
+		}
+		targetURL.RawQuery = query.Encode()
 
 		// Read request body
 		var bodyBytes []byte

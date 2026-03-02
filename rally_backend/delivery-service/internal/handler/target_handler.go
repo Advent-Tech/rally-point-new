@@ -266,7 +266,12 @@ func (h *TargetHandler) GetWorkerTargets(c *gin.Context) {
 	}
 
 	// Also get team targets if worker has a team
+	// Try to get team_id from JWT claims first, then from query params
 	teamIDStr := c.GetString("team_id")
+	if teamIDStr == "" {
+		teamIDStr = c.Query("team_id")
+	}
+
 	if teamIDStr != "" {
 		teamID, err := uuid.Parse(teamIDStr)
 		if err == nil {
