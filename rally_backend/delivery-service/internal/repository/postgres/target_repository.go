@@ -96,7 +96,7 @@ func (r *TargetRepository) CreateAssignment(ctx context.Context, assignment *dom
 	query := `
 		INSERT INTO target_assignments (id, target_id, assigned_to_type, assigned_to_id, assigned_by, period_start, period_end, status, created_at)
 		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-		ON CONFLICT (target_id, assigned_to_type, assigned_to_id, COALESCE(period_start, '1970-01-01')) DO UPDATE SET status = $8
+		ON CONFLICT DO NOTHING
 	`
 	_, err := r.db.ExecContext(ctx, query,
 		assignment.ID, assignment.TargetID, assignment.AssignedToType, assignment.AssignedToID,
