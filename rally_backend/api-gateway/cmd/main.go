@@ -747,6 +747,7 @@ func setupRouter(cfg *config.Config, jwtManager *auth.JWTManager, rateLimiter mi
 		teamLeaderRoutes.GET("/targets", serviceProxy.ProxyRequest("delivery"))
 		teamLeaderRoutes.PUT("/targets/:id", serviceProxy.ProxyRequest("delivery"))
 		teamLeaderRoutes.DELETE("/targets/:id", serviceProxy.ProxyRequest("delivery"))
+		teamLeaderRoutes.POST("/targets/:id/assign-team", serviceProxy.ProxyRequest("delivery"))
 		teamLeaderRoutes.POST("/targets/:id/assign-worker", serviceProxy.ProxyRequest("delivery"))
 		teamLeaderRoutes.GET("/targets/assigned", serviceProxy.ProxyRequest("delivery"))
 		teamLeaderRoutes.DELETE("/assignments/:id", serviceProxy.ProxyRequest("delivery"))
