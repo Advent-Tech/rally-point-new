@@ -286,6 +286,7 @@ func setupRouter(deliveryHandler *handler.DeliveryHandler, receiptHandler *handl
 			teamTargets.GET("/", targetHandler.GetTargets)
 			teamTargets.PUT("/:id", targetHandler.UpdateTarget)
 			teamTargets.DELETE("/:id", targetHandler.DeleteTarget)
+			teamTargets.POST("/:id/assign-team", targetHandler.AssignTargetToTeam)
 			teamTargets.POST("/:id/assign-worker", targetHandler.AssignTargetToWorker)
 			teamTargets.GET("/assigned", targetHandler.GetTeamTargets)
 		}
