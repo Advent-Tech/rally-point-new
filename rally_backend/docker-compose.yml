@@ -210,7 +210,7 @@ services:
       - JWT_SECRET=your-super-secret-jwt-key-change-in-production
       - NATS_URL=nats:4222
       - STORAGE_PATH=/app/uploads
-      - BASE_URL=http://18.188.1.122:8081
+      - BASE_URL=https://backend.lightsquads.com
       # Email configuration
       - SMTP_HOST=smtp.gmail.com
       - SMTP_PORT=587
@@ -218,7 +218,7 @@ services:
       - SMTP_PASSWORD=ehehkcforlbrjcld
       - SMTP_FROM=brichhaliya@gmail.com
       - SMTP_FROM_NAME=Rally Point
-      - FRONTEND_URL=http://18.188.1.122
+      - FRONTEND_URL=https://admin.lightsquads.com
       - GO_ENV=production
     volumes:
       - blog_uploads:/app/uploads
