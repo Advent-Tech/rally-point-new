@@ -9,6 +9,21 @@ class AppColors {
   static const Color primaryLight = Color(0xFF60A5FA);
   static const Color primaryDark = Color(0xFF2563EB);
 
+  // Button Colors - Light Theme (Purple)
+  static const Color buttonPrimaryLight = Color(0xFF7C3AED); // Purple
+  static const Color buttonPrimaryLightEnd = Color(
+    0xFF8B5CF6,
+  ); // Lighter Purple
+
+  // Button Colors - Dark Theme (Orange)
+  static const Color buttonPrimaryDark = Color(0xFFF59E0B); // Orange
+  static const Color buttonPrimaryDarkEnd = Color(0xFFFBBF24); // Lighter Orange
+
+  // Golden Accent for Tile Borders
+  static const Color goldenAccent = Color(0xFFFFD700);
+  static const Color goldenAccentLight = Color(0xFFFFE066);
+  static const Color goldenAccentDark = Color(0xFFB8860B);
+
   // Navy Blue (for active session cards)
   static const Color navyBlue = Color(0xFF1E3A5F);
   static const Color navyBlueLight = Color(0xFF2D4A6F);

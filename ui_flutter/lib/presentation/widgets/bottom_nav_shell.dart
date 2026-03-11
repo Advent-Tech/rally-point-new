@@ -100,12 +100,7 @@ class BottomNavShell extends StatelessWidget {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
-      body: Stack(
-        children: [
-          child,
-          const HelpFab(),
-        ],
-      ),
+      body: Stack(children: [child, const HelpFab()]),
       extendBody: true,
       bottomNavigationBar: Container(
         margin: const EdgeInsets.only(left: 16, right: 16, bottom: 16),
@@ -132,30 +127,58 @@ class BottomNavShell extends StatelessWidget {
     );
   }
 
-  List<Widget> _buildLeaderNavItems(BuildContext context, int currentIndex, bool isDark) {
+  List<Widget> _buildLeaderNavItems(
+    BuildContext context,
+    int currentIndex,
+    bool isDark,
+  ) {
     final items = [
       _NavItemData(Icons.dashboard_outlined, Icons.dashboard, 'Dashboard', 0),
       _NavItemData(Icons.people_outline, Icons.people, 'Team', 1),
       _NavItemData(Icons.assignment_outlined, Icons.assignment, 'Surveys', 2),
       _NavItemData(Icons.bar_chart_outlined, Icons.bar_chart, 'Reports', 3),
     ];
-    return items.map((item) => _buildNavItem(context, item, currentIndex, isDark, true)).toList();
+    return items
+        .map((item) => _buildNavItem(context, item, currentIndex, isDark, true))
+        .toList();
   }
 
-  List<Widget> _buildWorkerNavItems(BuildContext context, int currentIndex, bool isDark) {
+  List<Widget> _buildWorkerNavItems(
+    BuildContext context,
+    int currentIndex,
+    bool isDark,
+  ) {
     final items = [
       _NavItemData(Icons.home_outlined, Icons.home, 'Home', 0),
       _NavItemData(Icons.map_outlined, Icons.map, 'Territory', 1),
-      _NavItemData(Icons.directions_walk_outlined, Icons.directions_walk, 'Activity', 2),
+      _NavItemData(
+        Icons.directions_walk_outlined,
+        Icons.directions_walk,
+        'Activity',
+        2,
+      ),
       _NavItemData(Icons.assignment_outlined, Icons.assignment, 'Survey', 3),
     ];
-    return items.map((item) => _buildNavItem(context, item, currentIndex, isDark, false)).toList();
+    return items
+        .map(
+          (item) => _buildNavItem(context, item, currentIndex, isDark, false),
+        )
+        .toList();
   }
 
-  Widget _buildNavItem(BuildContext context, _NavItemData item, int currentIndex, bool isDark, bool isLeader) {
+  Widget _buildNavItem(
+    BuildContext context,
+    _NavItemData item,
+    int currentIndex,
+    bool isDark,
+    bool isLeader,
+  ) {
     final isSelected = currentIndex == item.index;
+    final selectedColor = isDark
+        ? AppColors.buttonPrimaryDark
+        : AppColors.buttonPrimaryLight;
     final color = isSelected
-        ? AppColors.primary
+        ? selectedColor
         : (isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight);
 
     return Expanded(

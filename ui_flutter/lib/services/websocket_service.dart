@@ -44,6 +44,9 @@ enum WsMessageType {
   chatParticipantOnline,
   chatParticipantOffline,
 
+  // Achievements
+  achievementUnlocked,
+
   // System
   ping,
   pong,
@@ -135,6 +138,8 @@ class WsMessage {
         return WsMessageType.chatParticipantOnline;
       case 'chat_participant_offline':
         return WsMessageType.chatParticipantOffline;
+      case 'achievement_unlocked':
+        return WsMessageType.achievementUnlocked;
       case 'ping':
         return WsMessageType.ping;
       case 'pong':
@@ -206,10 +211,10 @@ class WebSocketService {
   /// Get the WebSocket URL for location service (via API gateway proxy)
   String get _wsUrl {
     if (kReleaseMode) {
-      return 'wss://api.rallypoint.app${ApiConstants.wsLocation}';
+      return 'wss://backend.lightsquads.com${ApiConstants.wsLocation}';
     }
     // Development - use API gateway proxy at port 8080
-    return 'ws://18.188.1.122:8080${ApiConstants.wsLocation}';
+    return 'ws://backend.lightsquads.com${ApiConstants.wsLocation}';
   }
 
   /// Message stream for reactive updates
