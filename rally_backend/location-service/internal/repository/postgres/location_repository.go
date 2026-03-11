@@ -475,6 +475,68 @@ func (r *locationRepository) GetActiveWorkers() ([]*domain.WorkerLocation, error
 	return workers, nil
 }
 
+// GetActiveWorkersByTeam retrieves active workers for a specific team from database
+// This is a fallback when Redis cache doesn't have the data
+func (r *locationRepository) GetActiveWorkersByTeam(teamID string) ([]*domain.WorkerLocation, error) {
+	// Query workers who have active sessions for this team
+	// This is a simple fallback - the main data comes from Redis cache
+	query := `
+		SELECT 
+			u.id as user_id,
+			COALESCE(u.display_name, u.email) as user_name,
+			lt.latitude,
+			lt.longitude,
+			lt.accuracy,
+			lt.speed,
+			lt.heading,
+			true as is_active,
+			lt.tracked_at as last_seen,
+			lt.created_at as updated_at
+		FROM work_sessions ws
+		JOIN users u ON u.id = ws.user_id
+		LEFT JOIN LATERAL (
+			SELECT latitude, longitude, accuracy, speed, heading, tracked_at, created_at
+			FROM location_tracks lt
+			WHERE lt.user_id = u.id
+			ORDER BY lt.tracked_at DESC
+			LIMIT 1
+		) lt ON true
+		WHERE ws.team_id = $1 AND ws.is_active = true
+		ORDER BY lt.tracked_at DESC
+		LIMIT 50
+	`
+
+	rows, err := r.db.Query(query, teamID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get active workers by team: %w", err)
+	}
+	defer rows.Close()
+
+	var workers []*domain.WorkerLocation
+	for rows.Next() {
+		worker := &domain.WorkerLocation{}
+		err := rows.Scan(
+			&worker.UserID,
+			&worker.UserName,
+			&worker.Latitude,
+			&worker.Longitude,
+			&worker.Accuracy,
+			&worker.Speed,
+			&worker.Heading,
+			&worker.IsActive,
+			&worker.LastSeen,
+			&worker.UpdatedAt,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan worker: %w", err)
+		}
+		worker.TeamID = teamID
+		workers = append(workers, worker)
+	}
+
+	return workers, nil
+}
+
 // UpdateWorkerLocation updates a worker's real-time location in Redis (would be implemented with Redis)
 func (r *locationRepository) UpdateWorkerLocation(location *domain.WorkerLocation) error {
 	// This would typically update Redis for real-time data

@@ -6,6 +6,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../blocs/auth/auth_bloc.dart';
 import '../../blocs/dashboard/dashboard_bloc.dart';
 import '../../widgets/app_logo.dart';
+import '../../widgets/loading/skeleton_loader.dart';
 
 class TeamLeaderDashboard extends StatefulWidget {
   const TeamLeaderDashboard({super.key});
@@ -16,6 +17,7 @@ class TeamLeaderDashboard extends StatefulWidget {
 
 class _TeamLeaderDashboardState extends State<TeamLeaderDashboard> {
   late DashboardBloc _dashboardBloc;
+  bool _showAllManagement = false;
 
   @override
   void initState() {
@@ -62,6 +64,91 @@ class _TeamLeaderDashboardState extends State<TeamLeaderDashboard> {
   void dispose() {
     _dashboardBloc.close();
     super.dispose();
+  }
+
+  List<Widget> _buildManagementTiles(bool isDark, BuildContext context) {
+    final tiles = <Widget>[
+      _ManagementTile(
+        icon: Icons.map,
+        title: 'Command Center',
+        subtitle: 'Map, worker tracking & territories',
+        color: AppColors.primary,
+        isDark: isDark,
+        onTap: () => context.push('/leader/command-center?mode=overview'),
+      ),
+      _ManagementTile(
+        icon: Icons.people_outline,
+        title: 'Team Members',
+        subtitle: 'View and manage your team',
+        color: AppColors.secondary,
+        isDark: isDark,
+        onTap: () => context.push('/leader/team-members'),
+      ),
+      _ManagementTile(
+        icon: Icons.verified_user,
+        title: 'Verify Workers',
+        subtitle: 'Approve or reject join requests',
+        color: AppColors.info,
+        isDark: isDark,
+        onTap: () => context.push('/leader/worker-verification'),
+      ),
+      _ManagementTile(
+        icon: Icons.analytics_outlined,
+        title: 'Reports & Analytics',
+        subtitle: 'View team performance',
+        color: AppColors.accent,
+        isDark: isDark,
+        onTap: () => context.push('/leader/reports'),
+      ),
+      _ManagementTile(
+        icon: Icons.schedule_outlined,
+        title: 'Schedule',
+        subtitle: 'Manage team schedules',
+        color: AppColors.warning,
+        isDark: isDark,
+        onTap: () => context.push('/leader/schedule'),
+      ),
+      _ManagementTile(
+        icon: Icons.assignment,
+        title: 'Surveys',
+        subtitle: 'Manage surveys',
+        color: AppColors.success,
+        isDark: isDark,
+        onTap: () => context.push('/leader/survey'),
+      ),
+      _ManagementTile(
+        icon: Icons.flag_outlined,
+        title: 'Targets',
+        subtitle: 'Set team & worker goals',
+        color: AppColors.navyBlue,
+        isDark: isDark,
+        onTap: () => context.push('/leader/targets'),
+      ),
+      _ManagementTile(
+        icon: Icons.chat_bubble_outline,
+        title: 'Team Chat',
+        subtitle: 'Message team members',
+        color: AppColors.secondary,
+        isDark: isDark,
+        onTap: () => context.push('/leader/chat'),
+      ),
+      _ManagementTile(
+        icon: Icons.record_voice_over,
+        title: 'Walkie Talkie',
+        subtitle: 'Voice messages with your team',
+        color: AppColors.warning,
+        isDark: isDark,
+        onTap: () => context.push('/leader/walkie'),
+      ),
+    ];
+
+    final visibleTiles = _showAllManagement ? tiles : tiles.take(4).toList();
+    return visibleTiles
+        .map(
+          (tile) =>
+              Padding(padding: const EdgeInsets.only(bottom: 12), child: tile),
+        )
+        .toList();
   }
 
   @override
@@ -204,12 +291,7 @@ class _TeamLeaderDashboardState extends State<TeamLeaderDashboard> {
                             ),
                             const SizedBox(height: 16),
                             if (isLoading)
-                              const Center(
-                                child: Padding(
-                                  padding: EdgeInsets.all(20),
-                                  child: CircularProgressIndicator(),
-                                ),
-                              )
+                              const SkeletonOverviewGrid()
                             else ...[
                               Row(
                                 children: [
@@ -285,96 +367,37 @@ class _TeamLeaderDashboardState extends State<TeamLeaderDashboard> {
                               ?.copyWith(fontWeight: FontWeight.bold),
                         ),
                         const SizedBox(height: 16),
-                        _ManagementTile(
-                          icon: Icons.map,
-                          title: 'Team Map',
-                          subtitle: 'View workers and activities on map',
-                          color: AppColors.info,
-                          isDark: isDark,
-                          onTap: () => context.push('/leader/team-map'),
-                        ),
-                        const SizedBox(height: 12),
-                        _ManagementTile(
-                          icon: Icons.route,
-                          title: 'Track Workers',
-                          subtitle: 'View worker GPS trails and stats',
-                          color: AppColors.success,
-                          isDark: isDark,
-                          onTap: () => context.push('/leader/worker-tracking'),
-                        ),
-                        const SizedBox(height: 12),
-                        _ManagementTile(
-                          icon: Icons.map_outlined,
-                          title: 'Territory Assignment',
-                          subtitle: 'Assign territories to team members',
-                          color: AppColors.primary,
-                          isDark: isDark,
-                          onTap: () =>
-                              context.push('/leader/territory-assignment'),
-                        ),
-                        const SizedBox(height: 12),
-                        _ManagementTile(
-                          icon: Icons.people_outline,
-                          title: 'Team Members',
-                          subtitle: 'View and manage your team',
-                          color: AppColors.secondary,
-                          isDark: isDark,
-                          onTap: () => context.push('/leader/team-members'),
-                        ),
-                        const SizedBox(height: 12),
-                        _ManagementTile(
-                          icon: Icons.verified_user,
-                          title: 'Verify Workers',
-                          subtitle: 'Approve or reject join requests',
-                          color: AppColors.info,
-                          isDark: isDark,
-                          onTap: () =>
-                              context.push('/leader/worker-verification'),
-                        ),
-                        const SizedBox(height: 12),
-                        _ManagementTile(
-                          icon: Icons.analytics_outlined,
-                          title: 'Reports & Analytics',
-                          subtitle: 'View team performance',
-                          color: AppColors.accent,
-                          isDark: isDark,
-                          onTap: () => context.push('/leader/reports'),
-                        ),
-                        const SizedBox(height: 12),
-                        _ManagementTile(
-                          icon: Icons.schedule_outlined,
-                          title: 'Schedule',
-                          subtitle: 'Manage team schedules',
-                          color: AppColors.warning,
-                          isDark: isDark,
-                          onTap: () => context.push('/leader/schedule'),
-                        ),
-                        const SizedBox(height: 12),
-                        _ManagementTile(
-                          icon: Icons.assignment,
-                          title: 'Surveys',
-                          subtitle: 'Manage surveys',
-                          color: AppColors.success,
-                          isDark: isDark,
-                          onTap: () => context.push('/leader/survey'),
-                        ),
-                        const SizedBox(height: 12),
-                        _ManagementTile(
-                          icon: Icons.chat_bubble_outline,
-                          title: 'Team Chat',
-                          subtitle: 'Message team members',
-                          color: AppColors.secondary,
-                          isDark: isDark,
-                          onTap: () => context.push('/leader/chat'),
-                        ),
-                        const SizedBox(height: 12),
-                        _ManagementTile(
-                          icon: Icons.record_voice_over,
-                          title: 'Walkie Talkie',
-                          subtitle: 'Voice messages with your team',
-                          color: AppColors.warning,
-                          isDark: isDark,
-                          onTap: () => context.push('/leader/walkie'),
+                        ..._buildManagementTiles(isDark, context),
+                        const SizedBox(height: 8),
+                        GestureDetector(
+                          onTap: () => setState(
+                            () => _showAllManagement = !_showAllManagement,
+                          ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Text(
+                                _showAllManagement
+                                    ? 'Show Less'
+                                    : 'See All Actions',
+                                style: const TextStyle(
+                                  color: AppColors.primary,
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 13,
+                                ),
+                              ),
+                              const SizedBox(width: 4),
+                              AnimatedRotation(
+                                turns: _showAllManagement ? 0.5 : 0,
+                                duration: const Duration(milliseconds: 200),
+                                child: const Icon(
+                                  Icons.expand_more,
+                                  color: AppColors.primary,
+                                  size: 20,
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                       ],
                     ),

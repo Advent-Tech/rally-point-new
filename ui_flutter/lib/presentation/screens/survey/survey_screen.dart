@@ -6,6 +6,8 @@ import '../../../data/models/survey_model.dart';
 import '../../blocs/auth/auth_bloc.dart';
 import '../../blocs/survey/survey_bloc.dart';
 import '../../widgets/custom_button.dart';
+import '../../widgets/role_badge.dart';
+import '../../widgets/states/empty_state.dart';
 import 'survey_form_screen.dart';
 // NOTE: Survey creation is now admin-only (via admin panel)
 // Team leaders can only view surveys and see responses, not create them
@@ -18,7 +20,8 @@ class SurveyScreen extends StatefulWidget {
   State<SurveyScreen> createState() => _SurveyScreenState();
 }
 
-class _SurveyScreenState extends State<SurveyScreen> with SingleTickerProviderStateMixin {
+class _SurveyScreenState extends State<SurveyScreen>
+    with SingleTickerProviderStateMixin {
   TabController? _tabController;
   bool _isTeamLeader = false;
   bool _isInitialized = false;
@@ -33,10 +36,7 @@ class _SurveyScreenState extends State<SurveyScreen> with SingleTickerProviderSt
   Future<void> _initializeScreen() async {
     await _checkIfTeamLeader();
     // Leaders: 1 tab (Surveys), Workers: 2 tabs (Available, My Responses)
-    _tabController = TabController(
-      length: _isTeamLeader ? 1 : 2,
-      vsync: this,
-    );
+    _tabController = TabController(length: _isTeamLeader ? 1 : 2, vsync: this);
     // Load surveys on init
     if (mounted) {
       _loadSurveys();
@@ -45,10 +45,9 @@ class _SurveyScreenState extends State<SurveyScreen> with SingleTickerProviderSt
   }
 
   void _loadSurveys() {
-    context.read<SurveyBloc>().add(SurveyRefresh(
-      isLeader: _isTeamLeader,
-      teamId: _teamId,
-    ));
+    context.read<SurveyBloc>().add(
+      SurveyRefresh(isLeader: _isTeamLeader, teamId: _teamId),
+    );
   }
 
   Future<void> _checkIfTeamLeader() async {
@@ -73,11 +72,12 @@ class _SurveyScreenState extends State<SurveyScreen> with SingleTickerProviderSt
 
         // Also check for alternative role values
         if (!isLeader) {
-          isLeader = role == 'leader' ||
-                     role == 'team-leader' ||
-                     role == 'teamleader' ||
-                     role == 'manager' ||
-                     role == 'supervisor';
+          isLeader =
+              role == 'leader' ||
+              role == 'team-leader' ||
+              role == 'teamleader' ||
+              role == 'manager' ||
+              role == 'supervisor';
         }
       }
 
@@ -93,30 +93,38 @@ class _SurveyScreenState extends State<SurveyScreen> with SingleTickerProviderSt
         if (userData != null) {
           // Check common role field names if not already set
           if (role.isEmpty) {
-            role = (userData['role'] ??
-                    userData['user_role'] ??
-                    userData['userRole'] ??
-                    userData['type'] ??
-                    userData['user_type'] ??
-                    '').toString().toLowerCase().trim();
+            role =
+                (userData['role'] ??
+                        userData['user_role'] ??
+                        userData['userRole'] ??
+                        userData['type'] ??
+                        userData['user_type'] ??
+                        '')
+                    .toString()
+                    .toLowerCase()
+                    .trim();
 
             debugPrint('Survey Screen - Role from storage: "$role"');
 
-            isLeader = role == 'team_leader' ||
-                       role == 'teamleader' ||
-                       role == 'admin' ||
-                       role == 'leader' ||
-                       role == 'team-leader' ||
-                       role == 'manager' ||
-                       role == 'supervisor';
+            isLeader =
+                role == 'team_leader' ||
+                role == 'teamleader' ||
+                role == 'admin' ||
+                role == 'leader' ||
+                role == 'team-leader' ||
+                role == 'manager' ||
+                role == 'supervisor';
           }
 
           // Get teamId from storage if not already set
-          teamId ??= userData['team_id']?.toString() ?? userData['teamId']?.toString();
+          teamId ??=
+              userData['team_id']?.toString() ?? userData['teamId']?.toString();
         }
       }
 
-      debugPrint('Survey Screen - Final role: "$role", isLeader: $isLeader, teamId: $teamId');
+      debugPrint(
+        'Survey Screen - Final role: "$role", isLeader: $isLeader, teamId: $teamId',
+      );
 
       if (mounted) {
         setState(() {
@@ -144,9 +152,7 @@ class _SurveyScreenState extends State<SurveyScreen> with SingleTickerProviderSt
 
     // Show loading while initializing
     if (!_isInitialized || _tabController == null) {
-      return const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
-      );
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
 
     return Scaffold(
@@ -164,10 +170,8 @@ class _SurveyScreenState extends State<SurveyScreen> with SingleTickerProviderSt
                 ],
               ),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: _loadSurveys,
-          ),
+          const RoleBadge(),
+          IconButton(icon: const Icon(Icons.refresh), onPressed: _loadSurveys),
         ],
       ),
       // NOTE: FAB removed - survey creation is now admin-only via admin panel
@@ -182,13 +186,19 @@ class _SurveyScreenState extends State<SurveyScreen> with SingleTickerProviderSt
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const Icon(Icons.error_outline, size: 64, color: AppColors.error),
+                  const Icon(
+                    Icons.error_outline,
+                    size: 64,
+                    color: AppColors.error,
+                  ),
                   const SizedBox(height: 16),
                   Text(state.message),
                   const SizedBox(height: 16),
                   ElevatedButton(
                     onPressed: () {
-                      context.read<SurveyBloc>().add(SurveyRefresh(isLeader: false, teamId: null));
+                      context.read<SurveyBloc>().add(
+                        SurveyRefresh(isLeader: false, teamId: null),
+                      );
                     },
                     child: const Text('Retry'),
                   ),
@@ -200,12 +210,20 @@ class _SurveyScreenState extends State<SurveyScreen> with SingleTickerProviderSt
           if (state is SurveyLoaded) {
             // Leaders see a single list view, workers see tabs
             if (_isTeamLeader) {
-              return _AvailableSurveysTab(isDark: isDark, surveys: state.availableSurveys, isLeader: true);
+              return _AvailableSurveysTab(
+                isDark: isDark,
+                surveys: state.availableSurveys,
+                isLeader: true,
+              );
             }
             return TabBarView(
               controller: _tabController,
               children: [
-                _AvailableSurveysTab(isDark: isDark, surveys: state.availableSurveys, isLeader: false),
+                _AvailableSurveysTab(
+                  isDark: isDark,
+                  surveys: state.availableSurveys,
+                  isLeader: false,
+                ),
                 _MyResponsesTab(isDark: isDark, responses: state.myResponses),
               ],
             );
@@ -213,12 +231,20 @@ class _SurveyScreenState extends State<SurveyScreen> with SingleTickerProviderSt
 
           // Default empty state
           if (_isTeamLeader) {
-            return _AvailableSurveysTab(isDark: isDark, surveys: const [], isLeader: true);
+            return _AvailableSurveysTab(
+              isDark: isDark,
+              surveys: const [],
+              isLeader: true,
+            );
           }
           return TabBarView(
             controller: _tabController,
             children: [
-              _AvailableSurveysTab(isDark: isDark, surveys: const [], isLeader: false),
+              _AvailableSurveysTab(
+                isDark: isDark,
+                surveys: const [],
+                isLeader: false,
+              ),
               _MyResponsesTab(isDark: isDark, responses: const []),
             ],
           );
@@ -233,54 +259,28 @@ class _AvailableSurveysTab extends StatelessWidget {
   final List<SurveyModel> surveys;
   final bool isLeader;
 
-  const _AvailableSurveysTab({required this.isDark, required this.surveys, this.isLeader = false});
+  const _AvailableSurveysTab({
+    required this.isDark,
+    required this.surveys,
+    this.isLeader = false,
+  });
 
   @override
   Widget build(BuildContext context) {
     if (surveys.isEmpty) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(32),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Container(
-                width: 80,
-                height: 80,
-                decoration: BoxDecoration(
-                  color: AppColors.primary.withAlpha(30),
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(
-                  Icons.assignment_outlined,
-                  size: 40,
-                  color: AppColors.primary,
-                ),
-              ),
-              const SizedBox(height: 24),
-              Text(
-                'No Surveys Available',
-                style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'Check back later for new surveys',
-                textAlign: TextAlign.center,
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
-                ),
-              ),
-            ],
-          ),
-        ),
+      return const EmptyState(
+        icon: Icons.assignment_outlined,
+        title: 'No Surveys Available',
+        description:
+            'Your team leader will create surveys for you to complete. Check back later.',
       );
     }
 
     return RefreshIndicator(
       onRefresh: () async {
-        context.read<SurveyBloc>().add(SurveyRefresh(isLeader: false, teamId: null));
+        context.read<SurveyBloc>().add(
+          SurveyRefresh(isLeader: false, teamId: null),
+        );
       },
       child: ListView.builder(
         padding: const EdgeInsets.all(16),
@@ -318,96 +318,174 @@ class _SurveyCard extends StatelessWidget {
       case 'closed':
         return AppColors.error;
       default:
-        return AppColors.primary;
+        return isDark
+            ? AppColors.buttonPrimaryDark
+            : AppColors.buttonPrimaryLight;
     }
   }
 
   @override
   Widget build(BuildContext context) {
     final categoryColor = _getCategoryColor(survey.status);
+    final buttonColor = isDark
+        ? AppColors.buttonPrimaryDark
+        : AppColors.buttonPrimaryLight;
 
-    return Card(
+    return Container(
       margin: const EdgeInsets.only(bottom: 16),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: isDark
+              ? [AppColors.surfaceDark, AppColors.surfaceDark.withOpacity(0.8)]
+              : [AppColors.surfaceLight, AppColors.surfaceLight],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: isDark ? AppColors.borderDark : AppColors.borderLight,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: (isDark ? Colors.black : Colors.grey.shade200).withOpacity(
+              0.3,
+            ),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
-      child: InkWell(
-        onTap: isLeader ? () => _openDetailScreen(context) : null,
-        borderRadius: BorderRadius.circular(16),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: categoryColor.withAlpha(30),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Text(
-                      survey.status.toUpperCase(),
-                      style: TextStyle(
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: isLeader ? () => _openDetailScreen(context) : null,
+          borderRadius: BorderRadius.circular(20),
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: categoryColor.withOpacity(0.15),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Icon(
+                        Icons.assignment,
                         color: categoryColor,
-                        fontWeight: FontWeight.w600,
-                        fontSize: 12,
+                        size: 24,
                       ),
                     ),
-                  ),
-                  const Spacer(),
-                  Icon(
-                    Icons.arrow_forward_ios,
-                    size: 16,
-                    color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            survey.title,
+                            style: Theme.of(context).textTheme.titleMedium
+                                ?.copyWith(fontWeight: FontWeight.bold),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          const SizedBox(height: 4),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 2,
+                            ),
+                            decoration: BoxDecoration(
+                              color: categoryColor.withAlpha(25),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Text(
+                              survey.status.toUpperCase(),
+                              style: TextStyle(
+                                color: categoryColor,
+                                fontWeight: FontWeight.w600,
+                                fontSize: 10,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                if (survey.description != null) ...[
+                  const SizedBox(height: 12),
+                  Text(
+                    survey.description!,
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: isDark
+                          ? AppColors.textSecondaryDark
+                          : AppColors.textSecondaryLight,
+                    ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ],
-              ),
-              const SizedBox(height: 12),
-              Text(
-                survey.title,
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              if (survey.description != null) ...[
-                const SizedBox(height: 4),
-                Text(
-                  survey.description!,
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
-                  ),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    _InfoItem(
+                      icon: Icons.quiz_outlined,
+                      label: '${survey.questionCount} questions',
+                      isDark: isDark,
+                    ),
+                    const SizedBox(width: 16),
+                    _InfoItem(
+                      icon: Icons.people_outline,
+                      label: '${survey.responseCount} responses',
+                      isDark: isDark,
+                    ),
+                    const Spacer(),
+                    if (survey.isPublished && !isLeader)
+                      Container(
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: [buttonColor, buttonColor.withOpacity(0.8)],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
+                          borderRadius: BorderRadius.circular(12),
+                          boxShadow: [
+                            BoxShadow(
+                              color: buttonColor.withOpacity(0.4),
+                              blurRadius: 8,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
+                        ),
+                        child: Material(
+                          color: Colors.transparent,
+                          child: InkWell(
+                            onTap: () => _showSurveyDialog(context, survey),
+                            borderRadius: BorderRadius.circular(12),
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 20,
+                                vertical: 10,
+                              ),
+                              child: Text(
+                                'Start',
+                                style: TextStyle(
+                                  color: isDark ? Colors.black : Colors.white,
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 14,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
                 ),
               ],
-              const SizedBox(height: 16),
-              Row(
-                children: [
-                  _InfoItem(
-                    icon: Icons.quiz_outlined,
-                    label: '${survey.questionCount} questions',
-                    isDark: isDark,
-                  ),
-                  const SizedBox(width: 16),
-                  _InfoItem(
-                    icon: Icons.people_outline,
-                    label: '${survey.responseCount} responses',
-                    isDark: isDark,
-                  ),
-                  const Spacer(),
-                  if (survey.isPublished && !isLeader)
-                    CustomButton(
-                      text: 'Start',
-                      size: ButtonSize.small,
-                      onPressed: () {
-                        _showSurveyDialog(context, survey);
-                      },
-                    ),
-                ],
-              ),
-            ],
+            ),
           ),
         ),
       ),
@@ -437,8 +515,9 @@ class _SurveyCard extends StatelessWidget {
           ElevatedButton(
             onPressed: () {
               Navigator.pop(ctx);
-              // Load survey details and navigate to form
-              context.read<SurveyBloc>().add(SurveyLoadDetails(surveyId: survey.id));
+              context.read<SurveyBloc>().add(
+                SurveyLoadDetails(surveyId: survey.id),
+              );
               Navigator.push(
                 context,
                 MaterialPageRoute(
@@ -476,13 +555,17 @@ class _InfoItem extends StatelessWidget {
         Icon(
           icon,
           size: 16,
-          color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+          color: isDark
+              ? AppColors.textSecondaryDark
+              : AppColors.textSecondaryLight,
         ),
         const SizedBox(width: 4),
         Text(
           label,
           style: Theme.of(context).textTheme.bodySmall?.copyWith(
-            color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+            color: isDark
+                ? AppColors.textSecondaryDark
+                : AppColors.textSecondaryLight,
           ),
         ),
       ],
@@ -499,43 +582,12 @@ class _MyResponsesTab extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (responses.isEmpty) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(32),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Container(
-                width: 80,
-                height: 80,
-                decoration: BoxDecoration(
-                  color: AppColors.warning.withAlpha(30),
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(
-                  Icons.assignment_outlined,
-                  size: 40,
-                  color: AppColors.warning,
-                ),
-              ),
-              const SizedBox(height: 24),
-              Text(
-                'No Responses Yet',
-                style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'Complete a survey to see your responses here',
-                textAlign: TextAlign.center,
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
-                ),
-              ),
-            ],
-          ),
-        ),
+      return const EmptyState(
+        icon: Icons.assignment_turned_in_outlined,
+        title: 'No Responses Yet',
+        description: 'Complete a survey to see your responses here.',
+        iconColor: AppColors.warning,
+        secondaryColor: AppColors.warning,
       );
     }
 
@@ -568,16 +620,18 @@ class _MyResponsesTab extends StatelessWidget {
               ),
               title: Text(
                 'Survey Response',
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.bold,
-                ),
+                style: Theme.of(
+                  context,
+                ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
               ),
               subtitle: Text(
                 response.completedAt != null
                     ? 'Completed on ${_formatDate(response.completedAt!)}'
                     : 'In Progress',
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                  color: isDark
+                      ? AppColors.textSecondaryDark
+                      : AppColors.textSecondaryLight,
                 ),
               ),
               trailing: const Icon(Icons.chevron_right),
@@ -643,16 +697,18 @@ class _MyResponsesTab extends StatelessWidget {
                       children: [
                         Text(
                           'Survey Response',
-                          style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                            fontWeight: FontWeight.bold,
-                          ),
+                          style: Theme.of(context).textTheme.titleLarge
+                              ?.copyWith(fontWeight: FontWeight.bold),
                         ),
                         if (response.completedAt != null)
                           Text(
                             'Submitted on ${_formatDate(response.completedAt!)}',
-                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                              color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
-                            ),
+                            style: Theme.of(context).textTheme.bodySmall
+                                ?.copyWith(
+                                  color: isDark
+                                      ? AppColors.textSecondaryDark
+                                      : AppColors.textSecondaryLight,
+                                ),
                           ),
                       ],
                     ),
@@ -667,8 +723,18 @@ class _MyResponsesTab extends StatelessWidget {
                 controller: scrollController,
                 padding: const EdgeInsets.all(16),
                 children: [
-                  _buildDetailRow(context, 'Response ID', response.id.substring(0, 8), isDark),
-                  _buildDetailRow(context, 'Survey ID', response.surveyId.substring(0, 8), isDark),
+                  _buildDetailRow(
+                    context,
+                    'Response ID',
+                    response.id.substring(0, 8),
+                    isDark,
+                  ),
+                  _buildDetailRow(
+                    context,
+                    'Survey ID',
+                    response.surveyId.substring(0, 8),
+                    isDark,
+                  ),
                   if (response.latitude != null && response.longitude != null)
                     _buildDetailRow(
                       context,
@@ -676,7 +742,8 @@ class _MyResponsesTab extends StatelessWidget {
                       '${response.latitude!.toStringAsFixed(4)}, ${response.longitude!.toStringAsFixed(4)}',
                       isDark,
                     ),
-                  if (response.answers != null && response.answers!.isNotEmpty) ...[
+                  if (response.answers != null &&
+                      response.answers!.isNotEmpty) ...[
                     const SizedBox(height: 16),
                     Text(
                       'Answers',
@@ -685,32 +752,38 @@ class _MyResponsesTab extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(height: 12),
-                    ...response.answers!.map((answer) => Card(
-                      margin: const EdgeInsets.only(bottom: 8),
-                      child: Padding(
-                        padding: const EdgeInsets.all(12),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Question ${response.answers!.indexOf(answer) + 1}',
-                              style: TextStyle(
-                                fontWeight: FontWeight.w600,
-                                color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
-                                fontSize: 12,
+                    ...response.answers!.map(
+                      (answer) => Card(
+                        margin: const EdgeInsets.only(bottom: 8),
+                        child: Padding(
+                          padding: const EdgeInsets.all(12),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Question ${response.answers!.indexOf(answer) + 1}',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w600,
+                                  color: isDark
+                                      ? AppColors.textSecondaryDark
+                                      : AppColors.textSecondaryLight,
+                                  fontSize: 12,
+                                ),
                               ),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              answer.value ??
-                              answer.selectedOptions?.join(', ') ??
-                              (answer.signatureUrl != null ? '[Signature]' : 'No answer'),
-                              style: Theme.of(context).textTheme.bodyMedium,
-                            ),
-                          ],
+                              const SizedBox(height: 4),
+                              Text(
+                                answer.value ??
+                                    answer.selectedOptions?.join(', ') ??
+                                    (answer.signatureUrl != null
+                                        ? '[Signature]'
+                                        : 'No answer'),
+                                style: Theme.of(context).textTheme.bodyMedium,
+                              ),
+                            ],
+                          ),
                         ),
                       ),
-                    )),
+                    ),
                   ] else
                     Padding(
                       padding: const EdgeInsets.symmetric(vertical: 24),
@@ -718,7 +791,9 @@ class _MyResponsesTab extends StatelessWidget {
                         child: Text(
                           'No answer details available',
                           style: TextStyle(
-                            color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                            color: isDark
+                                ? AppColors.textSecondaryDark
+                                : AppColors.textSecondaryLight,
                           ),
                         ),
                       ),
@@ -732,7 +807,12 @@ class _MyResponsesTab extends StatelessWidget {
     );
   }
 
-  Widget _buildDetailRow(BuildContext context, String label, String value, bool isDark) {
+  Widget _buildDetailRow(
+    BuildContext context,
+    String label,
+    String value,
+    bool isDark,
+  ) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8),
       child: Row(
@@ -741,13 +821,12 @@ class _MyResponsesTab extends StatelessWidget {
           Text(
             label,
             style: TextStyle(
-              color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+              color: isDark
+                  ? AppColors.textSecondaryDark
+                  : AppColors.textSecondaryLight,
             ),
           ),
-          Text(
-            value,
-            style: const TextStyle(fontWeight: FontWeight.w500),
-          ),
+          Text(value, style: const TextStyle(fontWeight: FontWeight.w500)),
         ],
       ),
     );

@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../../blocs/dashboard/dashboard_bloc.dart';
 import '../../blocs/auth/auth_bloc.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../widgets/role_badge.dart';
 
 class ReportsScreen extends StatefulWidget {
   const ReportsScreen({super.key});
@@ -12,7 +13,8 @@ class ReportsScreen extends StatefulWidget {
   State<ReportsScreen> createState() => _ReportsScreenState();
 }
 
-class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProviderStateMixin {
+class _ReportsScreenState extends State<ReportsScreen>
+    with SingleTickerProviderStateMixin {
   late TabController _tabController;
   late DashboardBloc _dashboardBloc;
 
@@ -46,16 +48,16 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
       value: _dashboardBloc,
       child: Scaffold(
         appBar: AppBar(
-          leading: IconButton(
-            icon: const Icon(Icons.arrow_back),
-            onPressed: () => context.pop(),
-          ),
+          leading: GoRouter.of(context).canPop()
+              ? IconButton(
+                  icon: const Icon(Icons.arrow_back),
+                  onPressed: () => context.pop(),
+                )
+              : null,
           title: const Text('Reports & Analytics'),
           actions: [
-            IconButton(
-              icon: const Icon(Icons.refresh),
-              onPressed: _loadData,
-            ),
+            const RoleBadge(),
+            IconButton(icon: const Icon(Icons.refresh), onPressed: _loadData),
           ],
           bottom: TabBar(
             controller: _tabController,
@@ -85,7 +87,9 @@ class _OverviewTab extends StatelessWidget {
   const _OverviewTab({required this.isDark});
 
   /// Calculate daily activity counts for the current week
-  Map<String, int> _calculateDailyActivityCounts(List<TeamActivity> activities) {
+  Map<String, int> _calculateDailyActivityCounts(
+    List<TeamActivity> activities,
+  ) {
     final counts = <String, int>{
       'Mon': 0,
       'Tue': 0,
@@ -98,7 +102,11 @@ class _OverviewTab extends StatelessWidget {
 
     final now = DateTime.now();
     final weekStart = now.subtract(Duration(days: now.weekday - 1));
-    final weekStartDate = DateTime(weekStart.year, weekStart.month, weekStart.day);
+    final weekStartDate = DateTime(
+      weekStart.year,
+      weekStart.month,
+      weekStart.day,
+    );
 
     for (final activity in activities) {
       final activityDate = DateTime(
@@ -108,7 +116,9 @@ class _OverviewTab extends StatelessWidget {
       );
 
       // Only count activities from this week
-      if (activityDate.isAfter(weekStartDate.subtract(const Duration(days: 1))) &&
+      if (activityDate.isAfter(
+            weekStartDate.subtract(const Duration(days: 1)),
+          ) &&
           activityDate.isBefore(weekStartDate.add(const Duration(days: 7)))) {
         final dayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
         final dayIndex = activity.timestamp.weekday - 1; // weekday is 1-7
@@ -202,17 +212,26 @@ class _OverviewTab extends StatelessWidget {
                 Builder(
                   builder: (context) {
                     // Calculate daily activity counts for the past week
-                    final dailyCounts = _calculateDailyActivityCounts(state.recentActivity);
-                    final maxCount = dailyCounts.values.fold<int>(0, (max, count) => count > max ? count : max);
+                    final dailyCounts = _calculateDailyActivityCounts(
+                      state.recentActivity,
+                    );
+                    final maxCount = dailyCounts.values.fold<int>(
+                      0,
+                      (max, count) => count > max ? count : max,
+                    );
 
                     return Container(
                       height: 200,
                       padding: const EdgeInsets.all(20),
                       decoration: BoxDecoration(
-                        color: isDark ? AppColors.surfaceDark : AppColors.surfaceLight,
+                        color: isDark
+                            ? AppColors.surfaceDark
+                            : AppColors.surfaceLight,
                         borderRadius: BorderRadius.circular(16),
                         border: Border.all(
-                          color: isDark ? AppColors.borderDark : AppColors.borderLight,
+                          color: isDark
+                              ? AppColors.borderDark
+                              : AppColors.borderLight,
                         ),
                       ),
                       child: Column(
@@ -223,16 +242,27 @@ class _OverviewTab extends StatelessWidget {
                             child: Row(
                               crossAxisAlignment: CrossAxisAlignment.end,
                               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                              children: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((day) {
-                                final count = dailyCounts[day] ?? 0;
-                                final value = maxCount > 0 ? count / maxCount : 0.0;
-                                return _ChartBar(
-                                  value: value,
-                                  label: day,
-                                  isDark: isDark,
-                                  count: count,
-                                );
-                              }).toList(),
+                              children:
+                                  [
+                                    'Mon',
+                                    'Tue',
+                                    'Wed',
+                                    'Thu',
+                                    'Fri',
+                                    'Sat',
+                                    'Sun',
+                                  ].map((day) {
+                                    final count = dailyCounts[day] ?? 0;
+                                    final value = maxCount > 0
+                                        ? count / maxCount
+                                        : 0.0;
+                                    return _ChartBar(
+                                      value: value,
+                                      label: day,
+                                      isDark: isDark,
+                                      count: count,
+                                    );
+                                  }).toList(),
                             ),
                           ),
                           if (maxCount == 0)
@@ -242,7 +272,9 @@ class _OverviewTab extends StatelessWidget {
                                 'No activity data this week',
                                 style: TextStyle(
                                   fontSize: 12,
-                                  color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                                  color: isDark
+                                      ? AppColors.textSecondaryDark
+                                      : AppColors.textSecondaryLight,
                                 ),
                               ),
                             ),
@@ -264,10 +296,7 @@ class _OverviewTab extends StatelessWidget {
                         fontWeight: FontWeight.bold,
                       ),
                     ),
-                    TextButton(
-                      onPressed: () {},
-                      child: const Text('See All'),
-                    ),
+                    TextButton(onPressed: () {}, child: const Text('See All')),
                   ],
                 ),
                 const SizedBox(height: 8),
@@ -275,7 +304,9 @@ class _OverviewTab extends StatelessWidget {
                   Container(
                     padding: const EdgeInsets.all(32),
                     decoration: BoxDecoration(
-                      color: isDark ? AppColors.surfaceDark : AppColors.surfaceLight,
+                      color: isDark
+                          ? AppColors.surfaceDark
+                          : AppColors.surfaceLight,
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Center(
@@ -284,24 +315,31 @@ class _OverviewTab extends StatelessWidget {
                           Icon(
                             Icons.history,
                             size: 48,
-                            color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                            color: isDark
+                                ? AppColors.textSecondaryDark
+                                : AppColors.textSecondaryLight,
                           ),
                           const SizedBox(height: 8),
                           Text(
                             'No recent activity',
-                            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                              color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
-                            ),
+                            style: Theme.of(context).textTheme.bodyMedium
+                                ?.copyWith(
+                                  color: isDark
+                                      ? AppColors.textSecondaryDark
+                                      : AppColors.textSecondaryLight,
+                                ),
                           ),
                         ],
                       ),
                     ),
                   )
                 else
-                  ...state.recentActivity.take(5).map((activity) => _ActivityItem(
-                    activity: activity,
-                    isDark: isDark,
-                  )),
+                  ...state.recentActivity
+                      .take(5)
+                      .map(
+                        (activity) =>
+                            _ActivityItem(activity: activity, isDark: isDark),
+                      ),
               ],
             ),
           );
@@ -318,8 +356,11 @@ class _OverviewTab extends StatelessWidget {
               ElevatedButton(
                 onPressed: () {
                   final authState = context.read<AuthBloc>().state;
-                  if (authState is AuthAuthenticated && authState.user.teamId != null) {
-                    context.read<DashboardBloc>().add(DashboardLoadStats(teamId: authState.user.teamId!));
+                  if (authState is AuthAuthenticated &&
+                      authState.user.teamId != null) {
+                    context.read<DashboardBloc>().add(
+                      DashboardLoadStats(teamId: authState.user.teamId!),
+                    );
                   }
                 },
                 child: const Text('Retry'),
@@ -332,10 +373,17 @@ class _OverviewTab extends StatelessWidget {
   }
 }
 
-class _TeamTab extends StatelessWidget {
+class _TeamTab extends StatefulWidget {
   final bool isDark;
 
   const _TeamTab({required this.isDark});
+
+  @override
+  State<_TeamTab> createState() => _TeamTabState();
+}
+
+class _TeamTabState extends State<_TeamTab> {
+  String _searchQuery = '';
 
   @override
   Widget build(BuildContext context) {
@@ -346,6 +394,13 @@ class _TeamTab extends StatelessWidget {
         }
 
         if (state is DashboardLoaded) {
+          final filteredWorkers = state.workerPerformance
+              .where(
+                (w) =>
+                    w.name.toLowerCase().contains(_searchQuery.toLowerCase()),
+              )
+              .toList();
+
           return SingleChildScrollView(
             padding: const EdgeInsets.all(16),
             child: Column(
@@ -355,10 +410,14 @@ class _TeamTab extends StatelessWidget {
                 Container(
                   padding: const EdgeInsets.all(20),
                   decoration: BoxDecoration(
-                    color: isDark ? AppColors.surfaceDark : AppColors.surfaceLight,
+                    color: widget.isDark
+                        ? AppColors.surfaceDark
+                        : AppColors.surfaceLight,
                     borderRadius: BorderRadius.circular(16),
                     border: Border.all(
-                      color: isDark ? AppColors.borderDark : AppColors.borderLight,
+                      color: widget.isDark
+                          ? AppColors.borderDark
+                          : AppColors.borderLight,
                     ),
                   ),
                   child: Column(
@@ -377,14 +436,37 @@ class _TeamTab extends StatelessWidget {
                             color: AppColors.success,
                           ),
                           _TeamStatItem(
-                            value: '${state.stats.totalDeliveries}',
-                            label: 'Deliveries',
+                            value:
+                                '\$${state.workerPerformance.fold<double>(0, (sum, w) => sum + w.donationsTotal).toStringAsFixed(0)}',
+                            label: 'Donations',
                             color: AppColors.accent,
                           ),
                         ],
                       ),
                     ],
                   ),
+                ),
+
+                const SizedBox(height: 24),
+
+                // Search Bar
+                TextField(
+                  decoration: InputDecoration(
+                    hintText: 'Search workers...',
+                    prefixIcon: const Icon(Icons.search, size: 20),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    filled: true,
+                    fillColor: widget.isDark
+                        ? AppColors.surfaceDark
+                        : AppColors.surfaceLight,
+                    contentPadding: const EdgeInsets.symmetric(
+                      vertical: 0,
+                      horizontal: 16,
+                    ),
+                  ),
+                  onChanged: (value) => setState(() => _searchQuery = value),
                 ),
 
                 const SizedBox(height: 24),
@@ -398,44 +480,70 @@ class _TeamTab extends StatelessWidget {
                 ),
                 const SizedBox(height: 12),
 
-                if (state.workerPerformance.isEmpty)
+                if (filteredWorkers.isEmpty)
                   Container(
                     padding: const EdgeInsets.all(32),
                     decoration: BoxDecoration(
-                      color: isDark ? AppColors.surfaceDark : AppColors.surfaceLight,
+                      color: widget.isDark
+                          ? AppColors.surfaceDark
+                          : AppColors.surfaceLight,
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Center(
                       child: Column(
                         children: [
                           Icon(
-                            Icons.people_outline,
+                            _searchQuery.isEmpty
+                                ? Icons.people_outline
+                                : Icons.search_off,
                             size: 48,
-                            color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                            color: widget.isDark
+                                ? AppColors.textSecondaryDark
+                                : AppColors.textSecondaryLight,
                           ),
                           const SizedBox(height: 8),
                           Text(
-                            'No worker data available',
-                            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                              color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
-                            ),
+                            _searchQuery.isEmpty
+                                ? 'No worker data available'
+                                : 'No workers found',
+                            style: Theme.of(context).textTheme.bodyMedium
+                                ?.copyWith(
+                                  color: widget.isDark
+                                      ? AppColors.textSecondaryDark
+                                      : AppColors.textSecondaryLight,
+                                ),
                           ),
                         ],
                       ),
                     ),
                   )
                 else
-                  ...state.workerPerformance.map((worker) => Padding(
-                    padding: const EdgeInsets.only(bottom: 8),
-                    child: _WorkerPerformanceCard(
-                      name: worker.name,
-                      visits: worker.totalVisits,
-                      completion: worker.completionRate / 100, // Convert percentage to 0-1
-                      territoriesAssigned: worker.territoriesAssigned,
-                      isActive: worker.isActive,
-                      isDark: isDark,
+                  ...filteredWorkers.map(
+                    (worker) => Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: Builder(
+                        builder: (ctx) {
+                          final authState = context.read<AuthBloc>().state;
+                          final teamId = authState is AuthAuthenticated
+                              ? authState.user.teamId ?? ''
+                              : '';
+                          return GestureDetector(
+                            onTap: () => context.push(
+                              '/leader/worker/${worker.id}?name=${Uri.encodeComponent(worker.name)}&teamId=$teamId',
+                            ),
+                            child: _WorkerPerformanceCard(
+                              name: worker.name,
+                              donationsTotal: worker.donationsTotal,
+                              coverage: worker.territoryCoverage / 100,
+                              territoriesAssigned: worker.territoriesAssigned,
+                              isActive: worker.isActive,
+                              isDark: widget.isDark,
+                            ),
+                          );
+                        },
+                      ),
                     ),
-                  )),
+                  ),
               ],
             ),
           );
@@ -483,10 +591,14 @@ class _TerritoriesTab extends StatelessWidget {
                     return Container(
                       padding: const EdgeInsets.all(20),
                       decoration: BoxDecoration(
-                        color: isDark ? AppColors.surfaceDark : AppColors.surfaceLight,
+                        color: isDark
+                            ? AppColors.surfaceDark
+                            : AppColors.surfaceLight,
                         borderRadius: BorderRadius.circular(16),
                         border: Border.all(
-                          color: isDark ? AppColors.borderDark : AppColors.borderLight,
+                          color: isDark
+                              ? AppColors.borderDark
+                              : AppColors.borderLight,
                         ),
                       ),
                       child: Column(
@@ -517,17 +629,24 @@ class _TerritoriesTab extends StatelessWidget {
                               borderRadius: BorderRadius.circular(4),
                               child: LinearProgressIndicator(
                                 value: (overallCoverage / 100).clamp(0, 1),
-                                backgroundColor: AppColors.success.withAlpha(30),
-                                valueColor: const AlwaysStoppedAnimation(AppColors.success),
+                                backgroundColor: AppColors.success.withAlpha(
+                                  30,
+                                ),
+                                valueColor: const AlwaysStoppedAnimation(
+                                  AppColors.success,
+                                ),
                                 minHeight: 8,
                               ),
                             ),
                             const SizedBox(height: 8),
                             Text(
                               '$totalVisited visited • ${totalHouseholds - totalVisited} remaining',
-                              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
-                              ),
+                              style: Theme.of(context).textTheme.bodySmall
+                                  ?.copyWith(
+                                    color: isDark
+                                        ? AppColors.textSecondaryDark
+                                        : AppColors.textSecondaryLight,
+                                  ),
                             ),
                           ],
                         ],
@@ -550,7 +669,9 @@ class _TerritoriesTab extends StatelessWidget {
                   Container(
                     padding: const EdgeInsets.all(32),
                     decoration: BoxDecoration(
-                      color: isDark ? AppColors.surfaceDark : AppColors.surfaceLight,
+                      color: isDark
+                          ? AppColors.surfaceDark
+                          : AppColors.surfaceLight,
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Center(
@@ -559,33 +680,42 @@ class _TerritoriesTab extends StatelessWidget {
                           Icon(
                             Icons.map_outlined,
                             size: 48,
-                            color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                            color: isDark
+                                ? AppColors.textSecondaryDark
+                                : AppColors.textSecondaryLight,
                           ),
                           const SizedBox(height: 8),
                           Text(
                             'No territory data available',
-                            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                              color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
-                            ),
+                            style: Theme.of(context).textTheme.bodyMedium
+                                ?.copyWith(
+                                  color: isDark
+                                      ? AppColors.textSecondaryDark
+                                      : AppColors.textSecondaryLight,
+                                ),
                           ),
                         ],
                       ),
                     ),
                   )
                 else
-                  ...state.territoryStats.map((territory) => Padding(
-                    padding: const EdgeInsets.only(bottom: 8),
-                    child: _TerritoryReportCard(
-                      name: territory.name,
-                      assignee: territory.assigneeName,
-                      completion: territory.completionRate / 100, // Convert percentage to 0-1
-                      visits: territory.visitedCount,
-                      housingUnits: territory.housingUnits,
-                      remaining: territory.remaining,
-                      lastVisited: territory.lastVisited,
-                      isDark: isDark,
+                  ...state.territoryStats.map(
+                    (territory) => Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: _TerritoryReportCard(
+                        name: territory.name,
+                        assignee: territory.assigneeName,
+                        completion:
+                            territory.completionRate /
+                            100, // Convert percentage to 0-1
+                        visits: territory.visitedCount,
+                        housingUnits: territory.housingUnits,
+                        remaining: territory.remaining,
+                        lastVisited: territory.lastVisited,
+                        isDark: isDark,
+                      ),
                     ),
-                  )),
+                  ),
               ],
             ),
           );
@@ -646,21 +776,25 @@ class _MetricCard extends StatelessWidget {
           const SizedBox(height: 12),
           Text(
             value,
-            style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-              fontWeight: FontWeight.bold,
-            ),
+            style: Theme.of(
+              context,
+            ).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 4),
           Text(
             title,
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-              color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+              color: isDark
+                  ? AppColors.textSecondaryDark
+                  : AppColors.textSecondaryLight,
             ),
           ),
           Text(
             subtitle,
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
-              color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+              color: isDark
+                  ? AppColors.textSecondaryDark
+                  : AppColors.textSecondaryLight,
             ),
           ),
         ],
@@ -716,7 +850,9 @@ class _ChartBar extends StatelessWidget {
             label,
             style: TextStyle(
               fontSize: 10,
-              color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+              color: isDark
+                  ? AppColors.textSecondaryDark
+                  : AppColors.textSecondaryLight,
             ),
           ),
         ],
@@ -748,10 +884,7 @@ class _TeamStatItem extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 4),
-        Text(
-          label,
-          style: Theme.of(context).textTheme.bodySmall,
-        ),
+        Text(label, style: Theme.of(context).textTheme.bodySmall),
       ],
     );
   }
@@ -759,16 +892,16 @@ class _TeamStatItem extends StatelessWidget {
 
 class _WorkerPerformanceCard extends StatelessWidget {
   final String name;
-  final int visits;
-  final double completion;
+  final double donationsTotal;
+  final double coverage;
   final int territoriesAssigned;
   final bool isActive;
   final bool isDark;
 
   const _WorkerPerformanceCard({
     required this.name,
-    required this.visits,
-    required this.completion,
+    required this.donationsTotal,
+    required this.coverage,
     this.territoriesAssigned = 0,
     this.isActive = false,
     required this.isDark,
@@ -782,7 +915,9 @@ class _WorkerPerformanceCard extends StatelessWidget {
         color: isDark ? AppColors.surfaceDark : AppColors.surfaceLight,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: isActive ? AppColors.success : (isDark ? AppColors.borderDark : AppColors.borderLight),
+          color: isActive
+              ? AppColors.success
+              : (isDark ? AppColors.borderDark : AppColors.borderLight),
           width: isActive ? 2 : 1,
         ),
       ),
@@ -811,7 +946,9 @@ class _WorkerPerformanceCard extends StatelessWidget {
                       color: AppColors.success,
                       shape: BoxShape.circle,
                       border: Border.all(
-                        color: isDark ? AppColors.surfaceDark : AppColors.surfaceLight,
+                        color: isDark
+                            ? AppColors.surfaceDark
+                            : AppColors.surfaceLight,
                         width: 2,
                       ),
                     ),
@@ -837,17 +974,21 @@ class _WorkerPerformanceCard extends StatelessWidget {
                     ),
                     if (isActive)
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 6,
+                          vertical: 2,
+                        ),
                         decoration: BoxDecoration(
                           color: AppColors.success.withAlpha(30),
                           borderRadius: BorderRadius.circular(4),
                         ),
                         child: Text(
                           'Active',
-                          style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                            color: AppColors.success,
-                            fontWeight: FontWeight.bold,
-                          ),
+                          style: Theme.of(context).textTheme.labelSmall
+                              ?.copyWith(
+                                color: AppColors.success,
+                                fontWeight: FontWeight.bold,
+                              ),
                         ),
                       ),
                   ],
@@ -856,9 +997,11 @@ class _WorkerPerformanceCard extends StatelessWidget {
                 Row(
                   children: [
                     Text(
-                      '$visits deliveries',
+                      '\$${donationsTotal.toStringAsFixed(0)} donations',
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                        color: isDark
+                            ? AppColors.textSecondaryDark
+                            : AppColors.textSecondaryLight,
                       ),
                     ),
                     if (territoriesAssigned > 0) ...[
@@ -866,7 +1009,9 @@ class _WorkerPerformanceCard extends StatelessWidget {
                       Text(
                         '• $territoriesAssigned territories',
                         style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                          color: isDark
+                              ? AppColors.textSecondaryDark
+                              : AppColors.textSecondaryLight,
                         ),
                       ),
                     ],
@@ -879,19 +1024,21 @@ class _WorkerPerformanceCard extends StatelessWidget {
                       child: ClipRRect(
                         borderRadius: BorderRadius.circular(4),
                         child: LinearProgressIndicator(
-                          value: completion.clamp(0, 1),
+                          value: coverage.clamp(0, 1),
                           backgroundColor: AppColors.primary.withAlpha(30),
-                          valueColor: AlwaysStoppedAnimation(_getCompletionColor(completion)),
+                          valueColor: AlwaysStoppedAnimation(
+                            _getCoverageColor(coverage),
+                          ),
                           minHeight: 6,
                         ),
                       ),
                     ),
                     const SizedBox(width: 8),
                     Text(
-                      '${(completion * 100).toInt()}%',
+                      '${(coverage * 100).toInt()}%',
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
                         fontWeight: FontWeight.bold,
-                        color: _getCompletionColor(completion),
+                        color: _getCoverageColor(coverage),
                       ),
                     ),
                   ],
@@ -899,12 +1046,20 @@ class _WorkerPerformanceCard extends StatelessWidget {
               ],
             ),
           ),
+          const SizedBox(width: 8),
+          Icon(
+            Icons.chevron_right,
+            color: isDark
+                ? AppColors.textSecondaryDark
+                : AppColors.textSecondaryLight,
+            size: 20,
+          ),
         ],
       ),
     );
   }
 
-  Color _getCompletionColor(double value) {
+  Color _getCoverageColor(double value) {
     if (value >= 0.75) return AppColors.success;
     if (value >= 0.5) return AppColors.warning;
     if (value >= 0.25) return AppColors.accent;
@@ -935,7 +1090,8 @@ class _TerritoryReportCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final hasAssignee = assignee != null && assignee!.isNotEmpty && assignee != 'Unassigned';
+    final hasAssignee =
+        assignee != null && assignee!.isNotEmpty && assignee != 'Unassigned';
 
     return Container(
       padding: const EdgeInsets.all(16),
@@ -958,7 +1114,11 @@ class _TerritoryReportCard extends StatelessWidget {
                   color: AppColors.primary.withAlpha(30),
                   borderRadius: BorderRadius.circular(8),
                 ),
-                child: const Icon(Icons.map, color: AppColors.primary, size: 20),
+                child: const Icon(
+                  Icons.map,
+                  color: AppColors.primary,
+                  size: 20,
+                ),
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -977,22 +1137,33 @@ class _TerritoryReportCard extends StatelessWidget {
                     Row(
                       children: [
                         Icon(
-                          hasAssignee ? Icons.person : Icons.person_off_outlined,
+                          hasAssignee
+                              ? Icons.person
+                              : Icons.person_off_outlined,
                           size: 14,
                           color: hasAssignee
                               ? AppColors.success
-                              : (isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight),
+                              : (isDark
+                                    ? AppColors.textSecondaryDark
+                                    : AppColors.textSecondaryLight),
                         ),
                         const SizedBox(width: 4),
                         Expanded(
                           child: Text(
                             hasAssignee ? assignee! : 'Unassigned',
-                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                              color: hasAssignee
-                                  ? (isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight)
-                                  : (isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight),
-                              fontWeight: hasAssignee ? FontWeight.w500 : FontWeight.normal,
-                            ),
+                            style: Theme.of(context).textTheme.bodySmall
+                                ?.copyWith(
+                                  color: hasAssignee
+                                      ? (isDark
+                                            ? AppColors.textPrimaryDark
+                                            : AppColors.textPrimaryLight)
+                                      : (isDark
+                                            ? AppColors.textSecondaryDark
+                                            : AppColors.textSecondaryLight),
+                                  fontWeight: hasAssignee
+                                      ? FontWeight.w500
+                                      : FontWeight.normal,
+                                ),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                           ),
@@ -1017,14 +1188,18 @@ class _TerritoryReportCard extends StatelessWidget {
                     Text(
                       '$visits / $housingUnits',
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                        color: isDark
+                            ? AppColors.textSecondaryDark
+                            : AppColors.textSecondaryLight,
                       ),
                     )
                   else
                     Text(
                       '$visits deliveries',
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                        color: isDark
+                            ? AppColors.textSecondaryDark
+                            : AppColors.textSecondaryLight,
                       ),
                     ),
                 ],
@@ -1037,7 +1212,9 @@ class _TerritoryReportCard extends StatelessWidget {
             child: LinearProgressIndicator(
               value: completion.clamp(0, 1),
               backgroundColor: _getCompletionColor(completion).withAlpha(30),
-              valueColor: AlwaysStoppedAnimation(_getCompletionColor(completion)),
+              valueColor: AlwaysStoppedAnimation(
+                _getCompletionColor(completion),
+              ),
               minHeight: 8,
             ),
           ),
@@ -1049,7 +1226,9 @@ class _TerritoryReportCard extends StatelessWidget {
                   child: Text(
                     '$remaining remaining',
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                      color: isDark
+                          ? AppColors.textSecondaryDark
+                          : AppColors.textSecondaryLight,
                     ),
                     overflow: TextOverflow.ellipsis,
                   ),
@@ -1063,13 +1242,17 @@ class _TerritoryReportCard extends StatelessWidget {
                     Icon(
                       Icons.access_time,
                       size: 12,
-                      color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                      color: isDark
+                          ? AppColors.textSecondaryDark
+                          : AppColors.textSecondaryLight,
                     ),
                     const SizedBox(width: 4),
                     Text(
                       'Last: ${_formatLastVisited(lastVisited!)}',
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                        color: isDark
+                            ? AppColors.textSecondaryDark
+                            : AppColors.textSecondaryLight,
                       ),
                     ),
                   ],
@@ -1112,10 +1295,7 @@ class _ActivityItem extends StatelessWidget {
   final TeamActivity activity;
   final bool isDark;
 
-  const _ActivityItem({
-    required this.activity,
-    required this.isDark,
-  });
+  const _ActivityItem({required this.activity, required this.isDark});
 
   @override
   Widget build(BuildContext context) {
@@ -1150,14 +1330,16 @@ class _ActivityItem extends StatelessWidget {
               children: [
                 Text(
                   activity.workerName,
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    fontWeight: FontWeight.w600,
-                  ),
+                  style: Theme.of(
+                    context,
+                  ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
                 ),
                 Text(
                   '${_getActivityLabel(activity.type)} - ${activity.territoryName ?? ""}',
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                    color: isDark
+                        ? AppColors.textSecondaryDark
+                        : AppColors.textSecondaryLight,
                   ),
                 ),
               ],
@@ -1166,7 +1348,9 @@ class _ActivityItem extends StatelessWidget {
           Text(
             _formatTime(activity.timestamp),
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
-              color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+              color: isDark
+                  ? AppColors.textSecondaryDark
+                  : AppColors.textSecondaryLight,
             ),
           ),
         ],

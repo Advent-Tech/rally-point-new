@@ -3,21 +3,25 @@ import 'dart:math';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart' as mapbox;
 import 'package:go_router/go_router.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:intl/intl.dart';
+import 'package:showcaseview/showcaseview.dart';
 import '../../../core/theme/app_colors.dart';
-import '../../../core/constants/map_constants.dart';
 import '../../../core/constants/api_constants.dart';
 import '../../../core/storage/local_storage.dart';
 import '../../../core/network/api_client.dart';
 import '../../../core/network/api_result.dart';
 import '../../../data/models/delivery_model.dart';
 import '../../../data/repositories/territory_repository.dart';
+import '../../../services/coach_marks_service.dart';
 import '../../blocs/delivery/delivery_bloc.dart';
 import '../../widgets/custom_text_field.dart';
-import '../../widgets/custom_button.dart';
+import '../../widgets/role_badge.dart';
+import '../../widgets/animations/staggered_fade_in.dart';
+import '../../widgets/animations/success_check.dart';
+import '../../widgets/stepper/step_progress_bar.dart';
+import '../../widgets/states/empty_state.dart';
 
 /// Date filter options
 enum DateFilter { today, thisWeek, thisMonth, all }
@@ -33,6 +37,27 @@ class DeliveryScreen extends StatefulWidget {
 
 class _DeliveryScreenState extends State<DeliveryScreen> {
   DateFilter _selectedFilter = DateFilter.all;
+
+  // Coach mark keys
+  final _showcaseSummary = GlobalKey();
+  final _showcaseRecord = GlobalKey();
+  final _showcaseFilters = GlobalKey();
+  bool _coachMarksChecked = false;
+
+  static const _tooltipTitleStyle = TextStyle(
+    fontSize: 16,
+    fontWeight: FontWeight.w700,
+    color: Color(0xFF1E293B),
+    letterSpacing: -0.2,
+  );
+  static const _tooltipDescStyle = TextStyle(
+    fontSize: 13,
+    fontWeight: FontWeight.w400,
+    color: Color(0xFF64748B),
+    height: 1.4,
+  );
+  static final _tooltipRadius = BorderRadius.circular(14);
+  static const _tooltipPadding = EdgeInsets.symmetric(horizontal: 18, vertical: 16);
 
   @override
   void initState() {
@@ -86,11 +111,36 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
     }
   }
 
+  void _maybeShowCoachMarks() {
+    if (_coachMarksChecked) return;
+    _coachMarksChecked = true;
+    CoachMarksService.hasBeenShown('delivery').then((shown) {
+      if (!shown && mounted) {
+        Future.delayed(const Duration(milliseconds: 800), () {
+          if (mounted) {
+            ShowcaseView.get().startShowCase([
+              _showcaseSummary,
+              _showcaseRecord,
+              _showcaseFilters,
+            ]);
+            CoachMarksService.markAsShown('delivery');
+          }
+        });
+      }
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    return Scaffold(
+    // ignore: deprecated_member_use
+    return ShowCaseWidget(
+      onFinish: () {},
+      enableAutoScroll: true,
+      builder: (_) {
+        _maybeShowCoachMarks();
+        return Scaffold(
       appBar: AppBar(
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
@@ -104,6 +154,7 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
         ),
         title: const Text('Field Activity'),
         actions: [
+          const RoleBadge(),
           IconButton(
             icon: const Icon(Icons.refresh),
             onPressed: () {
@@ -122,13 +173,11 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
               ),
             );
           } else if (state is DeliveryCreateSuccess) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Recorded successfully!'),
-                backgroundColor: AppColors.success,
-              ),
-            );
-            context.read<DeliveryBloc>().add(const DeliveryLoadList());
+            SuccessOverlay.show(context, message: 'Recorded successfully!').then((_) {
+              if (context.mounted) {
+                context.read<DeliveryBloc>().add(const DeliveryLoadList());
+              }
+            });
           }
         },
         builder: (context, state) {
@@ -172,54 +221,84 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   // Today's Summary Card
-                  _TodaySummaryCard(
-                    donationsCount: donations.length,
-                    donationsAmount: totalDonationAmount,
-                    isDark: isDark,
+                  Showcase(
+                    key: _showcaseSummary,
+                    title: "Today's Summary",
+                    description: 'See your daily donation totals at a glance. This updates as you record donations.',
+                    titleTextStyle: _tooltipTitleStyle,
+                    descTextStyle: _tooltipDescStyle,
+                    tooltipBorderRadius: _tooltipRadius,
+                    tooltipPadding: _tooltipPadding,
+                    targetBorderRadius: BorderRadius.circular(20),
+                    child: _TodaySummaryCard(
+                      donationsCount: donations.length,
+                      donationsAmount: totalDonationAmount,
+                      isDark: isDark,
+                    ),
                   ),
                   const SizedBox(height: 24),
 
                   // Action Button - Record Donation
-                  _ActionButton(
-                    icon: Icons.volunteer_activism,
-                    label: 'Record Donation',
-                    color: AppColors.success,
-                    onTap: () => _showRecordSheet(context),
+                  Showcase(
+                    key: _showcaseRecord,
+                    title: 'Record Donation',
+                    description: 'Tap here to record a new donation. Your GPS location is automatically captured.',
+                    titleTextStyle: _tooltipTitleStyle,
+                    descTextStyle: _tooltipDescStyle,
+                    tooltipBorderRadius: _tooltipRadius,
+                    tooltipPadding: _tooltipPadding,
+                    targetBorderRadius: BorderRadius.circular(16),
+                    child: _ActionButton(
+                      icon: Icons.volunteer_activism,
+                      label: 'Record Donation',
+                      color: AppColors.success,
+                      onTap: () => _showRecordSheet(context),
+                    ),
                   ),
                   const SizedBox(height: 24),
 
                   // Date Filter Chips
-                  SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
-                    child: Row(
-                      children: DateFilter.values.map((filter) {
-                        final isSelected = _selectedFilter == filter;
-                        return Padding(
-                          padding: const EdgeInsets.only(right: 8),
-                          child: FilterChip(
-                            label: Text(_getChipLabel(filter)),
-                            selected: isSelected,
-                            onSelected: (selected) {
-                              setState(() => _selectedFilter = filter);
-                            },
-                            selectedColor: AppColors.primary.withAlpha(40),
-                            checkmarkColor: AppColors.primary,
-                            backgroundColor: isDark
-                                ? AppColors.surfaceDark
-                                : AppColors.surfaceLight,
-                            labelStyle: TextStyle(
-                              color: isSelected
-                                  ? AppColors.primary
-                                  : (isDark
-                                        ? AppColors.textPrimaryDark
-                                        : AppColors.textPrimaryLight),
-                              fontWeight: isSelected
-                                  ? FontWeight.bold
-                                  : FontWeight.normal,
+                  Showcase(
+                    key: _showcaseFilters,
+                    title: 'Filter Activity',
+                    description: 'Filter your donation history by Today, This Week, This Month, or view All records.',
+                    titleTextStyle: _tooltipTitleStyle,
+                    descTextStyle: _tooltipDescStyle,
+                    tooltipBorderRadius: _tooltipRadius,
+                    tooltipPadding: _tooltipPadding,
+                    targetBorderRadius: BorderRadius.circular(20),
+                    child: SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: Row(
+                        children: DateFilter.values.map((filter) {
+                          final isSelected = _selectedFilter == filter;
+                          return Padding(
+                            padding: const EdgeInsets.only(right: 8),
+                            child: FilterChip(
+                              label: Text(_getChipLabel(filter)),
+                              selected: isSelected,
+                              onSelected: (selected) {
+                                setState(() => _selectedFilter = filter);
+                              },
+                              selectedColor: AppColors.primary.withAlpha(40),
+                              checkmarkColor: AppColors.primary,
+                              backgroundColor: isDark
+                                  ? AppColors.surfaceDark
+                                  : AppColors.surfaceLight,
+                              labelStyle: TextStyle(
+                                color: isSelected
+                                    ? AppColors.primary
+                                    : (isDark
+                                          ? AppColors.textPrimaryDark
+                                          : AppColors.textPrimaryLight),
+                                fontWeight: isSelected
+                                    ? FontWeight.bold
+                                    : FontWeight.normal,
+                              ),
                             ),
-                          ),
-                        );
-                      }).toList(),
+                          );
+                        }).toList(),
+                      ),
                     ),
                   ),
                   const SizedBox(height: 16),
@@ -253,7 +332,12 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
                       ),
                     )
                   else if (filteredDeliveries.isEmpty)
-                    _EmptyState(isDark: isDark)
+                    const EmptyState(
+                      icon: Icons.volunteer_activism_outlined,
+                      title: 'No donations yet',
+                      description: 'Tap the button above to record your first donation.',
+                      compact: true,
+                    )
                   else
                     ListView.builder(
                       shrinkWrap: true,
@@ -261,10 +345,13 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
                       itemCount: filteredDeliveries.length,
                       itemBuilder: (context, index) {
                         final delivery = filteredDeliveries[index];
-                        return _ActivityCard(
-                          delivery: delivery,
-                          isDark: isDark,
-                          onTap: () => _showDetailSheet(context, delivery),
+                        return StaggeredFadeIn(
+                          index: index,
+                          child: _ActivityCard(
+                            delivery: delivery,
+                            isDark: isDark,
+                            onTap: () => _showDetailSheet(context, delivery),
+                          ),
                         );
                       },
                     ),
@@ -274,6 +361,8 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
           );
         },
       ),
+    );
+      },
     );
   }
 
@@ -410,20 +499,11 @@ class _DeliveryDetailSheet extends StatelessWidget {
                   'MMM d, yyyy h:mm a',
                 ).format(delivery.createdAt!),
               ),
-            if (delivery.latitude != null && delivery.longitude != null) ...[
-              const SizedBox(height: 16),
-              ClipRRect(
-                borderRadius: BorderRadius.circular(12),
-                child: SizedBox(
-                  height: 150,
-                  child: _DeliveryLocationMap(
-                    latitude: delivery.latitude!,
-                    longitude: delivery.longitude!,
-                    isDark: isDark,
-                  ),
-                ),
+            if (delivery.latitude != null && delivery.longitude != null)
+              _DetailRow(
+                label: 'Location',
+                value: '${delivery.latitude!.toStringAsFixed(5)}, ${delivery.longitude!.toStringAsFixed(5)}',
               ),
-            ],
             const SizedBox(height: 16),
             // View Receipt Button
             if (delivery.receiptNumber != null)
@@ -564,58 +644,6 @@ class _ActionButton extends StatelessWidget {
   }
 }
 
-class _EmptyState extends StatelessWidget {
-  final bool isDark;
-
-  const _EmptyState({required this.isDark});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(32),
-      decoration: BoxDecoration(
-        color: isDark ? AppColors.surfaceDark : AppColors.surfaceLight,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: isDark ? AppColors.borderDark : AppColors.borderLight,
-        ),
-      ),
-      child: Column(
-        children: [
-          Icon(
-            Icons.inbox_outlined,
-            size: 64,
-            color: isDark
-                ? AppColors.textSecondaryDark
-                : AppColors.textSecondaryLight,
-          ),
-          const SizedBox(height: 16),
-          Text(
-            'No activity recorded',
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w500,
-              color: isDark
-                  ? AppColors.textSecondaryDark
-                  : AppColors.textSecondaryLight,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'Tap the button above to record a donation',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              fontSize: 14,
-              color: isDark
-                  ? AppColors.textSecondaryDark
-                  : AppColors.textSecondaryLight,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
 
 class _ActivityCard extends StatelessWidget {
   final DeliveryModel delivery;
@@ -778,7 +806,11 @@ class _RecordDonationSheet extends StatefulWidget {
 }
 
 class _RecordDonationSheetState extends State<_RecordDonationSheet> {
-  final _formKey = GlobalKey<FormState>();
+  final _step1Key = GlobalKey<FormState>();
+  final _step2Key = GlobalKey<FormState>();
+  final _pageController = PageController();
+  int _currentStep = 0;
+
   final _nameController = TextEditingController();
   final _addressController = TextEditingController();
   final _phoneController = TextEditingController();
@@ -795,6 +827,8 @@ class _RecordDonationSheetState extends State<_RecordDonationSheet> {
   String? _workerId;
   String? _territoryId;
   String? _territoryName;
+
+  static const _stepLabels = ['Donor Info', 'Amount & Method', 'Review'];
 
   @override
   void initState() {
@@ -915,6 +949,7 @@ class _RecordDonationSheetState extends State<_RecordDonationSheet> {
 
   @override
   void dispose() {
+    _pageController.dispose();
     _nameController.dispose();
     _addressController.dispose();
     _phoneController.dispose();
@@ -967,8 +1002,39 @@ class _RecordDonationSheetState extends State<_RecordDonationSheet> {
     return true;
   }
 
+  void _goToStep(int step) {
+    _pageController.animateToPage(
+      step,
+      duration: const Duration(milliseconds: 300),
+      curve: Curves.easeInOut,
+    );
+    setState(() => _currentStep = step);
+  }
+
+  bool _validateCurrentStep() {
+    if (_currentStep == 0) {
+      return _step1Key.currentState?.validate() ?? false;
+    }
+    if (_currentStep == 1) {
+      return _step2Key.currentState?.validate() ?? false;
+    }
+    return true;
+  }
+
+  void _nextStep() {
+    if (!_validateCurrentStep()) return;
+    if (_currentStep < 2) {
+      _goToStep(_currentStep + 1);
+    }
+  }
+
+  void _prevStep() {
+    if (_currentStep > 0) {
+      _goToStep(_currentStep - 1);
+    }
+  }
+
   Future<void> _submit() async {
-    if (!_formKey.currentState!.validate()) return;
     if (_teamId == null || _teamId!.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -1107,249 +1173,411 @@ class _RecordDonationSheetState extends State<_RecordDonationSheet> {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    const color = AppColors.success;
 
     return Container(
       decoration: BoxDecoration(
         color: isDark ? AppColors.backgroundDark : Colors.white,
         borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
       ),
+      constraints: BoxConstraints(
+        maxHeight: MediaQuery.of(context).size.height * 0.85,
+      ),
       padding: EdgeInsets.only(
         bottom: MediaQuery.of(context).viewInsets.bottom,
       ),
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.all(24),
-        child: Form(
-          key: _formKey,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // Handle
-              Center(
-                child: Container(
-                  width: 40,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: isDark
-                        ? AppColors.borderDark
-                        : AppColors.borderLight,
-                    borderRadius: BorderRadius.circular(2),
-                  ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Handle
+          Padding(
+            padding: const EdgeInsets.only(top: 12),
+            child: Center(
+              child: Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: isDark ? AppColors.borderDark : AppColors.borderLight,
+                  borderRadius: BorderRadius.circular(2),
                 ),
               ),
-              const SizedBox(height: 20),
+            ),
+          ),
+          const SizedBox(height: 16),
 
-              // Header
-              Row(
+          // Header + Step indicator
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 24),
+            child: Column(
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      width: 48,
+                      height: 48,
+                      decoration: BoxDecoration(
+                        color: AppColors.success.withAlpha(20),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: const Icon(
+                        Icons.volunteer_activism,
+                        color: AppColors.success,
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Record Donation',
+                            style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          Text(
+                            'Step ${_currentStep + 1} of 3 — ${_stepLabels[_currentStep]}',
+                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                StepProgressBar(
+                  currentStep: _currentStep,
+                  totalSteps: 3,
+                  activeColor: AppColors.success,
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+
+          // Location status
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 24),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: (_latitude != null ? AppColors.success : AppColors.warning).withAlpha(20),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  Container(
-                    width: 48,
-                    height: 48,
-                    decoration: BoxDecoration(
-                      color: color.withAlpha(20),
-                      borderRadius: BorderRadius.circular(12),
+                  if (_isGettingLocation)
+                    const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2))
+                  else
+                    Icon(
+                      _latitude != null ? Icons.location_on : Icons.location_off,
+                      size: 16,
+                      color: _latitude != null ? AppColors.success : AppColors.warning,
                     ),
-                    child: const Icon(
-                      Icons.volunteer_activism,
-                      color: color,
-                    ),
-                  ),
-                  const SizedBox(width: 16),
+                  const SizedBox(width: 8),
                   Text(
-                    'Record Donation',
-                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                      fontWeight: FontWeight.bold,
+                    _isGettingLocation
+                        ? 'Getting location...'
+                        : _latitude != null
+                            ? 'Location captured${_territoryName != null ? ' ($_territoryName)' : ''}'
+                            : 'Location not available',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: _latitude != null ? AppColors.success : AppColors.warning,
                     ),
                   ),
                 ],
               ),
-              const SizedBox(height: 8),
+            ),
+          ),
+          const SizedBox(height: 8),
 
-              // Location status
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 8,
+          // Step pages
+          Flexible(
+            child: PageView(
+              controller: _pageController,
+              physics: const NeverScrollableScrollPhysics(),
+              children: [
+                _buildStep1(isDark),
+                _buildStep2(isDark),
+                _buildStep3(isDark),
+              ],
+            ),
+          ),
+
+          // Navigation buttons
+          Padding(
+            padding: EdgeInsets.fromLTRB(24, 8, 24, MediaQuery.of(context).padding.bottom + 16),
+            child: Row(
+              children: [
+                if (_currentStep > 0)
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: _prevStep,
+                      icon: const Icon(Icons.arrow_back, size: 18),
+                      label: const Text('Back'),
+                    ),
+                  ),
+                if (_currentStep > 0) const SizedBox(width: 12),
+                Expanded(
+                  flex: _currentStep == 0 ? 1 : 1,
+                  child: _currentStep < 2
+                      ? FilledButton.icon(
+                          onPressed: _nextStep,
+                          icon: const Icon(Icons.arrow_forward, size: 18),
+                          label: const Text('Next'),
+                          style: FilledButton.styleFrom(
+                            backgroundColor: AppColors.success,
+                          ),
+                        )
+                      : FilledButton.icon(
+                          onPressed: _isSubmitting || _isProcessingPayment ? null : _submit,
+                          icon: _isSubmitting || _isProcessingPayment
+                              ? const SizedBox(
+                                  width: 18,
+                                  height: 18,
+                                  child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                                )
+                              : const Icon(Icons.check, size: 18),
+                          label: Text(_isSubmitting || _isProcessingPayment ? 'Processing...' : 'Confirm & Submit'),
+                          style: FilledButton.styleFrom(
+                            backgroundColor: AppColors.success,
+                          ),
+                        ),
                 ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Step 1: Donor Info
+  Widget _buildStep1(bool isDark) {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+      child: Form(
+        key: _step1Key,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            CustomTextField(
+              controller: _nameController,
+              label: 'Donor Name',
+              prefixIcon: Icons.person_outline,
+              realtimeValidation: true,
+              validator: (value) =>
+                  (value == null || value.trim().isEmpty) ? 'Name is required' : null,
+            ),
+            const SizedBox(height: 16),
+            CustomTextField(
+              controller: _addressController,
+              label: 'Address (optional)',
+              prefixIcon: Icons.location_on_outlined,
+            ),
+            const SizedBox(height: 16),
+            CustomTextField(
+              controller: _phoneController,
+              label: 'Phone (optional)',
+              prefixIcon: Icons.phone_outlined,
+              keyboardType: TextInputType.phone,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // Step 2: Amount & Payment Method
+  Widget _buildStep2(bool isDark) {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+      child: Form(
+        key: _step2Key,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            CustomTextField(
+              controller: _amountController,
+              label: 'Donation Amount (\$)',
+              prefixIcon: Icons.attach_money,
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              realtimeValidation: true,
+              validator: (value) {
+                if (value == null || value.trim().isEmpty) {
+                  return 'Amount is required';
+                }
+                final amount = double.tryParse(value);
+                if (amount == null || amount <= 0) {
+                  return 'Enter a valid amount';
+                }
+                return null;
+              },
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'Payment Method',
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w500),
+            ),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                _PaymentChip(
+                  label: 'Cash',
+                  icon: Icons.money,
+                  isSelected: _paymentMethod == 'cash',
+                  onTap: () => setState(() => _paymentMethod = 'cash'),
+                ),
+                const SizedBox(width: 12),
+                _PaymentChip(
+                  label: 'Send Payment Link',
+                  icon: Icons.send,
+                  isSelected: _paymentMethod == 'online',
+                  onTap: () => setState(() => _paymentMethod = 'online'),
+                ),
+              ],
+            ),
+            if (_paymentMethod == 'online') ...[
+              const SizedBox(height: 16),
+              Container(
+                padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  color:
-                      (_latitude != null
-                              ? AppColors.success
-                              : AppColors.warning)
-                          .withAlpha(20),
-                  borderRadius: BorderRadius.circular(8),
+                  color: AppColors.info.withAlpha(20),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: AppColors.info.withAlpha(50)),
                 ),
                 child: Row(
-                  mainAxisSize: MainAxisSize.min,
                   children: [
-                    if (_isGettingLocation)
-                      const SizedBox(
-                        width: 14,
-                        height: 14,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    else
-                      Icon(
-                        _latitude != null
-                            ? Icons.location_on
-                            : Icons.location_off,
-                        size: 16,
-                        color: _latitude != null
-                            ? AppColors.success
-                            : AppColors.warning,
-                      ),
-                    const SizedBox(width: 8),
-                    Text(
-                      _isGettingLocation
-                          ? 'Getting location...'
-                          : _latitude != null
-                          ? 'Location captured${_territoryName != null ? ' ($_territoryName)' : ''}'
-                          : 'Location not available',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: _latitude != null
-                            ? AppColors.success
-                            : AppColors.warning,
+                    Icon(Icons.info_outline, color: AppColors.info, size: 20),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        'A payment link will be sent to the phone number. The donor will complete payment on their own device.',
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                        ),
                       ),
                     ),
                   ],
                 ),
               ),
-              const SizedBox(height: 20),
-
-              // Name field
-              CustomTextField(
-                controller: _nameController,
-                label: 'Donor Name',
-                prefixIcon: Icons.person_outline,
-                validator: (value) => (value == null || value.trim().isEmpty)
-                    ? 'Name is required'
-                    : null,
-              ),
-              const SizedBox(height: 16),
-
-              // Amount field
-              CustomTextField(
-                controller: _amountController,
-                label: 'Donation Amount (\$)',
-                prefixIcon: Icons.attach_money,
-                keyboardType: const TextInputType.numberWithOptions(
-                  decimal: true,
-                ),
-                validator: (value) {
-                  if (value == null || value.trim().isEmpty)
-                    return 'Amount is required';
-                  final amount = double.tryParse(value);
-                  if (amount == null || amount <= 0)
-                    return 'Enter a valid amount';
-                  return null;
-                },
-              ),
-              const SizedBox(height: 16),
-
-              // Address field
-              CustomTextField(
-                controller: _addressController,
-                label: 'Address (optional)',
-                prefixIcon: Icons.location_on_outlined,
-              ),
-              const SizedBox(height: 16),
-
-              // Phone field
-              CustomTextField(
-                controller: _phoneController,
-                label: 'Phone (optional)',
-                prefixIcon: Icons.phone_outlined,
-                keyboardType: TextInputType.phone,
-              ),
-              const SizedBox(height: 16),
-
-              // Payment method
-              Text(
-                'Payment Method',
-                style: Theme.of(
-                  context,
-                ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w500),
-              ),
-              const SizedBox(height: 8),
-              Row(
-                children: [
-                  _PaymentChip(
-                    label: 'Cash',
-                    icon: Icons.money,
-                    isSelected: _paymentMethod == 'cash',
-                    onTap: () => setState(() => _paymentMethod = 'cash'),
-                  ),
-                  const SizedBox(width: 12),
-                  _PaymentChip(
-                    label: 'Send Payment Link',
-                    icon: Icons.send,
-                    isSelected: _paymentMethod == 'online',
-                    onTap: () => setState(() => _paymentMethod = 'online'),
-                  ),
-                ],
-              ),
-
-              // Online payment info
-              if (_paymentMethod == 'online') ...[
-                const SizedBox(height: 16),
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: AppColors.info.withAlpha(20),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: AppColors.info.withAlpha(50)),
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(Icons.info_outline, color: AppColors.info, size: 20),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Text(
-                          'A payment link will be sent to the phone number above. The donor will complete payment on their own device.',
-                          style: TextStyle(
-                            fontSize: 13,
-                            color: isDark
-                                ? AppColors.textSecondaryDark
-                                : AppColors.textSecondaryLight,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-
-              const SizedBox(height: 16),
-
-              // Notes
-              CustomTextField(
-                controller: _notesController,
-                label: 'Notes (optional)',
-                prefixIcon: Icons.notes,
-                maxLines: 2,
-              ),
-              const SizedBox(height: 24),
-
-              // Submit button
-              SizedBox(
-                width: double.infinity,
-                child: CustomButton(
-                  text: _isSubmitting || _isProcessingPayment
-                      ? 'Processing...'
-                      : 'Record Donation',
-                  onPressed: _isSubmitting || _isProcessingPayment
-                      ? null
-                      : _submit,
-                  isLoading: _isSubmitting || _isProcessingPayment,
-                ),
-              ),
-              const SizedBox(height: 16),
             ],
-          ),
+            const SizedBox(height: 16),
+            CustomTextField(
+              controller: _notesController,
+              label: 'Notes (optional)',
+              prefixIcon: Icons.notes,
+              maxLines: 2,
+            ),
+          ],
         ),
       ),
+    );
+  }
+
+  // Step 3: Review & Confirm
+  Widget _buildStep3(bool isDark) {
+    final amount = double.tryParse(_amountController.text) ?? 0;
+    final secondaryColor = isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight;
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: isDark ? AppColors.surfaceDark : AppColors.surfaceLight,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: isDark ? AppColors.borderDark : AppColors.borderLight,
+          ),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Review Donation',
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 16),
+            _ReviewRow(label: 'Donor', value: _nameController.text.trim().isNotEmpty ? _nameController.text.trim() : '—', color: secondaryColor),
+            const Divider(height: 24),
+            _ReviewRow(
+              label: 'Amount',
+              value: amount > 0 ? '\$${amount.toStringAsFixed(2)}' : '—',
+              valueStyle: TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 18,
+                color: AppColors.success,
+              ),
+              color: secondaryColor,
+            ),
+            const Divider(height: 24),
+            _ReviewRow(label: 'Payment', value: _paymentMethod == 'cash' ? 'Cash' : 'Payment Link', color: secondaryColor),
+            if (_addressController.text.trim().isNotEmpty) ...[
+              const Divider(height: 24),
+              _ReviewRow(label: 'Address', value: _addressController.text.trim(), color: secondaryColor),
+            ],
+            if (_phoneController.text.trim().isNotEmpty) ...[
+              const Divider(height: 24),
+              _ReviewRow(label: 'Phone', value: _phoneController.text.trim(), color: secondaryColor),
+            ],
+            if (_notesController.text.trim().isNotEmpty) ...[
+              const Divider(height: 24),
+              _ReviewRow(label: 'Notes', value: _notesController.text.trim(), color: secondaryColor),
+            ],
+            if (_territoryName != null) ...[
+              const Divider(height: 24),
+              _ReviewRow(label: 'Territory', value: _territoryName!, color: secondaryColor),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ReviewRow extends StatelessWidget {
+  final String label;
+  final String value;
+  final Color color;
+  final TextStyle? valueStyle;
+
+  const _ReviewRow({
+    required this.label,
+    required this.value,
+    required this.color,
+    this.valueStyle,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SizedBox(
+          width: 80,
+          child: Text(
+            label,
+            style: TextStyle(
+              fontSize: 13,
+              color: color,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ),
+        Expanded(
+          child: Text(
+            value,
+            style: valueStyle ?? const TextStyle(fontWeight: FontWeight.w500),
+          ),
+        ),
+      ],
     );
   }
 }
@@ -1908,63 +2136,3 @@ class _ReceiptRow extends StatelessWidget {
   }
 }
 
-/// Small static map widget to show delivery location
-class _DeliveryLocationMap extends StatefulWidget {
-  final double latitude;
-  final double longitude;
-  final bool isDark;
-
-  const _DeliveryLocationMap({
-    required this.latitude,
-    required this.longitude,
-    required this.isDark,
-  });
-
-  @override
-  State<_DeliveryLocationMap> createState() => _DeliveryLocationMapState();
-}
-
-class _DeliveryLocationMapState extends State<_DeliveryLocationMap> {
-  mapbox.MapboxMap? _mapboxMap;
-  mapbox.CircleAnnotationManager? _circleManager;
-
-  void _onMapCreated(mapbox.MapboxMap mapboxMap) async {
-    _mapboxMap = mapboxMap;
-    _circleManager = await mapboxMap.annotations.createCircleAnnotationManager();
-
-    // Add location marker
-    await _circleManager!.create(mapbox.CircleAnnotationOptions(
-      geometry: mapbox.Point(coordinates: mapbox.Position(widget.longitude, widget.latitude)),
-      circleColor: AppColors.success.toARGB32(),
-      circleRadius: 12,
-      circleStrokeColor: Colors.white.toARGB32(),
-      circleStrokeWidth: 3,
-    ));
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return mapbox.MapWidget(
-      key: ValueKey('deliveryMap_${widget.latitude}_${widget.longitude}'),
-      styleUri: MapConstants.getThemedStyleUri(widget.isDark),
-      cameraOptions: mapbox.CameraOptions(
-        center: mapbox.Point(coordinates: mapbox.Position(widget.longitude, widget.latitude)),
-        zoom: 15,
-      ),
-      onMapCreated: (mapboxMap) async {
-        // Enable all gestures
-        await mapboxMap.gestures.updateSettings(mapbox.GesturesSettings(
-          scrollEnabled: true,
-          rotateEnabled: true,
-          pinchToZoomEnabled: true,
-          doubleTapToZoomInEnabled: true,
-          doubleTouchToZoomOutEnabled: true,
-          quickZoomEnabled: true,
-          pitchEnabled: true,
-          simultaneousRotateAndPinchToZoomEnabled: true,
-        ));
-        _onMapCreated(mapboxMap);
-      },
-    );
-  }
-}

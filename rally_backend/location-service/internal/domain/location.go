@@ -8,16 +8,18 @@ import (
 
 // LocationTrack represents a location tracking record
 type LocationTrack struct {
-	ID        uuid.UUID  `json:"id" db:"id"`
-	UserID    uuid.UUID  `json:"user_id" db:"user_id"`
-	Latitude  float64    `json:"latitude" db:"latitude"`
-	Longitude float64    `json:"longitude" db:"longitude"`
-	Accuracy  *float64   `json:"accuracy,omitempty" db:"accuracy"`
-	Speed     *float64   `json:"speed,omitempty" db:"speed"`
-	Heading   *float64   `json:"heading,omitempty" db:"heading"`
-	SessionID *uuid.UUID `json:"session_id,omitempty" db:"session_id"`
-	TrackedAt time.Time  `json:"tracked_at" db:"tracked_at"`
-	CreatedAt time.Time  `json:"created_at" db:"created_at"`
+	ID                uuid.UUID  `json:"id" db:"id"`
+	UserID            uuid.UUID  `json:"user_id" db:"user_id"`
+	Latitude          float64    `json:"latitude" db:"latitude"`
+	Longitude         float64    `json:"longitude" db:"longitude"`
+	SmoothedLatitude  *float64   `json:"smoothed_latitude,omitempty" db:"smoothed_latitude"`
+	SmoothedLongitude *float64   `json:"smoothed_longitude,omitempty" db:"smoothed_longitude"`
+	Accuracy          *float64   `json:"accuracy,omitempty" db:"accuracy"`
+	Speed             *float64   `json:"speed,omitempty" db:"speed"`
+	Heading           *float64   `json:"heading,omitempty" db:"heading"`
+	SessionID         *uuid.UUID `json:"session_id,omitempty" db:"session_id"`
+	TrackedAt         time.Time  `json:"tracked_at" db:"tracked_at"`
+	CreatedAt         time.Time  `json:"created_at" db:"created_at"`
 }
 
 // LocationSession represents a location tracking session
@@ -122,6 +124,7 @@ type LocationRepository interface {
 
 	GetLocationStats(userID uuid.UUID, days int) (*LocationStats, error)
 	GetActiveWorkers() ([]*WorkerLocation, error)
+	GetActiveWorkersByTeam(teamID string) ([]*WorkerLocation, error)
 	UpdateWorkerLocation(location *WorkerLocation) error
 	SetWorkerOffline(userID uuid.UUID) error
 }
@@ -138,6 +141,7 @@ type LocationService interface {
 
 	GetLocationStats(userID uuid.UUID, days int) (*LocationStats, error)
 	GetActiveWorkers() ([]*WorkerLocation, error)
+	GetActiveWorkersByTeam(teamID string) ([]*WorkerLocation, error)
 	SetWorkerOffline(userID uuid.UUID) error
 
 	// Real-time features
@@ -198,6 +202,7 @@ type LocationEventPublisher interface {
 type WorkerLocationCache interface {
 	SetWorkerLocation(location *WorkerLocation) error
 	GetActiveWorkers() ([]*WorkerLocation, error)
+	GetActiveWorkersByTeam(teamID string) ([]*WorkerLocation, error)
 	RemoveWorker(userID uuid.UUID) error
 }
 

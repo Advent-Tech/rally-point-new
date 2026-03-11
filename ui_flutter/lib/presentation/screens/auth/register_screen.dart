@@ -314,7 +314,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
         }
       } else {
         if (mounted) {
-          AppSnackbar.warning(context, message: 'Invalid team link. Please paste a valid team invite link.');
+          AppSnackbar.warning(
+            context,
+            message:
+                'Invalid team link. Please paste a valid team invite link.',
+          );
         }
       }
     } catch (e) {
@@ -328,7 +332,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
     if (_formKey.currentState?.validate() ?? false) {
       // Validate team requirements for workers
       if (_selectedRole == 'worker' && _selectedTeam == null) {
-        AppSnackbar.error(context, message: 'Please select a team to request joining');
+        AppSnackbar.error(
+          context,
+          message: 'Please select a team to request joining',
+        );
         return;
       }
 
@@ -360,9 +367,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
         // Extract error message
         String errorMessage = 'Registration failed. Please try again.';
         if (e is DioException && e.response?.data is Map) {
-          errorMessage = e.response?.data['error'] ??
-                        e.response?.data['message'] ??
-                        errorMessage;
+          errorMessage =
+              e.response?.data['error'] ??
+              e.response?.data['message'] ??
+              errorMessage;
         }
         AppSnackbar.error(context, message: errorMessage);
       } finally {
@@ -389,7 +397,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Registration successful! Please check your email to verify your account.'),
+            const Text(
+              'Registration successful! Please check your email to verify your account.',
+            ),
             const SizedBox(height: 16),
             Container(
               padding: const EdgeInsets.all(12),
@@ -457,14 +467,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
       builder: (dialogContext) => AlertDialog(
         title: Row(
           children: [
-            Icon(
-              Icons.mark_email_read,
-              color: AppColors.success,
-            ),
+            Icon(Icons.mark_email_read, color: AppColors.success),
             const SizedBox(width: 12),
-            const Expanded(
-              child: Text('Verify Your Email'),
-            ),
+            const Expanded(child: Text('Verify Your Email')),
           ],
         ),
         content: Column(
@@ -537,6 +542,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
       context: context,
       barrierDismissible: false,
       builder: (dialogContext) => AlertDialog(
+        backgroundColor: Colors.white,
         title: Row(
           children: [
             Icon(
@@ -544,9 +550,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
               color: AppColors.primary,
             ),
             const SizedBox(width: 12),
-            Text(state.role == 'team_leader'
-                ? 'Pending Verification'
-                : 'Request Sent'),
+            Text(
+              state.role == 'team_leader'
+                  ? 'Pending Verification'
+                  : 'Request Sent',
+            ),
           ],
         ),
         content: Column(
@@ -596,15 +604,21 @@ class _RegisterScreenState extends State<RegisterScreen> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
-        appBar: AppBar(
-          leading: IconButton(
-            icon: const Icon(Icons.arrow_back),
-            onPressed: () => context.go('/login'),
-          ),
+      appBar: AppBar(
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () => context.go('/login'),
         ),
-        body: SafeArea(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(24),
+      ),
+      body: SafeArea(
+        child: Builder(
+          builder: (context) => SingleChildScrollView(
+            padding: EdgeInsets.fromLTRB(
+              24,
+              24,
+              24,
+              24 + MediaQuery.of(context).viewInsets.bottom,
+            ),
             child: Form(
               key: _formKey,
               child: Column(
@@ -622,7 +636,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   Text(
                     'Join Rally Point today',
                     style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                      color: isDark
+                          ? AppColors.textSecondaryDark
+                          : AppColors.textSecondaryLight,
                     ),
                     textAlign: TextAlign.center,
                   ),
@@ -655,7 +671,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
                           title: 'Team Leader',
                           subtitle: 'Manage a team',
                           isSelected: _selectedRole == 'team_leader',
-                          onTap: () => setState(() => _selectedRole = 'team_leader'),
+                          onTap: () =>
+                              setState(() => _selectedRole = 'team_leader'),
                           isDark: isDark,
                         ),
                       ),
@@ -669,6 +686,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     label: 'Full Name',
                     hint: 'Enter your full name',
                     prefixIcon: Icons.person_outlined,
+                    realtimeValidation: true,
                     validator: (value) {
                       if (value == null || value.isEmpty) {
                         return 'Please enter your name';
@@ -685,11 +703,14 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     hint: 'Enter your email',
                     keyboardType: TextInputType.emailAddress,
                     prefixIcon: Icons.email_outlined,
+                    realtimeValidation: true,
                     validator: (value) {
                       if (value == null || value.isEmpty) {
                         return 'Please enter your email';
                       }
-                      if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(value)) {
+                      if (!RegExp(
+                        r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$',
+                      ).hasMatch(value)) {
                         return 'Please enter a valid email';
                       }
                       return null;
@@ -704,14 +725,20 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       decoration: BoxDecoration(
                         color: AppColors.info.withValues(alpha: 0.06),
                         borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: AppColors.info.withValues(alpha: 0.16)),
+                        border: Border.all(
+                          color: AppColors.info.withValues(alpha: 0.16),
+                        ),
                       ),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Row(
                             children: [
-                              Icon(Icons.info_outline, color: AppColors.info, size: 20),
+                              Icon(
+                                Icons.info_outline,
+                                color: AppColors.info,
+                                size: 20,
+                              ),
                               const SizedBox(width: 8),
                               Text(
                                 'Verification Required',
@@ -726,10 +753,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
                           Text(
                             'After registration, your account will be reviewed by an admin. '
                             'Once verified, you will be assigned to manage a team and receive territory allocations.',
-                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                              color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
-                              height: 1.4,
-                            ),
+                            style: Theme.of(context).textTheme.bodySmall
+                                ?.copyWith(
+                                  color: isDark
+                                      ? AppColors.textSecondaryDark
+                                      : AppColors.textSecondaryLight,
+                                  height: 1.4,
+                                ),
                           ),
                         ],
                       ),
@@ -749,7 +779,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     Text(
                       'Your request will be sent to the team leader for approval',
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                        color: isDark
+                            ? AppColors.textSecondaryDark
+                            : AppColors.textSecondaryLight,
                       ),
                     ),
                     const SizedBox(height: 8),
@@ -771,7 +803,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                         child: SizedBox(
                                           width: 20,
                                           height: 20,
-                                          child: CircularProgressIndicator(strokeWidth: 2),
+                                          child: CircularProgressIndicator(
+                                            strokeWidth: 2,
+                                          ),
                                         ),
                                       )
                                     : null,
@@ -779,7 +813,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                   borderRadius: BorderRadius.circular(12),
                                 ),
                                 filled: true,
-                                fillColor: isDark ? AppColors.surfaceDark : AppColors.surfaceLight,
+                                fillColor: isDark
+                                    ? AppColors.surfaceDark
+                                    : AppColors.surfaceLight,
                               ),
                             ),
                           ),
@@ -790,9 +826,15 @@ class _RegisterScreenState extends State<RegisterScreen> {
                           child: OutlinedButton.icon(
                             onPressed: _pasteTeamLink,
                             icon: const Icon(Icons.content_paste, size: 18),
-                            label: const Text('Paste\nLink', textAlign: TextAlign.center, style: TextStyle(fontSize: 11)),
+                            label: const Text(
+                              'Paste\nLink',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(fontSize: 11),
+                            ),
                             style: OutlinedButton.styleFrom(
-                              padding: const EdgeInsets.symmetric(horizontal: 12),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                              ),
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(12),
                               ),
@@ -804,15 +846,24 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     if (_selectedTeam != null) ...[
                       const SizedBox(height: 8),
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 8,
+                        ),
                         decoration: BoxDecoration(
                           color: AppColors.success.withValues(alpha: 0.08),
                           borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: AppColors.success.withValues(alpha: 0.2)),
+                          border: Border.all(
+                            color: AppColors.success.withValues(alpha: 0.2),
+                          ),
                         ),
                         child: Row(
                           children: [
-                            Icon(Icons.check_circle, color: AppColors.success, size: 18),
+                            Icon(
+                              Icons.check_circle,
+                              color: AppColors.success,
+                              size: 18,
+                            ),
                             const SizedBox(width: 8),
                             Expanded(
                               child: Column(
@@ -830,7 +881,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                       'Led by ${_selectedTeam!.leaderName}',
                                       style: TextStyle(
                                         fontSize: 12,
-                                        color: AppColors.success.withValues(alpha: 0.7),
+                                        color: AppColors.success.withValues(
+                                          alpha: 0.7,
+                                        ),
                                       ),
                                     ),
                                 ],
@@ -861,12 +914,18 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     hint: 'Create a password',
                     obscureText: _obscurePassword,
                     prefixIcon: Icons.lock_outlined,
+                    realtimeValidation: true,
                     suffixIcon: IconButton(
                       icon: Icon(
-                        _obscurePassword ? Icons.visibility_outlined : Icons.visibility_off_outlined,
-                        color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                        _obscurePassword
+                            ? Icons.visibility_outlined
+                            : Icons.visibility_off_outlined,
+                        color: isDark
+                            ? AppColors.textSecondaryDark
+                            : AppColors.textSecondaryLight,
                       ),
-                      onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
+                      onPressed: () =>
+                          setState(() => _obscurePassword = !_obscurePassword),
                     ),
                     validator: (value) {
                       if (value == null || value.isEmpty) {
@@ -887,12 +946,20 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     hint: 'Confirm your password',
                     obscureText: _obscureConfirmPassword,
                     prefixIcon: Icons.lock_outlined,
+                    realtimeValidation: true,
                     suffixIcon: IconButton(
                       icon: Icon(
-                        _obscureConfirmPassword ? Icons.visibility_outlined : Icons.visibility_off_outlined,
-                        color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                        _obscureConfirmPassword
+                            ? Icons.visibility_outlined
+                            : Icons.visibility_off_outlined,
+                        color: isDark
+                            ? AppColors.textSecondaryDark
+                            : AppColors.textSecondaryLight,
                       ),
-                      onPressed: () => setState(() => _obscureConfirmPassword = !_obscureConfirmPassword),
+                      onPressed: () => setState(
+                        () =>
+                            _obscureConfirmPassword = !_obscureConfirmPassword,
+                      ),
                     ),
                     validator: (value) {
                       if (value == null || value.isEmpty) {
@@ -935,6 +1002,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
             ),
           ),
         ),
+      ),
     );
   }
 }
@@ -990,7 +1058,9 @@ class _RoleCard extends StatelessWidget {
                 icon,
                 color: isSelected
                     ? AppColors.primary
-                    : (isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight),
+                    : (isDark
+                          ? AppColors.textSecondaryDark
+                          : AppColors.textSecondaryLight),
               ),
             ),
             const SizedBox(height: 12),
@@ -1005,7 +1075,9 @@ class _RoleCard extends StatelessWidget {
             Text(
               subtitle,
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                color: isDark
+                    ? AppColors.textSecondaryDark
+                    : AppColors.textSecondaryLight,
               ),
               textAlign: TextAlign.center,
             ),

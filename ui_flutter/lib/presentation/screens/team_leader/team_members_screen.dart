@@ -6,6 +6,8 @@ import '../../../data/models/team_model.dart';
 import '../../blocs/auth/auth_bloc.dart';
 import '../../blocs/team/team_bloc.dart';
 import '../../widgets/custom_button.dart';
+import '../../widgets/role_badge.dart';
+import '../../widgets/states/empty_state.dart';
 
 class TeamMembersScreen extends StatefulWidget {
   const TeamMembersScreen({super.key});
@@ -43,12 +45,15 @@ class _TeamMembersScreenState extends State<TeamMembersScreen> {
       value: _teamBloc,
       child: Scaffold(
         appBar: AppBar(
-          leading: IconButton(
-            icon: const Icon(Icons.arrow_back),
-            onPressed: () => context.pop(),
-          ),
+          leading: GoRouter.of(context).canPop()
+              ? IconButton(
+                  icon: const Icon(Icons.arrow_back),
+                  onPressed: () => context.pop(),
+                )
+              : null,
           title: const Text('Team Members'),
           actions: [
+            const RoleBadge(),
             IconButton(
               icon: const Icon(Icons.person_add),
               tooltip: 'Invite Member',
@@ -94,24 +99,13 @@ class _TeamMembersScreenState extends State<TeamMembersScreen> {
 
             // Initial state - check if user has a team
             final authState = context.read<AuthBloc>().state;
-            if (authState is AuthAuthenticated && authState.user.teamId == null) {
+            if (authState is AuthAuthenticated &&
+                authState.user.teamId == null) {
               return _buildNoTeamView(context, isDark);
             }
 
             return _buildEmptyState(context, isDark);
           },
-        ),
-        floatingActionButton: Padding(
-          padding: const EdgeInsets.only(bottom: 80),
-          child: FloatingActionButton.extended(
-            onPressed: () => _showInviteDialog(context),
-            backgroundColor: AppColors.secondary,
-            icon: const Icon(Icons.person_add, color: Colors.white),
-            label: const Text(
-              'Invite Member',
-              style: TextStyle(color: Colors.white),
-            ),
-          ),
         ),
       ),
     );
@@ -127,14 +121,18 @@ class _TeamMembersScreenState extends State<TeamMembersScreen> {
             Icon(
               Icons.error_outline,
               size: 64,
-              color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+              color: isDark
+                  ? AppColors.textSecondaryDark
+                  : AppColors.textSecondaryLight,
             ),
             const SizedBox(height: 16),
             Text(
               message,
               textAlign: TextAlign.center,
               style: TextStyle(
-                color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                color: isDark
+                    ? AppColors.textSecondaryDark
+                    : AppColors.textSecondaryLight,
               ),
             ),
             const SizedBox(height: 16),
@@ -151,89 +149,23 @@ class _TeamMembersScreenState extends State<TeamMembersScreen> {
   }
 
   Widget _buildNoTeamView(BuildContext context, bool isDark) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(32),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              Icons.group_off,
-              size: 80,
-              color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
-            ),
-            const SizedBox(height: 24),
-            Text(
-              'No Team Found',
-              style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Create a team first to manage team members.',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
-              ),
-            ),
-          ],
-        ),
-      ),
+    return const EmptyState(
+      icon: Icons.group_off,
+      title: 'No Team Found',
+      description: 'Create a team first to manage team members.',
     );
   }
 
   Widget _buildEmptyState(BuildContext context, bool isDark) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(32),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              width: 100,
-              height: 100,
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [
-                    AppColors.secondary.withAlpha(40),
-                    AppColors.primary.withAlpha(40),
-                  ],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(
-                Icons.people_outline,
-                size: 48,
-                color: AppColors.secondary,
-              ),
-            ),
-            const SizedBox(height: 24),
-            Text(
-              'No Team Members Yet',
-              style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Invite workers to join your team so you can assign territories to them.',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
-              ),
-            ),
-            const SizedBox(height: 24),
-            CustomButton(
-              text: 'Invite Team Member',
-              icon: Icons.person_add,
-              onPressed: () => _showInviteDialog(context),
-            ),
-          ],
-        ),
-      ),
+    return EmptyState(
+      icon: Icons.people_outline,
+      title: 'No Team Members Yet',
+      description:
+          'Invite workers to join your team so you can assign territories to them.',
+      iconColor: AppColors.secondary,
+      secondaryColor: AppColors.primary,
+      actionLabel: 'Invite Team Member',
+      onAction: () => _showInviteDialog(context),
     );
   }
 
@@ -243,7 +175,9 @@ class _TeamMembersScreenState extends State<TeamMembersScreen> {
 
     // Get the team ID from auth state
     final authState = context.read<AuthBloc>().state;
-    final teamId = authState is AuthAuthenticated ? authState.user.teamId : null;
+    final teamId = authState is AuthAuthenticated
+        ? authState.user.teamId
+        : null;
 
     if (teamId == null) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -266,7 +200,8 @@ class _TeamMembersScreenState extends State<TeamMembersScreen> {
               _showInvitationSuccessDialog(context, state.email);
               // Reload members list so screen doesn't show empty state
               final authState = context.read<AuthBloc>().state;
-              if (authState is AuthAuthenticated && authState.user.teamId != null) {
+              if (authState is AuthAuthenticated &&
+                  authState.user.teamId != null) {
                 _teamBloc.add(TeamLoadMembers(teamId: authState.user.teamId!));
               }
             } else if (state is TeamError) {
@@ -282,7 +217,9 @@ class _TeamMembersScreenState extends State<TeamMembersScreen> {
             final isLoading = state is TeamLoading;
 
             return AlertDialog(
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
               title: Row(
                 children: [
                   Container(
@@ -291,7 +228,10 @@ class _TeamMembersScreenState extends State<TeamMembersScreen> {
                       color: AppColors.secondary.withAlpha(30),
                       borderRadius: BorderRadius.circular(8),
                     ),
-                    child: const Icon(Icons.person_add, color: AppColors.secondary),
+                    child: const Icon(
+                      Icons.person_add,
+                      color: AppColors.secondary,
+                    ),
                   ),
                   const SizedBox(width: 12),
                   const Text('Invite Team Member'),
@@ -305,10 +245,7 @@ class _TeamMembersScreenState extends State<TeamMembersScreen> {
                   children: [
                     Text(
                       'Enter the email address of the person you want to invite to your team.',
-                      style: TextStyle(
-                        color: Colors.grey[600],
-                        fontSize: 14,
-                      ),
+                      style: TextStyle(color: Colors.grey[600], fontSize: 14),
                     ),
                     const SizedBox(height: 20),
                     TextFormField(
@@ -327,7 +264,9 @@ class _TeamMembersScreenState extends State<TeamMembersScreen> {
                         if (value == null || value.isEmpty) {
                           return 'Please enter an email address';
                         }
-                        if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(value)) {
+                        if (!RegExp(
+                          r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$',
+                        ).hasMatch(value)) {
                           return 'Please enter a valid email address';
                         }
                         return null;
@@ -343,12 +282,19 @@ class _TeamMembersScreenState extends State<TeamMembersScreen> {
                       ),
                       child: Row(
                         children: [
-                          Icon(Icons.info_outline, color: Colors.blue[700], size: 20),
+                          Icon(
+                            Icons.info_outline,
+                            color: Colors.blue[700],
+                            size: 20,
+                          ),
                           const SizedBox(width: 8),
                           Expanded(
                             child: Text(
                               'An invitation email will be sent with a link to join your team.',
-                              style: TextStyle(fontSize: 12, color: Colors.blue[700]),
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.blue[700],
+                              ),
                             ),
                           ),
                         ],
@@ -359,7 +305,9 @@ class _TeamMembersScreenState extends State<TeamMembersScreen> {
               ),
               actions: [
                 TextButton(
-                  onPressed: isLoading ? null : () => Navigator.pop(dialogContext),
+                  onPressed: isLoading
+                      ? null
+                      : () => Navigator.pop(dialogContext),
                   child: const Text('Cancel'),
                 ),
                 ElevatedButton(
@@ -367,10 +315,12 @@ class _TeamMembersScreenState extends State<TeamMembersScreen> {
                       ? null
                       : () {
                           if (formKey.currentState?.validate() ?? false) {
-                            context.read<TeamBloc>().add(TeamSendInvitation(
-                              teamId: teamId,
-                              email: emailController.text.trim(),
-                            ));
+                            context.read<TeamBloc>().add(
+                              TeamSendInvitation(
+                                teamId: teamId,
+                                email: emailController.text.trim(),
+                              ),
+                            );
                           }
                         },
                   style: ElevatedButton.styleFrom(
@@ -423,10 +373,7 @@ class _TeamMembersScreenState extends State<TeamMembersScreen> {
             const SizedBox(height: 20),
             const Text(
               'Invitation Sent!',
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-              ),
+              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 12),
             Text(
@@ -451,10 +398,7 @@ class _TeamMembersScreenState extends State<TeamMembersScreen> {
               child: Text(
                 'They will receive an email with a link to join your team. The invitation expires in 7 days.',
                 textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 12,
-                  color: Colors.grey[600],
-                ),
+                style: TextStyle(fontSize: 12, color: Colors.grey[600]),
               ),
             ),
           ],
@@ -485,139 +429,158 @@ class _TeamMembersScreenState extends State<TeamMembersScreen> {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
+      useSafeArea: true,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      builder: (context) => Container(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 40,
-              height: 4,
-              decoration: BoxDecoration(
-                color: Colors.grey[300],
-                borderRadius: BorderRadius.circular(2),
+      builder: (context) => SafeArea(
+        child: Container(
+          padding: const EdgeInsets.fromLTRB(20, 20, 20, 100),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.grey[300],
+                  borderRadius: BorderRadius.circular(2),
+                ),
               ),
-            ),
-            const SizedBox(height: 20),
-            CircleAvatar(
-              radius: 40,
-              backgroundColor: AppColors.primary.withAlpha(30),
-              backgroundImage: member.avatarUrl != null ? NetworkImage(member.avatarUrl!) : null,
-              child: member.avatarUrl == null
-                  ? Text(
-                      (member.displayName ?? member.email ?? 'U')[0].toUpperCase(),
-                      style: const TextStyle(
-                        color: AppColors.primary,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 28,
-                      ),
-                    )
-                  : null,
-            ),
-            const SizedBox(height: 16),
-            Text(
-              member.displayName ?? member.email ?? 'Unknown',
-              style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
-            ),
-            if (member.email != null) ...[
-              const SizedBox(height: 4),
+              const SizedBox(height: 20),
+              CircleAvatar(
+                radius: 40,
+                backgroundColor: AppColors.primary.withAlpha(30),
+                backgroundImage: member.avatarUrl != null
+                    ? NetworkImage(member.avatarUrl!)
+                    : null,
+                child: member.avatarUrl == null
+                    ? Text(
+                        (member.displayName ?? member.email ?? 'U')[0]
+                            .toUpperCase(),
+                        style: const TextStyle(
+                          color: AppColors.primary,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 28,
+                        ),
+                      )
+                    : null,
+              ),
+              const SizedBox(height: 16),
               Text(
-                member.email!,
-                style: TextStyle(
-                  color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
-                ),
+                member.displayName ?? member.email ?? 'Unknown',
+                style: Theme.of(
+                  context,
+                ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
               ),
-            ],
-            const SizedBox(height: 16),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: _getRoleColor(member.role).withAlpha(30),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Text(
-                    _formatRole(member.role),
-                    style: TextStyle(
-                      fontWeight: FontWeight.w600,
-                      color: _getRoleColor(member.role),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: (member.isOnline ? Colors.green : Colors.grey).withAlpha(30),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Container(
-                        width: 8,
-                        height: 8,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: member.isOnline ? Colors.green : Colors.grey,
-                        ),
-                      ),
-                      const SizedBox(width: 6),
-                      Text(
-                        member.isOnline ? 'Online' : 'Offline',
-                        style: TextStyle(
-                          color: member.isOnline ? Colors.green : Colors.grey,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    ],
+              if (member.email != null) ...[
+                const SizedBox(height: 4),
+                Text(
+                  member.email!,
+                  style: TextStyle(
+                    color: isDark
+                        ? AppColors.textSecondaryDark
+                        : AppColors.textSecondaryLight,
                   ),
                 ),
               ],
-            ),
-            const SizedBox(height: 24),
-            if (member.role == 'worker') ...[
-              // Use Column to avoid overflow
-              Column(
+              const SizedBox(height: 16),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  SizedBox(
-                    width: double.infinity,
-                    child: CustomButton(
-                      text: 'View Assignments',
-                      icon: Icons.map_outlined,
-                      type: ButtonType.outline,
-                      onPressed: () {
-                        Navigator.pop(context);
-                        // Navigate to worker's territory assignments
-                        context.push('/leader/worker-assignments/${member.userId}?name=${Uri.encodeComponent(member.displayName ?? member.email ?? 'Worker')}');
-                      },
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 6,
+                    ),
+                    decoration: BoxDecoration(
+                      color: _getRoleColor(member.role).withAlpha(30),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Text(
+                      _formatRole(member.role),
+                      style: TextStyle(
+                        fontWeight: FontWeight.w600,
+                        color: _getRoleColor(member.role),
+                      ),
                     ),
                   ),
-                  const SizedBox(height: 12),
-                  SizedBox(
-                    width: double.infinity,
-                    child: CustomButton(
-                      text: 'Assign Territory',
-                      icon: Icons.add_location,
-                      onPressed: () {
-                        Navigator.pop(context);
-                        // Pass worker ID so territory assignment can pre-select this worker
-                        context.push('/leader/territory-assignment?workerId=${member.userId}&workerName=${Uri.encodeComponent(member.displayName ?? member.email ?? 'Worker')}');
-                      },
+                  const SizedBox(width: 12),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 6,
+                    ),
+                    decoration: BoxDecoration(
+                      color: (member.isOnline ? Colors.green : Colors.grey)
+                          .withAlpha(30),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          width: 8,
+                          height: 8,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: member.isOnline ? Colors.green : Colors.grey,
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          member.isOnline ? 'Online' : 'Offline',
+                          style: TextStyle(
+                            color: member.isOnline ? Colors.green : Colors.grey,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ],
               ),
+              const SizedBox(height: 24),
+              if (member.role == 'worker') ...[
+                // Use Column to avoid overflow
+                Column(
+                  children: [
+                    SizedBox(
+                      width: double.infinity,
+                      child: CustomButton(
+                        text: 'View Assignments',
+                        icon: Icons.map_outlined,
+                        type: ButtonType.outline,
+                        onPressed: () {
+                          Navigator.pop(context);
+                          // Navigate to worker's territory assignments
+                          context.push(
+                            '/leader/worker-assignments/${member.userId}?name=${Uri.encodeComponent(member.displayName ?? member.email ?? 'Worker')}',
+                          );
+                        },
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    SizedBox(
+                      width: double.infinity,
+                      child: CustomButton(
+                        text: 'Assign Territory',
+                        icon: Icons.add_location,
+                        onPressed: () {
+                          Navigator.pop(context);
+                          // Pass worker ID so territory assignment can pre-select this worker
+                          context.push(
+                            '/leader/territory-assignment?workerId=${member.userId}&workerName=${Uri.encodeComponent(member.displayName ?? member.email ?? 'Worker')}',
+                          );
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+              const SizedBox(height: 16),
             ],
-            const SizedBox(height: 16),
-          ],
+          ),
         ),
       ),
     );
@@ -676,10 +639,13 @@ class _TeamMemberCard extends StatelessWidget {
               CircleAvatar(
                 radius: 28,
                 backgroundColor: AppColors.primary.withAlpha(30),
-                backgroundImage: member.avatarUrl != null ? NetworkImage(member.avatarUrl!) : null,
+                backgroundImage: member.avatarUrl != null
+                    ? NetworkImage(member.avatarUrl!)
+                    : null,
                 child: member.avatarUrl == null
                     ? Text(
-                        (member.displayName ?? member.email ?? 'U')[0].toUpperCase(),
+                        (member.displayName ?? member.email ?? 'U')[0]
+                            .toUpperCase(),
                         style: const TextStyle(
                           color: AppColors.primary,
                           fontWeight: FontWeight.bold,
@@ -706,7 +672,9 @@ class _TeamMemberCard extends StatelessWidget {
                         member.email!,
                         style: TextStyle(
                           fontSize: 13,
-                          color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                          color: isDark
+                              ? AppColors.textSecondaryDark
+                              : AppColors.textSecondaryLight,
                         ),
                       ),
                     ],
@@ -714,7 +682,10 @@ class _TeamMemberCard extends StatelessWidget {
                     Row(
                       children: [
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 3,
+                          ),
                           decoration: BoxDecoration(
                             color: _getRoleColor(member.role).withAlpha(30),
                             borderRadius: BorderRadius.circular(8),
@@ -742,7 +713,9 @@ class _TeamMemberCard extends StatelessWidget {
                           member.isOnline ? 'Online' : 'Offline',
                           style: TextStyle(
                             fontSize: 11,
-                            color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                            color: isDark
+                                ? AppColors.textSecondaryDark
+                                : AppColors.textSecondaryLight,
                           ),
                         ),
                       ],
@@ -752,7 +725,9 @@ class _TeamMemberCard extends StatelessWidget {
               ),
               Icon(
                 Icons.chevron_right,
-                color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                color: isDark
+                    ? AppColors.textSecondaryDark
+                    : AppColors.textSecondaryLight,
               ),
             ],
           ),

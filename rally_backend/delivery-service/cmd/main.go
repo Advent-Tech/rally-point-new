@@ -78,18 +78,28 @@ func main() {
 		}
 	}
 
+	// Initialize achievement components
+	achievementRepo := postgres.NewAchievementRepository(db.DB)
+	achievementService := service.NewAchievementService(achievementRepo)
+	achievementHandler := handler.NewAchievementHandler(achievementService)
+
 	// Initialize components
 	deliveryRepo := postgres.NewDeliveryRepository(db.DB)
 	routeOptimizer := service.NewRouteOptimizer()
-	deliveryService := service.NewDeliveryService(deliveryRepo, routeOptimizer, territoryClient, nc)
+	deliveryService := service.NewDeliveryServiceWithAchievements(deliveryRepo, routeOptimizer, territoryClient, nc, achievementService)
 
 	// Initialize receipt components
 	receiptRepo := postgres.NewReceiptRepository(db.DB)
-	receiptService := service.NewReceiptService(receiptRepo)
+	receiptService := service.NewReceiptServiceWithAchievements(receiptRepo, achievementService)
 
 	// Initialize prayer request components
 	prayerRepo := postgres.NewPrayerRequestRepository(db.DB)
-	prayerService := service.NewPrayerRequestService(prayerRepo, nc)
+	prayerService := service.NewPrayerRequestServiceWithAchievements(prayerRepo, nc, achievementService)
+
+	// Initialize target components
+	targetRepo := postgres.NewTargetRepository(db.DB)
+	targetService := service.NewTargetService(targetRepo)
+	targetHandler := handler.NewTargetHandler(targetService)
 
 	// Initialize handlers
 	deliveryHandler := handler.NewDeliveryHandler(deliveryService, jwtManager)
@@ -98,7 +108,7 @@ func main() {
 	prayerHandler := handler.NewPrayerRequestHandler(prayerService)
 
 	// Setup router
-	router := setupRouter(deliveryHandler, receiptHandler, paymentHandler, prayerHandler)
+	router := setupRouter(deliveryHandler, receiptHandler, paymentHandler, prayerHandler, targetHandler, achievementHandler)
 
 	// Server configuration
 	port := getEnv("PORT", "8085")
@@ -133,7 +143,7 @@ func main() {
 	log.Println("✅ Server exited")
 }
 
-func setupRouter(deliveryHandler *handler.DeliveryHandler, receiptHandler *handler.ReceiptHandler, paymentHandler *handler.PaymentHandler, prayerHandler *handler.PrayerRequestHandler) *gin.Engine {
+func setupRouter(deliveryHandler *handler.DeliveryHandler, receiptHandler *handler.ReceiptHandler, paymentHandler *handler.PaymentHandler, prayerHandler *handler.PrayerRequestHandler, targetHandler *handler.TargetHandler, achievementHandler *handler.AchievementHandler) *gin.Engine {
 	// Set Gin mode
 	if getEnv("GIN_MODE", "debug") == "release" {
 		gin.SetMode(gin.ReleaseMode)
@@ -149,7 +159,7 @@ func setupRouter(deliveryHandler *handler.DeliveryHandler, receiptHandler *handl
 
 	// API routes
 	api := router.Group("/api")
-	
+
 	// Protected routes
 	protected := api.Group("/")
 	protected.Use(deliveryHandler.AuthMiddleware())
@@ -253,6 +263,59 @@ func setupRouter(deliveryHandler *handler.DeliveryHandler, receiptHandler *handl
 			prayerRequests.GET("/worker/:workerId", prayerHandler.GetWorkerPrayerRequests)
 			prayerRequests.GET("/team/:teamId", prayerHandler.GetTeamPrayerRequests)
 			prayerRequests.GET("/territory/:territoryId", prayerHandler.GetTerritoryPrayerRequests)
+		}
+
+		// Target management
+		targets := protected.Group("/targets")
+		{
+			targets.GET("/me", targetHandler.GetWorkerTargets)
+		}
+
+		// Achievement management
+		achievements := protected.Group("/achievements")
+		{
+			achievements.GET("/me", achievementHandler.GetWorkerAchievements)
+			achievements.GET("/me/level", achievementHandler.GetWorkerLevel)
+			achievements.GET("/me/:category", achievementHandler.GetWorkerAchievementsByCategory)
+		}
+
+		// Team leader target management
+		teamTargets := protected.Group("/teams/targets")
+		{
+			teamTargets.POST("/", targetHandler.CreateTarget)
+			teamTargets.GET("/", targetHandler.GetTargets)
+			teamTargets.PUT("/:id", targetHandler.UpdateTarget)
+			teamTargets.DELETE("/:id", targetHandler.DeleteTarget)
+			teamTargets.POST("/:id/assign-team", targetHandler.AssignTargetToTeam)
+			teamTargets.POST("/:id/assign-worker", targetHandler.AssignTargetToWorker)
+			teamTargets.GET("/assigned", targetHandler.GetTeamTargets)
+		}
+
+		// Team progress and leaderboard
+		teamProgress := protected.Group("/teams")
+		{
+			teamProgress.GET("/team-progress", targetHandler.GetTeamTargets)
+			teamProgress.GET("/team-leaderboard", achievementHandler.GetWorkerStats)
+		}
+
+		// Admin target management
+		adminTargets := protected.Group("/admin/targets")
+		{
+			adminTargets.POST("/", targetHandler.CreateTarget)
+			adminTargets.GET("/", targetHandler.GetTargets)
+			adminTargets.PUT("/:id", targetHandler.UpdateTarget)
+			adminTargets.DELETE("/:id", targetHandler.DeleteTarget)
+			adminTargets.POST("/:id/assign-team", targetHandler.AssignTargetToTeam)
+			adminTargets.POST("/:id/assign-worker", targetHandler.AssignTargetToWorker)
+		}
+
+		// Admin achievement management
+		adminAchievements := protected.Group("/admin/achievements")
+		{
+			adminAchievements.GET("/", achievementHandler.GetAllAchievements)
+			adminAchievements.POST("/", achievementHandler.CreateAchievement)
+			adminAchievements.PUT("/:id", achievementHandler.UpdateAchievement)
+			adminAchievements.DELETE("/:id", achievementHandler.DeleteAchievement)
 		}
 	}
 

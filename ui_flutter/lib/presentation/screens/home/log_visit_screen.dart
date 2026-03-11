@@ -4,7 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../../blocs/work_session/work_session_bloc.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../widgets/custom_button.dart';
-import '../../widgets/feedback/app_snackbar.dart';
+import '../../widgets/animations/success_check.dart';
 
 class LogVisitScreen extends StatefulWidget {
   const LogVisitScreen({super.key});
@@ -34,7 +34,7 @@ class _LogVisitScreenState extends State<LogVisitScreen> {
     super.dispose();
   }
 
-  void _submitVisit() {
+  void _submitVisit() async {
     if (_formKey.currentState!.validate()) {
       context.read<WorkSessionBloc>().add(WorkSessionLogVisit(
         address: _addressController.text.trim(),
@@ -42,9 +42,8 @@ class _LogVisitScreenState extends State<LogVisitScreen> {
         notes: _notesController.text.trim().isEmpty ? null : _notesController.text.trim(),
       ));
 
-      AppSnackbar.success(context, message: 'Visit logged successfully');
-
-      context.pop();
+      await SuccessOverlay.show(context, message: 'Visit logged!', duration: const Duration(milliseconds: 1200));
+      if (mounted) context.pop();
     }
   }
 
@@ -165,6 +164,7 @@ class _LogVisitScreenState extends State<LogVisitScreen> {
                   const SizedBox(height: 8),
                   TextFormField(
                     controller: _addressController,
+                    autovalidateMode: AutovalidateMode.onUserInteraction,
                     decoration: InputDecoration(
                       hintText: 'Enter the address',
                       prefixIcon: const Icon(Icons.home_outlined),

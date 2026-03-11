@@ -1,5 +1,5 @@
 # Flutter
-ui_flutter/build/
+ui_flutter/
 ui_flutter/.dart_tool/
 ui_flutter/.packages
 ui_flutter/.pub-cache/
@@ -49,6 +49,11 @@ Thumbs.db
 *.ipa
 *.dill
 *.bin
+
+# Geospatial data (large binary files)
+Geopackage/
+KMZ/
+Shapefile/
 
 # Screenshots (optional - remove if you want to keep them)
 # *.png

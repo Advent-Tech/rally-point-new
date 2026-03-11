@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"fmt"
 	"time"
 
@@ -10,12 +11,21 @@ import (
 
 // receiptService implements domain.ReceiptService
 type receiptService struct {
-	repo domain.ReceiptRepository
+	repo               domain.ReceiptRepository
+	achievementService *AchievementService
 }
 
 // NewReceiptService creates a new receipt service
 func NewReceiptService(repo domain.ReceiptRepository) domain.ReceiptService {
 	return &receiptService{repo: repo}
+}
+
+// NewReceiptServiceWithAchievements creates a receipt service with achievement checking
+func NewReceiptServiceWithAchievements(repo domain.ReceiptRepository, achievementSvc *AchievementService) domain.ReceiptService {
+	return &receiptService{
+		repo:               repo,
+		achievementService: achievementSvc,
+	}
 }
 
 // CreateReceipt creates a new receipt with items
@@ -275,7 +285,32 @@ func (s *receiptService) CreateDonation(workerID uuid.UUID, workerName string, r
 		return nil, fmt.Errorf("failed to create donation: %w", err)
 	}
 
+	// Check achievements in background
+	if s.achievementService != nil {
+		go func() {
+			s.checkDonationAchievements(context.Background(), workerID, donation.Amount)
+		}()
+	}
+
 	return donation, nil
+}
+
+func (s *receiptService) checkDonationAchievements(ctx context.Context, workerID uuid.UUID, amount float64) {
+	if s.achievementService == nil {
+		return
+	}
+
+	// Get worker's current donation stats
+	stats, err := s.repo.GetWorkerDonationStats(workerID, 365) // Last year
+	if err != nil {
+		return
+	}
+
+	// Check count achievements
+	s.achievementService.CheckAndAwardAchievements(ctx, workerID, "donation", float64(stats.TotalDonations))
+
+	// Check amount achievements
+	s.achievementService.CheckAndAwardAchievements(ctx, workerID, "donation", stats.TotalAmount)
 }
 
 // GetDonation gets a donation by ID

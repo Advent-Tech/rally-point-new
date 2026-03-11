@@ -60,16 +60,16 @@ class TeamMapLoaded extends TeamMapState {
 
   @override
   List<Object?> get props => [
-        activeWorkers,
-        prayerRequests,
-        donations,
-        territoryBoundaries,
-        showWorkers,
-        showPrayers,
-        showDonations,
-        showTerritories,
-        teamId,
-      ];
+    activeWorkers,
+    prayerRequests,
+    donations,
+    territoryBoundaries,
+    showWorkers,
+    showPrayers,
+    showDonations,
+    showTerritories,
+    teamId,
+  ];
 }
 
 class TeamMapError extends TeamMapState {
@@ -123,6 +123,7 @@ class MapDonationMarker {
   final double amount;
   final String donorName;
   final String workerName;
+  final String workerId;
 
   const MapDonationMarker({
     required this.id,
@@ -131,6 +132,7 @@ class MapDonationMarker {
     required this.amount,
     required this.donorName,
     required this.workerName,
+    required this.workerId,
   });
 
   factory MapDonationMarker.fromJson(Map<String, dynamic> json) {
@@ -141,6 +143,10 @@ class MapDonationMarker {
       amount: (json['amount'] ?? 0.0).toDouble(),
       donorName: json['donor_name'] ?? 'Anonymous',
       workerName: json['worker_name'] ?? json['collector_name'] ?? 'Unknown',
+      workerId:
+          json['worker_id']?.toString() ??
+          json['collected_by_id']?.toString() ??
+          '',
     );
   }
 }
@@ -176,7 +182,10 @@ class MapPrayerMarker {
       title: json['title'] ?? 'Prayer Request',
       description: json['description'],
       workerName: json['worker_name'] ?? json['submitted_by_name'] ?? 'Unknown',
-      workerId: json['worker_id']?.toString() ?? json['submitted_by']?.toString() ?? '',
+      workerId:
+          json['worker_id']?.toString() ??
+          json['submitted_by']?.toString() ??
+          '',
       status: json['status'] ?? 'pending',
       createdAt: json['created_at'] != null
           ? DateTime.tryParse(json['created_at'].toString()) ?? DateTime.now()
@@ -230,10 +239,7 @@ class TerritoryBoundary {
         final outer = rawCoordinates[0] as List;
         coords = outer.map<List<double>>((point) {
           final p = point as List;
-          return [
-            (p[0] as num).toDouble(),
-            (p[1] as num).toDouble(),
-          ];
+          return [(p[0] as num).toDouble(), (p[1] as num).toDouble()];
         }).toList();
       } else if (geometryType == 'MultiPolygon') {
         // MultiPolygon: [[[[lng, lat], ...]], [[[lng, lat], ...]]]
@@ -244,10 +250,7 @@ class TerritoryBoundary {
             final outer = firstPolygon[0] as List;
             coords = outer.map<List<double>>((point) {
               final p = point as List;
-              return [
-                (p[0] as num).toDouble(),
-                (p[1] as num).toDouble(),
-              ];
+              return [(p[0] as num).toDouble(), (p[1] as num).toDouble()];
             }).toList();
           }
         }
@@ -256,7 +259,8 @@ class TerritoryBoundary {
 
     return TerritoryBoundary(
       id: feature['id']?.toString() ?? properties['id']?.toString() ?? '',
-      name: properties['entity_name']?.toString() ??
+      name:
+          properties['entity_name']?.toString() ??
           properties['name']?.toString() ??
           'Territory',
       solid: properties['solid']?.toString(),
@@ -280,10 +284,7 @@ class TerritoryBoundary {
           final outer = rawCoordinates[0] as List;
           coords = outer.map<List<double>>((point) {
             final p = point as List;
-            return [
-              (p[0] as num).toDouble(),
-              (p[1] as num).toDouble(),
-            ];
+            return [(p[0] as num).toDouble(), (p[1] as num).toDouble()];
           }).toList();
         } else if (geometryType == 'MultiPolygon') {
           // MultiPolygon: [[[[lng, lat], ...]], [[[lng, lat], ...]]]
@@ -293,10 +294,7 @@ class TerritoryBoundary {
               final outer = firstPolygon[0] as List;
               coords = outer.map<List<double>>((point) {
                 final p = point as List;
-                return [
-                  (p[0] as num).toDouble(),
-                  (p[1] as num).toDouble(),
-                ];
+                return [(p[0] as num).toDouble(), (p[1] as num).toDouble()];
               }).toList();
             }
           }
@@ -306,7 +304,8 @@ class TerritoryBoundary {
 
     return TerritoryBoundary(
       id: json['id']?.toString() ?? json['territory_id']?.toString() ?? '',
-      name: json['territory_name']?.toString() ??
+      name:
+          json['territory_name']?.toString() ??
           json['entity_name']?.toString() ??
           'Territory',
       solid: json['solid']?.toString(),

@@ -7,6 +7,7 @@ import '../../../data/models/prayer_request_model.dart';
 import '../../blocs/auth/auth_bloc.dart';
 import '../../blocs/prayer_request/prayer_request_bloc.dart';
 import '../../widgets/custom_button.dart';
+import '../../widgets/animations/success_check.dart';
 
 class PrayerRequestFormScreen extends StatefulWidget {
   const PrayerRequestFormScreen({super.key});
@@ -172,16 +173,18 @@ class _PrayerRequestFormScreenState extends State<PrayerRequestFormScreen> {
     return BlocListener<PrayerRequestBloc, PrayerRequestState>(
       listener: (context, state) {
         if (state is PrayerRequestSubmitSuccess) {
-          _showSnackBar('Prayer request submitted successfully!');
-          // Navigate to prayer requests list based on user role
-          final authState = context.read<AuthBloc>().state;
-          if (authState is AuthAuthenticated) {
-            final isLeader = authState.user.role == 'team_leader' ||
-                authState.user.role == 'admin';
-            context.go(isLeader ? '/leader/prayer-requests' : '/prayer-requests');
-          } else {
-            context.go('/prayer-requests');
-          }
+          SuccessOverlay.show(context, message: 'Prayer request submitted!').then((_) {
+            if (context.mounted) {
+              final authState = context.read<AuthBloc>().state;
+              if (authState is AuthAuthenticated) {
+                final isLeader = authState.user.role == 'team_leader' ||
+                    authState.user.role == 'admin';
+                context.go(isLeader ? '/leader/prayer-requests' : '/prayer-requests');
+              } else {
+                context.go('/prayer-requests');
+              }
+            }
+          });
         } else if (state is PrayerRequestError) {
           setState(() => _isSubmitting = false);
           _showSnackBar(state.message, isError: true);
@@ -462,6 +465,7 @@ class _PrayerRequestFormScreenState extends State<PrayerRequestFormScreen> {
       controller: controller,
       maxLines: maxLines,
       keyboardType: keyboardType,
+      autovalidateMode: isRequired ? AutovalidateMode.onUserInteraction : null,
       decoration: InputDecoration(
         labelText: label,
         prefixIcon: icon != null ? Icon(icon) : null,

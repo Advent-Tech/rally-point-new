@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -14,12 +15,21 @@ import (
 )
 
 type PrayerRequestService struct {
-	repo domain.PrayerRequestRepository
-	nc   *nats.Conn
+	repo               domain.PrayerRequestRepository
+	nc                 *nats.Conn
+	achievementService *AchievementService
 }
 
 func NewPrayerRequestService(repo domain.PrayerRequestRepository, nc *nats.Conn) *PrayerRequestService {
 	return &PrayerRequestService{repo: repo, nc: nc}
+}
+
+func NewPrayerRequestServiceWithAchievements(repo domain.PrayerRequestRepository, nc *nats.Conn, achievementSvc *AchievementService) *PrayerRequestService {
+	return &PrayerRequestService{
+		repo:               repo,
+		nc:                 nc,
+		achievementService: achievementSvc,
+	}
 }
 
 // publishNotify publishes a notification event to NATS
@@ -305,5 +315,32 @@ func (s *PrayerRequestService) AssignPreacher(id uuid.UUID, preacherID uuid.UUID
 }
 
 func (s *PrayerRequestService) CompletePrayerRequest(id uuid.UUID, completedBy uuid.UUID, notes *string) error {
-	return s.repo.UpdateStatus(id, domain.PrayerStatusCompleted, &completedBy, notes)
+	err := s.repo.UpdateStatus(id, domain.PrayerStatusCompleted, &completedBy, notes)
+	if err != nil {
+		return err
+	}
+
+	// Check achievements in background
+	if s.achievementService != nil {
+		go func() {
+			s.checkPrayerAchievements(context.Background(), completedBy)
+		}()
+	}
+
+	return nil
+}
+
+func (s *PrayerRequestService) checkPrayerAchievements(ctx context.Context, workerID uuid.UUID) {
+	if s.achievementService == nil {
+		return
+	}
+
+	// Get worker's completed prayer count
+	count, err := s.repo.GetCompletedPrayerCount(workerID)
+	if err != nil {
+		return
+	}
+
+	// Check prayer count achievements
+	s.achievementService.CheckAndAwardAchievements(ctx, workerID, "prayer", float64(count))
 }

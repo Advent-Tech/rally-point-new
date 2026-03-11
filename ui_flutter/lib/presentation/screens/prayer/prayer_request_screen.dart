@@ -6,6 +6,8 @@ import '../../../data/models/prayer_request_model.dart';
 import '../../blocs/auth/auth_bloc.dart';
 import '../../blocs/prayer_request/prayer_request_bloc.dart';
 import '../../widgets/custom_button.dart';
+import '../../widgets/role_badge.dart';
+import '../../widgets/states/empty_state.dart';
 
 class PrayerRequestScreen extends StatefulWidget {
   const PrayerRequestScreen({super.key});
@@ -53,6 +55,7 @@ class _PrayerRequestScreenState extends State<PrayerRequestScreen>
       appBar: AppBar(
         title: const Text('Prayer Requests'),
         actions: [
+          const RoleBadge(),
           IconButton(
             icon: const Icon(Icons.filter_list),
             onPressed: _showFilterDialog,
@@ -526,32 +529,12 @@ class _PrayerRequestScreenState extends State<PrayerRequestScreen>
   }
 
   Widget _buildEmptyState() {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(
-            Icons.volunteer_activism_outlined,
-            size: 64,
-            color: Colors.grey[400],
-          ),
-          const SizedBox(height: 16),
-          Text(
-            'No Prayer Requests',
-            style: Theme.of(context).textTheme.titleLarge,
-          ),
-          const SizedBox(height: 8),
-          const Text(
-            'Start by creating a new prayer request',
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 24),
-          CustomButton(
-            text: 'New Prayer Request',
-            onPressed: () => context.push('/prayer-requests/new'),
-          ),
-        ],
-      ),
+    return EmptyState(
+      icon: Icons.volunteer_activism_outlined,
+      title: 'No Prayer Requests',
+      description: 'Share a prayer request with your team.',
+      actionLabel: 'New Prayer Request',
+      onAction: () => context.push('/prayer-requests/new'),
     );
   }
 

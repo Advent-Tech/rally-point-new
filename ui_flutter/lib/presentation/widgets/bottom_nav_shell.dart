@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import '../../core/theme/app_colors.dart';
 import '../blocs/auth/auth_bloc.dart';
+import 'help/help_fab.dart';
 
 class BottomNavShell extends StatelessWidget {
   final Widget child;
@@ -28,13 +29,13 @@ class BottomNavShell extends StatelessWidget {
     if (isLeader) {
       // Leader navigation: Dashboard, Team, Surveys, Reports
       switch (location) {
-        case '/home':
+        case '/leader/dashboard':
           return 0;
-        case '/team':
+        case '/leader/team-members':
           return 1;
-        case '/survey':
+        case '/leader/survey':
           return 2;
-        case '/reports':
+        case '/leader/reports':
           return 3;
         default:
           return 0;
@@ -61,16 +62,16 @@ class BottomNavShell extends StatelessWidget {
       // Leader navigation
       switch (index) {
         case 0:
-          context.go('/home');
+          context.go('/leader/dashboard');
           break;
         case 1:
-          context.go('/team');
+          context.go('/leader/team-members');
           break;
         case 2:
-          context.go('/survey');
+          context.go('/leader/survey');
           break;
         case 3:
-          context.go('/reports');
+          context.go('/leader/reports');
           break;
       }
     } else {
@@ -99,7 +100,7 @@ class BottomNavShell extends StatelessWidget {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
-      body: child,
+      body: Stack(children: [child, const HelpFab()]),
       extendBody: true,
       bottomNavigationBar: Container(
         margin: const EdgeInsets.only(left: 16, right: 16, bottom: 16),
@@ -126,30 +127,58 @@ class BottomNavShell extends StatelessWidget {
     );
   }
 
-  List<Widget> _buildLeaderNavItems(BuildContext context, int currentIndex, bool isDark) {
+  List<Widget> _buildLeaderNavItems(
+    BuildContext context,
+    int currentIndex,
+    bool isDark,
+  ) {
     final items = [
       _NavItemData(Icons.dashboard_outlined, Icons.dashboard, 'Dashboard', 0),
       _NavItemData(Icons.people_outline, Icons.people, 'Team', 1),
       _NavItemData(Icons.assignment_outlined, Icons.assignment, 'Surveys', 2),
       _NavItemData(Icons.bar_chart_outlined, Icons.bar_chart, 'Reports', 3),
     ];
-    return items.map((item) => _buildNavItem(context, item, currentIndex, isDark, true)).toList();
+    return items
+        .map((item) => _buildNavItem(context, item, currentIndex, isDark, true))
+        .toList();
   }
 
-  List<Widget> _buildWorkerNavItems(BuildContext context, int currentIndex, bool isDark) {
+  List<Widget> _buildWorkerNavItems(
+    BuildContext context,
+    int currentIndex,
+    bool isDark,
+  ) {
     final items = [
       _NavItemData(Icons.home_outlined, Icons.home, 'Home', 0),
       _NavItemData(Icons.map_outlined, Icons.map, 'Territory', 1),
-      _NavItemData(Icons.directions_walk_outlined, Icons.directions_walk, 'Activity', 2),
+      _NavItemData(
+        Icons.directions_walk_outlined,
+        Icons.directions_walk,
+        'Activity',
+        2,
+      ),
       _NavItemData(Icons.assignment_outlined, Icons.assignment, 'Survey', 3),
     ];
-    return items.map((item) => _buildNavItem(context, item, currentIndex, isDark, false)).toList();
+    return items
+        .map(
+          (item) => _buildNavItem(context, item, currentIndex, isDark, false),
+        )
+        .toList();
   }
 
-  Widget _buildNavItem(BuildContext context, _NavItemData item, int currentIndex, bool isDark, bool isLeader) {
+  Widget _buildNavItem(
+    BuildContext context,
+    _NavItemData item,
+    int currentIndex,
+    bool isDark,
+    bool isLeader,
+  ) {
     final isSelected = currentIndex == item.index;
+    final selectedColor = isDark
+        ? AppColors.buttonPrimaryDark
+        : AppColors.buttonPrimaryLight;
     final color = isSelected
-        ? AppColors.primary
+        ? selectedColor
         : (isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight);
 
     return Expanded(

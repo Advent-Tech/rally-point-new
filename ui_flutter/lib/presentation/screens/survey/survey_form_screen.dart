@@ -8,6 +8,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../data/models/survey_model.dart';
 import '../../blocs/survey/survey_bloc.dart';
 import '../../widgets/custom_button.dart';
+import '../../widgets/animations/success_check.dart';
 import '../../widgets/survey/dynamic_survey_field.dart';
 
 /// Survey form screen for workers to fill out survey questions
@@ -224,13 +225,9 @@ class _SurveyFormScreenState extends State<SurveyFormScreen> {
     return BlocListener<SurveyBloc, SurveyState>(
       listener: (context, state) {
         if (state is SurveySubmitSuccess) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Survey submitted successfully!'),
-              backgroundColor: AppColors.success,
-            ),
-          );
-          context.pop();
+          SuccessOverlay.show(context, message: 'Survey submitted!').then((_) {
+            if (context.mounted) context.pop();
+          });
         } else if (state is SurveyError) {
           setState(() => _isSubmitting = false);
           ScaffoldMessenger.of(context).showSnackBar(

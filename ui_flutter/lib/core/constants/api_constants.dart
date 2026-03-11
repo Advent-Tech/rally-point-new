@@ -3,8 +3,8 @@ class ApiConstants {
   ApiConstants._();
 
   // Base URLs
-  // EC2 Production Server
-  static const String prodBaseUrl = 'https://18.188.1.122';
+  // Production Server - Lightsquads Domain
+  static const String prodBaseUrl = 'https://backend.lightsquads.com';
   static const String devBaseUrl = 'http://10.0.2.2:8080'; // Android emulator
   static const String devBaseUrlIOS = 'http://localhost:8080'; // iOS simulator
 
@@ -81,9 +81,12 @@ class ApiConstants {
   static const String sessionsStart = '/api/sessions/start';
   static const String sessionsActive = '/api/sessions/active';
   static const String workersActive = '/api/workers/active';
+  static const String workersLiveLocations =
+      '/api/locations/workers/team'; // New: Get live worker locations by team
   static const String workersNearby = '/api/workers/nearby';
   static const String geofenceCheckin = '/api/geofence/checkin';
   static const String geofenceCheckout = '/api/geofence/checkout';
+  static const String geofenceLocationUpdate = '/api/geofence/location-update';
 
   // Territory Endpoints
   static const String territories = '/api/territories';
@@ -108,7 +111,6 @@ class ApiConstants {
   static const String myAssignments = '/api/geo/assignments';
   static const String requestTerritory = '/api/geo/assignments/request';
   static const String geofenceCheck = '/api/geofence/check';
-  static const String geofenceLocationUpdate = '/api/geofence/location-update';
 
   // Survey Endpoints
   static const String surveys = '/api/surveys';
@@ -153,23 +155,30 @@ class ApiConstants {
   static const String prayerRequestsMe = '/api/prayer-requests/me';
   static const String prayerRequestsMap = '/api/prayer-requests/map';
   static const String prayerRequestsStats = '/api/prayer-requests/stats';
-  static const String prayerRequestsWorker = '/api/prayer-requests/worker'; // + /{workerId}
-  static const String prayerRequestsTeam = '/api/prayer-requests/team'; // + /{teamId}
-  static const String prayerRequestsTerritory = '/api/prayer-requests/territory'; // + /{territoryId}
+  static const String prayerRequestsWorker =
+      '/api/prayer-requests/worker'; // + /{workerId}
+  static const String prayerRequestsTeam =
+      '/api/prayer-requests/team'; // + /{teamId}
+  static const String prayerRequestsTerritory =
+      '/api/prayer-requests/territory'; // + /{territoryId}
 
   // Donation Endpoints
   static const String donations = '/api/donations';
   static const String donationsCreate = '/api/donations/';
-  static const String donationsWorker = '/api/donations/worker'; // + /{workerId}
+  static const String donationsWorker =
+      '/api/donations/worker'; // + /{workerId}
   static const String donationsTeam = '/api/donations/team'; // + /{teamId}
   static const String donationsStats = '/api/donations/stats';
 
   // Notification Endpoints
   static const String notifications = '/api/notifications';
-  static const String notificationsDeviceToken = '/api/notifications/device-token';
-  static const String notificationsUnreadCount = '/api/notifications/unread-count';
+  static const String notificationsDeviceToken =
+      '/api/notifications/device-token';
+  static const String notificationsUnreadCount =
+      '/api/notifications/unread-count';
   static const String notificationsReadAll = '/api/notifications/read-all';
-  static const String notificationsPreferences = '/api/notifications/preferences';
+  static const String notificationsPreferences =
+      '/api/notifications/preferences';
 
   // WebSocket Endpoints
   static const String wsLocation = '/ws/location';

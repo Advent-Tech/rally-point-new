@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../core/theme/app_colors.dart';
@@ -26,9 +27,10 @@ enum InputFieldType {
 ///   hint: 'Enter your email',
 ///   fieldType: InputFieldType.email,
 ///   prefixIcon: Icons.email_outlined,
+///   realtimeValidation: true,
 /// )
 /// ```
-class CustomTextField extends StatelessWidget {
+class CustomTextField extends StatefulWidget {
   final TextEditingController? controller;
   final String? label;
   final String? hint;
@@ -67,6 +69,10 @@ class CustomTextField extends StatelessWidget {
   /// Whether to show character counter
   final bool showCounter;
 
+  /// Enable real-time validation as the user types (debounced 500ms).
+  /// Shows a green checkmark on valid fields and animates error text.
+  final bool realtimeValidation;
+
   const CustomTextField({
     super.key,
     this.controller,
@@ -100,25 +106,104 @@ class CustomTextField extends StatelessWidget {
     this.semanticLabel,
     this.fieldType,
     this.showCounter = false,
+    this.realtimeValidation = false,
   });
+
+  @override
+  State<CustomTextField> createState() => _CustomTextFieldState();
+}
+
+class _CustomTextFieldState extends State<CustomTextField> {
+  GlobalKey<FormFieldState>? _fieldKey;
+  Timer? _debounceTimer;
+  bool _isValid = false;
+  bool _hasInteracted = false;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.realtimeValidation) {
+      _fieldKey = GlobalKey<FormFieldState>();
+      widget.controller?.addListener(_onTextChanged);
+    }
+  }
+
+  @override
+  void didUpdateWidget(CustomTextField oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.controller != widget.controller ||
+        oldWidget.realtimeValidation != widget.realtimeValidation) {
+      if (oldWidget.realtimeValidation) {
+        oldWidget.controller?.removeListener(_onTextChanged);
+      }
+      if (widget.realtimeValidation) {
+        widget.controller?.addListener(_onTextChanged);
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    _debounceTimer?.cancel();
+    if (widget.realtimeValidation) {
+      widget.controller?.removeListener(_onTextChanged);
+    }
+    super.dispose();
+  }
+
+  void _onTextChanged() {
+    _hasInteracted = true;
+    _debounceTimer?.cancel();
+    _debounceTimer = Timer(const Duration(milliseconds: 500), () {
+      if (mounted) {
+        final isValid = _fieldKey?.currentState?.validate() ?? false;
+        if (_isValid != isValid) {
+          setState(() => _isValid = isValid);
+        }
+      }
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     // Determine keyboard type from field type if not explicitly set
-    final effectiveKeyboardType = keyboardType ?? _getKeyboardType();
+    final effectiveKeyboardType = widget.keyboardType ?? _getKeyboardType();
 
     // Get autofill hints
     final autofillHints = _getAutofillHints();
 
-    Widget field = Column(
+    // Build effective suffix icon with optional green check
+    final showValidState = widget.realtimeValidation &&
+        widget.validator != null &&
+        _hasInteracted &&
+        _isValid &&
+        (widget.controller?.text.isNotEmpty ?? false);
+
+    Widget? effectiveSuffixIcon = widget.suffixIcon ?? widget.suffix;
+    if (showValidState) {
+      const checkIcon = Padding(
+        padding: EdgeInsets.only(right: 4),
+        child: Icon(Icons.check_circle, color: AppColors.success, size: 20),
+      );
+      if (effectiveSuffixIcon != null) {
+        effectiveSuffixIcon = Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [checkIcon, effectiveSuffixIcon],
+        );
+      } else {
+        effectiveSuffixIcon = checkIcon;
+      }
+    }
+
+    Widget fieldColumn = Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
       children: [
-        if (label != null) ...[
+        if (widget.label != null) ...[
           Text(
-            label!,
+            widget.label!,
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                   fontWeight: FontWeight.w500,
                   color: isDark
@@ -129,113 +214,128 @@ class CustomTextField extends StatelessWidget {
           SizedBox(height: AppSpacing.sm),
         ],
         TextFormField(
-          controller: controller,
-          obscureText: obscureText,
-          enabled: enabled,
-          readOnly: readOnly,
-          autofocus: autofocus,
-          maxLines: obscureText ? 1 : maxLines,
-          minLines: minLines,
-          maxLength: maxLength,
-          keyboardType: effectiveKeyboardType,
-          textInputAction: textInputAction ?? TextInputAction.next,
-          textCapitalization: textCapitalization,
-          inputFormatters: inputFormatters,
-          validator: validator,
-          onChanged: onChanged,
-          onFieldSubmitted: onSubmitted,
-          onTap: onTap,
-          focusNode: focusNode,
-          autofillHints: autofillHints,
-          style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                color: isDark
-                    ? AppColors.textPrimaryDark
-                    : AppColors.textPrimaryLight,
-              ),
-          buildCounter: showCounter
-              ? null
-              : (context,
-                      {required currentLength,
-                      required isFocused,
-                      required maxLength}) =>
-                  null,
-          decoration: InputDecoration(
-            hintText: hint,
-            helperText: helperText,
-            errorText: errorText,
-            filled: filled,
-            fillColor: fillColor ??
-                (isDark ? AppColors.surfaceDark : AppColors.surfaceLight),
-            contentPadding: contentPadding ??
-                EdgeInsets.symmetric(
-                  horizontal: AppSpacing.md,
-                  vertical: AppSpacing.md,
+          key: _fieldKey,
+            controller: widget.controller,
+            obscureText: widget.obscureText,
+            enabled: widget.enabled,
+            readOnly: widget.readOnly,
+            autofocus: widget.autofocus,
+            maxLines: widget.obscureText ? 1 : widget.maxLines,
+            minLines: widget.minLines,
+            maxLength: widget.maxLength,
+            keyboardType: effectiveKeyboardType,
+            textInputAction: widget.textInputAction ?? TextInputAction.next,
+            textCapitalization: widget.textCapitalization,
+            inputFormatters: widget.inputFormatters,
+            validator: widget.validator,
+            onChanged: widget.onChanged,
+            onFieldSubmitted: widget.onSubmitted,
+            onTap: widget.onTap,
+            focusNode: widget.focusNode,
+            autofillHints: autofillHints,
+            style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                  color: isDark
+                      ? AppColors.textPrimaryDark
+                      : AppColors.textPrimaryLight,
                 ),
-            prefixIcon: prefixIcon != null
-                ? Icon(
-                    prefixIcon,
-                    color: isDark
-                        ? AppColors.textSecondaryDark
-                        : AppColors.textSecondaryLight,
-                    size: AppSpacing.iconMd + 2,
-                  )
-                : prefix,
-            suffixIcon: suffixIcon ?? suffix,
-            border: OutlineInputBorder(
-              borderRadius: AppSpacing.borderRadiusMd,
-              borderSide: BorderSide(
-                color: isDark ? AppColors.borderDark : AppColors.borderLight,
+            buildCounter: widget.showCounter
+                ? null
+                : (context,
+                        {required currentLength,
+                        required isFocused,
+                        required maxLength}) =>
+                    null,
+            decoration: InputDecoration(
+              hintText: widget.hint,
+              helperText: widget.helperText,
+              errorText: widget.errorText,
+              filled: widget.filled,
+              fillColor: widget.fillColor ??
+                  (isDark ? AppColors.surfaceDark : AppColors.surfaceLight),
+              contentPadding: widget.contentPadding ??
+                  EdgeInsets.symmetric(
+                    horizontal: AppSpacing.md,
+                    vertical: AppSpacing.md,
+                  ),
+              prefixIcon: widget.prefixIcon != null
+                  ? Icon(
+                      widget.prefixIcon,
+                      color: isDark
+                          ? AppColors.textSecondaryDark
+                          : AppColors.textSecondaryLight,
+                      size: AppSpacing.iconMd + 2,
+                    )
+                  : widget.prefix,
+              suffixIcon: effectiveSuffixIcon,
+              border: OutlineInputBorder(
+                borderRadius: AppSpacing.borderRadiusMd,
+                borderSide: BorderSide(
+                  color: isDark ? AppColors.borderDark : AppColors.borderLight,
+                ),
               ),
-            ),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: AppSpacing.borderRadiusMd,
-              borderSide: BorderSide(
-                color: isDark ? AppColors.borderDark : AppColors.borderLight,
+              enabledBorder: OutlineInputBorder(
+                borderRadius: AppSpacing.borderRadiusMd,
+                borderSide: BorderSide(
+                  color: showValidState
+                      ? AppColors.success
+                      : (isDark
+                          ? AppColors.borderDark
+                          : AppColors.borderLight),
+                ),
               ),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: AppSpacing.borderRadiusMd,
-              borderSide: const BorderSide(
-                color: AppColors.primary,
-                width: 2,
+              focusedBorder: OutlineInputBorder(
+                borderRadius: AppSpacing.borderRadiusMd,
+                borderSide: BorderSide(
+                  color:
+                      showValidState ? AppColors.success : AppColors.primary,
+                  width: 2,
+                ),
               ),
-            ),
-            errorBorder: OutlineInputBorder(
-              borderRadius: AppSpacing.borderRadiusMd,
-              borderSide: const BorderSide(
-                color: AppColors.error,
+              errorBorder: OutlineInputBorder(
+                borderRadius: AppSpacing.borderRadiusMd,
+                borderSide: const BorderSide(
+                  color: AppColors.error,
+                ),
               ),
-            ),
-            focusedErrorBorder: OutlineInputBorder(
-              borderRadius: AppSpacing.borderRadiusMd,
-              borderSide: const BorderSide(
-                color: AppColors.error,
-                width: 2,
+              focusedErrorBorder: OutlineInputBorder(
+                borderRadius: AppSpacing.borderRadiusMd,
+                borderSide: const BorderSide(
+                  color: AppColors.error,
+                  width: 2,
+                ),
               ),
-            ),
-            disabledBorder: OutlineInputBorder(
-              borderRadius: AppSpacing.borderRadiusMd,
-              borderSide: BorderSide(
-                color: (isDark ? AppColors.borderDark : AppColors.borderLight)
-                    .withValues(alpha: 0.5),
+              disabledBorder: OutlineInputBorder(
+                borderRadius: AppSpacing.borderRadiusMd,
+                borderSide: BorderSide(
+                  color: (isDark ? AppColors.borderDark : AppColors.borderLight)
+                      .withValues(alpha: 0.5),
+                ),
               ),
             ),
           ),
-        ),
       ],
     );
+
+    // Only wrap in AnimatedSize when realtime validation is active
+    final Widget field = widget.realtimeValidation
+        ? AnimatedSize(
+            duration: const Duration(milliseconds: 200),
+            alignment: Alignment.topCenter,
+            child: fieldColumn,
+          )
+        : fieldColumn;
 
     // Wrap with semantics
     return Semantics(
       textField: true,
-      label: semanticLabel ?? label ?? hint,
-      enabled: enabled,
+      label: widget.semanticLabel ?? widget.label ?? widget.hint,
+      enabled: widget.enabled,
       child: field,
     );
   }
 
   TextInputType? _getKeyboardType() {
-    return switch (fieldType) {
+    return switch (widget.fieldType) {
       InputFieldType.email => TextInputType.emailAddress,
       InputFieldType.phone => TextInputType.phone,
       InputFieldType.url => TextInputType.url,
@@ -249,7 +349,7 @@ class CustomTextField extends StatelessWidget {
   }
 
   List<String>? _getAutofillHints() {
-    return switch (fieldType) {
+    return switch (widget.fieldType) {
       InputFieldType.email => [AutofillHints.email],
       InputFieldType.password => [AutofillHints.password],
       InputFieldType.newPassword => [AutofillHints.newPassword],
@@ -400,6 +500,7 @@ class CustomTextArea extends StatelessWidget {
   final String? Function(String?)? validator;
   final void Function(String)? onChanged;
   final String? semanticLabel;
+  final bool realtimeValidation;
 
   const CustomTextArea({
     super.key,
@@ -416,6 +517,7 @@ class CustomTextArea extends StatelessWidget {
     this.validator,
     this.onChanged,
     this.semanticLabel,
+    this.realtimeValidation = false,
   });
 
   @override
@@ -436,6 +538,7 @@ class CustomTextArea extends StatelessWidget {
       semanticLabel: semanticLabel,
       textInputAction: TextInputAction.newline,
       keyboardType: TextInputType.multiline,
+      realtimeValidation: realtimeValidation,
     );
   }
 }

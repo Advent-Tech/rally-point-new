@@ -86,6 +86,7 @@ LocationUpdate _$LocationUpdateFromJson(Map<String, dynamic> json) =>
       speed: (json['speed'] as num?)?.toDouble(),
       heading: (json['heading'] as num?)?.toDouble(),
       sessionId: json['session_id'] as String?,
+      teamId: json['team_id'] as String?,
     );
 
 Map<String, dynamic> _$LocationUpdateToJson(LocationUpdate instance) =>
@@ -97,6 +98,7 @@ Map<String, dynamic> _$LocationUpdateToJson(LocationUpdate instance) =>
       'speed': instance.speed,
       'heading': instance.heading,
       'session_id': instance.sessionId,
+      'team_id': instance.teamId,
     };
 
 WorkerLocation _$WorkerLocationFromJson(Map<String, dynamic> json) =>

@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import '../../../core/theme/app_colors.dart';
 import '../blocs/work_session/work_session_bloc.dart';
 
-/// A card widget that displays current session status and auto-tracking toggle
 class SessionTrackingCard extends StatelessWidget {
   const SessionTrackingCard({super.key});
 
@@ -49,12 +49,16 @@ class SessionTrackingCard extends StatelessWidget {
     );
   }
 
-  Widget _buildActiveSessionCard(BuildContext context, WorkSessionActive state) {
+  Widget _buildActiveSessionCard(
+    BuildContext context,
+    WorkSessionActive state,
+  ) {
     final theme = Theme.of(context);
     final session = state.session;
+    final isDark = theme.brightness == Brightness.dark;
 
     return Card(
-      color: theme.colorScheme.primaryContainer,
+      color: AppColors.navyBlue,
       child: Padding(
         padding: const EdgeInsets.all(16.0),
         child: Column(
@@ -82,10 +86,9 @@ class SessionTrackingCard extends StatelessWidget {
                   'Active Session',
                   style: theme.textTheme.titleMedium?.copyWith(
                     fontWeight: FontWeight.bold,
+                    color: Colors.white,
                   ),
                 ),
-                const Spacer(),
-                _buildAutoTrackingToggle(context, state.autoTrackingEnabled),
               ],
             ),
             const SizedBox(height: 12),
@@ -93,6 +96,7 @@ class SessionTrackingCard extends StatelessWidget {
               session.territoryName,
               style: theme.textTheme.bodyLarge?.copyWith(
                 fontWeight: FontWeight.w500,
+                color: Colors.white,
               ),
             ),
             const SizedBox(height: 8),
@@ -101,44 +105,45 @@ class SessionTrackingCard extends StatelessWidget {
                 Icon(
                   Icons.timer_outlined,
                   size: 16,
-                  color: theme.colorScheme.onPrimaryContainer.withOpacity(0.7),
+                  color: Colors.white.withOpacity(0.7),
                 ),
                 const SizedBox(width: 4),
                 Text(
                   session.formattedDuration,
                   style: theme.textTheme.bodySmall?.copyWith(
-                    color: theme.colorScheme.onPrimaryContainer.withOpacity(0.7),
+                    color: Colors.white.withOpacity(0.7),
                   ),
                 ),
                 const SizedBox(width: 16),
                 Icon(
                   Icons.home_work_outlined,
                   size: 16,
-                  color: theme.colorScheme.onPrimaryContainer.withOpacity(0.7),
+                  color: Colors.white.withOpacity(0.7),
                 ),
                 const SizedBox(width: 4),
                 Text(
                   '${state.todayVisits.length} visits',
                   style: theme.textTheme.bodySmall?.copyWith(
-                    color: theme.colorScheme.onPrimaryContainer.withOpacity(0.7),
+                    color: Colors.white.withOpacity(0.7),
                   ),
                 ),
               ],
             ),
-            if (state.currentLatitude != null && state.currentLongitude != null) ...[
+            if (state.currentLatitude != null &&
+                state.currentLongitude != null) ...[
               const SizedBox(height: 8),
               Row(
                 children: [
                   Icon(
                     Icons.location_on,
                     size: 16,
-                    color: theme.colorScheme.onPrimaryContainer.withOpacity(0.7),
+                    color: Colors.white.withOpacity(0.7),
                   ),
                   const SizedBox(width: 4),
                   Text(
                     '${state.currentLatitude!.toStringAsFixed(5)}, ${state.currentLongitude!.toStringAsFixed(5)}',
                     style: theme.textTheme.bodySmall?.copyWith(
-                      color: theme.colorScheme.onPrimaryContainer.withOpacity(0.7),
+                      color: Colors.white.withOpacity(0.7),
                       fontFamily: 'monospace',
                     ),
                   ),
@@ -153,8 +158,8 @@ class SessionTrackingCard extends StatelessWidget {
                 icon: const Icon(Icons.logout),
                 label: const Text('End Session'),
                 style: OutlinedButton.styleFrom(
-                  foregroundColor: theme.colorScheme.error,
-                  side: BorderSide(color: theme.colorScheme.error),
+                  foregroundColor: Colors.white,
+                  side: const BorderSide(color: Colors.white),
                 ),
               ),
             ),
@@ -166,6 +171,7 @@ class SessionTrackingCard extends StatelessWidget {
 
   Widget _buildInactiveCard(BuildContext context, WorkSessionInactive state) {
     final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
 
     return Card(
       child: Padding(
@@ -190,15 +196,11 @@ class SessionTrackingCard extends StatelessWidget {
                     fontWeight: FontWeight.bold,
                   ),
                 ),
-                const Spacer(),
-                _buildAutoTrackingToggle(context, state.autoTrackingEnabled),
               ],
             ),
             const SizedBox(height: 12),
             Text(
-              state.autoTrackingEnabled
-                  ? 'Auto-tracking enabled. Session will start automatically when you enter an assigned territory.'
-                  : 'Enable auto-tracking to automatically start sessions when you enter territories.',
+              'Start a session from the GPS Tracking button to begin tracking your work.',
               style: theme.textTheme.bodyMedium?.copyWith(
                 color: theme.colorScheme.onSurfaceVariant,
               ),
@@ -222,30 +224,6 @@ class SessionTrackingCard extends StatelessWidget {
           ],
         ),
       ),
-    );
-  }
-
-  Widget _buildAutoTrackingToggle(BuildContext context, bool enabled) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Text(
-          'Auto',
-          style: Theme.of(context).textTheme.labelSmall?.copyWith(
-            color: enabled ? Colors.green : Colors.grey,
-          ),
-        ),
-        const SizedBox(width: 4),
-        Switch(
-          value: enabled,
-          onChanged: (value) {
-            context.read<WorkSessionBloc>().add(
-              WorkSessionToggleAutoTracking(enabled: value),
-            );
-          },
-          materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-        ),
-      ],
     );
   }
 

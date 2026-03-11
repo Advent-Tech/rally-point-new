@@ -1,10 +1,12 @@
 import 'dart:convert';
 import 'dart:io';
 import 'package:firebase_messaging/firebase_messaging.dart';
-import 'package:flutter/foundation.dart';
+import 'package:flutter/widgets.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_sound/flutter_sound.dart';
 import 'package:go_router/go_router.dart';
+import '../presentation/blocs/auth/auth_bloc.dart';
 import '../presentation/navigation/app_router.dart';
 import 'notification_api_service.dart';
 import 'realtime_provider.dart';
@@ -265,7 +267,19 @@ class PushNotificationService {
     _navigateToNotification(message.data);
   }
 
-  /// Navigate to the appropriate screen based on notification type and data
+  /// Check if current user is a team leader
+  bool _isUserLeader(BuildContext context) {
+    try {
+      final authState = BlocProvider.of<AuthBloc>(context, listen: false).state;
+      if (authState is AuthAuthenticated) {
+        return authState.user.isTeamLeader;
+      }
+    } catch (_) {}
+    return false;
+  }
+
+  /// Navigate to the appropriate screen based on notification type and user role.
+  /// Uses go() instead of push() to avoid GlobalKey conflicts with ShellRoute.
   void _navigateToNotification(Map<String, dynamic> data) {
     final context = AppRouter.rootNavigatorKey.currentContext;
     if (context == null) {
@@ -274,38 +288,43 @@ class PushNotificationService {
     }
 
     final type = data['notification_type']?.toString();
-    debugPrint('Deep-linking for notification type: $type, data: $data');
+    final isLeader = _isUserLeader(context);
+    final router = GoRouter.of(context);
+    debugPrint('Deep-linking for type: $type, isLeader: $isLeader');
 
     switch (type) {
       case 'chat':
         final conversationId = data['conversation_id']?.toString();
         if (conversationId != null && conversationId.isNotEmpty) {
-          GoRouter.of(context).push('/chat/$conversationId');
+          router.go(isLeader ? '/leader/chat/$conversationId' : '/chat/$conversationId');
         } else {
-          GoRouter.of(context).push('/chat');
+          router.go(isLeader ? '/leader/chat' : '/chat');
         }
         break;
       case 'walkie':
-        GoRouter.of(context).push('/walkie');
+        router.go(isLeader ? '/leader/walkie' : '/walkie');
         break;
       case 'delivery':
-        GoRouter.of(context).push('/delivery');
+        router.go(isLeader ? '/leader/reports' : '/delivery');
         break;
       case 'prayer':
-        GoRouter.of(context).push('/prayer-requests');
+        router.go(isLeader ? '/leader/prayer-requests' : '/home');
         break;
       case 'team':
-        GoRouter.of(context).push('/notifications');
+        router.go(isLeader ? '/leader/worker-verification' : '/home');
         break;
       case 'survey':
-        GoRouter.of(context).push('/survey');
+        router.go(isLeader ? '/leader/survey' : '/survey');
         break;
       case 'geofence':
       case 'session':
-        GoRouter.of(context).push('/territory');
+        router.go(isLeader ? '/leader/command-center?mode=workers' : '/territory');
+        break;
+      case 'territory':
+        router.go(isLeader ? '/leader/command-center?mode=territories' : '/territory');
         break;
       default:
-        GoRouter.of(context).push('/notifications');
+        router.go('/notifications');
         break;
     }
   }

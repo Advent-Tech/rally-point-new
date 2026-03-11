@@ -1,4 +1,6 @@
+import 'dart:io';
 import 'package:dio/dio.dart';
+import 'package:dio/io.dart';
 import 'package:flutter/foundation.dart';
 import '../constants/api_constants.dart';
 import '../storage/secure_storage.dart';
@@ -12,6 +14,14 @@ class ApiClient {
 
   ApiClient._() {
     _dio = Dio(_baseOptions);
+    // Trust self-signed certificates (EC2 uses self-signed SSL)
+    if (!kIsWeb) {
+      (_dio.httpClientAdapter as IOHttpClientAdapter).createHttpClient = () {
+        final client = HttpClient();
+        client.badCertificateCallback = (cert, host, port) => true;
+        return client;
+      };
+    }
   }
 
   /// Unnamed constructor that returns the singleton instance synchronously

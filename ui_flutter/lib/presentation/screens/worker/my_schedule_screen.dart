@@ -6,6 +6,8 @@ import '../../../core/theme/app_colors.dart';
 import '../../blocs/worker_schedule/worker_schedule_bloc.dart';
 import '../../blocs/schedule/schedule_bloc.dart';
 import '../../blocs/work_session/work_session_bloc.dart';
+import '../../widgets/animations/staggered_fade_in.dart';
+import '../../widgets/states/empty_state.dart';
 
 class MyScheduleScreen extends StatefulWidget {
   const MyScheduleScreen({super.key});
@@ -293,31 +295,11 @@ class _MyScheduleScreenState extends State<MyScheduleScreen> {
 
   Widget _buildScheduleList(BuildContext context, List<ScheduleEntry> schedules, bool isDark) {
     if (schedules.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              Icons.event_available,
-              size: 64,
-              color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
-            ),
-            const SizedBox(height: 16),
-            Text(
-              'No schedules for this day',
-              style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Check back later or contact your team leader',
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
-              ),
-            ),
-          ],
-        ),
+      return const EmptyState(
+        icon: Icons.calendar_month_outlined,
+        title: 'No schedule set',
+        description: 'No shifts scheduled for this day. Your team leader will assign your schedule.',
+        compact: true,
       );
     }
 
@@ -326,14 +308,17 @@ class _MyScheduleScreenState extends State<MyScheduleScreen> {
       itemCount: schedules.length,
       itemBuilder: (context, index) {
         final schedule = schedules[index];
-        return _ScheduleCard(
-          schedule: schedule,
-          onStart: schedule.status == 'scheduled'
-              ? () => _showStartSessionDialog(context, schedule)
-              : null,
-          onComplete: schedule.status == 'in_progress'
-              ? () => _scheduleBloc.add(WorkerScheduleCompleteSession(scheduleId: schedule.id))
-              : null,
+        return StaggeredFadeIn(
+          index: index,
+          child: _ScheduleCard(
+            schedule: schedule,
+            onStart: schedule.status == 'scheduled'
+                ? () => _showStartSessionDialog(context, schedule)
+                : null,
+            onComplete: schedule.status == 'in_progress'
+                ? () => _scheduleBloc.add(WorkerScheduleCompleteSession(scheduleId: schedule.id))
+                : null,
+          ),
         );
       },
     );

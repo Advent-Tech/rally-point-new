@@ -82,6 +82,9 @@ class _TerritoryMapWidgetState extends State<TerritoryMapWidget> {
   ];
 
   final Map<String, List<Position>> _geometryCache = {};
+  // Stores the actual displayed dot position for each territory (by id)
+  // so tap detection matches exactly where dots are drawn
+  final Map<String, Position> _displayedDotPositions = {};
 
   @override
   void didUpdateWidget(TerritoryMapWidget oldWidget) {
@@ -97,7 +100,17 @@ class _TerritoryMapWidgetState extends State<TerritoryMapWidget> {
 
     if (_isMapReady) {
       _updateAnnotations();
-      if (fitRequested ||
+
+      // Handle selected territory changes: zoom in or out
+      final oldSelected = oldWidget.selectedTerritory?.id;
+      final newSelected = widget.selectedTerritory?.id;
+      if (oldSelected != newSelected) {
+        if (widget.selectedTerritory != null) {
+          _zoomToTerritory(widget.selectedTerritory!);
+        } else {
+          _fitToAllTerritories();
+        }
+      } else if (fitRequested ||
           (wasEmpty && nowHasData) ||
           (!_hasInitiallyFitTerritories && nowHasData) ||
           (widget.fitToTerritories &&
@@ -140,48 +153,9 @@ class _TerritoryMapWidgetState extends State<TerritoryMapWidget> {
     await _polygonManager!.deleteAll();
     await _polylineManager!.deleteAll();
     await _circleManager!.deleteAll();
+    _displayedDotPositions.clear();
 
     debugPrint('TerritoryMapWidget: Updating ${widget.territories.length} territories');
-
-    // Pre-compute centroids and offset overlapping ones for dot-only mode
-    final Map<int, Position> offsetCentroids = {};
-    if (widget.dotOnly) {
-      final centroids = <int, Position>{};
-      for (int i = 0; i < widget.territories.length; i++) {
-        final coords = _parseGeometryForTerritory(widget.territories[i]);
-        if (coords.length > 2) {
-          centroids[i] = _calculateCentroid(coords);
-        }
-      }
-      // Detect overlapping centroids (within 0.01 degrees ~1km) and offset them
-      final indices = centroids.keys.toList();
-      for (int a = 0; a < indices.length; a++) {
-        final idxA = indices[a];
-        final cA = centroids[idxA]!;
-        final overlapping = <int>[idxA];
-        for (int b = a + 1; b < indices.length; b++) {
-          final idxB = indices[b];
-          final cB = centroids[idxB]!;
-          final dist = ((cA.lat.toDouble() - cB.lat.toDouble()).abs() +
-              (cA.lng.toDouble() - cB.lng.toDouble()).abs());
-          if (dist < 0.01) {
-            overlapping.add(idxB);
-          }
-        }
-        if (overlapping.length > 1) {
-          const offsetDeg = 0.8; // ~80km offset for visibility at zoomed-out level
-          for (int j = 0; j < overlapping.length; j++) {
-            final idx = overlapping[j];
-            final c = centroids[idx]!;
-            final angle = (2 * math.pi * j) / overlapping.length;
-            offsetCentroids[idx] = Position(
-              c.lng.toDouble() + offsetDeg * math.cos(angle),
-              c.lat.toDouble() + offsetDeg * math.sin(angle),
-            );
-          }
-        }
-      }
-    }
 
     // Add territory annotations
     for (int i = 0; i < widget.territories.length; i++) {
@@ -202,16 +176,36 @@ class _TerritoryMapWidgetState extends State<TerritoryMapWidget> {
 
       try {
         if (widget.dotOnly) {
-          // Dot-only mode: show only circle markers at centroids
+          // Dot-only mode: show territory dot at real centroid
           if (coords.length > 2) {
-            final centroid = offsetCentroids[i] ?? _calculateCentroid(coords);
+            final centroid = _calculateCentroid(coords);
+            _displayedDotPositions[territory.id] = centroid;
+            // Territory dots: larger with thick white border to distinguish from visit markers
             await _circleManager?.create(CircleAnnotationOptions(
               geometry: Point(coordinates: centroid),
               circleColor: baseColor.toARGB32(),
-              circleRadius: isSelected ? 16.0 : 12.0,
+              circleRadius: isSelected ? 18.0 : 14.0,
               circleStrokeColor: Colors.white.toARGB32(),
-              circleStrokeWidth: 3,
-              circleOpacity: 0.9,
+              circleStrokeWidth: 4,
+              circleOpacity: 1.0,
+            ));
+          }
+          // Draw polygon + boundary for the selected territory on the main map
+          if (isSelected && coords.length > 2) {
+            await _polygonManager!.create(PolygonAnnotationOptions(
+              geometry: Polygon(coordinates: [coords]),
+              fillColor: AppColors.primary.toARGB32(),
+              fillOpacity: 0.25,
+            ));
+            final lineCoords = List<Position>.from(coords);
+            if (lineCoords.isNotEmpty && lineCoords.first != lineCoords.last) {
+              lineCoords.add(lineCoords.first);
+            }
+            await _polylineManager!.create(PolylineAnnotationOptions(
+              geometry: LineString(coordinates: lineCoords),
+              lineColor: AppColors.primary.toARGB32(),
+              lineWidth: 4.0,
+              lineOpacity: 0.9,
             ));
           }
         } else {
@@ -250,6 +244,7 @@ class _TerritoryMapWidgetState extends State<TerritoryMapWidget> {
           // Also add a centroid marker for visibility at zoomed-out levels
           if (coords.length > 2) {
             final centroid = _calculateCentroid(coords);
+            _displayedDotPositions[territory.id] = centroid;
             await _circleManager?.create(CircleAnnotationOptions(
               geometry: Point(coordinates: centroid),
               circleColor: baseColor.toARGB32(),
@@ -349,6 +344,40 @@ class _TerritoryMapWidgetState extends State<TerritoryMapWidget> {
     }
   }
 
+  void _zoomToTerritory(GeoTerritory territory) {
+    if (_mapboxMap == null) return;
+
+    final coords = _parseGeometryForTerritory(territory);
+    if (coords.isEmpty) return;
+
+    double minLat = coords[0].lat.toDouble();
+    double maxLat = coords[0].lat.toDouble();
+    double minLng = coords[0].lng.toDouble();
+    double maxLng = coords[0].lng.toDouble();
+
+    for (final coord in coords) {
+      if (coord.lat < minLat) minLat = coord.lat.toDouble();
+      if (coord.lat > maxLat) maxLat = coord.lat.toDouble();
+      if (coord.lng < minLng) minLng = coord.lng.toDouble();
+      if (coord.lng > maxLng) maxLng = coord.lng.toDouble();
+    }
+
+    final bounds = CoordinateBounds(
+      southwest: Point(coordinates: Position(minLng, minLat)),
+      northeast: Point(coordinates: Position(maxLng, maxLat)),
+      infiniteBounds: false,
+    );
+
+    // Extra bottom padding for the bottom sheet
+    _mapboxMap!.cameraForCoordinateBounds(
+      bounds,
+      MbxEdgeInsets(top: 60, left: 60, bottom: 260, right: 60),
+      null, null, 18.0, null,
+    ).then((cameraOptions) {
+      _mapboxMap!.flyTo(cameraOptions, MapAnimationOptions(duration: 1000));
+    });
+  }
+
   CoordinateBounds? _calculateBounds() {
     if (widget.territories.isEmpty) return null;
 
@@ -437,10 +466,10 @@ class _TerritoryMapWidgetState extends State<TerritoryMapWidget> {
             // Handle tap on territories
             final point = context.point;
 
-            // First, check if tap is near any centroid marker (for zoomed-out views)
-            GeoTerritory? tappedTerritory = _findTerritoryNearPoint(point);
+            // First, check if tap is near any territory dot marker
+            GeoTerritory? tappedTerritory = await _findTerritoryNearPoint(point);
 
-            // If not near centroid, check if inside polygon boundary
+            // If not near a dot, check if inside polygon boundary
             if (tappedTerritory == null) {
               for (final territory in widget.territories) {
                 if (_isPointInTerritory(point, territory)) {
@@ -517,27 +546,36 @@ class _TerritoryMapWidgetState extends State<TerritoryMapWidget> {
     return Position(sumLng / coords.length, sumLat / coords.length);
   }
 
-  /// Find territory whose centroid is near the tapped point
-  /// Uses a threshold that scales with zoom level
-  GeoTerritory? _findTerritoryNearPoint(Point point) {
-    const double thresholdDegrees = 2.0; // ~200km at equator, good for zoomed-out view
+  /// Find territory whose displayed dot is near the tapped point.
+  /// Uses the actual displayed dot positions (stored during annotation creation)
+  /// and a zoom-aware threshold so taps are precise.
+  Future<GeoTerritory?> _findTerritoryNearPoint(Point point) async {
+    // Get current zoom to scale threshold: at zoom 4 (~continent) allow ~0.5 deg,
+    // at zoom 10 (~city) allow ~0.01 deg, at zoom 15 (~street) allow ~0.0005 deg
+    double threshold = 0.5; // fallback for zoomed-out
+    try {
+      final camera = await _mapboxMap?.getCameraState();
+      if (camera != null) {
+        // Each zoom level halves the degrees visible, so threshold halves too
+        threshold = 180.0 / math.pow(2, camera.zoom);
+      }
+    } catch (_) {}
 
     double closestDistance = double.infinity;
     GeoTerritory? closestTerritory;
 
     for (final territory in widget.territories) {
-      final coords = _parseGeometryForTerritory(territory);
-      if (coords.isEmpty) continue;
+      final dotPos = _displayedDotPositions[territory.id];
+      if (dotPos == null) continue;
 
-      final centroid = _calculateCentroid(coords);
       final distance = _calculateDistance(
         point.coordinates.lat.toDouble(),
         point.coordinates.lng.toDouble(),
-        centroid.lat.toDouble(),
-        centroid.lng.toDouble(),
+        dotPos.lat.toDouble(),
+        dotPos.lng.toDouble(),
       );
 
-      if (distance < thresholdDegrees && distance < closestDistance) {
+      if (distance < threshold && distance < closestDistance) {
         closestDistance = distance;
         closestTerritory = territory;
       }

@@ -4,6 +4,7 @@ import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
 
 enum ButtonType { primary, secondary, outline, text, danger, success }
+
 enum ButtonSize { small, medium, large }
 
 /// A customizable button component with haptic feedback and accessibility support.
@@ -98,12 +99,17 @@ class CustomButton extends StatelessWidget {
           };
 
     // Size configurations using design system constants
-    final (double height, double fontSize, double iconSize, EdgeInsetsGeometry effectivePadding) =
-        _getSizeConfig();
+    final (
+      double height,
+      double fontSize,
+      double iconSize,
+      EdgeInsetsGeometry effectivePadding,
+    ) = _getSizeConfig();
 
     // Color configurations
-    final (Color bgColor, Color fgColor, Color borderColor) =
-        _getColorConfig(isDark);
+    final (Color bgColor, Color fgColor, Color borderColor) = _getColorConfig(
+      isDark,
+    );
 
     final effectiveBgColor = backgroundColor ?? bgColor;
     final effectiveFgColor = foregroundColor ?? fgColor;
@@ -119,11 +125,12 @@ class CustomButton extends StatelessWidget {
     final effectiveBorderRadius = borderRadius ?? AppSpacing.borderRadiusMd;
 
     // Create text style from theme
-    final textStyle = Theme.of(context).textTheme.labelLarge?.copyWith(
-              fontSize: fontSize,
-              fontWeight: FontWeight.w600,
-              color: finalFgColor,
-            ) ??
+    final textStyle =
+        Theme.of(context).textTheme.labelLarge?.copyWith(
+          fontSize: fontSize,
+          fontWeight: FontWeight.w600,
+          color: finalFgColor,
+        ) ??
         TextStyle(
           fontSize: fontSize,
           fontWeight: FontWeight.w600,
@@ -150,11 +157,7 @@ class CustomButton extends StatelessWidget {
           SizedBox(width: AppSpacing.sm),
         ],
         Flexible(
-          child: Text(
-            text,
-            style: textStyle,
-            overflow: TextOverflow.ellipsis,
-          ),
+          child: Text(text, style: textStyle, overflow: TextOverflow.ellipsis),
         ),
         if (icon != null && iconTrailing && !isLoading) ...[
           SizedBox(width: AppSpacing.sm),
@@ -188,58 +191,53 @@ class CustomButton extends StatelessWidget {
   (double, double, double, EdgeInsetsGeometry) _getSizeConfig() {
     return switch (size) {
       ButtonSize.small => (
-          AppSpacing.buttonHeightSm,
-          13.0,
-          AppSpacing.iconSm + 2,
-          padding ?? EdgeInsets.symmetric(horizontal: AppSpacing.smd),
-        ),
+        AppSpacing.buttonHeightSm,
+        13.0,
+        AppSpacing.iconSm + 2,
+        padding ?? EdgeInsets.symmetric(horizontal: AppSpacing.smd),
+      ),
       ButtonSize.medium => (
-          AppSpacing.buttonHeightMd,
-          15.0,
-          AppSpacing.iconMd,
-          padding ?? EdgeInsets.symmetric(horizontal: AppSpacing.mlg),
-        ),
+        AppSpacing.buttonHeightMd,
+        15.0,
+        AppSpacing.iconMd,
+        padding ?? EdgeInsets.symmetric(horizontal: AppSpacing.mlg),
+      ),
       ButtonSize.large => (
-          AppSpacing.buttonHeightLg,
-          17.0,
-          AppSpacing.iconLg,
-          padding ?? EdgeInsets.symmetric(horizontal: AppSpacing.xl),
-        ),
+        AppSpacing.buttonHeightLg,
+        17.0,
+        AppSpacing.iconLg,
+        padding ?? EdgeInsets.symmetric(horizontal: AppSpacing.xl),
+      ),
     };
   }
 
   (Color, Color, Color) _getColorConfig(bool isDark) {
+    final buttonPrimary = isDark
+        ? AppColors.buttonPrimaryDark
+        : AppColors.buttonPrimaryLight;
     return switch (type) {
       ButtonType.primary => (
-          AppColors.primary,
-          Colors.white,
-          Colors.transparent,
-        ),
+        buttonPrimary,
+        isDark ? Colors.black : Colors.white,
+        Colors.transparent,
+      ),
       ButtonType.secondary => (
-          isDark ? AppColors.surfaceDark : AppColors.surfaceLight,
-          isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight,
-          isDark ? AppColors.borderDark : AppColors.borderLight,
-        ),
-      ButtonType.outline => (
-          Colors.transparent,
-          AppColors.primary,
-          AppColors.primary,
-        ),
+        isDark ? AppColors.surfaceDark : AppColors.surfaceLight,
+        isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight,
+        isDark ? AppColors.borderDark : AppColors.borderLight,
+      ),
+      ButtonType.outline => (Colors.transparent, buttonPrimary, buttonPrimary),
       ButtonType.text => (
-          Colors.transparent,
-          AppColors.primary,
-          Colors.transparent,
-        ),
-      ButtonType.danger => (
-          AppColors.error,
-          Colors.white,
-          Colors.transparent,
-        ),
+        Colors.transparent,
+        buttonPrimary,
+        Colors.transparent,
+      ),
+      ButtonType.danger => (AppColors.error, Colors.white, Colors.transparent),
       ButtonType.success => (
-          AppColors.success,
-          Colors.white,
-          Colors.transparent,
-        ),
+        AppColors.success,
+        Colors.white,
+        Colors.transparent,
+      ),
     };
   }
 
@@ -336,9 +334,11 @@ class CustomIconButton extends StatelessWidget {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final effectiveBackgroundColor =
-        backgroundColor ?? (isDark ? AppColors.surfaceDark : AppColors.surfaceLight);
+        backgroundColor ??
+        (isDark ? AppColors.surfaceDark : AppColors.surfaceLight);
     final effectiveIconColor =
-        iconColor ?? (isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight);
+        iconColor ??
+        (isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight);
 
     Widget button = Material(
       color: effectiveBackgroundColor,
@@ -357,11 +357,7 @@ class CustomIconButton extends StatelessWidget {
           width: size,
           height: size,
           child: Center(
-            child: Icon(
-              icon,
-              size: iconSize,
-              color: effectiveIconColor,
-            ),
+            child: Icon(icon, size: iconSize, color: effectiveIconColor),
           ),
         ),
       ),
@@ -381,10 +377,7 @@ class CustomIconButton extends StatelessWidget {
                 color: AppColors.error,
                 shape: BoxShape.circle,
               ),
-              constraints: const BoxConstraints(
-                minWidth: 18,
-                minHeight: 18,
-              ),
+              constraints: const BoxConstraints(minWidth: 18, minHeight: 18),
               child: Text(
                 badgeCount! > 99 ? '99+' : badgeCount.toString(),
                 style: const TextStyle(
@@ -402,23 +395,20 @@ class CustomIconButton extends StatelessWidget {
 
     // Ensure minimum touch target
     button = SizedBox(
-      width: size < AppSpacing.minTouchTarget ? AppSpacing.minTouchTarget : size,
-      height: size < AppSpacing.minTouchTarget ? AppSpacing.minTouchTarget : size,
+      width: size < AppSpacing.minTouchTarget
+          ? AppSpacing.minTouchTarget
+          : size,
+      height: size < AppSpacing.minTouchTarget
+          ? AppSpacing.minTouchTarget
+          : size,
       child: Center(child: button),
     );
 
     if (tooltip != null) {
-      return Tooltip(
-        message: tooltip!,
-        child: button,
-      );
+      return Tooltip(message: tooltip!, child: button);
     }
 
-    return Semantics(
-      button: true,
-      label: tooltip,
-      child: button,
-    );
+    return Semantics(button: true, label: tooltip, child: button);
   }
 }
 
@@ -480,11 +470,7 @@ class CustomFAB extends StatelessWidget {
       );
     }
 
-    return Semantics(
-      button: true,
-      label: tooltip ?? label,
-      child: fab,
-    );
+    return Semantics(button: true, label: tooltip ?? label, child: fab);
   }
 }
 
@@ -526,9 +512,7 @@ class SegmentedButtonGroup<T> extends StatelessWidget {
       },
       style: ButtonStyle(
         shape: WidgetStateProperty.all(
-          RoundedRectangleBorder(
-            borderRadius: AppSpacing.borderRadiusMd,
-          ),
+          RoundedRectangleBorder(borderRadius: AppSpacing.borderRadiusMd),
         ),
       ),
     );
