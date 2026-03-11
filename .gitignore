@@ -1,17 +1,17 @@
 # Flutter
-# ui_flutter/
-# ui_flutter/.dart_tool/
-# ui_flutter/.packages
-# ui_flutter/.pub-cache/
-# ui_flutter/.pub/
-# ui_flutter/*.iml
-# ui_flutter/.idea/
-# ui_flutter/android/.gradle/
-# ui_flutter/android/app/debug/
-# ui_flutter/android/app/profile/
-# ui_flutter/android/app/release/
-# ui_flutter/ios/Pods/
-# ui_flutter/ios/.symlinks/
+ui_flutter/
+ui_flutter/.dart_tool/
+ui_flutter/.packages
+ui_flutter/.pub-cache/
+ui_flutter/.pub/
+ui_flutter/*.iml
+ui_flutter/.idea/
+ui_flutter/android/.gradle/
+ui_flutter/android/app/debug/
+ui_flutter/android/app/profile/
+ui_flutter/android/app/release/
+ui_flutter/ios/Pods/
+ui_flutter/ios/.symlinks/
 
 # React Native / Expo
 ui/node_modules/
