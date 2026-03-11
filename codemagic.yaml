@@ -10,17 +10,17 @@ workflows:
     scripts:
       - name: Move to Flutter project
         script: |
-          cd flutter_ui
+          cd ui_flutter
 
       - name: Get Flutter packages
         script: |
-          cd flutter_ui
+          cd ui_flutter
           flutter pub get
 
       - name: Build iOS (no signing)
         script: |
-          cd flutter_ui
+          cd ui_flutter
           flutter build ios --release --no-codesign
 
     artifacts:
-      - flutter_ui/build/ios/iphoneos/*.app
+      - ui_flutter/build/ios/iphoneos/*.app
