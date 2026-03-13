@@ -57,7 +57,10 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
     height: 1.4,
   );
   static final _tooltipRadius = BorderRadius.circular(14);
-  static const _tooltipPadding = EdgeInsets.symmetric(horizontal: 18, vertical: 16);
+  static const _tooltipPadding = EdgeInsets.symmetric(
+    horizontal: 18,
+    vertical: 16,
+  );
 
   @override
   void initState() {
@@ -114,7 +117,7 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
   void _maybeShowCoachMarks() {
     if (_coachMarksChecked) return;
     _coachMarksChecked = true;
-    CoachMarksService.hasBeenShown('delivery').then((shown) {
+    CoachMarksService().hasBeenShown('delivery').then((shown) {
       if (!shown && mounted) {
         Future.delayed(const Duration(milliseconds: 800), () {
           if (mounted) {
@@ -123,7 +126,7 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
               _showcaseRecord,
               _showcaseFilters,
             ]);
-            CoachMarksService.markAsShown('delivery');
+            CoachMarksService().markAsShown('delivery');
           }
         });
       }
@@ -141,227 +144,238 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
       builder: (_) {
         _maybeShowCoachMarks();
         return Scaffold(
-      appBar: AppBar(
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () {
-            if (context.canPop()) {
-              context.pop();
-            } else {
-              context.go('/home');
-            }
-          },
-        ),
-        title: const Text('Field Activity'),
-        actions: [
-          const RoleBadge(),
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: () {
-              context.read<DeliveryBloc>().add(const DeliveryRefresh());
-            },
-          ),
-        ],
-      ),
-      body: BlocConsumer<DeliveryBloc, DeliveryState>(
-        listener: (context, state) {
-          if (state is DeliveryError) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(state.message),
-                backgroundColor: AppColors.error,
+          appBar: AppBar(
+            leading: IconButton(
+              icon: const Icon(Icons.arrow_back),
+              onPressed: () {
+                if (context.canPop()) {
+                  context.pop();
+                } else {
+                  context.go('/home');
+                }
+              },
+            ),
+            title: const Text('Field Activity'),
+            actions: [
+              const RoleBadge(),
+              IconButton(
+                icon: const Icon(Icons.refresh),
+                onPressed: () {
+                  context.read<DeliveryBloc>().add(const DeliveryRefresh());
+                },
               ),
-            );
-          } else if (state is DeliveryCreateSuccess) {
-            SuccessOverlay.show(context, message: 'Recorded successfully!').then((_) {
-              if (context.mounted) {
-                context.read<DeliveryBloc>().add(const DeliveryLoadList());
+            ],
+          ),
+          body: BlocConsumer<DeliveryBloc, DeliveryState>(
+            listener: (context, state) {
+              if (state is DeliveryError) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(state.message),
+                    backgroundColor: AppColors.error,
+                  ),
+                );
+              } else if (state is DeliveryCreateSuccess) {
+                SuccessOverlay.show(
+                  context,
+                  message: 'Recorded successfully!',
+                ).then((_) {
+                  if (context.mounted) {
+                    context.read<DeliveryBloc>().add(const DeliveryLoadList());
+                  }
+                });
               }
-            });
-          }
-        },
-        builder: (context, state) {
-          List<DeliveryModel> filteredDeliveries = [];
-          List<DeliveryModel> todayDeliveries = [];
-
-          if (state is DeliveryListLoaded) {
-            filteredDeliveries = _filterDeliveries(state.deliveries);
-            // Always calculate today's totals for the summary card
-            final now = DateTime.now();
-            final today = DateTime(now.year, now.month, now.day);
-            todayDeliveries = state.deliveries.where((d) {
-              final createdAt = d.createdAt ?? d.completedAt;
-              if (createdAt == null) return false;
-              // Convert to local time for proper date comparison (backend returns UTC)
-              final localCreatedAt = createdAt.toLocal();
-              final localDate = DateTime(
-                localCreatedAt.year,
-                localCreatedAt.month,
-                localCreatedAt.day,
-              );
-              return localDate.isAtSameMomentAs(today);
-            }).toList();
-          }
-
-          // Calculate today's totals for summary (donations only)
-          final donations = todayDeliveries.toList();
-          final totalDonationAmount = donations.fold<double>(
-            0,
-            (sum, d) => sum + (d.donationAmount ?? 0),
-          );
-
-          return RefreshIndicator(
-            onRefresh: () async {
-              context.read<DeliveryBloc>().add(const DeliveryRefresh());
             },
-            child: SingleChildScrollView(
-              physics: const AlwaysScrollableScrollPhysics(),
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Today's Summary Card
-                  Showcase(
-                    key: _showcaseSummary,
-                    title: "Today's Summary",
-                    description: 'See your daily donation totals at a glance. This updates as you record donations.',
-                    titleTextStyle: _tooltipTitleStyle,
-                    descTextStyle: _tooltipDescStyle,
-                    tooltipBorderRadius: _tooltipRadius,
-                    tooltipPadding: _tooltipPadding,
-                    targetBorderRadius: BorderRadius.circular(20),
-                    child: _TodaySummaryCard(
-                      donationsCount: donations.length,
-                      donationsAmount: totalDonationAmount,
-                      isDark: isDark,
-                    ),
-                  ),
-                  const SizedBox(height: 24),
+            builder: (context, state) {
+              List<DeliveryModel> filteredDeliveries = [];
+              List<DeliveryModel> todayDeliveries = [];
 
-                  // Action Button - Record Donation
-                  Showcase(
-                    key: _showcaseRecord,
-                    title: 'Record Donation',
-                    description: 'Tap here to record a new donation. Your GPS location is automatically captured.',
-                    titleTextStyle: _tooltipTitleStyle,
-                    descTextStyle: _tooltipDescStyle,
-                    tooltipBorderRadius: _tooltipRadius,
-                    tooltipPadding: _tooltipPadding,
-                    targetBorderRadius: BorderRadius.circular(16),
-                    child: _ActionButton(
-                      icon: Icons.volunteer_activism,
-                      label: 'Record Donation',
-                      color: AppColors.success,
-                      onTap: () => _showRecordSheet(context),
-                    ),
-                  ),
-                  const SizedBox(height: 24),
+              if (state is DeliveryListLoaded) {
+                filteredDeliveries = _filterDeliveries(state.deliveries);
+                // Always calculate today's totals for the summary card
+                final now = DateTime.now();
+                final today = DateTime(now.year, now.month, now.day);
+                todayDeliveries = state.deliveries.where((d) {
+                  final createdAt = d.createdAt ?? d.completedAt;
+                  if (createdAt == null) return false;
+                  // Convert to local time for proper date comparison (backend returns UTC)
+                  final localCreatedAt = createdAt.toLocal();
+                  final localDate = DateTime(
+                    localCreatedAt.year,
+                    localCreatedAt.month,
+                    localCreatedAt.day,
+                  );
+                  return localDate.isAtSameMomentAs(today);
+                }).toList();
+              }
 
-                  // Date Filter Chips
-                  Showcase(
-                    key: _showcaseFilters,
-                    title: 'Filter Activity',
-                    description: 'Filter your donation history by Today, This Week, This Month, or view All records.',
-                    titleTextStyle: _tooltipTitleStyle,
-                    descTextStyle: _tooltipDescStyle,
-                    tooltipBorderRadius: _tooltipRadius,
-                    tooltipPadding: _tooltipPadding,
-                    targetBorderRadius: BorderRadius.circular(20),
-                    child: SingleChildScrollView(
-                      scrollDirection: Axis.horizontal,
-                      child: Row(
-                        children: DateFilter.values.map((filter) {
-                          final isSelected = _selectedFilter == filter;
-                          return Padding(
-                            padding: const EdgeInsets.only(right: 8),
-                            child: FilterChip(
-                              label: Text(_getChipLabel(filter)),
-                              selected: isSelected,
-                              onSelected: (selected) {
-                                setState(() => _selectedFilter = filter);
-                              },
-                              selectedColor: AppColors.primary.withAlpha(40),
-                              checkmarkColor: AppColors.primary,
-                              backgroundColor: isDark
-                                  ? AppColors.surfaceDark
-                                  : AppColors.surfaceLight,
-                              labelStyle: TextStyle(
-                                color: isSelected
-                                    ? AppColors.primary
-                                    : (isDark
-                                          ? AppColors.textPrimaryDark
-                                          : AppColors.textPrimaryLight),
-                                fontWeight: isSelected
-                                    ? FontWeight.bold
-                                    : FontWeight.normal,
-                              ),
-                            ),
-                          );
-                        }).toList(),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
+              // Calculate today's totals for summary (donations only)
+              final donations = todayDeliveries.toList();
+              final totalDonationAmount = donations.fold<double>(
+                0,
+                (sum, d) => sum + (d.donationAmount ?? 0),
+              );
 
-                  // Activity List Header
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              return RefreshIndicator(
+                onRefresh: () async {
+                  context.read<DeliveryBloc>().add(const DeliveryRefresh());
+                },
+                child: SingleChildScrollView(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        _getFilterLabel(),
-                        style: Theme.of(context).textTheme.titleMedium
-                            ?.copyWith(fontWeight: FontWeight.bold),
-                      ),
-                      Text(
-                        '${filteredDeliveries.length} records',
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: isDark
-                              ? AppColors.textSecondaryDark
-                              : AppColors.textSecondaryLight,
+                      // Today's Summary Card
+                      Showcase(
+                        key: _showcaseSummary,
+                        title: "Today's Summary",
+                        description:
+                            'See your daily donation totals at a glance. This updates as you record donations.',
+                        titleTextStyle: _tooltipTitleStyle,
+                        descTextStyle: _tooltipDescStyle,
+                        tooltipBorderRadius: _tooltipRadius,
+                        tooltipPadding: _tooltipPadding,
+                        targetBorderRadius: BorderRadius.circular(20),
+                        child: _TodaySummaryCard(
+                          donationsCount: donations.length,
+                          donationsAmount: totalDonationAmount,
+                          isDark: isDark,
                         ),
                       ),
+                      const SizedBox(height: 24),
+
+                      // Action Button - Record Donation
+                      Showcase(
+                        key: _showcaseRecord,
+                        title: 'Record Donation',
+                        description:
+                            'Tap here to record a new donation. Your GPS location is automatically captured.',
+                        titleTextStyle: _tooltipTitleStyle,
+                        descTextStyle: _tooltipDescStyle,
+                        tooltipBorderRadius: _tooltipRadius,
+                        tooltipPadding: _tooltipPadding,
+                        targetBorderRadius: BorderRadius.circular(16),
+                        child: _ActionButton(
+                          icon: Icons.volunteer_activism,
+                          label: 'Record Donation',
+                          color: AppColors.success,
+                          onTap: () => _showRecordSheet(context),
+                        ),
+                      ),
+                      const SizedBox(height: 24),
+
+                      // Date Filter Chips
+                      Showcase(
+                        key: _showcaseFilters,
+                        title: 'Filter Activity',
+                        description:
+                            'Filter your donation history by Today, This Week, This Month, or view All records.',
+                        titleTextStyle: _tooltipTitleStyle,
+                        descTextStyle: _tooltipDescStyle,
+                        tooltipBorderRadius: _tooltipRadius,
+                        tooltipPadding: _tooltipPadding,
+                        targetBorderRadius: BorderRadius.circular(20),
+                        child: SingleChildScrollView(
+                          scrollDirection: Axis.horizontal,
+                          child: Row(
+                            children: DateFilter.values.map((filter) {
+                              final isSelected = _selectedFilter == filter;
+                              return Padding(
+                                padding: const EdgeInsets.only(right: 8),
+                                child: FilterChip(
+                                  label: Text(_getChipLabel(filter)),
+                                  selected: isSelected,
+                                  onSelected: (selected) {
+                                    setState(() => _selectedFilter = filter);
+                                  },
+                                  selectedColor: AppColors.primary.withAlpha(
+                                    40,
+                                  ),
+                                  checkmarkColor: AppColors.primary,
+                                  backgroundColor: isDark
+                                      ? AppColors.surfaceDark
+                                      : AppColors.surfaceLight,
+                                  labelStyle: TextStyle(
+                                    color: isSelected
+                                        ? AppColors.primary
+                                        : (isDark
+                                              ? AppColors.textPrimaryDark
+                                              : AppColors.textPrimaryLight),
+                                    fontWeight: isSelected
+                                        ? FontWeight.bold
+                                        : FontWeight.normal,
+                                  ),
+                                ),
+                              );
+                            }).toList(),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+
+                      // Activity List Header
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            _getFilterLabel(),
+                            style: Theme.of(context).textTheme.titleMedium
+                                ?.copyWith(fontWeight: FontWeight.bold),
+                          ),
+                          Text(
+                            '${filteredDeliveries.length} records',
+                            style: Theme.of(context).textTheme.bodySmall
+                                ?.copyWith(
+                                  color: isDark
+                                      ? AppColors.textSecondaryDark
+                                      : AppColors.textSecondaryLight,
+                                ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+
+                      if (state is DeliveryLoading)
+                        const Center(
+                          child: Padding(
+                            padding: EdgeInsets.all(32),
+                            child: CircularProgressIndicator(),
+                          ),
+                        )
+                      else if (filteredDeliveries.isEmpty)
+                        const EmptyState(
+                          icon: Icons.volunteer_activism_outlined,
+                          title: 'No donations yet',
+                          description:
+                              'Tap the button above to record your first donation.',
+                          compact: true,
+                        )
+                      else
+                        ListView.builder(
+                          shrinkWrap: true,
+                          physics: const NeverScrollableScrollPhysics(),
+                          itemCount: filteredDeliveries.length,
+                          itemBuilder: (context, index) {
+                            final delivery = filteredDeliveries[index];
+                            return StaggeredFadeIn(
+                              index: index,
+                              child: _ActivityCard(
+                                delivery: delivery,
+                                isDark: isDark,
+                                onTap: () =>
+                                    _showDetailSheet(context, delivery),
+                              ),
+                            );
+                          },
+                        ),
                     ],
                   ),
-                  const SizedBox(height: 12),
-
-                  if (state is DeliveryLoading)
-                    const Center(
-                      child: Padding(
-                        padding: EdgeInsets.all(32),
-                        child: CircularProgressIndicator(),
-                      ),
-                    )
-                  else if (filteredDeliveries.isEmpty)
-                    const EmptyState(
-                      icon: Icons.volunteer_activism_outlined,
-                      title: 'No donations yet',
-                      description: 'Tap the button above to record your first donation.',
-                      compact: true,
-                    )
-                  else
-                    ListView.builder(
-                      shrinkWrap: true,
-                      physics: const NeverScrollableScrollPhysics(),
-                      itemCount: filteredDeliveries.length,
-                      itemBuilder: (context, index) {
-                        final delivery = filteredDeliveries[index];
-                        return StaggeredFadeIn(
-                          index: index,
-                          child: _ActivityCard(
-                            delivery: delivery,
-                            isDark: isDark,
-                            onTap: () => _showDetailSheet(context, delivery),
-                          ),
-                        );
-                      },
-                    ),
-                ],
-              ),
-            ),
-          );
-        },
-      ),
-    );
+                ),
+              );
+            },
+          ),
+        );
       },
     );
   }
@@ -502,7 +516,8 @@ class _DeliveryDetailSheet extends StatelessWidget {
             if (delivery.latitude != null && delivery.longitude != null)
               _DetailRow(
                 label: 'Location',
-                value: '${delivery.latitude!.toStringAsFixed(5)}, ${delivery.longitude!.toStringAsFixed(5)}',
+                value:
+                    '${delivery.latitude!.toStringAsFixed(5)}, ${delivery.longitude!.toStringAsFixed(5)}',
               ),
             const SizedBox(height: 16),
             // View Receipt Button
@@ -643,7 +658,6 @@ class _ActionButton extends StatelessWidget {
     );
   }
 }
-
 
 class _ActivityCard extends StatelessWidget {
   final DeliveryModel delivery;
@@ -1230,15 +1244,17 @@ class _RecordDonationSheetState extends State<_RecordDonationSheet> {
                         children: [
                           Text(
                             'Record Donation',
-                            style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                              fontWeight: FontWeight.bold,
-                            ),
+                            style: Theme.of(context).textTheme.titleLarge
+                                ?.copyWith(fontWeight: FontWeight.bold),
                           ),
                           Text(
                             'Step ${_currentStep + 1} of 3 — ${_stepLabels[_currentStep]}',
-                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                              color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
-                            ),
+                            style: Theme.of(context).textTheme.bodySmall
+                                ?.copyWith(
+                                  color: isDark
+                                      ? AppColors.textSecondaryDark
+                                      : AppColors.textSecondaryLight,
+                                ),
                           ),
                         ],
                       ),
@@ -1262,30 +1278,42 @@ class _RecordDonationSheetState extends State<_RecordDonationSheet> {
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               decoration: BoxDecoration(
-                color: (_latitude != null ? AppColors.success : AppColors.warning).withAlpha(20),
+                color:
+                    (_latitude != null ? AppColors.success : AppColors.warning)
+                        .withAlpha(20),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   if (_isGettingLocation)
-                    const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2))
+                    const SizedBox(
+                      width: 14,
+                      height: 14,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
                   else
                     Icon(
-                      _latitude != null ? Icons.location_on : Icons.location_off,
+                      _latitude != null
+                          ? Icons.location_on
+                          : Icons.location_off,
                       size: 16,
-                      color: _latitude != null ? AppColors.success : AppColors.warning,
+                      color: _latitude != null
+                          ? AppColors.success
+                          : AppColors.warning,
                     ),
                   const SizedBox(width: 8),
                   Text(
                     _isGettingLocation
                         ? 'Getting location...'
                         : _latitude != null
-                            ? 'Location captured${_territoryName != null ? ' ($_territoryName)' : ''}'
-                            : 'Location not available',
+                        ? 'Location captured${_territoryName != null ? ' ($_territoryName)' : ''}'
+                        : 'Location not available',
                     style: TextStyle(
                       fontSize: 12,
-                      color: _latitude != null ? AppColors.success : AppColors.warning,
+                      color: _latitude != null
+                          ? AppColors.success
+                          : AppColors.warning,
                     ),
                   ),
                 ],
@@ -1309,7 +1337,12 @@ class _RecordDonationSheetState extends State<_RecordDonationSheet> {
 
           // Navigation buttons
           Padding(
-            padding: EdgeInsets.fromLTRB(24, 8, 24, MediaQuery.of(context).padding.bottom + 16),
+            padding: EdgeInsets.fromLTRB(
+              24,
+              8,
+              24,
+              MediaQuery.of(context).padding.bottom + 16,
+            ),
             child: Row(
               children: [
                 if (_currentStep > 0)
@@ -1333,15 +1366,24 @@ class _RecordDonationSheetState extends State<_RecordDonationSheet> {
                           ),
                         )
                       : FilledButton.icon(
-                          onPressed: _isSubmitting || _isProcessingPayment ? null : _submit,
+                          onPressed: _isSubmitting || _isProcessingPayment
+                              ? null
+                              : _submit,
                           icon: _isSubmitting || _isProcessingPayment
                               ? const SizedBox(
                                   width: 18,
                                   height: 18,
-                                  child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: Colors.white,
+                                  ),
                                 )
                               : const Icon(Icons.check, size: 18),
-                          label: Text(_isSubmitting || _isProcessingPayment ? 'Processing...' : 'Confirm & Submit'),
+                          label: Text(
+                            _isSubmitting || _isProcessingPayment
+                                ? 'Processing...'
+                                : 'Confirm & Submit',
+                          ),
                           style: FilledButton.styleFrom(
                             backgroundColor: AppColors.success,
                           ),
@@ -1369,8 +1411,9 @@ class _RecordDonationSheetState extends State<_RecordDonationSheet> {
               label: 'Donor Name',
               prefixIcon: Icons.person_outline,
               realtimeValidation: true,
-              validator: (value) =>
-                  (value == null || value.trim().isEmpty) ? 'Name is required' : null,
+              validator: (value) => (value == null || value.trim().isEmpty)
+                  ? 'Name is required'
+                  : null,
             ),
             const SizedBox(height: 16),
             CustomTextField(
@@ -1404,7 +1447,9 @@ class _RecordDonationSheetState extends State<_RecordDonationSheet> {
               controller: _amountController,
               label: 'Donation Amount (\$)',
               prefixIcon: Icons.attach_money,
-              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              keyboardType: const TextInputType.numberWithOptions(
+                decimal: true,
+              ),
               realtimeValidation: true,
               validator: (value) {
                 if (value == null || value.trim().isEmpty) {
@@ -1420,7 +1465,9 @@ class _RecordDonationSheetState extends State<_RecordDonationSheet> {
             const SizedBox(height: 16),
             Text(
               'Payment Method',
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w500),
+              style: Theme.of(
+                context,
+              ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w500),
             ),
             const SizedBox(height: 8),
             Row(
@@ -1458,7 +1505,9 @@ class _RecordDonationSheetState extends State<_RecordDonationSheet> {
                         'A payment link will be sent to the phone number. The donor will complete payment on their own device.',
                         style: TextStyle(
                           fontSize: 13,
-                          color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                          color: isDark
+                              ? AppColors.textSecondaryDark
+                              : AppColors.textSecondaryLight,
                         ),
                       ),
                     ),
@@ -1482,7 +1531,9 @@ class _RecordDonationSheetState extends State<_RecordDonationSheet> {
   // Step 3: Review & Confirm
   Widget _buildStep3(bool isDark) {
     final amount = double.tryParse(_amountController.text) ?? 0;
-    final secondaryColor = isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight;
+    final secondaryColor = isDark
+        ? AppColors.textSecondaryDark
+        : AppColors.textSecondaryLight;
 
     return SingleChildScrollView(
       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
@@ -1500,12 +1551,18 @@ class _RecordDonationSheetState extends State<_RecordDonationSheet> {
           children: [
             Text(
               'Review Donation',
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.bold,
-              ),
+              style: Theme.of(
+                context,
+              ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 16),
-            _ReviewRow(label: 'Donor', value: _nameController.text.trim().isNotEmpty ? _nameController.text.trim() : '—', color: secondaryColor),
+            _ReviewRow(
+              label: 'Donor',
+              value: _nameController.text.trim().isNotEmpty
+                  ? _nameController.text.trim()
+                  : '—',
+              color: secondaryColor,
+            ),
             const Divider(height: 24),
             _ReviewRow(
               label: 'Amount',
@@ -1518,22 +1575,42 @@ class _RecordDonationSheetState extends State<_RecordDonationSheet> {
               color: secondaryColor,
             ),
             const Divider(height: 24),
-            _ReviewRow(label: 'Payment', value: _paymentMethod == 'cash' ? 'Cash' : 'Payment Link', color: secondaryColor),
+            _ReviewRow(
+              label: 'Payment',
+              value: _paymentMethod == 'cash' ? 'Cash' : 'Payment Link',
+              color: secondaryColor,
+            ),
             if (_addressController.text.trim().isNotEmpty) ...[
               const Divider(height: 24),
-              _ReviewRow(label: 'Address', value: _addressController.text.trim(), color: secondaryColor),
+              _ReviewRow(
+                label: 'Address',
+                value: _addressController.text.trim(),
+                color: secondaryColor,
+              ),
             ],
             if (_phoneController.text.trim().isNotEmpty) ...[
               const Divider(height: 24),
-              _ReviewRow(label: 'Phone', value: _phoneController.text.trim(), color: secondaryColor),
+              _ReviewRow(
+                label: 'Phone',
+                value: _phoneController.text.trim(),
+                color: secondaryColor,
+              ),
             ],
             if (_notesController.text.trim().isNotEmpty) ...[
               const Divider(height: 24),
-              _ReviewRow(label: 'Notes', value: _notesController.text.trim(), color: secondaryColor),
+              _ReviewRow(
+                label: 'Notes',
+                value: _notesController.text.trim(),
+                color: secondaryColor,
+              ),
             ],
             if (_territoryName != null) ...[
               const Divider(height: 24),
-              _ReviewRow(label: 'Territory', value: _territoryName!, color: secondaryColor),
+              _ReviewRow(
+                label: 'Territory',
+                value: _territoryName!,
+                color: secondaryColor,
+              ),
             ],
           ],
         ),
@@ -2033,10 +2110,7 @@ class _ReceiptDialog extends StatelessWidget {
                 'MMM d, yyyy h:mm a',
               ).format(delivery.createdAt ?? DateTime.now()),
             ),
-            _ReceiptRow(
-              label: 'Donor',
-              value: delivery.recipientName,
-            ),
+            _ReceiptRow(label: 'Donor', value: delivery.recipientName),
             _ReceiptRow(
               label: 'Payment Method',
               value: (delivery.paymentMethod ?? 'cash').toUpperCase(),
@@ -2135,4 +2209,3 @@ class _ReceiptRow extends StatelessWidget {
     );
   }
 }
-

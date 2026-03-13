@@ -98,7 +98,7 @@ class OverviewStatCard extends StatelessWidget {
             textBaseline: TextBaseline.alphabetic,
             children: [
               CountingText(
-                value: value,
+                endValue: int.tryParse(value) ?? 0,
                 style: Theme.of(context).textTheme.headlineMedium?.copyWith(
                   fontWeight: FontWeight.bold,
                 ),

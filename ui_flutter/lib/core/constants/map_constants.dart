@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart';
 
+/// Map mode enum for command center tabs
+enum MapMode { overview, workers, territories }
+
 /// Lightweight model for a selectable map style.
 class MapStyle {
   final String label;
@@ -20,13 +23,18 @@ class MapConstants {
 
   /// Mapbox style URIs for native SDK
   static const String mapboxStyleStreets = 'mapbox://styles/mapbox/streets-v12';
-  static const String mapboxStyleOutdoors = 'mapbox://styles/mapbox/outdoors-v12';
+  static const String mapboxStyleOutdoors =
+      'mapbox://styles/mapbox/outdoors-v12';
   static const String mapboxStyleLight = 'mapbox://styles/mapbox/light-v11';
   static const String mapboxStyleDark = 'mapbox://styles/mapbox/dark-v11';
-  static const String mapboxStyleSatellite = 'mapbox://styles/mapbox/satellite-v9';
-  static const String mapboxStyleSatelliteStreets = 'mapbox://styles/mapbox/satellite-streets-v12';
-  static const String mapboxStyleNavigationDay = 'mapbox://styles/mapbox/navigation-day-v1';
-  static const String mapboxStyleNavigationNight = 'mapbox://styles/mapbox/navigation-night-v1';
+  static const String mapboxStyleSatellite =
+      'mapbox://styles/mapbox/satellite-v9';
+  static const String mapboxStyleSatelliteStreets =
+      'mapbox://styles/mapbox/satellite-streets-v12';
+  static const String mapboxStyleNavigationDay =
+      'mapbox://styles/mapbox/navigation-day-v1';
+  static const String mapboxStyleNavigationNight =
+      'mapbox://styles/mapbox/navigation-night-v1';
 
   /// Get style URI based on theme
   static String getThemedStyleUri(bool isDark) {
@@ -54,8 +62,7 @@ class MapConstants {
   ];
 
   /// Attribution (required by Mapbox ToS - handled automatically by SDK)
-  static const String mapboxAttribution =
-      '© Mapbox © OpenStreetMap';
+  static const String mapboxAttribution = '© Mapbox © OpenStreetMap';
 }
 
 /// A floating pill widget that lets the user switch between map styles.

@@ -17,7 +17,8 @@ class ProfileScreen extends StatelessWidget {
 
     // Check if user is team leader to show back button
     final authState = context.read<AuthBloc>().state;
-    final isTeamLeader = authState is AuthAuthenticated && authState.user.isTeamLeader;
+    final isTeamLeader =
+        authState is AuthAuthenticated && authState.user.isTeamLeader;
 
     return Scaffold(
       appBar: AppBar(
@@ -89,7 +90,9 @@ class ProfileScreen extends StatelessWidget {
                 Text(
                   'Rally Point v1.0.0',
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                    color: isDark
+                        ? AppColors.textSecondaryDark
+                        : AppColors.textSecondaryLight,
                   ),
                 ),
                 const SizedBox(height: 32),
@@ -117,9 +120,7 @@ class ProfileScreen extends StatelessWidget {
               Navigator.pop(context);
               context.read<AuthBloc>().add(const AuthLogout());
             },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.error,
-            ),
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.error),
             child: const Text('Sign Out'),
           ),
         ],
@@ -188,9 +189,9 @@ class _ProfileHeader extends StatelessWidget {
               children: [
                 Text(
                   name,
-                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
+                  style: Theme.of(
+                    context,
+                  ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
@@ -198,14 +199,19 @@ class _ProfileHeader extends StatelessWidget {
                 Text(
                   email,
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                    color: isDark
+                        ? AppColors.textSecondaryDark
+                        : AppColors.textSecondaryLight,
                   ),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
                 const SizedBox(height: 8),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 4,
+                  ),
                   decoration: BoxDecoration(
                     color: AppColors.primary.withAlpha(30),
                     borderRadius: BorderRadius.circular(12),
@@ -281,10 +287,14 @@ class _StatsSectionState extends State<_StatsSection> {
         return Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: widget.isDark ? AppColors.surfaceDark : AppColors.surfaceLight,
+            color: widget.isDark
+                ? AppColors.surfaceDark
+                : AppColors.surfaceLight,
             borderRadius: BorderRadius.circular(16),
             border: Border.all(
-              color: widget.isDark ? AppColors.borderDark : AppColors.borderLight,
+              color: widget.isDark
+                  ? AppColors.borderDark
+                  : AppColors.borderLight,
             ),
           ),
           child: Column(
@@ -406,7 +416,9 @@ class _StatCard extends StatelessWidget {
                   Text(
                     label,
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                      color: isDark
+                          ? AppColors.textSecondaryDark
+                          : AppColors.textSecondaryLight,
                       fontSize: 11,
                     ),
                     overflow: TextOverflow.ellipsis,
@@ -449,7 +461,9 @@ class _SettingsSection extends StatelessWidget {
                   value: state.themeMode == ThemeMode.dark,
                   onChanged: (value) {
                     context.read<ThemeBloc>().add(
-                      ThemeChanged(themeMode: value ? ThemeMode.dark : ThemeMode.light),
+                      ThemeChanged(
+                        themeMode: value ? ThemeMode.dark : ThemeMode.light,
+                      ),
                     );
                   },
                   activeColor: AppColors.primary,
@@ -538,14 +552,18 @@ class _SettingsTile extends StatelessWidget {
       ),
       title: Text(
         title,
-        style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-          fontWeight: FontWeight.w500,
-        ),
+        style: Theme.of(
+          context,
+        ).textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w500),
       ),
-      trailing: trailing ?? Icon(
-        Icons.chevron_right,
-        color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
-      ),
+      trailing:
+          trailing ??
+          Icon(
+            Icons.chevron_right,
+            color: isDark
+                ? AppColors.textSecondaryDark
+                : AppColors.textSecondaryLight,
+          ),
       onTap: onTap,
     );
   }
@@ -557,7 +575,20 @@ class _HelpModeTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final helpNotifier = HelpModeProvider.of(context);
+    final helpNotifier = HelpModeProvider.notifierOf(context);
+
+    if (helpNotifier == null) {
+      return _SettingsTile(
+        icon: Icons.help_outline,
+        title: 'Help Mode',
+        isDark: isDark,
+        trailing: Switch(
+          value: false,
+          onChanged: (value) {},
+          activeColor: AppColors.primary,
+        ),
+      );
+    }
 
     return ValueListenableBuilder<bool>(
       valueListenable: helpNotifier,
@@ -570,7 +601,6 @@ class _HelpModeTile extends StatelessWidget {
             value: isEnabled,
             onChanged: (value) {
               helpNotifier.value = value;
-              saveHelpMode(value);
             },
             activeColor: AppColors.primary,
           ),

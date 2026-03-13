@@ -206,10 +206,10 @@ class WebSocketService {
   /// Get the WebSocket URL for location service (via API gateway proxy)
   String get _wsUrl {
     if (kReleaseMode) {
-      return 'wss://api.rallypoint.app${ApiConstants.wsLocation}';
+      return 'wss://backend.lightsquads.com${ApiConstants.wsLocation}';
     }
     // Development - use API gateway proxy at port 8080
-    return 'ws://18.188.1.122:8080${ApiConstants.wsLocation}';
+    return 'wss://backend.lightsquads.com${ApiConstants.wsLocation}';
   }
 
   /// Message stream for reactive updates

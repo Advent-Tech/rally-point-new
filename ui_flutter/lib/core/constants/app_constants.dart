@@ -12,6 +12,7 @@ class AppConstants {
   static const String userDataKey = 'user_data';
   static const String themeKey = 'theme_mode';
   static const String onboardingKey = 'onboarding_completed';
+  static const String helpModeKey = 'help_mode_enabled';
   static const String lastSyncKey = 'last_sync';
 
   // Pagination

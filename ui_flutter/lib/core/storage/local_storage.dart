@@ -35,6 +35,15 @@ class LocalStorage {
     return _prefs.getBool(AppConstants.onboardingKey) ?? false;
   }
 
+  // Help Mode
+  Future<void> saveHelpMode(bool enabled) async {
+    await _prefs.setBool(AppConstants.helpModeKey, enabled);
+  }
+
+  bool isHelpModeEnabled() {
+    return _prefs.getBool(AppConstants.helpModeKey) ?? false;
+  }
+
   // User Data (cached)
   Future<void> saveUserData(Map<String, dynamic> userData) async {
     await _prefs.setString(AppConstants.userDataKey, jsonEncode(userData));

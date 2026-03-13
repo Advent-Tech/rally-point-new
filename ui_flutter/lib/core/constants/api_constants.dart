@@ -3,8 +3,8 @@ class ApiConstants {
   ApiConstants._();
 
   // Base URLs
-  // EC2 Production Server
-  static const String prodBaseUrl = 'https://18.188.1.122';
+  // Production Server - New domain
+  static const String prodBaseUrl = 'https://backend.lightsquads.com';
   static const String devBaseUrl = 'http://10.0.2.2:8080'; // Android emulator
   static const String devBaseUrlIOS = 'http://localhost:8080'; // iOS simulator
 

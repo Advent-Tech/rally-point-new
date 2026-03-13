@@ -1,10 +1,10 @@
 import 'dart:async';
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:equatable/equatable.dart';
 import '../../../data/models/user_model.dart';
 import '../../../core/network/api_client.dart';
-import '../../../core/network/api_result.dart';
 import '../../../core/storage/secure_storage.dart';
 import '../../../core/storage/local_storage.dart';
 import '../../../core/constants/api_constants.dart';
@@ -117,7 +117,10 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     }
   }
 
-  Future<void> _onCheckStatus(AuthCheckStatus event, Emitter<AuthState> emit) async {
+  Future<void> _onCheckStatus(
+    AuthCheckStatus event,
+    Emitter<AuthState> emit,
+  ) async {
     emit(AuthLoading());
 
     try {
@@ -145,6 +148,9 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
       if (response.statusCode == 200) {
         final user = UserModel.fromJson(response.data);
         await _local.saveUserData(response.data);
+        if (user.teamId != null && user.teamId!.isNotEmpty) {
+          await _secure.write('team_id', user.teamId!);
+        }
         _startRefreshTimer();
         emit(AuthAuthenticated(user: user));
       } else {
@@ -156,6 +162,9 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
       final cachedUser = _local.getUserData();
       if (cachedUser != null) {
         final user = UserModel.fromJson(cachedUser);
+        if (user.teamId != null && user.teamId!.isNotEmpty) {
+          await _secure.write('team_id', user.teamId!);
+        }
         emit(AuthAuthenticated(user: user, isOffline: true));
       } else {
         emit(AuthUnauthenticated());
@@ -171,10 +180,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
 
       final response = await _api.post(
         ApiConstants.login,
-        data: {
-          'email': event.email,
-          'password': event.password,
-        },
+        data: {'email': event.email, 'password': event.password},
       );
 
       if (response.statusCode == 200) {
@@ -201,10 +207,15 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
         }
 
         await _local.saveUserData(user.toJson());
+        if (user.teamId != null && user.teamId!.isNotEmpty) {
+          await _secure.write('team_id', user.teamId!);
+        }
         _startRefreshTimer();
         emit(AuthAuthenticated(user: user));
       } else {
-        emit(AuthError(message: 'Login failed. Please check your credentials.'));
+        emit(
+          AuthError(message: 'Login failed. Please check your credentials.'),
+        );
       }
     } catch (e) {
       // Check if this is a specific error type
@@ -215,10 +226,12 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
       if (errorLower.contains('verify your email') ||
           errorLower.contains('email verification') ||
           errorLower.contains('verification link')) {
-        emit(AuthEmailVerificationRequired(
-          message: errorMessage,
-          email: event.email,
-        ));
+        emit(
+          AuthEmailVerificationRequired(
+            message: errorMessage,
+            email: event.email,
+          ),
+        );
       }
       // Check for pending approval (after email verification)
       else if (errorLower.contains('pending verification') ||
@@ -227,30 +240,37 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
           errorLower.contains('wait for approval') ||
           errorLower.contains('await approval')) {
         // Determine role from error message
-        final isTeamLeader = errorLower.contains('admin approval') ||
-                             errorLower.contains('administrator');
-        emit(AuthPendingVerification(
-          message: errorMessage,
-          role: isTeamLeader ? 'team_leader' : 'worker',
-          email: event.email,
-        ));
+        final isTeamLeader =
+            errorLower.contains('admin approval') ||
+            errorLower.contains('administrator');
+        emit(
+          AuthPendingVerification(
+            message: errorMessage,
+            role: isTeamLeader ? 'team_leader' : 'worker',
+            email: event.email,
+          ),
+        );
       }
       // Check for account rejected
       else if (errorLower.contains('rejected') ||
-               errorLower.contains('account has been rejected')) {
+          errorLower.contains('account has been rejected')) {
         // Try to extract rejection reason
         String? reason;
-        final reasonMatch = RegExp(r'reason[:\s]+(.+)', caseSensitive: false).firstMatch(errorMessage);
+        final reasonMatch = RegExp(
+          r'reason[:\s]+(.+)',
+          caseSensitive: false,
+        ).firstMatch(errorMessage);
         if (reasonMatch != null) {
           reason = reasonMatch.group(1)?.trim();
         }
-        emit(AuthAccountRejected(
-          message: errorMessage,
-          reason: reason,
-          email: event.email,
-        ));
-      }
-      else {
+        emit(
+          AuthAccountRejected(
+            message: errorMessage,
+            reason: reason,
+            email: event.email,
+          ),
+        );
+      } else {
         emit(AuthError(message: errorMessage));
       }
     }
@@ -283,44 +303,56 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
         // Check if this is a pending verification response (no tokens)
         final accessToken = data['access_token']?.toString() ?? '';
         // verification_status can be at top level or inside user object
-        final verificationStatus = data['verification_status'] ??
+        final verificationStatus =
+            data['verification_status'] ??
             (data['user'] as Map<String, dynamic>?)?['verification_status'];
         // Check if email verification is required
         // Handle both boolean and potential string values from API
-        final rawEmailVerified = data['email_verified'] ??
+        final rawEmailVerified =
+            data['email_verified'] ??
             (data['user'] as Map<String, dynamic>?)?['email_verified'];
-        final emailVerified = rawEmailVerified == true || rawEmailVerified == 'true';
+        final emailVerified =
+            rawEmailVerified == true || rawEmailVerified == 'true';
 
         if (accessToken.isEmpty || verificationStatus == 'pending') {
           // Check if email verification is needed first (email NOT verified yet)
           if (!emailVerified) {
             // User registered but needs to verify email first
-            print('📧 Emitting AuthRegistrationSuccess for ${event.email}');
-            emit(AuthRegistrationSuccess(
-              message: data['message'] ??
-                  'Registration successful! Please check your email to verify your account.',
-              email: event.email,
-              role: event.role,
-            ));
-            print('📧 AuthRegistrationSuccess emitted');
+            debugPrint(
+              '📧 Emitting AuthRegistrationSuccess for ${event.email}',
+            );
+            emit(
+              AuthRegistrationSuccess(
+                message:
+                    data['message'] ??
+                    'Registration successful! Please check your email to verify your account.',
+                email: event.email,
+                role: event.role,
+              ),
+            );
+            debugPrint('📧 AuthRegistrationSuccess emitted');
             return;
           }
 
           // Email is verified but still pending approval
           String message;
           if (event.role == 'team_leader') {
-            message = 'Your account has been created and is pending verification by an admin. '
+            message =
+                'Your account has been created and is pending verification by an admin. '
                 'You will be able to login once your account is approved.';
           } else {
-            message = 'Your account has been created. '
+            message =
+                'Your account has been created. '
                 'You will be able to login once a team leader approves your join request.';
           }
 
-          emit(AuthPendingVerification(
-            message: data['message'] ?? message,
-            role: event.role,
-            email: event.email,
-          ));
+          emit(
+            AuthPendingVerification(
+              message: data['message'] ?? message,
+              role: event.role,
+              email: event.email,
+            ),
+          );
           return;
         }
 
@@ -348,6 +380,9 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
         }
 
         await _local.saveUserData(user.toJson());
+        if (user.teamId != null && user.teamId!.isNotEmpty) {
+          await _secure.write('team_id', user.teamId!);
+        }
         _startRefreshTimer();
         emit(AuthAuthenticated(user: user));
       } else {
@@ -385,7 +420,10 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     }
   }
 
-  Future<void> _onUpdateUser(AuthUpdateUser event, Emitter<AuthState> emit) async {
+  Future<void> _onUpdateUser(
+    AuthUpdateUser event,
+    Emitter<AuthState> emit,
+  ) async {
     final currentState = state;
     if (currentState is AuthAuthenticated) {
       await _local.saveUserData(event.user.toJson());
@@ -393,7 +431,10 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     }
   }
 
-  Future<void> _onRefreshToken(AuthRefreshToken event, Emitter<AuthState> emit) async {
+  Future<void> _onRefreshToken(
+    AuthRefreshToken event,
+    Emitter<AuthState> emit,
+  ) async {
     final currentState = state;
     if (currentState is! AuthAuthenticated) return;
 
@@ -403,14 +444,20 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     }
   }
 
-  Future<void> _onTokenExpired(AuthTokenExpired event, Emitter<AuthState> emit) async {
+  Future<void> _onTokenExpired(
+    AuthTokenExpired event,
+    Emitter<AuthState> emit,
+  ) async {
     _stopRefreshTimer();
     await _secure.clearTokens();
     await _local.clearUserData();
     emit(AuthUnauthenticated());
   }
 
-  Future<void> _onForgotPassword(AuthForgotPassword event, Emitter<AuthState> emit) async {
+  Future<void> _onForgotPassword(
+    AuthForgotPassword event,
+    Emitter<AuthState> emit,
+  ) async {
     emit(AuthLoading());
 
     try {
@@ -423,27 +470,40 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
 
       if (response.statusCode == 200) {
         final data = response.data as Map<String, dynamic>;
-        emit(AuthForgotPasswordSuccess(
-          message: data['message'] ?? 'If an account exists with this email, a password reset link has been sent.',
-          email: event.email,
-        ));
+        emit(
+          AuthForgotPasswordSuccess(
+            message:
+                data['message'] ??
+                'If an account exists with this email, a password reset link has been sent.',
+            email: event.email,
+          ),
+        );
       } else {
         // Still show success to prevent email enumeration
-        emit(AuthForgotPasswordSuccess(
-          message: 'If an account exists with this email, a password reset link has been sent.',
-          email: event.email,
-        ));
+        emit(
+          AuthForgotPasswordSuccess(
+            message:
+                'If an account exists with this email, a password reset link has been sent.',
+            email: event.email,
+          ),
+        );
       }
     } catch (e) {
       // Still show success to prevent email enumeration
-      emit(AuthForgotPasswordSuccess(
-        message: 'If an account exists with this email, a password reset link has been sent.',
-        email: event.email,
-      ));
+      emit(
+        AuthForgotPasswordSuccess(
+          message:
+              'If an account exists with this email, a password reset link has been sent.',
+          email: event.email,
+        ),
+      );
     }
   }
 
-  Future<void> _onResetPassword(AuthResetPassword event, Emitter<AuthState> emit) async {
+  Future<void> _onResetPassword(
+    AuthResetPassword event,
+    Emitter<AuthState> emit,
+  ) async {
     emit(AuthLoading());
 
     try {
@@ -451,17 +511,18 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
 
       final response = await _api.post(
         ApiConstants.resetPassword,
-        data: {
-          'token': event.token,
-          'new_password': event.newPassword,
-        },
+        data: {'token': event.token, 'new_password': event.newPassword},
       );
 
       if (response.statusCode == 200) {
         final data = response.data as Map<String, dynamic>;
-        emit(AuthPasswordResetSuccess(
-          message: data['message'] ?? 'Password reset successfully. Please login with your new password.',
-        ));
+        emit(
+          AuthPasswordResetSuccess(
+            message:
+                data['message'] ??
+                'Password reset successfully. Please login with your new password.',
+          ),
+        );
       } else {
         emit(AuthError(message: 'Failed to reset password. Please try again.'));
       }
@@ -470,7 +531,10 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     }
   }
 
-  Future<void> _onVerifyEmail(AuthVerifyEmail event, Emitter<AuthState> emit) async {
+  Future<void> _onVerifyEmail(
+    AuthVerifyEmail event,
+    Emitter<AuthState> emit,
+  ) async {
     emit(AuthLoading());
 
     try {
@@ -483,18 +547,30 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
 
       if (response.statusCode == 200) {
         final data = response.data as Map<String, dynamic>;
-        emit(AuthEmailVerified(
-          message: data['message'] ?? 'Email verified successfully. You can now await approval from the administrator.',
-        ));
+        emit(
+          AuthEmailVerified(
+            message:
+                data['message'] ??
+                'Email verified successfully. You can now await approval from the administrator.',
+          ),
+        );
       } else {
-        emit(AuthError(message: 'Failed to verify email. The link may be invalid or expired.'));
+        emit(
+          AuthError(
+            message:
+                'Failed to verify email. The link may be invalid or expired.',
+          ),
+        );
       }
     } catch (e) {
       emit(AuthError(message: _extractErrorMessage(e)));
     }
   }
 
-  Future<void> _onResendVerification(AuthResendVerification event, Emitter<AuthState> emit) async {
+  Future<void> _onResendVerification(
+    AuthResendVerification event,
+    Emitter<AuthState> emit,
+  ) async {
     emit(AuthLoading());
 
     try {
@@ -507,24 +583,37 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
 
       if (response.statusCode == 200) {
         final data = response.data as Map<String, dynamic>;
-        emit(AuthResendVerificationSuccess(
-          message: data['message'] ?? 'If an account exists with this email and is not yet verified, a verification email has been sent.',
-        ));
+        emit(
+          AuthResendVerificationSuccess(
+            message:
+                data['message'] ??
+                'If an account exists with this email and is not yet verified, a verification email has been sent.',
+          ),
+        );
       } else {
         // Still show success to prevent email enumeration
-        emit(AuthResendVerificationSuccess(
-          message: 'If an account exists with this email and is not yet verified, a verification email has been sent.',
-        ));
+        emit(
+          AuthResendVerificationSuccess(
+            message:
+                'If an account exists with this email and is not yet verified, a verification email has been sent.',
+          ),
+        );
       }
     } catch (e) {
       // Still show success to prevent email enumeration
-      emit(AuthResendVerificationSuccess(
-        message: 'If an account exists with this email and is not yet verified, a verification email has been sent.',
-      ));
+      emit(
+        AuthResendVerificationSuccess(
+          message:
+              'If an account exists with this email and is not yet verified, a verification email has been sent.',
+        ),
+      );
     }
   }
 
-  Future<void> _onClearError(AuthClearError event, Emitter<AuthState> emit) async {
+  Future<void> _onClearError(
+    AuthClearError event,
+    Emitter<AuthState> emit,
+  ) async {
     emit(AuthUnauthenticated());
   }
 

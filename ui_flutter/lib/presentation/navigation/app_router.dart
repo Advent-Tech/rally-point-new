@@ -4,6 +4,9 @@ import 'package:go_router/go_router.dart';
 import '../blocs/auth/auth_bloc.dart';
 import '../blocs/worker_tracking/worker_tracking_bloc.dart';
 import '../blocs/prayer_request/prayer_request_bloc.dart';
+import '../screens/team_leader/command_center/command_center_bloc.dart';
+import '../../core/network/api_client.dart';
+import '../../core/storage/secure_storage.dart';
 import '../screens/splash_screen.dart';
 import '../screens/auth/login_screen.dart';
 import '../screens/auth/register_screen.dart';
@@ -20,7 +23,9 @@ import '../screens/team_leader/schedule_screen.dart';
 import '../screens/team_leader/leader_targets_screen.dart';
 import '../screens/team_leader/worker_detail_screen.dart';
 import '../screens/team_leader/command_center/command_center_screen.dart';
-import '../screens/team_leader/command_center/command_center_state.dart';
+import '../screens/team_leader/command_center/command_center_state.dart' as cc;
+// import '../blocs/territory/territory_bloc.dart'; // Unused
+// import '../blocs/donation/donation_bloc.dart'; // DonationBloc not found in project
 import '../screens/team_leader/worker_activity_screen.dart';
 import '../screens/team_leader/worker_verification_screen.dart';
 import '../screens/home/log_visit_screen.dart';
@@ -366,23 +371,23 @@ class AppRouter {
           pageBuilder: (context, state) {
             final modeParam = state.uri.queryParameters['mode'];
             final initialMode = switch (modeParam) {
-              'workers' => MapMode.workers,
-              'territories' => MapMode.territories,
-              _ => MapMode.overview,
+              'workers' => cc.MapMode.workers,
+              'territories' => cc.MapMode.territories,
+              _ => cc.MapMode.overview,
             };
             return AppPageTransitions.slide(
               key: state.pageKey,
-              child: BlocProvider(
-                create: (_) => WorkerTrackingBloc(),
-                child: CommandCenterScreen(
-                  initialMode: initialMode,
-                  deepLinkWorkerId: state.uri.queryParameters['workerId'],
-                  deepLinkWorkerName: state.uri.queryParameters['workerName'],
-                  preSelectedWorkerId:
-                      state.uri.queryParameters['preSelectedWorkerId'],
-                  preSelectedWorkerName:
-                      state.uri.queryParameters['preSelectedWorkerName'],
-                ),
+              child: MultiBlocProvider(
+                providers: [
+                  BlocProvider(
+                    create: (context) => CommandCenterBloc(
+                      apiClient: context.read<ApiClient>(),
+                      storage: context.read<SecureStorage>(),
+                    ),
+                  ),
+                  BlocProvider(create: (_) => WorkerTrackingBloc()),
+                ],
+                child: CommandCenterScreen(initialMode: initialMode),
               ),
             );
           },
@@ -430,9 +435,10 @@ class AppRouter {
             final workerName = state.uri.queryParameters['workerName'];
             var target = '/leader/command-center?mode=territories';
             if (workerId != null) target += '&preSelectedWorkerId=$workerId';
-            if (workerName != null)
+            if (workerName != null) {
               target +=
                   '&preSelectedWorkerName=${Uri.encodeComponent(workerName)}';
+            }
             return target;
           },
         ),
@@ -577,10 +583,12 @@ class GoRouterRefreshStream extends ChangeNotifier {
           state is AuthLoading ||
           state is AuthAuthenticated ||
           state is AuthUnauthenticated) {
-        print('🔄 GoRouter refresh for state: ${state.runtimeType}');
+        debugPrint('🔄 GoRouter refresh for state: ${state.runtimeType}');
         notifyListeners();
       } else {
-        print('⏭️ GoRouter skipping refresh for state: ${state.runtimeType}');
+        debugPrint(
+          '⏭️ GoRouter skipping refresh for state: ${state.runtimeType}',
+        );
       }
     });
   }

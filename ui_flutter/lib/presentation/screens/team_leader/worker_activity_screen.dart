@@ -6,6 +6,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/constants/map_constants.dart';
 import '../../../core/network/api_client.dart';
 import '../../widgets/role_badge.dart';
+import '../../widgets/worker_context_banner.dart';
 
 /// Worker Activity Screen - Shows all activity for a specific worker
 /// Used by team leaders to view detailed worker performance and activity history

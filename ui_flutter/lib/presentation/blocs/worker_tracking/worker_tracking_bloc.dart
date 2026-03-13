@@ -43,7 +43,7 @@ class WorkerTrackingBloc
       List<Map<String, dynamic>> liveWorkerData = [];
       try {
         final liveResponse = await _apiClient!.get(
-          '/api/locations/workers/team?team_id=${event.teamId}',
+          '/api/locations/workers/team',
         );
         if (liveResponse.statusCode == 200 &&
             liveResponse.data['workers'] != null) {
