@@ -55,11 +55,13 @@ class ChatBloc extends Bloc<ChatEvent, ChatState> {
   String _getChatWsUrl(String conversationId) {
     String baseUrl;
     if (kReleaseMode) {
-      baseUrl = 'wss://api.rallypoint.app';
+      baseUrl = 'wss://backend.lightsquads.com';
     } else {
       // Use production server for real devices
       final httpBase = ApiConstants.prodBaseUrl;
-      baseUrl = httpBase.replaceFirst('http://', 'ws://').replaceFirst('https://', 'wss://');
+      baseUrl = httpBase
+          .replaceFirst('http://', 'ws://')
+          .replaceFirst('https://', 'wss://');
     }
     return '$baseUrl${ApiConstants.wsChat}?user_id=$_currentUserId&conversation_id=$conversationId';
   }
@@ -82,10 +84,7 @@ class ChatBloc extends Bloc<ChatEvent, ChatState> {
 
       final response = await _api.get(
         '/api/chat/conversations',
-        queryParameters: {
-          'limit': event.limit,
-          'offset': event.offset,
-        },
+        queryParameters: {'limit': event.limit, 'offset': event.offset},
       );
 
       if (response.statusCode == 200) {
@@ -111,17 +110,21 @@ class ChatBloc extends Bloc<ChatEvent, ChatState> {
     try {
       await _initialize();
 
-      final response = await _api.get('/api/chat/conversations/${event.conversationId}');
+      final response = await _api.get(
+        '/api/chat/conversations/${event.conversationId}',
+      );
 
       if (response.statusCode == 200) {
         final conversation = ChatConversation.fromJson(response.data);
 
-        emit(ChatInConversation(
-          conversation: conversation,
-          messages: [],
-          typingUsers: [],
-          isLoadingMessages: true,
-        ));
+        emit(
+          ChatInConversation(
+            conversation: conversation,
+            messages: [],
+            typingUsers: [],
+            isLoadingMessages: true,
+          ),
+        );
 
         // Load messages
         add(ChatLoadMessages(conversationId: event.conversationId));
@@ -149,10 +152,7 @@ class ChatBloc extends Bloc<ChatEvent, ChatState> {
 
       final response = await _api.get(
         '/api/chat/conversations/${event.conversationId}/messages',
-        queryParameters: {
-          'limit': event.limit,
-          'offset': event.offset,
-        },
+        queryParameters: {'limit': event.limit, 'offset': event.offset},
       );
 
       if (response.statusCode == 200) {
@@ -161,14 +161,18 @@ class ChatBloc extends Bloc<ChatEvent, ChatState> {
             .map<ChatMessage>((json) => ChatMessage.fromJson(json))
             .toList();
 
-        emit(currentState.copyWith(messages: messages, isLoadingMessages: false));
+        emit(
+          currentState.copyWith(messages: messages, isLoadingMessages: false),
+        );
 
         // Mark messages as read to clear unread count
         if (messages.isNotEmpty) {
-          add(ChatMarkAsRead(
-            conversationId: event.conversationId,
-            messageId: messages.last.id,
-          ));
+          add(
+            ChatMarkAsRead(
+              conversationId: event.conversationId,
+              messageId: messages.last.id,
+            ),
+          );
         }
       } else {
         emit(currentState.copyWith(isLoadingMessages: false));
@@ -186,7 +190,9 @@ class ChatBloc extends Bloc<ChatEvent, ChatState> {
     ChatSendMessage event,
     Emitter<ChatState> emit,
   ) async {
-    debugPrint('ChatBloc: _onSendMessage called with content: "${event.content}"');
+    debugPrint(
+      'ChatBloc: _onSendMessage called with content: "${event.content}"',
+    );
 
     final currentState = state;
     debugPrint('ChatBloc: Current state type: ${currentState.runtimeType}');
@@ -215,10 +221,15 @@ class ChatBloc extends Bloc<ChatEvent, ChatState> {
       );
 
       // Add optimistic message
-      final messagesWithOptimistic = [...currentState.messages, optimisticMessage];
+      final messagesWithOptimistic = [
+        ...currentState.messages,
+        optimisticMessage,
+      ];
       emit(currentState.copyWith(messages: messagesWithOptimistic));
 
-      debugPrint('ChatBloc: Sending message to conversation ${event.conversationId}');
+      debugPrint(
+        'ChatBloc: Sending message to conversation ${event.conversationId}',
+      );
 
       // Send to server
       final response = await _api.post(
@@ -232,7 +243,9 @@ class ChatBloc extends Bloc<ChatEvent, ChatState> {
         },
       );
 
-      debugPrint('ChatBloc: Send message response status: ${response.statusCode}');
+      debugPrint(
+        'ChatBloc: Send message response status: ${response.statusCode}',
+      );
 
       // Get the latest state after the API call
       final latestState = state;
@@ -242,14 +255,15 @@ class ChatBloc extends Bloc<ChatEvent, ChatState> {
         final sentMessage = ChatMessage.fromJson(response.data);
 
         // Replace optimistic message with real one using latest state
-        final finalMessages = latestState.messages
-            .where((m) => m.id != tempId)
-            .toList()
-          ..add(sentMessage);
+        final finalMessages =
+            latestState.messages.where((m) => m.id != tempId).toList()
+              ..add(sentMessage);
 
         emit(latestState.copyWith(messages: finalMessages));
       } else {
-        debugPrint('ChatBloc: Send message failed with status ${response.statusCode}: ${response.data}');
+        debugPrint(
+          'ChatBloc: Send message failed with status ${response.statusCode}: ${response.data}',
+        );
         // Mark as failed using latest state
         final failedMessages = latestState.messages.map((m) {
           if (m.id == tempId) {
@@ -292,12 +306,14 @@ class ChatBloc extends Bloc<ChatEvent, ChatState> {
       if (response.statusCode == 200 || response.statusCode == 201) {
         final conversation = ChatConversation.fromJson(response.data);
 
-        emit(ChatInConversation(
-          conversation: conversation,
-          messages: [],
-          typingUsers: [],
-          isLoadingMessages: true,
-        ));
+        emit(
+          ChatInConversation(
+            conversation: conversation,
+            messages: [],
+            typingUsers: [],
+            isLoadingMessages: true,
+          ),
+        );
 
         // Load messages if any exist
         add(ChatLoadMessages(conversationId: conversation.id));
@@ -331,12 +347,14 @@ class ChatBloc extends Bloc<ChatEvent, ChatState> {
       if (response.statusCode == 200) {
         final conversation = ChatConversation.fromJson(response.data);
 
-        emit(ChatInConversation(
-          conversation: conversation,
-          messages: [],
-          typingUsers: [],
-          isLoadingMessages: true,
-        ));
+        emit(
+          ChatInConversation(
+            conversation: conversation,
+            messages: [],
+            typingUsers: [],
+            isLoadingMessages: true,
+          ),
+        );
 
         add(ChatLoadMessages(conversationId: conversation.id));
         add(ChatConnectWebSocket(conversationId: conversation.id));
@@ -438,12 +456,14 @@ class ChatBloc extends Bloc<ChatEvent, ChatState> {
 
       // Auto-remove after 5 seconds
       _typingTimers[event.userId] = Timer(const Duration(seconds: 5), () {
-        add(ChatTypingReceived(
-          conversationId: event.conversationId,
-          userId: event.userId,
-          userName: event.userName,
-          isTyping: false,
-        ));
+        add(
+          ChatTypingReceived(
+            conversationId: event.conversationId,
+            userId: event.userId,
+            userName: event.userName,
+            isTyping: false,
+          ),
+        );
       });
     } else {
       // Remove typing indicator
@@ -470,9 +490,13 @@ class ChatBloc extends Bloc<ChatEvent, ChatState> {
       return p;
     }).toList();
 
-    emit(currentState.copyWith(
-      conversation: currentState.conversation.copyWith(participants: updatedParticipants),
-    ));
+    emit(
+      currentState.copyWith(
+        conversation: currentState.conversation.copyWith(
+          participants: updatedParticipants,
+        ),
+      ),
+    );
   }
 
   Future<void> _onEditMessage(
@@ -511,7 +535,9 @@ class ChatBloc extends Bloc<ChatEvent, ChatState> {
     try {
       await _initialize();
 
-      final response = await _api.delete('/api/chat/messages/${event.messageId}');
+      final response = await _api.delete(
+        '/api/chat/messages/${event.messageId}',
+      );
 
       if (response.statusCode == 200) {
         final currentState = state;
@@ -547,7 +573,9 @@ class ChatBloc extends Bloc<ChatEvent, ChatState> {
     _stopPolling();
 
     if (event.conversationId == null || _currentUserId == null) {
-      debugPrint('ChatBloc: Cannot connect WebSocket - missing conversationId or userId');
+      debugPrint(
+        'ChatBloc: Cannot connect WebSocket - missing conversationId or userId',
+      );
       // Still start polling as fallback
       _startPolling();
       return;
@@ -587,21 +615,29 @@ class ChatBloc extends Bloc<ChatEvent, ChatState> {
 
       if (type == 'chat_message') {
         final messageData = json['data'] ?? json;
-        add(ChatMessageReceived(messageData: messageData is Map<String, dynamic> ? messageData : {}));
+        add(
+          ChatMessageReceived(
+            messageData: messageData is Map<String, dynamic> ? messageData : {},
+          ),
+        );
       } else if (type == 'chat_typing') {
         final msgData = json['data'] ?? json;
-        add(ChatTypingReceived(
-          conversationId: msgData['conversation_id']?.toString() ?? '',
-          userId: msgData['user_id']?.toString() ?? '',
-          userName: msgData['user_name']?.toString() ?? '',
-          isTyping: msgData['is_typing'] ?? false,
-        ));
+        add(
+          ChatTypingReceived(
+            conversationId: msgData['conversation_id']?.toString() ?? '',
+            userId: msgData['user_id']?.toString() ?? '',
+            userName: msgData['user_name']?.toString() ?? '',
+            isTyping: msgData['is_typing'] ?? false,
+          ),
+        );
       } else if (type == 'chat_user_online' || type == 'chat_user_offline') {
         final msgData = json['data'] ?? json;
-        add(ChatUserStatusChanged(
-          userId: msgData['user_id']?.toString() ?? '',
-          isOnline: type == 'chat_user_online',
-        ));
+        add(
+          ChatUserStatusChanged(
+            userId: msgData['user_id']?.toString() ?? '',
+            isOnline: type == 'chat_user_online',
+          ),
+        );
       }
     } catch (e) {
       debugPrint('ChatBloc: Error parsing WebSocket message: $e');
@@ -685,7 +721,11 @@ class ChatBloc extends Bloc<ChatEvent, ChatState> {
               mergedIds.add(m.id);
             }
           }
-          merged.sort((a, b) => (a.createdAt ?? DateTime(0)).compareTo(b.createdAt ?? DateTime(0)));
+          merged.sort(
+            (a, b) => (a.createdAt ?? DateTime(0)).compareTo(
+              b.createdAt ?? DateTime(0),
+            ),
+          );
           emit(currentState.copyWith(messages: merged));
         }
       }

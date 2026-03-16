@@ -38,7 +38,6 @@
         "just_audio",
         "logger",
         "mapbox_maps_flutter",
-        "mobile_scanner",
         "path_provider",
         "permission_handler",
         "pull_to_refresh",
@@ -415,15 +414,6 @@
         "path_provider",
         "rxdart",
         "uuid"
-      ]
-    },
-    {
-      "name": "mobile_scanner",
-      "version": "4.0.1",
-      "dependencies": [
-        "flutter",
-        "flutter_web_plugins",
-        "js"
       ]
     },
     {

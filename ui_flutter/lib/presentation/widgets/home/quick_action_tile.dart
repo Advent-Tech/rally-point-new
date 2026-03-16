@@ -10,6 +10,7 @@ class QuickActionTile extends StatelessWidget {
   final String label;
   final String? subtitle;
   final Color backgroundColor;
+  final Color? backgroundColorEnd;
   final VoidCallback onTap;
   final bool isSmall;
   final int? badgeCount;
@@ -20,6 +21,7 @@ class QuickActionTile extends StatelessWidget {
     required this.label,
     this.subtitle,
     required this.backgroundColor,
+    this.backgroundColorEnd,
     required this.onTap,
     this.isSmall = false,
     this.badgeCount,
@@ -30,6 +32,7 @@ class QuickActionTile extends StatelessWidget {
     final iconSize = isSmall ? 36.0 : 56.0;
     final borderRadius = isSmall ? 20.0 : 24.0;
     final hasBadge = badgeCount != null && badgeCount! > 0;
+    final endColor = backgroundColorEnd ?? backgroundColor;
 
     return SizedBox.expand(
       child: GestureDetector(
@@ -40,11 +43,15 @@ class QuickActionTile extends StatelessWidget {
             Positioned.fill(
               child: Container(
                 decoration: BoxDecoration(
-                  color: backgroundColor,
+                  gradient: LinearGradient(
+                    colors: [backgroundColor, endColor],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
                   borderRadius: BorderRadius.circular(borderRadius),
                   boxShadow: [
                     BoxShadow(
-                      color: backgroundColor.withValues(alpha: 0.3),
+                      color: backgroundColor.withValues(alpha: 0.4),
                       blurRadius: 12,
                       offset: const Offset(0, 4),
                     ),
@@ -57,8 +64,19 @@ class QuickActionTile extends StatelessWidget {
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Icon(icon, color: Colors.white, size: iconSize),
-                    const SizedBox(height: 6),
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.2),
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(
+                        icon,
+                        color: Colors.white,
+                        size: iconSize * 0.55,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
                     Text(
                       label,
                       style: Theme.of(context).textTheme.titleSmall?.copyWith(
@@ -71,15 +89,19 @@ class QuickActionTile extends StatelessWidget {
                     ),
                     if (subtitle != null) ...[
                       const SizedBox(height: 2),
-                      Text(
-                        subtitle!,
-                        style: TextStyle(
-                          color: Colors.white.withValues(alpha: 0.7),
-                          fontSize: 10,
+                      SizedBox(
+                        width: 80,
+                        child: Text(
+                          subtitle!,
+                          style: TextStyle(
+                            color: Colors.white.withValues(alpha: 0.8),
+                            fontSize: 9,
+                            fontWeight: FontWeight.w500,
+                          ),
+                          textAlign: TextAlign.center,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
                         ),
-                        textAlign: TextAlign.center,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
                       ),
                     ],
                   ],
@@ -151,7 +173,7 @@ class QuickActionGrid extends StatelessWidget {
         crossAxisCount: 2,
         mainAxisSpacing: AppSpacing.md,
         crossAxisSpacing: AppSpacing.md,
-        childAspectRatio: 1.0,
+        childAspectRatio: 1.25,
       ),
       itemCount: actions.length,
       itemBuilder: (context, index) {
@@ -161,6 +183,7 @@ class QuickActionGrid extends StatelessWidget {
           label: action.label,
           subtitle: action.subtitle,
           backgroundColor: action.backgroundColor,
+          backgroundColorEnd: action.backgroundColorEnd,
           onTap: action.onTap,
           isSmall: true,
           badgeCount: action.badgeCount,
@@ -176,6 +199,7 @@ class QuickActionTileData {
   final String label;
   final String? subtitle;
   final Color backgroundColor;
+  final Color? backgroundColorEnd;
   final VoidCallback onTap;
   final int? badgeCount;
 
@@ -184,6 +208,7 @@ class QuickActionTileData {
     required this.label,
     this.subtitle,
     required this.backgroundColor,
+    this.backgroundColorEnd,
     required this.onTap,
     this.badgeCount,
   });
@@ -193,42 +218,55 @@ class QuickActionTileData {
 class QuickActionColors {
   QuickActionColors._();
 
-  /// Purple - My Territory
+  /// Purple gradient - My Territory
   static const Color territory = Color(0xFF7E57C2);
+  static const Color territoryEnd = Color(0xFFB085F5);
 
-  /// Coral/Rose - Donation
+  /// Coral/Rose gradient - Donation
   static const Color delivery = Color(0xFFE57373);
+  static const Color deliveryEnd = Color(0xFFFF9E9E);
 
-  /// Amber/Gold - Survey Form
+  /// Amber/Gold gradient - Survey Form
   static const Color survey = Color(0xFFFFB74D);
+  static const Color surveyEnd = Color(0xFFFFE97D);
 
-  /// Teal - Team Group
+  /// Teal gradient - Team Group
   static const Color team = Color(0xFF4DB6AC);
+  static const Color teamEnd = Color(0xFF80CBC4);
 
-  /// Green - GPS Tracking
+  /// Green gradient - GPS Tracking
   static const Color tracking = Color(0xFF66BB6A);
+  static const Color trackingEnd = Color(0xFF81C784);
 
-  /// Orange - Achievements
+  /// Orange gradient - Achievements
   static const Color achievements = Color(0xFFFF8A65);
+  static const Color achievementsEnd = Color(0xFFFFAB91);
 
-  /// Blue - Chat
+  /// Blue gradient - Chat
   static const Color chat = Color(0xFF42A5F5);
+  static const Color chatEnd = Color(0xFF64B5F6);
 
-  /// Red/Coral - End Session
+  /// Red/Coral gradient - End Session
   static const Color endSession = Color(0xFFEF5350);
+  static const Color endSessionEnd = Color(0xFFEF9A9A);
 
-  /// Green - Start Session
+  /// Green gradient - Start Session
   static const Color startSession = Color(0xFF66BB6A);
+  static const Color startSessionEnd = Color(0xFF81C784);
 
-  /// Deep Purple - Prayer
+  /// Deep Purple gradient - Prayer
   static const Color prayer = Color(0xFF9575CD);
+  static const Color prayerEnd = Color(0xFFB39DDB);
 
-  /// Indigo - News
+  /// Indigo gradient - News
   static const Color news = Color(0xFF5C6BC0);
+  static const Color newsEnd = Color(0xFF7986CB);
 
-  /// Amber - Walkie
-
-  /// Navy Blue - Targets
-  static const Color targets = Color(0xFF1E3A5F);
+  /// Amber gradient - Walkie
   static const Color walkie = Color(0xFFFFB300);
+  static const Color walkieEnd = Color(0xFFFFCA28);
+
+  /// Navy Blue gradient - Targets
+  static const Color targets = Color(0xFF1E3A5F);
+  static const Color targetsEnd = Color(0xFF2E5077);
 }

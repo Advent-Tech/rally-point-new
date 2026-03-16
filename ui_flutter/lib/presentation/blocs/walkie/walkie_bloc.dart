@@ -65,10 +65,12 @@ class WalkieBloc extends Bloc<WalkieEvent, WalkieState> {
       if (state is WalkieInChannel) {
         final currentState = state as WalkieInChannel;
         // Clear current speaker when playback ends
-        add(WalkieParticipantUpdated(
-          participantId: currentState.currentSpeaker?.userId ?? '',
-          isSpeaking: false,
-        ));
+        add(
+          WalkieParticipantUpdated(
+            participantId: currentState.currentSpeaker?.userId ?? '',
+            isSpeaking: false,
+          ),
+        );
       }
     };
 
@@ -79,10 +81,12 @@ class WalkieBloc extends Bloc<WalkieEvent, WalkieState> {
   String _getWalkieWsUrl(String teamId) {
     String baseUrl;
     if (kReleaseMode) {
-      baseUrl = 'wss://api.rallypoint.app';
+      baseUrl = 'wss://backend.lightsquads.com';
     } else {
       final httpBase = ApiConstants.prodBaseUrl;
-      baseUrl = httpBase.replaceFirst('http://', 'ws://').replaceFirst('https://', 'wss://');
+      baseUrl = httpBase
+          .replaceFirst('http://', 'ws://')
+          .replaceFirst('https://', 'wss://');
     }
     return '$baseUrl${ApiConstants.wsWalkie}?user_id=$_currentUserId&team_id=$teamId';
   }
@@ -128,16 +132,20 @@ class WalkieBloc extends Bloc<WalkieEvent, WalkieState> {
         }
       } else if (type == 'speaking_start') {
         final msgData = json['data'] ?? json;
-        add(WalkieParticipantUpdated(
-          participantId: msgData['user_id']?.toString() ?? '',
-          isSpeaking: true,
-        ));
+        add(
+          WalkieParticipantUpdated(
+            participantId: msgData['user_id']?.toString() ?? '',
+            isSpeaking: true,
+          ),
+        );
       } else if (type == 'speaking_end') {
         final msgData = json['data'] ?? json;
-        add(WalkieParticipantUpdated(
-          participantId: msgData['user_id']?.toString() ?? '',
-          isSpeaking: false,
-        ));
+        add(
+          WalkieParticipantUpdated(
+            participantId: msgData['user_id']?.toString() ?? '',
+            isSpeaking: false,
+          ),
+        );
       }
     } catch (e) {
       debugPrint('WalkieBloc: Error parsing WebSocket message: $e');
@@ -191,25 +199,33 @@ class WalkieBloc extends Bloc<WalkieEvent, WalkieState> {
         emit(WalkieChannelsLoaded(channels: channels));
       } else {
         // If no channels endpoint, create a default team channel
-        emit(WalkieChannelsLoaded(channels: [
-          WalkieChannel(
-            id: event.teamId,
-            name: 'Team Channel',
-            teamId: event.teamId,
-            channelType: 'team',
+        emit(
+          WalkieChannelsLoaded(
+            channels: [
+              WalkieChannel(
+                id: event.teamId,
+                name: 'Team Channel',
+                teamId: event.teamId,
+                channelType: 'team',
+              ),
+            ],
           ),
-        ]));
+        );
       }
     } catch (e) {
       // Fallback: create default channel
-      emit(WalkieChannelsLoaded(channels: [
-        WalkieChannel(
-          id: event.teamId,
-          name: 'Team Channel',
-          teamId: event.teamId,
-          channelType: 'team',
+      emit(
+        WalkieChannelsLoaded(
+          channels: [
+            WalkieChannel(
+              id: event.teamId,
+              name: 'Team Channel',
+              teamId: event.teamId,
+              channelType: 'team',
+            ),
+          ],
         ),
-      ]));
+      );
     }
   }
 
@@ -252,15 +268,19 @@ class WalkieBloc extends Bloc<WalkieEvent, WalkieState> {
         List<WalkieParticipant> participants = [];
         if (response.data['participants'] != null) {
           participants = (response.data['participants'] as List)
-              .map<WalkieParticipant>((json) => WalkieParticipant.fromJson(json))
+              .map<WalkieParticipant>(
+                (json) => WalkieParticipant.fromJson(json),
+              )
               .toList();
         }
 
-        emit(WalkieInChannel(
-          channel: channel,
-          participants: participants,
-          messages: [],
-        ));
+        emit(
+          WalkieInChannel(
+            channel: channel,
+            participants: participants,
+            messages: [],
+          ),
+        );
 
         // Connect to WebSocket for real-time updates
         _connectWebSocket(event.channelId);
@@ -282,11 +302,7 @@ class WalkieBloc extends Bloc<WalkieEvent, WalkieState> {
         channelType: 'team',
       );
 
-      emit(WalkieInChannel(
-        channel: channel,
-        participants: [],
-        messages: [],
-      ));
+      emit(WalkieInChannel(channel: channel, participants: [], messages: []));
 
       _connectWebSocket(event.channelId);
 
@@ -314,9 +330,7 @@ class WalkieBloc extends Bloc<WalkieEvent, WalkieState> {
 
       await _api.post(
         ApiConstants.walkieEnd,
-        data: {
-          'channel_id': currentState.channel.id,
-        },
+        data: {'channel_id': currentState.channel.id},
       );
 
       emit(WalkieInitial());
@@ -348,17 +362,18 @@ class WalkieBloc extends Bloc<WalkieEvent, WalkieState> {
         return;
       }
 
-      emit(currentState.copyWith(
-        isSpeaking: true,
-        audioLevel: 0.0,
-      ));
+      emit(currentState.copyWith(isSpeaking: true, audioLevel: 0.0));
 
       // Notify others via WebSocket
-      _walkieSocket?.add(jsonEncode({
-        'type': 'speaking_start',
-        'data': {'user_id': _currentUserId, 'team_id': currentState.channel.id},
-      }));
-
+      _walkieSocket?.add(
+        jsonEncode({
+          'type': 'speaking_start',
+          'data': {
+            'user_id': _currentUserId,
+            'team_id': currentState.channel.id,
+          },
+        }),
+      );
     } catch (e) {
       // Error starting recording
     }
@@ -377,10 +392,12 @@ class WalkieBloc extends Bloc<WalkieEvent, WalkieState> {
     emit(currentState.copyWith(isSpeaking: false, audioLevel: 0.0));
 
     // Notify others via WebSocket
-    _walkieSocket?.add(jsonEncode({
-      'type': 'speaking_end',
-      'data': {'user_id': _currentUserId, 'team_id': currentState.channel.id},
-    }));
+    _walkieSocket?.add(
+      jsonEncode({
+        'type': 'speaking_end',
+        'data': {'user_id': _currentUserId, 'team_id': currentState.channel.id},
+      }),
+    );
 
     try {
       await _initialize();
@@ -413,7 +430,10 @@ class WalkieBloc extends Bloc<WalkieEvent, WalkieState> {
       // Upload to Supabase
       String? audioUrl;
       try {
-        audioUrl = await _uploadAudioToSupabase(result.path, currentState.channel.id);
+        audioUrl = await _uploadAudioToSupabase(
+          result.path,
+          currentState.channel.id,
+        );
       } catch (e) {
         // Failed to upload to Supabase
       }
@@ -430,7 +450,8 @@ class WalkieBloc extends Bloc<WalkieEvent, WalkieState> {
           'message': audioUrl,
           'message_type': 'audio',
           'duration': result.durationMs ~/ 1000, // Convert to seconds
-          'sender_name': _currentUserName, // Include sender name for backend to use
+          'sender_name':
+              _currentUserName, // Include sender name for backend to use
           'sender_id': _currentUserId,
         },
       );
@@ -439,15 +460,24 @@ class WalkieBloc extends Bloc<WalkieEvent, WalkieState> {
       if (response.statusCode == 200 || response.statusCode == 201) {
         final messageData = response.data;
         final sentMessage = WalkieMessage(
-          id: messageData['id']?.toString() ?? DateTime.now().millisecondsSinceEpoch.toString(),
+          id:
+              messageData['id']?.toString() ??
+              DateTime.now().millisecondsSinceEpoch.toString(),
           channelId: currentState.channel.id,
-          senderId: messageData['sender_id']?.toString() ?? _currentUserId ?? '',
+          senderId:
+              messageData['sender_id']?.toString() ?? _currentUserId ?? '',
           // Use _currentUserName first since backend returns hardcoded "User"
-          senderName: _currentUserName ?? messageData['sender_name']?.toString() ?? 'You',
+          senderName:
+              _currentUserName ??
+              messageData['sender_name']?.toString() ??
+              'You',
           messageType: 'audio',
-          audioUrl: result.path, // Use local file for immediate playback (Supabase URL sent to backend for others)
+          audioUrl: result
+              .path, // Use local file for immediate playback (Supabase URL sent to backend for others)
           audioDurationMs: result.durationMs,
-          createdAt: DateTime.tryParse(messageData['sent_at']?.toString() ?? '') ?? DateTime.now(),
+          createdAt:
+              DateTime.tryParse(messageData['sent_at']?.toString() ?? '') ??
+              DateTime.now(),
         );
 
         // Get fresh state since emit was called earlier
@@ -464,7 +494,10 @@ class WalkieBloc extends Bloc<WalkieEvent, WalkieState> {
 
   /// Upload audio file directly to Supabase Storage
   /// Returns the public URL of the uploaded audio
-  Future<String?> _uploadAudioToSupabase(String filePath, String channelId) async {
+  Future<String?> _uploadAudioToSupabase(
+    String filePath,
+    String channelId,
+  ) async {
     try {
       final supabaseService = await SupabaseService.getInstance();
 
@@ -502,8 +535,7 @@ class WalkieBloc extends Bloc<WalkieEvent, WalkieState> {
         },
       );
 
-      if (response.statusCode == 200 || response.statusCode == 201) {
-      }
+      if (response.statusCode == 200 || response.statusCode == 201) {}
     } catch (e) {
       // Error sending text message
     }
@@ -532,10 +564,12 @@ class WalkieBloc extends Bloc<WalkieEvent, WalkieState> {
         );
       }
 
-      emit(currentState.copyWith(
-        messages: updatedMessages,
-        currentSpeaker: currentSpeaker,
-      ));
+      emit(
+        currentState.copyWith(
+          messages: updatedMessages,
+          currentSpeaker: currentSpeaker,
+        ),
+      );
 
       // Auto-play voice messages from others
       if ((message.messageType == 'voice' || message.messageType == 'audio') &&
@@ -543,9 +577,12 @@ class WalkieBloc extends Bloc<WalkieEvent, WalkieState> {
           message.senderId != _currentUserId) {
         final audioPath = message.audioUrl!;
         if (audioPath.startsWith('/') || audioPath.startsWith('file://')) {
-          final filePath = audioPath.startsWith('file://') ? audioPath.substring(7) : audioPath;
+          final filePath = audioPath.startsWith('file://')
+              ? audioPath.substring(7)
+              : audioPath;
           await _audio.playFromFile(filePath, audioId: message.id);
-        } else if (audioPath.startsWith('http://') || audioPath.startsWith('https://')) {
+        } else if (audioPath.startsWith('http://') ||
+            audioPath.startsWith('https://')) {
           await _audio.playFromUrl(audioPath, audioId: message.id);
         } else {
           await _audio.playFromFile(audioPath, audioId: message.id);
@@ -558,10 +595,12 @@ class WalkieBloc extends Bloc<WalkieEvent, WalkieState> {
           if (state is WalkieInChannel) {
             final s = state as WalkieInChannel;
             if (s.currentSpeaker?.userId == message.senderId) {
-              add(WalkieParticipantUpdated(
-                participantId: message.senderId,
-                isSpeaking: false,
-              ));
+              add(
+                WalkieParticipantUpdated(
+                  participantId: message.senderId,
+                  isSpeaking: false,
+                ),
+              );
             }
           }
         });
@@ -592,9 +631,12 @@ class WalkieBloc extends Bloc<WalkieEvent, WalkieState> {
         // Check if it's a local file or URL
         final audioPath = message.audioUrl!;
         if (audioPath.startsWith('/') || audioPath.startsWith('file://')) {
-          final filePath = audioPath.startsWith('file://') ? audioPath.substring(7) : audioPath;
+          final filePath = audioPath.startsWith('file://')
+              ? audioPath.substring(7)
+              : audioPath;
           await _audio.playFromFile(filePath, audioId: message.id);
-        } else if (audioPath.startsWith('http://') || audioPath.startsWith('https://')) {
+        } else if (audioPath.startsWith('http://') ||
+            audioPath.startsWith('https://')) {
           await _audio.playFromUrl(audioPath, audioId: message.id);
         } else {
           // Assume local file
@@ -653,15 +695,17 @@ class WalkieBloc extends Bloc<WalkieEvent, WalkieState> {
         orElse: () => currentState.currentSpeaker!,
       );
     } else if (event.isSpeaking == false &&
-               currentState.currentSpeaker?.userId == event.participantId) {
+        currentState.currentSpeaker?.userId == event.participantId) {
       currentSpeaker = null;
     }
 
-    emit(currentState.copyWith(
-      participants: updatedParticipants,
-      currentSpeaker: currentSpeaker,
-      clearCurrentSpeaker: currentSpeaker == null,
-    ));
+    emit(
+      currentState.copyWith(
+        participants: updatedParticipants,
+        currentSpeaker: currentSpeaker,
+        clearCurrentSpeaker: currentSpeaker == null,
+      ),
+    );
   }
 
   Future<void> _onLoadHistory(
@@ -730,7 +774,6 @@ class WalkieBloc extends Bloc<WalkieEvent, WalkieState> {
           if (event.message != null) 'text': event.message,
         },
       );
-
     } catch (e) {
       // Error sending alert
     }

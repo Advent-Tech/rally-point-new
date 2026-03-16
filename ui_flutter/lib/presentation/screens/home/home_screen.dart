@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
+import 'package:shimmer/shimmer.dart';
 import '../../blocs/auth/auth_bloc.dart';
 import '../../blocs/work_session/work_session_bloc.dart';
 import '../../blocs/territory/territory_bloc.dart';
@@ -10,6 +11,8 @@ import '../../blocs/schedule/schedule_bloc.dart';
 import '../../blocs/delivery/delivery_bloc.dart';
 import '../../blocs/prayer_request/prayer_request_bloc.dart';
 import '../../blocs/location/location_bloc.dart';
+import '../../../core/network/api_client.dart';
+import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/theme.dart';
 import '../../widgets/widgets.dart';
 
@@ -28,6 +31,8 @@ class _HomeScreenState extends State<HomeScreen> {
 
   bool _showAllTiles = false;
   bool _showStats = false;
+  List<dynamic> _workerTargets = [];
+  bool _isLoadingTargets = true;
 
   @override
   void initState() {
@@ -51,6 +56,9 @@ class _HomeScreenState extends State<HomeScreen> {
     // Load recent deliveries
     context.read<DeliveryBloc>().add(const DeliveryLoadList());
 
+    // Load worker targets
+    _loadWorkerTargets();
+
     // Load team leader allocations if user is a team leader
     // This is done after the first frame to ensure AuthBloc state is available
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -61,6 +69,133 @@ class _HomeScreenState extends State<HomeScreen> {
         context.read<TerritoryBloc>().add(const TerritoryLoadMyAllocations());
       }
     });
+  }
+
+  Future<void> _loadWorkerTargets() async {
+    try {
+      final apiClient = await ApiClient.getInstance();
+      final response = await apiClient.get('/api/targets/me');
+      debugPrint(
+        'Targets API response: ${response.statusCode} - ${response.data}',
+      );
+      if (mounted) {
+        setState(() {
+          if (response.statusCode == 200 && response.data != null) {
+            // Handle both direct list and wrapped response {data: [...]}
+            if (response.data is List) {
+              _workerTargets = response.data as List;
+            } else if (response.data is Map) {
+              final mapData = response.data as Map;
+              if (mapData['data'] is List) {
+                _workerTargets = mapData['data'] as List;
+              } else if (mapData['targets'] is List) {
+                _workerTargets = mapData['targets'] as List;
+              } else {
+                _workerTargets = [];
+              }
+            } else {
+              _workerTargets = [];
+            }
+            debugPrint('Parsed targets count: ${_workerTargets.length}');
+          } else {
+            _workerTargets = [];
+          }
+          _isLoadingTargets = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error loading worker targets: $e');
+      if (mounted) {
+        setState(() => _isLoadingTargets = false);
+      }
+    }
+  }
+
+  List<TargetBannerData> _buildTargetBannerData() {
+    final targetData = <String, TargetBannerData>{};
+    debugPrint('Building target banner from ${_workerTargets.length} targets');
+
+    for (final target in _workerTargets) {
+      debugPrint('Processing target: $target');
+
+      // Handle nested structure: target['assignment']['target']
+      Map<String, dynamic> assignment = {};
+      Map<String, dynamic> targetInfo = {};
+      Map<String, dynamic> progressData = {};
+
+      if (target is Map) {
+        assignment = target['assignment'] as Map<String, dynamic>? ?? {};
+        targetInfo = assignment['target'] as Map<String, dynamic>? ?? {};
+        progressData = target['progress'] as Map<String, dynamic>? ?? {};
+      }
+
+      final targetType = targetInfo['target_type']?.toString() ?? '';
+      if (targetType.isEmpty) continue; // Skip invalid entries
+
+      final targetValue = (targetInfo['target_value'] ?? 0).toDouble();
+      final currentValue = (progressData['current_value'] ?? 0).toDouble();
+      final progress = targetValue > 0
+          ? (currentValue / targetValue).clamp(0.0, 1.0)
+          : 0.0;
+      final unit = targetInfo['target_unit']?.toString() ?? 'count';
+      final isTeamTarget = assignment['assigned_to_type'] == 'team';
+
+      String currentStr;
+      if (unit == 'amount') {
+        currentStr = '\$${currentValue.toStringAsFixed(0)}';
+      } else {
+        currentStr = currentValue.toStringAsFixed(0);
+      }
+
+      String targetStr;
+      if (unit == 'amount') {
+        targetStr = '\$${targetValue.toStringAsFixed(0)}';
+      } else {
+        targetStr = targetValue.toStringAsFixed(0);
+      }
+
+      Color color;
+      IconData icon;
+      switch (targetType) {
+        case 'territory':
+          color = AppColors.success;
+          icon = Icons.map_outlined;
+          break;
+        case 'donation':
+          color = AppColors.accent;
+          icon = Icons.volunteer_activism_outlined;
+          break;
+        case 'prayer':
+          color = AppColors.secondary;
+          icon = Icons.volunteer_activism;
+          break;
+        case 'visit':
+          color = AppColors.primary;
+          icon = Icons.directions_walk;
+          break;
+        default:
+          color = AppColors.primary;
+          icon = Icons.flag;
+      }
+
+      // Only keep one target per type (latest)
+      final label = isTeamTarget
+          ? 'Team ${targetType[0].toUpperCase() + targetType.substring(1)}'
+          : targetType[0].toUpperCase() + targetType.substring(1);
+
+      targetData[targetType] = TargetBannerData(
+        label: label,
+        current: currentStr,
+        target: targetStr,
+        icon: icon,
+        progress: progress,
+        color: color,
+        isTeamTarget: isTeamTarget,
+      );
+    }
+
+    // Return up to 3 targets
+    return targetData.values.take(3).toList();
   }
 
   @override
@@ -679,35 +814,14 @@ class _HomeScreenState extends State<HomeScreen> {
             SliverToBoxAdapter(
               child: Padding(
                 padding: const EdgeInsets.only(top: 8, bottom: 16),
-                child: TargetBanner(
-                  targets: [
-                    TargetBannerData(
-                      label: 'Territory',
-                      current: '2',
-                      target: '5',
-                      icon: Icons.map_outlined,
-                      progress: 0.4,
-                      color: AppColors.success,
-                    ),
-                    TargetBannerData(
-                      label: 'Donations',
-                      current: '\$150',
-                      target: '\$500',
-                      icon: Icons.volunteer_activism_outlined,
-                      progress: 0.3,
-                      color: AppColors.accent,
-                    ),
-                    TargetBannerData(
-                      label: 'Prayers',
-                      current: '3',
-                      target: '5',
-                      icon: Icons.volunteer_activism,
-                      progress: 0.6,
-                      color: AppColors.secondary,
-                    ),
-                  ],
-                  onTap: () => context.push('/targets'),
-                ),
+                child: _isLoadingTargets
+                    ? _TargetBannerShimmer()
+                    : _workerTargets.isEmpty
+                    ? NoTargetsBanner(onTap: () => context.push('/targets'))
+                    : TargetBanner(
+                        targets: _buildTargetBannerData(),
+                        onTap: () => context.push('/targets'),
+                      ),
               ),
             ),
 
@@ -788,45 +902,59 @@ class _HomeScreenState extends State<HomeScreen> {
                   builder: (context, sessionState) {
                     final allActions = [
                       QuickActionTileData(
-                        icon: Icons.map_outlined,
+                        icon: Icons.map,
                         label: 'My Territory',
+                        subtitle: 'Manage areas',
                         backgroundColor: QuickActionColors.territory,
+                        backgroundColorEnd: QuickActionColors.territoryEnd,
                         onTap: () => context.go('/territory'),
                       ),
                       QuickActionTileData(
-                        icon: Icons.volunteer_activism_outlined,
+                        icon: Icons.volunteer_activism,
                         label: 'Donation',
+                        subtitle: 'Record gifts',
                         backgroundColor: QuickActionColors.delivery,
+                        backgroundColorEnd: QuickActionColors.deliveryEnd,
                         onTap: () => context.go('/delivery'),
                       ),
                       QuickActionTileData(
-                        icon: Icons.assignment_outlined,
+                        icon: Icons.assignment,
                         label: 'Survey Form',
+                        subtitle: 'Gather info',
                         backgroundColor: QuickActionColors.survey,
+                        backgroundColorEnd: QuickActionColors.surveyEnd,
                         onTap: () => context.go('/survey'),
                       ),
                       QuickActionTileData(
-                        icon: Icons.volunteer_activism,
-                        label: 'Prayer Request',
+                        icon: Icons.church,
+                        label: 'Prayer',
+                        subtitle: 'Track needs',
                         backgroundColor: QuickActionColors.prayer,
+                        backgroundColorEnd: QuickActionColors.prayerEnd,
                         onTap: () => context.go('/prayer-requests/new'),
                       ),
                       QuickActionTileData(
-                        icon: Icons.groups_outlined,
-                        label: 'Team Group',
+                        icon: Icons.groups,
+                        label: 'Team Chat',
+                        subtitle: 'Team connect',
                         backgroundColor: QuickActionColors.team,
+                        backgroundColorEnd: QuickActionColors.teamEnd,
                         onTap: () => context.go('/chat'),
                       ),
                       QuickActionTileData(
-                        icon: Icons.article_outlined,
+                        icon: Icons.article,
                         label: 'News',
+                        subtitle: 'Latest updates',
                         backgroundColor: QuickActionColors.news,
+                        backgroundColorEnd: QuickActionColors.newsEnd,
                         onTap: () => context.go('/blogs'),
                       ),
                       QuickActionTileData(
-                        icon: Icons.emoji_events_outlined,
+                        icon: Icons.emoji_events,
                         label: 'Achievements',
+                        subtitle: 'View badges',
                         backgroundColor: QuickActionColors.achievements,
+                        backgroundColorEnd: QuickActionColors.achievementsEnd,
                         onTap: () => context.push('/achievements'),
                       ),
                     ];
@@ -2130,6 +2258,76 @@ class _ActivityItem extends StatelessWidget {
           color: isDark
               ? AppColors.textSecondaryDark
               : AppColors.textSecondaryLight,
+        ),
+      ),
+    );
+  }
+}
+
+class _TargetBannerShimmer extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 20),
+      height: 180,
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [Color(0xFF1A237E), Color(0xFF3949AB), Color(0xFF5C6BC0)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Shimmer.fromColors(
+          baseColor: Colors.white.withOpacity(0.1),
+          highlightColor: Colors.white.withOpacity(0.3),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    width: 36,
+                    height: 36,
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Container(
+                    width: 120,
+                    height: 18,
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 24),
+              Row(
+                children: List.generate(3, (index) {
+                  return Expanded(
+                    child: Container(
+                      margin: const EdgeInsets.symmetric(horizontal: 4),
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.15),
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [const SizedBox(height: 12)],
+                      ),
+                    ),
+                  );
+                }),
+              ),
+            ],
+          ),
         ),
       ),
     );
