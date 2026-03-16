@@ -1,28 +1,40 @@
 workflows:
-  ios-workflow:
-    name: Rally Point iOS
-    instance_type: mac_mini_m1
+  ios-release:
+    name: iOS Release Build
+    instance_type: mac_mini_m2  # Use Apple silicon for faster builds
     max_build_duration: 60
     environment:
+      flutter: stable
+      xcode: latest
       groups:
+        - app_store_credentials # Match the group name in Codemagic UI
         - mapbox_tokens
-        - firebase_credentials
       vars:
         PROJECT_DIR: "ui_flutter"
+        BUNDLE_ID: "com.rallypoint.rallyPoint"
     scripts:
       - name: Set up Mapbox
         script: |
           echo "machine api.mapbox.com login mapbox password $MAPBOX_DOWNLOAD_TOKEN" > ~/.netrc
           chmod 600 ~/.netrc
-      - name: Flutter build
+      - name: Install dependencies
         script: |
           cd $PROJECT_DIR
           flutter pub get
-          cd ios
-          pod install --repo-update
-          cd ..
-          # Build the IPA with verbose logging for visibility
-          flutter build ios --release --no-codesign --verbose
+      - name: Set up keychain
+        script: keychain initialize
+      - name: Fetch signing files
+        script: |
+          app-store-connect fetch-signing-files "$BUNDLE_ID" --type IOS_APP_STORE --create
+      - name: Add certificates to keychain
+        script: keychain add-certificates
+      - name: Configure Xcode code signing
+        script: xcode-project use-profiles
+      - name: Build IPA
+        script: |
+          cd $PROJECT_DIR
+          flutter build ipa --release \
+            --export-options-plist=$HOME/export_options.plist
     artifacts:
       - ui_flutter/build/ios/ipa/*.ipa
     publishing:
