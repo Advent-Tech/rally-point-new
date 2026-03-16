@@ -1,16 +1,16 @@
 workflows:
   flutter-ios-workflow:
     name: Rally Point iOS Build
-    instance_type: mac_mini_m2
+    instance_type: mac_mini
     max_build_duration: 60
     environment:
       groups:
         - mapbox_tokens
         - firebase_credentials
       vars:
+        FLUTTER_PROJECT_PATH: "ui_flutter"
         XCODE_WORKSPACE: "ui_flutter/ios/Runner.xcworkspace"
         XCODE_SCHEME: "Runner"
-        FLUTTER_PROJECT_PATH: "ui_flutter"
       flutter: stable
       xcode: latest
     scripts:
