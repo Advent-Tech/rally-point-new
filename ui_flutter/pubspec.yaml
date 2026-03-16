@@ -56,9 +56,6 @@ dependencies:
   url_launcher: ^6.2.5
   path_provider: ^2.1.2
 
-  # Barcode & QR
-  mobile_scanner: ^6.0.0
-
   # Audio (for walkie-talkie)
   just_audio: ^0.9.36
   record: ^5.2.0
