@@ -1,0 +1,59 @@
+workflows:
+  flutter-ios-workflow:
+    name: Rally Point iOS Build
+    max_build_duration: 60
+    instance_type: mac_mini_m2
+    working_directory: ui_flutter
+    environment:
+      groups:
+        - mapbox_tokens
+        - firebase_credentials
+      vars:
+        XCODE_WORKSPACE: "ios/Runner.xcworkspace"
+        XCODE_SCHEME: "Runner"
+      flutter: stable
+      xcode: latest
+      cocoapods: default
+    scripts:
+      - name: Set up Mapbox Download Token
+        script: |
+          echo "machine api.mapbox.com login mapbox password $MAPBOX_DOWNLOAD_TOKEN" > ~/.netrc
+          chmod 600 ~/.netrc
+      - name: Get Flutter packages
+        script: |
+          flutter pub get
+      - name: Install CocoaPods
+        script: |
+          cd ios && pod install
+      - name: Flutter build iOS
+        script: |
+          flutter build ios --release --no-codesign
+    artifacts:
+      - ui_flutter/build/ios/ipa/*.ipa
+    publishing:
+      email:
+        recipients:
+          - your-email@example.com
+
+  flutter-android-workflow:
+    name: Rally Point Android Build
+    max_build_duration: 30
+    instance_type: linux_m2
+    working_directory: ui_flutter
+    environment:
+      groups:
+        - firebase_credentials
+      flutter: stable
+    scripts:
+      - name: Get Flutter packages
+        script: |
+          flutter pub get
+      - name: Build Android App Bundle
+        script: |
+          flutter build appbundle --release
+    artifacts:
+      - ui_flutter/build/app/outputs/bundle/release/*.aab
+    publishing:
+      email:
+        recipients:
+          - your-email@example.com
