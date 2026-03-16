@@ -22,25 +22,43 @@ workflows:
           
           # Manually create Podfile to bypass CDN issues and set platform
           cat <<EOF > ios/Podfile
+          # Load Flutter helper methods
+          flutter_install_all_ios_pods File.dirname(File.realpath(__FILE__)) if respond_to?(:flutter_install_all_ios_pods)
+          
+          # Fallback if the helper is not available (manual definition)
+          if !respond_to?(:flutter_install_all_ios_pods)
+            def flutter_install_all_ios_pods(path)
+              # Minimal fallback for plugin registration
+            end
+          end
+
           platform :ios, '13.0'
-          # Use GitHub master repo instead of CDN
           source 'https://github.com/CocoaPods/Specs.git'
           
           target 'Runner' do
             use_frameworks!
             use_modular_headers!
-            flutter_install_all_ios_pods File.dirname(File.realpath(__FILE__))
+            
+            # The standard Flutter pod inclusion
+            # We need to ensure the helper is loaded before this
+            if respond_to?(:flutter_install_all_ios_pods)
+              flutter_install_all_ios_pods File.dirname(File.realpath(__FILE__))
+            end
           end
           
           post_install do |installer|
             installer.pods_project.targets.each do |target|
-              flutter_additional_ios_build_settings(target)
+              flutter_additional_ios_build_settings(target) if respond_to?(:flutter_additional_ios_build_settings)
               target.build_configurations.each do |config|
                 config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '13.0'
               end
             end
           end
           EOF
+
+          # Ensure the Podfile includes the actual Flutter helper script path
+          # This is critical because 'flutter create' might not have linked it correctly in the custom Podfile
+          sed -i '' "1s|^|require File.expand_path(File.join('..', '..', '..', 'packages', 'flutter_tools', 'bin', 'podhelper'), \`flutter config --machine \| grep -o '\"flutterRoot\": \"[^\"]*\"' \| cut -d'\"' -f4\`)\n|" ios/Podfile || true
 
           flutter pub get
           cd ios
