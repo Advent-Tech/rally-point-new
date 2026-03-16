@@ -7,7 +7,7 @@ workflows:
       flutter: stable
       xcode: latest
       groups:
-        - ios build
+        - "iOS build"
       vars:
         PROJECT_DIR: "ui_flutter"
         BUNDLE_ID: "com.rallypoint.rallyPoint"
