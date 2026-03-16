@@ -7,8 +7,7 @@ workflows:
       flutter: stable
       xcode: latest
       groups:
-        - app_store_credentials # Match the group name in Codemagic UI
-        - mapbox_tokens
+        - ios build
       vars:
         PROJECT_DIR: "ui_flutter"
         BUNDLE_ID: "com.rallypoint.rallyPoint"
