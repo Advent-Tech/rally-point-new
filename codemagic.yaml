@@ -22,6 +22,35 @@ workflows:
           flutter pub get
       - name: Set up keychain
         script: keychain initialize
+      - name: Prepare App Store Connect API key
+        script: |
+          set -e
+          python3 - <<'PY'
+          import os, base64, sys
+          k = os.environ.get('APP_STORE_CONNECT_PRIVATE_KEY', '') or ''
+          kb64 = os.environ.get('APP_STORE_CONNECT_PRIVATE_KEY_BASE64', '') or ''
+          if kb64.strip():
+            k = base64.b64decode(kb64).decode('utf-8')
+          k = k.replace('\\n', '\n').strip() + '\n'
+          sys.stdout.write(k)
+          PY
+          
+          python3 - <<'PY' > "$HOME/AuthKey.p8"
+          import os, base64, sys
+          k = os.environ.get('APP_STORE_CONNECT_PRIVATE_KEY', '') or ''
+          kb64 = os.environ.get('APP_STORE_CONNECT_PRIVATE_KEY_BASE64', '') or ''
+          if kb64.strip():
+            k = base64.b64decode(kb64).decode('utf-8')
+          k = k.replace('\\n', '\n').strip() + '\n'
+          sys.stdout.write(k)
+          PY
+
+          if ! grep -q "BEGIN PRIVATE KEY" "$HOME/AuthKey.p8"; then
+            echo "APP_STORE_CONNECT_PRIVATE_KEY is not a valid .p8/PEM key (missing BEGIN PRIVATE KEY header)" >&2
+            exit 1
+          fi
+
+          export APP_STORE_CONNECT_PRIVATE_KEY="$(cat "$HOME/AuthKey.p8")"
       - name: Fetch signing files
         script: |
           app-store-connect fetch-signing-files "$BUNDLE_ID" --type IOS_APP_STORE --create
