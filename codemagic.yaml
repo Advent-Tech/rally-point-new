@@ -17,34 +17,12 @@ workflows:
       - name: Flutter build
         script: |
           cd $PROJECT_DIR
-          # Recreate iOS project structure
-          flutter create --platforms ios .
-          
-          # Manually create Podfile with the correct helper path
-          cat <<EOF > ios/Podfile
-          require File.expand_path(File.join('packages', 'flutter_tools', 'bin', 'podhelper'), `flutter config --machine | grep -o '\"flutterRoot\": \"[^\"]*\"' | cut -d'\"' -f4`)
-
-          platform :ios, '13.0'
-          # Use GitHub master repo instead of CDN to bypass connection issues
-          source 'https://github.com/CocoaPods/Specs.git'
-          
-          target 'Runner' do
-            use_frameworks!
-            use_modular_headers!
-            flutter_install_all_ios_pods File.dirname(File.realpath(__FILE__))
-          end
-          
-          post_install do |installer|
-            installer.pods_project.targets.each do |target|
-              flutter_additional_ios_build_settings(target)
-              target.build_configurations.each do |config|
-                config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '13.0'
-              end
-            end
-          end
-          EOF
-
           flutter pub get
+          
+          # Dynamically fix Podfile helper path for CI environment
+          FLUTTER_SDK_PATH=$(flutter config --machine | grep -o '"flutterRoot": "[^"]*"' | cut -d'"' -f4)
+          sed -i '' "s|require File.expand_path(File.join.*|require File.expand_path(File.join('packages', 'flutter_tools', 'bin', 'podhelper'), '$FLUTTER_SDK_PATH')|" ios/Podfile
+
           cd ios
           pod install --repo-update
           cd ..
