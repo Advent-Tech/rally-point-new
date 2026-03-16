@@ -67,6 +67,7 @@ workflows:
         script: |
           cd $PROJECT_DIR
           flutter build ipa --release -v \
+            --build-number=$CM_BUILD_NUMBER \
             --export-options-plist=$HOME/export_options.plist
     artifacts:
       - ui_flutter/build/ios/ipa/*.ipa
@@ -78,7 +79,7 @@ workflows:
         submit_to_testflight: true
       email:
         recipients:
-          - your-email@example.com
+          - streams.app.2030@gmail.com
 
   android-workflow:
     name: Rally Point Android
