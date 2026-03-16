@@ -20,6 +20,24 @@ workflows:
         script: |
           cd $PROJECT_DIR
           flutter pub get
+      - name: Ensure iOS deployment target
+        script: |
+          cd $PROJECT_DIR
+          echo "--- ios/Podfile (head) ---"
+          head -n 20 ios/Podfile || true
+          echo "--- enforcing iOS 14.0 in Podfile ---"
+          if grep -q "^platform :ios" ios/Podfile; then
+            sed -i '' "s/^platform :ios, .*/platform :ios, '14.0'/" ios/Podfile
+          else
+            printf "platform :ios, '14.0'\n\n" | cat - ios/Podfile > ios/Podfile.tmp
+            mv ios/Podfile.tmp ios/Podfile
+          fi
+          echo "--- ios/Podfile (head after) ---"
+          head -n 20 ios/Podfile || true
+      - name: Install CocoaPods
+        script: |
+          cd $PROJECT_DIR/ios
+          pod install --repo-update
       - name: Set up keychain
         script: keychain initialize
       - name: Fetch signing files
