@@ -17,9 +17,15 @@ workflows:
       - name: Flutter build
         script: |
           cd $PROJECT_DIR
+          # Recreate iOS project if missing and fetch packages
+          flutter create --platforms=ios .
           flutter pub get
-          cd ios && pod install
+          # Initialize and install pods
+          cd ios
+          pod init || true # Continue if already exists
+          pod install
           cd ..
+          # Build the IPA
           flutter build ios --release --no-codesign
     artifacts:
       - ui_flutter/build/ios/ipa/*.ipa
