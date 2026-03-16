@@ -11,8 +11,8 @@ workflows:
         FLUTTER_PROJECT_PATH: "ui_flutter"
         XCODE_WORKSPACE: "ui_flutter/ios/Runner.xcworkspace"
         XCODE_SCHEME: "Runner"
-      flutter: stable
-      xcode: latest
+        F_VERSION: "stable"
+        X_VERSION: "latest"
     scripts:
       - name: Set up Mapbox Download Token
         script: |
@@ -43,7 +43,7 @@ workflows:
         - firebase_credentials
       vars:
         FLUTTER_PROJECT_PATH: "ui_flutter"
-      flutter: stable
+        F_VERSION: "stable"
     scripts:
       - name: Get Flutter packages
         script: |
