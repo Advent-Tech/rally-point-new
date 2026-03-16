@@ -1,32 +1,26 @@
 workflows:
-  flutter-ios-workflow:
-    name: Rally Point iOS Build
-    instance_type: mac_mini
+  ios-workflow:
+    name: Rally Point iOS
+    instance_type: mac_mini_m2
     max_build_duration: 60
     environment:
       groups:
         - mapbox_tokens
         - firebase_credentials
       vars:
-        FLUTTER_PROJECT_PATH: "ui_flutter"
-        XCODE_WORKSPACE: "ui_flutter/ios/Runner.xcworkspace"
-        XCODE_SCHEME: "Runner"
-        F_VERSION: "stable"
-        X_VERSION: "latest"
+        PROJECT_DIR: "ui_flutter"
     scripts:
-      - name: Set up Mapbox Download Token
+      - name: Set up Mapbox
         script: |
           echo "machine api.mapbox.com login mapbox password $MAPBOX_DOWNLOAD_TOKEN" > ~/.netrc
           chmod 600 ~/.netrc
-      - name: Get Flutter packages
+      - name: Flutter build
         script: |
-          cd $FLUTTER_PROJECT_PATH && flutter pub get
-      - name: Install CocoaPods
-        script: |
-          cd $FLUTTER_PROJECT_PATH/ios && pod install
-      - name: Flutter build iOS
-        script: |
-          cd $FLUTTER_PROJECT_PATH && flutter build ios --release --no-codesign
+          cd $PROJECT_DIR
+          flutter pub get
+          cd ios && pod install
+          cd ..
+          flutter build ios --release --no-codesign
     artifacts:
       - ui_flutter/build/ios/ipa/*.ipa
     publishing:
@@ -34,23 +28,21 @@ workflows:
         recipients:
           - your-email@example.com
 
-  flutter-android-workflow:
-    name: Rally Point Android Build
+  android-workflow:
+    name: Rally Point Android
     instance_type: linux
     max_build_duration: 30
     environment:
       groups:
         - firebase_credentials
       vars:
-        FLUTTER_PROJECT_PATH: "ui_flutter"
-        F_VERSION: "stable"
+        PROJECT_DIR: "ui_flutter"
     scripts:
-      - name: Get Flutter packages
+      - name: Flutter build
         script: |
-          cd $FLUTTER_PROJECT_PATH && flutter pub get
-      - name: Build Android App Bundle
-        script: |
-          cd $FLUTTER_PROJECT_PATH && flutter build appbundle --release
+          cd $PROJECT_DIR
+          flutter pub get
+          flutter build appbundle --release
     artifacts:
       - ui_flutter/build/app/outputs/bundle/release/*.aab
     publishing:
