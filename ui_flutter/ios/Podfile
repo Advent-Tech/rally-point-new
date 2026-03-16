@@ -2,6 +2,9 @@ platform :ios, '14.0'
 
 # Dynamically resolve the Flutter SDK path
 def flutter_root
+  env_flutter_root = ENV['FLUTTER_ROOT']
+  return env_flutter_root.strip if env_flutter_root && !env_flutter_root.strip.empty?
+
   generated_xcode_build_settings_path = File.expand_path(File.join('..', 'Flutter', 'Generated.xcconfig'), __FILE__)
   if File.exist?(generated_xcode_build_settings_path)
     File.foreach(generated_xcode_build_settings_path) do |line|
@@ -9,8 +12,23 @@ def flutter_root
       return matches[1].strip if matches
     end
   end
-  # Fallback to shell command if xcconfig fails
-  `flutter config --machine | grep -o '"flutterRoot": "[^"]*"' | cut -d'"' -f4`.strip
+
+  # Fallback to Flutter config JSON if xcconfig fails
+  begin
+    require 'json'
+    flutter_config = JSON.parse(`flutter config --machine`)
+    flutter_root_from_config = flutter_config['flutterRoot']
+    return flutter_root_from_config.strip if flutter_root_from_config && !flutter_root_from_config.strip.empty?
+  rescue
+  end
+
+  # Last resort: infer from flutter binary path
+  flutter_bin = `which flutter`.strip
+  if flutter_bin && !flutter_bin.empty?
+    return File.expand_path('..', File.dirname(flutter_bin))
+  end
+
+  raise "Unable to determine FLUTTER_ROOT"
 end
 
 require File.expand_path(File.join('packages', 'flutter_tools', 'bin', 'podhelper'), flutter_root)
