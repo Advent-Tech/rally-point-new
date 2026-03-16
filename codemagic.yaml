@@ -66,7 +66,7 @@ workflows:
       - name: Build IPA
         script: |
           cd $PROJECT_DIR
-          flutter build ipa --release \
+          flutter build ipa --release -v \
             --export-options-plist=$HOME/export_options.plist
     artifacts:
       - ui_flutter/build/ios/ipa/*.ipa
