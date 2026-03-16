@@ -20,6 +20,10 @@ workflows:
         script: |
           cd $PROJECT_DIR
           flutter pub get
+      - name: Analyze Dart code
+        script: |
+          cd $PROJECT_DIR
+          flutter analyze
       - name: Update CocoaPods specs
         script: |
           cd $PROJECT_DIR/ios
