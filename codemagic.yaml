@@ -20,6 +20,11 @@ workflows:
         script: |
           cd $PROJECT_DIR
           flutter pub get
+      - name: Update CocoaPods specs
+        script: |
+          cd $PROJECT_DIR/ios
+          pod repo update
+          pod install --repo-update
       - name: Set up keychain
         script: keychain initialize
       - name: Prepare App Store Connect API key
