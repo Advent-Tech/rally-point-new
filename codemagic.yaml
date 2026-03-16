@@ -18,16 +18,11 @@ workflows:
         script: |
           cd $PROJECT_DIR
           flutter pub get
-          
-          # Dynamically fix Podfile helper path for CI environment
-          FLUTTER_SDK_PATH=$(flutter config --machine | grep -o '"flutterRoot": "[^"]*"' | cut -d'"' -f4)
-          sed -i '' "s|require File.expand_path(File.join.*|require File.expand_path(File.join('packages', 'flutter_tools', 'bin', 'podhelper'), '$FLUTTER_SDK_PATH')|" ios/Podfile
-
           cd ios
           pod install --repo-update
           cd ..
-          # Build the IPA
-          flutter build ios --release --no-codesign
+          # Build the IPA with verbose logging for visibility
+          flutter build ios --release --no-codesign --verbose
     artifacts:
       - ui_flutter/build/ios/ipa/*.ipa
     publishing:
