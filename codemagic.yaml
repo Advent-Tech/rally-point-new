@@ -17,13 +17,34 @@ workflows:
       - name: Flutter build
         script: |
           cd $PROJECT_DIR
-          # Recreate iOS project if missing and fetch packages
+          # Recreate iOS project structure
           flutter create --platforms ios .
+          
+          # Manually create Podfile to bypass CDN issues and set platform
+          cat <<EOF > ios/Podfile
+          platform :ios, '13.0'
+          # Use GitHub master repo instead of CDN
+          source 'https://github.com/CocoaPods/Specs.git'
+          
+          target 'Runner' do
+            use_frameworks!
+            use_modular_headers!
+            flutter_install_all_ios_pods File.dirname(File.realpath(__FILE__))
+          end
+          
+          post_install do |installer|
+            installer.pods_project.targets.each do |target|
+              flutter_additional_ios_build_settings(target)
+              target.build_configurations.each do |config|
+                config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '13.0'
+              end
+            end
+          end
+          EOF
+
           flutter pub get
-          # Initialize and install pods
           cd ios
-          pod repo update
-          pod install
+          pod install --repo-update
           cd ..
           # Build the IPA
           flutter build ios --release --no-codesign
