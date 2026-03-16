@@ -18,11 +18,11 @@ workflows:
         script: |
           cd $PROJECT_DIR
           # Recreate iOS project if missing and fetch packages
-          flutter create --platforms=ios .
+          flutter create --platforms ios .
           flutter pub get
           # Initialize and install pods
           cd ios
-          pod init || true # Continue if already exists
+          pod repo update
           pod install
           cd ..
           # Build the IPA
