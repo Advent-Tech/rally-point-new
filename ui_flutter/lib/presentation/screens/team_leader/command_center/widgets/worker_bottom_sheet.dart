@@ -104,6 +104,15 @@ class _WorkerBottomSheetState extends State<WorkerBottomSheet> {
                         );
 
                         return ListTile(
+                          onTap: isLive
+                              ? () {
+                                  context.read<CommandCenterBloc>().add(
+                                    FollowWorkerEvent(
+                                      workerId: isFollowing ? null : worker.id,
+                                    ),
+                                  );
+                                }
+                              : null,
                           leading: CircleAvatar(
                             backgroundColor: isLive
                                 ? Colors.green

@@ -150,6 +150,13 @@ class ActivityLayer {
     }
   }
 
+  Future<void> clear() async {
+    if (_circleManager == null) return;
+    await _circleManager!.deleteAll();
+    _donationRegistry.clear();
+    _prayerRegistry.clear();
+  }
+
   void dispose() {
     _circleManager = null;
   }

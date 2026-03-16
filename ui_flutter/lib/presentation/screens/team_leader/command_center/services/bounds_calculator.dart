@@ -81,6 +81,59 @@ class BoundsCalculator {
     );
   }
 
+  /// Calculate bounds from a collection of live worker positions
+  static CoordinateBounds fromPositions(Iterable<cc_state.Position> positions) {
+    final lats = <double>[];
+    final lngs = <double>[];
+
+    for (final p in positions) {
+      final lat = p.latitude;
+      final lng = p.longitude;
+      if (lat == 0 && lng == 0) continue;
+      if (lat < -90 || lat > 90 || lng < -180 || lng > 180) continue;
+      lats.add(lat);
+      lngs.add(lng);
+    }
+
+    if (lats.isEmpty || lngs.isEmpty) {
+      return CoordinateBounds(
+        southwest: Point(coordinates: Position(-125.0, 24.0)),
+        northeast: Point(coordinates: Position(-66.0, 49.0)),
+        infiniteBounds: false,
+      );
+    }
+
+    var minLat = lats.reduce((a, b) => a < b ? a : b);
+    var maxLat = lats.reduce((a, b) => a > b ? a : b);
+    var minLng = lngs.reduce((a, b) => a < b ? a : b);
+    var maxLng = lngs.reduce((a, b) => a > b ? a : b);
+
+    const minSpread = 0.02;
+    if (maxLat - minLat < minSpread) {
+      final center = (maxLat + minLat) / 2;
+      minLat = center - (minSpread / 2);
+      maxLat = center + (minSpread / 2);
+    }
+    if (maxLng - minLng < minSpread) {
+      final center = (maxLng + minLng) / 2;
+      minLng = center - (minSpread / 2);
+      maxLng = center + (minSpread / 2);
+    }
+
+    final latPadding = (maxLat - minLat).abs() * 0.15;
+    final lngPadding = (maxLng - minLng).abs() * 0.15;
+
+    return CoordinateBounds(
+      southwest: Point(
+        coordinates: Position(minLng - lngPadding, minLat - latPadding),
+      ),
+      northeast: Point(
+        coordinates: Position(maxLng + lngPadding, maxLat + latPadding),
+      ),
+      infiniteBounds: false,
+    );
+  }
+
   /// Calculate unified bounds for territories and activities
   static CoordinateBounds calculateOverviewBounds(
     cc_state.CommandCenterState state,

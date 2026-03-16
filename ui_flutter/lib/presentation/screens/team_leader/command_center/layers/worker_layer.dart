@@ -117,6 +117,12 @@ class WorkerLayer {
     }
   }
 
+  Future<void> clear() async {
+    if (_circleManager == null) return;
+    await _circleManager!.deleteAll();
+    _registry.clear();
+  }
+
   void dispose() {
     _pulseTimer?.cancel();
     _circleManager = null;

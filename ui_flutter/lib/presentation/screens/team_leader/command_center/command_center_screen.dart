@@ -69,6 +69,8 @@ class _CommandCenterScreenState extends State<CommandCenterScreen> {
           mapbox.MapWidget(
             key: const ValueKey('command-center-map'),
             onMapCreated: _onMapCreated,
+            onTapListener: (context) =>
+                _commandController?.handleMapTap(context),
             cameraOptions: mapbox.CameraOptions(
               center: mapbox.Point(
                 coordinates: mapbox.Position(-98.5795, 39.8283),

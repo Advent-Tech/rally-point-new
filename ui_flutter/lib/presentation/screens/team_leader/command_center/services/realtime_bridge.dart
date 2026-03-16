@@ -10,37 +10,78 @@ import '../command_center_state.dart';
 class RealtimeBridge {
   final CommandCenterBloc bloc;
   final List<StreamSubscription> _subscriptions = [];
+  final WebSocketService _ws;
 
-  RealtimeBridge({required this.bloc}) {
+  RealtimeBridge({required this.bloc, WebSocketService? ws})
+    : _ws = ws ?? WebSocketService() {
     _initialize();
   }
 
   void _initialize() {
-    final ws = WebSocketService();
-
     // Listen for worker location updates
     _subscriptions.add(
-      ws.messagesOfType(WsMessageType.locationUpdate).listen((message) {
+      _ws.messagesOfType(WsMessageType.locationUpdate).listen((message) {
         final update = message.data;
+        final userId = update['userId']?.toString();
+        final latRaw = update['latitude'];
+        final lngRaw = update['longitude'];
+        if (userId == null || userId.isEmpty) return;
+        if (latRaw is! num || lngRaw is! num) return;
         bloc.add(
           UpdateLiveLocationEvent(
-            workerId: update['userId'] as String,
-            latitude: update['latitude'] as double,
-            longitude: update['longitude'] as double,
+            workerId: userId,
+            latitude: latRaw.toDouble(),
+            longitude: lngRaw.toDouble(),
           ),
         );
 
         // Update worker path if tracking
-        if (update['userId'] == bloc.state.followTarget) {
-          final currentPath = bloc.state.workerPaths[update['userId']] ?? [];
+        if (userId == bloc.state.followTarget) {
+          final currentPath = bloc.state.workerPaths[userId] ?? [];
           bloc.add(
             UpdateWorkerPathEvent(
-              workerId: update['userId'] as String,
+              workerId: userId,
               path: [
                 ...currentPath,
                 Position(
-                  latitude: update['latitude'] as double,
-                  longitude: update['longitude'] as double,
+                  latitude: latRaw.toDouble(),
+                  longitude: lngRaw.toDouble(),
+                ),
+              ],
+            ),
+          );
+        }
+      }),
+    );
+
+    _subscriptions.add(
+      _ws.messagesOfType(WsMessageType.workerLocationBroadcast).listen((
+        message,
+      ) {
+        final update = message.data;
+        final userId = update['userId']?.toString();
+        final latRaw = update['latitude'];
+        final lngRaw = update['longitude'];
+        if (userId == null || userId.isEmpty) return;
+        if (latRaw is! num || lngRaw is! num) return;
+        bloc.add(
+          UpdateLiveLocationEvent(
+            workerId: userId,
+            latitude: latRaw.toDouble(),
+            longitude: lngRaw.toDouble(),
+          ),
+        );
+
+        if (userId == bloc.state.followTarget) {
+          final currentPath = bloc.state.workerPaths[userId] ?? [];
+          bloc.add(
+            UpdateWorkerPathEvent(
+              workerId: userId,
+              path: [
+                ...currentPath,
+                Position(
+                  latitude: latRaw.toDouble(),
+                  longitude: lngRaw.toDouble(),
                 ),
               ],
             ),
@@ -51,7 +92,7 @@ class RealtimeBridge {
 
     // Listen for new donations (using team activity stream)
     _subscriptions.add(
-      ws.teamActivityStream.listen((message) {
+      _ws.teamActivityStream.listen((message) {
         final data = message.data;
         if (data['type'] == 'donation') {
           final donation = DonationModel.fromJson(data);
@@ -62,7 +103,7 @@ class RealtimeBridge {
 
     // Listen for new prayer requests (using team activity stream)
     _subscriptions.add(
-      ws.teamActivityStream.listen((message) {
+      _ws.teamActivityStream.listen((message) {
         final data = message.data;
         if (data['type'] == 'prayer_request') {
           final prayer = PrayerRequestModel.fromJson(data);

@@ -6,11 +6,17 @@ import '../services/annotation_registry.dart';
 class TerritoryLayer {
   final MapboxMap mapController;
   final _registry = AnnotationRegistry<GeoTerritory>();
+  final Map<String, List<List<Position>>> _geometryCache = {};
 
   PolygonAnnotationManager? _polygonManager;
   PolylineAnnotationManager? _polylineManager;
+  CircleAnnotationManager? _circleManager;
 
   TerritoryLayer({required this.mapController});
+
+  List<dynamic> getRegisteredAnnotations(String domainId) {
+    return _registry.getAnnotations(domainId);
+  }
 
   Future<void> initialize() async {
     try {
@@ -18,159 +24,171 @@ class TerritoryLayer {
           .createPolygonAnnotationManager();
       _polylineManager = await mapController.annotations
           .createPolylineAnnotationManager();
+      _circleManager = await mapController.annotations
+          .createCircleAnnotationManager();
     } catch (e) {
       debugPrint('Error initializing territory layer: $e');
     }
   }
 
-  void updateTerritories(List<GeoTerritory> territories) async {
-    if (_polygonManager == null || _polylineManager == null) return;
-
-    final currentIds = territories.map((t) => t.id).toSet();
-    final Map<String, GeoTerritory> entities = Map.fromEntries(
-      territories.map((t) => MapEntry(t.id, t)),
-    );
-    final Map<String, dynamic> diff = _registry.diff(currentIds, entities);
-
-    final List<String> added = List<String>.from(diff['added'] as Iterable);
-    final List<String> updated = List<String>.from(diff['updated'] as Iterable);
-    final Map<String, List<String>> removed = Map<String, List<String>>.from(
-      diff['removed'] as Map,
-    );
-
-    // Remove old annotations
-    if (removed.isNotEmpty) {
-      final toRemove = removed.values
-          .expand((r) => r as Iterable<dynamic>)
-          .toList();
-      for (final annotation in toRemove) {
-        if (annotation is PolygonAnnotation) {
-          await _polygonManager?.delete(annotation);
-        } else if (annotation is PolylineAnnotation) {
-          await _polylineManager?.delete(annotation);
-        }
-      }
+  void updateTerritories(
+    List<GeoTerritory> territories, {
+    String? selectedId,
+  }) async {
+    if (_polygonManager == null ||
+        _polylineManager == null ||
+        _circleManager == null) {
+      return;
     }
 
-    // Add/update territories
+    // Clear and batch update for performance
+    await _polygonManager!.deleteAll();
+    await _polylineManager!.deleteAll();
+    await _circleManager!.deleteAll();
+    _registry.clear();
+
     final List<PolygonAnnotationOptions> polygonsToAdd = [];
     final List<PolylineAnnotationOptions> polylinesToAdd = [];
+    final List<CircleAnnotationOptions> circlesToAdd = [];
     final List<String> idsToAdd = [];
 
-    for (final id in [...added, ...updated]) {
-      final territory = entities[id];
-      if (territory == null) continue;
-      final geometry = territory.geometry;
-      if (geometry != null) {
-        final type = geometry['type'] as String?;
-        final coordinates = geometry['coordinates'];
+    for (final territory in territories) {
+      final id = territory.id;
+      final isSelected = id == selectedId;
 
-        if (coordinates is List) {
-          final List<List<Position>> polygonCoords = [];
+      List<List<Position>> polygonCoords = _geometryCache[id] ?? [];
 
-          if (type == 'Polygon') {
-            for (final ring in coordinates) {
-              if (ring is List) {
-                final List<Position> points = ring.map((coord) {
-                  final c = coord as List;
-                  final lng = (c[0] as num).toDouble();
-                  final lat = (c[1] as num).toDouble();
+      if (polygonCoords.isEmpty) {
+        final geometry = territory.geometry;
+        if (geometry != null) {
+          final type = geometry['type'] as String?;
+          final coordinates = geometry['coordinates'];
 
-                  // // Debug logging for the first point of each ring
-                  // if (polygonCoords.isEmpty && points.isEmpty) {
-                  //   debugPrint('Territory $id First Point: Lng=$lng, Lat=$lat');
-                  // }
-
-                  return Position(lng, lat);
-                }).toList();
-                polygonCoords.add(points);
-              }
-            }
-          } else if (type == 'MultiPolygon') {
-            for (final polygon in coordinates) {
-              if (polygon is List && polygon.isNotEmpty) {
-                final ring = polygon.first;
+          if (coordinates is List) {
+            if (type == 'Polygon') {
+              for (final ring in coordinates) {
                 if (ring is List) {
                   final List<Position> points = ring.map((coord) {
                     final c = coord as List;
-                    final lng = (c[0] as num).toDouble();
-                    final lat = (c[1] as num).toDouble();
-
-                    // Debug logging for the first point of each polygon
-                    // if (polygonCoords.isEmpty && points.isEmpty) {
-                    //   debugPrint(
-                    //     'MultiTerritory $id First Point: Lng=$lng, Lat=$lat',
-                    //   );
-                    // }
-
-                    return Position(lng, lat);
+                    return Position(
+                      (c[0] as num).toDouble(),
+                      (c[1] as num).toDouble(),
+                    );
                   }).toList();
                   polygonCoords.add(points);
                 }
               }
+            } else if (type == 'MultiPolygon') {
+              for (final polygon in coordinates) {
+                if (polygon is List && polygon.isNotEmpty) {
+                  final ring = polygon.first;
+                  if (ring is List) {
+                    final List<Position> points = ring.map((coord) {
+                      final c = coord as List;
+                      return Position(
+                        (c[0] as num).toDouble(),
+                        (c[1] as num).toDouble(),
+                      );
+                    }).toList();
+                    polygonCoords.add(points);
+                  }
+                }
+              }
             }
-          }
-
-          if (polygonCoords.isNotEmpty) {
-            final isSolid = territory.solid.toLowerCase() == 'true';
-
-            polygonsToAdd.add(
-              PolygonAnnotationOptions(
-                geometry: Polygon(coordinates: polygonCoords),
-                fillColor: isSolid
-                    ? const Color(0x803B82F6)
-                          .toARGB32() // 0.5 opacity (increased)
-                    : const Color(
-                        0x4D3B82F6,
-                      ).toARGB32(), // 0.3 opacity (increased)
-                fillOutlineColor: const Color(0xFF3B82F6).toARGB32(),
-              ),
-            );
-
-            // Add outlines for each ring
-            for (final points in polygonCoords) {
-              polylinesToAdd.add(
-                PolylineAnnotationOptions(
-                  geometry: LineString(coordinates: points),
-                  lineColor: const Color(0xFF3B82F6).toARGB32(),
-                  lineWidth: 3.5, // Increased width
-                ),
-              );
+            if (polygonCoords.isNotEmpty) {
+              _geometryCache[id] = polygonCoords;
             }
-            idsToAdd.add(territory.id);
           }
         }
+      }
+
+      if (polygonCoords.isNotEmpty) {
+        final isSolid = territory.solid.toLowerCase() == 'true';
+
+        polygonsToAdd.add(
+          PolygonAnnotationOptions(
+            geometry: Polygon(coordinates: polygonCoords),
+            fillColor: isSelected
+                ? const Color(0x993B82F6)
+                      .toARGB32() // Higher opacity for selected
+                : (isSolid
+                      ? const Color(0x803B82F6).toARGB32()
+                      : const Color(0x4D3B82F6).toARGB32()),
+            fillOutlineColor: const Color(0xFF3B82F6).toARGB32(),
+          ),
+        );
+
+        for (final points in polygonCoords) {
+          polylinesToAdd.add(
+            PolylineAnnotationOptions(
+              geometry: LineString(coordinates: points),
+              lineColor: const Color(0xFF3B82F6).toARGB32(),
+              lineWidth: isSelected ? 5.0 : 3.5,
+            ),
+          );
+        }
+
+        // Add centroid marker for better visibility at zoomed-out levels
+        final centroid = _calculateCentroid(polygonCoords.first);
+        circlesToAdd.add(
+          CircleAnnotationOptions(
+            geometry: Point(coordinates: centroid),
+            circleColor: const Color(0xFF3B82F6).toARGB32(),
+            circleRadius: isSelected ? 12.0 : 8.0,
+            circleStrokeColor: const Color(0xFFFFFFFF).toARGB32(),
+            circleStrokeWidth: 2.0,
+          ),
+        );
+
+        idsToAdd.add(id);
       }
     }
 
     if (polygonsToAdd.isNotEmpty) {
-      final List<PolygonAnnotation?>? createdPolygons = await _polygonManager
-          ?.createMulti(polygonsToAdd);
-      final List<PolylineAnnotation?>? createdPolylines = await _polylineManager
-          ?.createMulti(polylinesToAdd);
+      final createdPolygons = await _polygonManager!.createMulti(polygonsToAdd);
+      final createdPolylines = await _polylineManager!.createMulti(
+        polylinesToAdd,
+      );
+      final createdCircles = await _circleManager!.createMulti(circlesToAdd);
 
-      if (createdPolygons != null && createdPolylines != null) {
-        // Update registry
-        for (var i = 0; i < idsToAdd.length; i++) {
-          final id = idsToAdd[i];
-          final territory = entities[id]!;
-          final polygon = createdPolygons[i];
-          final polyline = createdPolylines[i];
-          if (polygon != null && polyline != null) {
-            _registry.register(
-              id,
-              territory,
-              [polygon.id, polyline.id],
-              [polygon, polyline],
-            );
-          }
-        }
+      for (var i = 0; i < idsToAdd.length; i++) {
+        final id = idsToAdd[i];
+        final territory = territories.firstWhere((t) => t.id == id);
+        _registry.register(
+          id,
+          territory,
+          [
+            createdPolygons[i]!.id,
+            createdPolylines[i]!.id,
+            createdCircles[i]!.id,
+          ],
+          [createdPolygons[i], createdPolylines[i], createdCircles[i]],
+        );
       }
     }
+  }
+
+  Position _calculateCentroid(List<Position> coords) {
+    if (coords.isEmpty) return Position(0, 0);
+    double sumLat = 0, sumLng = 0;
+    for (final coord in coords) {
+      sumLat += coord.lat;
+      sumLng += coord.lng;
+    }
+    return Position(sumLng / coords.length, sumLat / coords.length);
+  }
+
+  Future<void> clear() async {
+    await _polygonManager?.deleteAll();
+    await _polylineManager?.deleteAll();
+    await _circleManager?.deleteAll();
+    _registry.clear();
   }
 
   void dispose() {
     _polygonManager = null;
     _polylineManager = null;
+    _circleManager = null;
+    _geometryCache.clear();
   }
 }

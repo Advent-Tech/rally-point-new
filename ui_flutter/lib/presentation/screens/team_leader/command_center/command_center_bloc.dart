@@ -45,7 +45,44 @@ class CommandCenterBloc extends Bloc<CommandCenterEvent, CommandCenterState> {
     ChangeMapModeEvent event,
     Emitter<CommandCenterState> emit,
   ) async {
-    emit(state.copyWith(mapMode: event.mode));
+    switch (event.mode) {
+      case MapMode.overview:
+        emit(
+          state.copyWith(
+            mapMode: event.mode,
+            showTerritories: true,
+            showWorkers: false,
+            showActivities: true,
+            showTrails: false,
+            followTarget: '',
+          ),
+        );
+        break;
+      case MapMode.workers:
+        emit(
+          state.copyWith(
+            mapMode: event.mode,
+            showTerritories: false,
+            showWorkers: true,
+            showActivities: false,
+            showTrails: false,
+            selectedTerritoryId: '',
+          ),
+        );
+        break;
+      case MapMode.territories:
+        emit(
+          state.copyWith(
+            mapMode: event.mode,
+            showTerritories: true,
+            showWorkers: false,
+            showActivities: false,
+            showTrails: false,
+            followTarget: '',
+          ),
+        );
+        break;
+    }
   }
 
   Future<void> _onRefreshData(

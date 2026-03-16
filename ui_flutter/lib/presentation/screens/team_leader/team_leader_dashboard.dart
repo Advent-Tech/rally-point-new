@@ -74,8 +74,8 @@ class _TeamLeaderDashboardState extends State<TeamLeaderDashboard> {
         subtitle: 'Map, worker tracking & territories',
         color: AppColors.primary,
         isDark: isDark,
-        onTap: () {},
-        // onTap: () => context.push('/leader/command-center?mode=overview'),
+
+        onTap: () => context.push('/leader/command-center?mode=overview'),
       ),
       _ManagementTile(
         icon: Icons.people_outline,
