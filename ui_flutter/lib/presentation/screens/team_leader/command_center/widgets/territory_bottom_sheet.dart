@@ -18,9 +18,6 @@ class _TerritoryBottomSheetState extends State<TerritoryBottomSheet> {
   @override
   void initState() {
     super.initState();
-    _controller.addListener(() {
-      setState(() {});
-    });
   }
 
   @override
@@ -34,8 +31,10 @@ class _TerritoryBottomSheetState extends State<TerritoryBottomSheet> {
     return DraggableScrollableSheet(
       controller: _controller,
       initialChildSize: 0.3,
-      minChildSize: 0.1,
+      minChildSize: 0.12,
       maxChildSize: 0.8,
+      snap: true,
+      snapSizes: const [0.12, 0.3, 0.8],
       builder: (context, scrollController) {
         return Container(
           decoration: BoxDecoration(
@@ -72,6 +71,19 @@ class _TerritoryBottomSheetState extends State<TerritoryBottomSheet> {
                       style: Theme.of(context).textTheme.titleLarge,
                     ),
                     const Spacer(),
+                    IconButton(
+                      onPressed: () {
+                        final size = _controller.size;
+                        final target = size > 0.3 ? 0.3 : 0.12;
+                        _controller.animateTo(
+                          target,
+                          duration: const Duration(milliseconds: 220),
+                          curve: Curves.easeOut,
+                        );
+                      },
+                      icon: const Icon(Icons.keyboard_arrow_down),
+                      visualDensity: VisualDensity.compact,
+                    ),
                     BlocBuilder<CommandCenterBloc, CommandCenterState>(
                       builder: (context, state) {
                         return Chip(

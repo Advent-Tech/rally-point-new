@@ -4,6 +4,10 @@ class AnnotationRegistry<T> {
   final Map<String, List<String>> _annotationIds = {};
   final Map<String, dynamic> _annotationObjects = {};
 
+  Iterable<String> get domainIds => _entities.keys;
+
+  T? getEntity(String domainId) => _entities[domainId];
+
   /// Register an entity with its annotation IDs and objects
   void register(
     String domainId,

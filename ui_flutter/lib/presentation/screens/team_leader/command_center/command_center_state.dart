@@ -6,6 +6,37 @@ import '../../../../data/models/prayer_request_model.dart';
 
 enum MapMode { overview, workers, territories }
 
+enum MapPopupKind { activityDonation, activityPrayer, territory, worker }
+
+class MapPopup extends Equatable {
+  final MapPopupKind kind;
+  final String id;
+  final double? latitude;
+  final double? longitude;
+  final bool expanded;
+
+  const MapPopup({
+    required this.kind,
+    required this.id,
+    this.latitude,
+    this.longitude,
+    this.expanded = false,
+  });
+
+  MapPopup copyWith({bool? expanded}) {
+    return MapPopup(
+      kind: kind,
+      id: id,
+      latitude: latitude,
+      longitude: longitude,
+      expanded: expanded ?? this.expanded,
+    );
+  }
+
+  @override
+  List<Object?> get props => [kind, id, latitude, longitude, expanded];
+}
+
 class CommandCenterState extends Equatable {
   // Map mode and UI state
   final MapMode mapMode;
@@ -26,12 +57,15 @@ class CommandCenterState extends Equatable {
 
   // Real-time data
   final Map<String, Position> liveLocations; // workerId -> Position
+  final Set<String> gpsLiveWorkerIds; // workerIds with websocket GPS updates
   final Set<String> breachedWorkerIds;
 
   // Interaction state
   final String? followTarget; // workerId being followed
   final String? selectedTerritoryId;
   final Map<String, List<Position>> workerPaths; // workerId -> trail
+
+  final MapPopup? activePopup;
 
   const CommandCenterState({
     this.mapMode = MapMode.overview,
@@ -46,10 +80,12 @@ class CommandCenterState extends Equatable {
     this.donations = const [],
     this.prayerRequests = const [],
     this.liveLocations = const {},
+    this.gpsLiveWorkerIds = const {},
     this.breachedWorkerIds = const {},
     this.followTarget,
     this.selectedTerritoryId,
     this.workerPaths = const {},
+    this.activePopup,
   });
 
   @override
@@ -66,10 +102,12 @@ class CommandCenterState extends Equatable {
     donations,
     prayerRequests,
     liveLocations,
+    gpsLiveWorkerIds,
     breachedWorkerIds,
     followTarget,
     selectedTerritoryId,
     workerPaths,
+    activePopup,
   ];
 
   CommandCenterState copyWith({
@@ -85,10 +123,12 @@ class CommandCenterState extends Equatable {
     List<DonationModel>? donations,
     List<PrayerRequestModel>? prayerRequests,
     Map<String, Position>? liveLocations,
+    Set<String>? gpsLiveWorkerIds,
     Set<String>? breachedWorkerIds,
     String? followTarget,
     String? selectedTerritoryId,
     Map<String, List<Position>>? workerPaths,
+    MapPopup? activePopup,
   }) {
     return CommandCenterState(
       mapMode: mapMode ?? this.mapMode,
@@ -103,6 +143,7 @@ class CommandCenterState extends Equatable {
       donations: donations ?? this.donations,
       prayerRequests: prayerRequests ?? this.prayerRequests,
       liveLocations: liveLocations ?? this.liveLocations,
+      gpsLiveWorkerIds: gpsLiveWorkerIds ?? this.gpsLiveWorkerIds,
       breachedWorkerIds: breachedWorkerIds ?? this.breachedWorkerIds,
       followTarget: followTarget == ''
           ? null
@@ -111,6 +152,7 @@ class CommandCenterState extends Equatable {
           ? null
           : (selectedTerritoryId ?? this.selectedTerritoryId),
       workerPaths: workerPaths ?? this.workerPaths,
+      activePopup: activePopup,
     );
   }
 }

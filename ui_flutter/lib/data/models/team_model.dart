@@ -1,5 +1,4 @@
 import 'package:json_annotation/json_annotation.dart';
-import 'user_model.dart';
 
 part 'team_model.g.dart';
 
@@ -36,7 +35,8 @@ class TeamModel {
     this.updatedAt,
   });
 
-  factory TeamModel.fromJson(Map<String, dynamic> json) => _$TeamModelFromJson(json);
+  factory TeamModel.fromJson(Map<String, dynamic> json) =>
+      _$TeamModelFromJson(json);
   Map<String, dynamic> toJson() => _$TeamModelToJson(this);
 }
 
@@ -73,14 +73,35 @@ class TeamMember {
     this.joinedAt,
   });
 
-  factory TeamMember.fromJson(Map<String, dynamic> json) => _$TeamMemberFromJson(json);
+  factory TeamMember.fromJson(Map<String, dynamic> json) =>
+      _$TeamMemberFromJson(json);
   Map<String, dynamic> toJson() => _$TeamMemberToJson(this);
 
   /// Factory to parse User objects from backend (returned by /teams/:id/workers)
   factory TeamMember.fromUserJson(Map<String, dynamic> json) {
     final id = json['id']?.toString() ?? '';
+
+    final dynamic onlineRaw =
+        json['is_online'] ??
+        json['isOnline'] ??
+        json['online'] ??
+        json['is_active_session'] ??
+        json['active_session'];
+
+    bool isOnline;
+    if (onlineRaw is bool) {
+      isOnline = onlineRaw;
+    } else if (onlineRaw is num) {
+      isOnline = onlineRaw != 0;
+    } else if (onlineRaw is String) {
+      final v = onlineRaw.toLowerCase().trim();
+      isOnline = v == 'true' || v == '1' || v == 'online' || v == 'active';
+    } else {
+      isOnline = false;
+    }
+
     return TeamMember(
-      id: id,  // Use user ID as membership ID since backend doesn't return separate membership
+      id: id, // Use user ID as membership ID since backend doesn't return separate membership
       userId: id,
       teamId: json['team_id']?.toString() ?? '',
       role: json['role']?.toString() ?? 'worker',
@@ -88,7 +109,7 @@ class TeamMember {
       email: json['email']?.toString(),
       avatarUrl: json['profile_photo_url']?.toString(),
       isActive: true,
-      isOnline: json['is_online'] == true,
+      isOnline: isOnline,
       joinedAt: json['created_at'] != null
           ? DateTime.tryParse(json['created_at'].toString())
           : null,
@@ -103,12 +124,10 @@ class CreateTeamRequest {
   final String name;
   final String? description;
 
-  const CreateTeamRequest({
-    required this.name,
-    this.description,
-  });
+  const CreateTeamRequest({required this.name, this.description});
 
-  factory CreateTeamRequest.fromJson(Map<String, dynamic> json) => _$CreateTeamRequestFromJson(json);
+  factory CreateTeamRequest.fromJson(Map<String, dynamic> json) =>
+      _$CreateTeamRequestFromJson(json);
   Map<String, dynamic> toJson() => _$CreateTeamRequestToJson(this);
 }
 
@@ -119,12 +138,10 @@ class JoinTeamRequest {
   @JsonKey(name: 'team_code')
   final String? teamCode;
 
-  const JoinTeamRequest({
-    required this.teamId,
-    this.teamCode,
-  });
+  const JoinTeamRequest({required this.teamId, this.teamCode});
 
-  factory JoinTeamRequest.fromJson(Map<String, dynamic> json) => _$JoinTeamRequestFromJson(json);
+  factory JoinTeamRequest.fromJson(Map<String, dynamic> json) =>
+      _$JoinTeamRequestFromJson(json);
   Map<String, dynamic> toJson() => _$JoinTeamRequestToJson(this);
 }
 
@@ -188,9 +205,12 @@ class TeamJoinRequest {
           : null,
       rejectionReason: json['rejection_reason']?.toString(),
       // Extract user details from nested user object, fallback to top-level
-      displayName: user?['display_name']?.toString() ?? json['display_name']?.toString(),
+      displayName:
+          user?['display_name']?.toString() ?? json['display_name']?.toString(),
       email: user?['email']?.toString() ?? json['email']?.toString(),
-      profilePhotoUrl: user?['profile_photo_url']?.toString() ?? json['profile_photo_url']?.toString(),
+      profilePhotoUrl:
+          user?['profile_photo_url']?.toString() ??
+          json['profile_photo_url']?.toString(),
       phone: user?['phone']?.toString() ?? json['phone']?.toString(),
     );
   }

@@ -95,28 +95,39 @@ class _WorkerBottomSheetState extends State<WorkerBottomSheet> {
                       itemCount: state.workers.length,
                       itemBuilder: (context, index) {
                         final worker = state.workers[index];
-                        final isLive = state.liveLocations.containsKey(
+                        final hasAnyLocation = state.liveLocations.containsKey(
                           worker.id,
                         );
+                        final isGpsLive = state.gpsLiveWorkerIds.contains(
+                          worker.id,
+                        );
+                        final isApiOnline = worker.isOnline;
                         final isFollowing = state.followTarget == worker.id;
                         final isBreached = state.breachedWorkerIds.contains(
                           worker.id,
                         );
 
+                        final pos = state.liveLocations[worker.id];
+
                         return ListTile(
-                          onTap: isLive
-                              ? () {
-                                  context.read<CommandCenterBloc>().add(
-                                    FollowWorkerEvent(
-                                      workerId: isFollowing ? null : worker.id,
-                                    ),
-                                  );
-                                }
-                              : null,
+                          onTap: () {
+                            context.read<CommandCenterBloc>().add(
+                              ShowMapPopupEvent(
+                                popup: MapPopup(
+                                  kind: MapPopupKind.worker,
+                                  id: worker.id,
+                                  latitude: pos?.latitude,
+                                  longitude: pos?.longitude,
+                                ),
+                              ),
+                            );
+                          },
                           leading: CircleAvatar(
-                            backgroundColor: isLive
+                            backgroundColor: isGpsLive
                                 ? Colors.green
-                                : Colors.grey.shade300,
+                                : (isApiOnline
+                                      ? Colors.orange
+                                      : Colors.grey.shade400),
                             child: Text(
                               (worker.displayName ?? 'W')
                                   .substring(0, 1)
@@ -126,7 +137,13 @@ class _WorkerBottomSheetState extends State<WorkerBottomSheet> {
                           ),
                           title: Text(worker.displayName ?? 'Team Member'),
                           subtitle: Text(
-                            isLive ? 'Live location' : 'Location unavailable',
+                            isGpsLive
+                                ? 'GPS Live'
+                                : (hasAnyLocation
+                                      ? 'Last known (entry)'
+                                      : (isApiOnline
+                                            ? 'Online (no GPS)'
+                                            : 'Offline')),
                           ),
                           trailing: Row(
                             mainAxisSize: MainAxisSize.min,
@@ -137,7 +154,7 @@ class _WorkerBottomSheetState extends State<WorkerBottomSheet> {
                                   color: Colors.red.shade700,
                                   size: 20,
                                 ),
-                              if (isLive)
+                              if (isGpsLive)
                                 IconButton(
                                   icon: Icon(
                                     isFollowing

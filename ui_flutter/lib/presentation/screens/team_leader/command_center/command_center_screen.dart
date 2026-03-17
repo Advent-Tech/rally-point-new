@@ -14,6 +14,7 @@ import 'widgets/breach_alert_banner.dart';
 import 'widgets/worker_bottom_sheet.dart';
 import 'widgets/territory_bottom_sheet.dart';
 import 'widgets/overview_stats_bar.dart';
+import 'widgets/map_popup_overlay.dart';
 import '../../../../core/constants/map_constants.dart';
 import '../../../../services/websocket_service.dart';
 
@@ -79,6 +80,8 @@ class _CommandCenterScreenState extends State<CommandCenterScreen> {
             ),
             styleUri: MapConstants.getThemedStyleUri(isDark),
           ),
+
+          MapPopupOverlay(mapController: _mapController),
 
           // Mode Selector (top)
           const Positioned(

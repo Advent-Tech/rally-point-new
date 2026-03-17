@@ -30,7 +30,7 @@ class BreachLayer {
     });
   }
 
-  void updateBreaches(
+  Future<void> updateBreaches(
     Set<String> breachedWorkerIds,
     Map<String, cc.Position> liveLocations,
   ) async {

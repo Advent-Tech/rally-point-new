@@ -13,6 +13,44 @@ class ActivityLayer {
 
   ActivityLayer({required this.mapController});
 
+  List<ActivityTapTarget> getTapTargets() {
+    final targets = <ActivityTapTarget>[];
+
+    for (final id in _donationRegistry.domainIds) {
+      final annotations = _donationRegistry.getAnnotations(id);
+      for (final a in annotations) {
+        if (a is CircleAnnotation) {
+          targets.add(
+            ActivityTapTarget(
+              kind: ActivityTapKind.donation,
+              id: id,
+              latitude: a.geometry.coordinates.lat.toDouble(),
+              longitude: a.geometry.coordinates.lng.toDouble(),
+            ),
+          );
+        }
+      }
+    }
+
+    for (final id in _prayerRegistry.domainIds) {
+      final annotations = _prayerRegistry.getAnnotations(id);
+      for (final a in annotations) {
+        if (a is CircleAnnotation) {
+          targets.add(
+            ActivityTapTarget(
+              kind: ActivityTapKind.prayer,
+              id: id,
+              latitude: a.geometry.coordinates.lat.toDouble(),
+              longitude: a.geometry.coordinates.lng.toDouble(),
+            ),
+          );
+        }
+      }
+    }
+
+    return targets;
+  }
+
   Future<void> initialize() async {
     try {
       _circleManager = await mapController.annotations
@@ -22,7 +60,7 @@ class ActivityLayer {
     }
   }
 
-  void updateActivities(
+  Future<void> updateActivities(
     List<DonationModel> donations,
     List<PrayerRequestModel> prayers,
   ) async {
@@ -160,4 +198,20 @@ class ActivityLayer {
   void dispose() {
     _circleManager = null;
   }
+}
+
+enum ActivityTapKind { donation, prayer }
+
+class ActivityTapTarget {
+  final ActivityTapKind kind;
+  final String id;
+  final double latitude;
+  final double longitude;
+
+  const ActivityTapTarget({
+    required this.kind,
+    required this.id,
+    required this.latitude,
+    required this.longitude,
+  });
 }

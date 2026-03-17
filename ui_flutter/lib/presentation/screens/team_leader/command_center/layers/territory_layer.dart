@@ -31,7 +31,7 @@ class TerritoryLayer {
     }
   }
 
-  void updateTerritories(
+  Future<void> updateTerritories(
     List<GeoTerritory> territories, {
     String? selectedId,
   }) async {

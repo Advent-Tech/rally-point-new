@@ -36,7 +36,7 @@ class WorkerLayer {
     });
   }
 
-  void updateWorkers(
+  Future<void> updateWorkers(
     List<TeamMember> workers,
     Map<String, cc.Position> liveLocations,
   ) async {

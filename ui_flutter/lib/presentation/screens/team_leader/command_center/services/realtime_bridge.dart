@@ -21,12 +21,19 @@ class RealtimeBridge {
     // Listen for worker location updates
     _subscriptions.add(
       _ws.messagesOfType(WsMessageType.locationUpdate).listen((message) {
-        final update = message.data;
-        final userId = update['userId']?.toString();
-        final latRaw = update['latitude'];
-        final lngRaw = update['longitude'];
+        if (bloc.state.mapMode != MapMode.workers) return;
+
+        final raw = message.data;
+        final payload = (raw['data'] is Map) ? (raw['data'] as Map) : raw;
+
+        final userId = (payload['userId'] ?? payload['user_id'])?.toString();
         if (userId == null || userId.isEmpty) return;
+        if (userId != bloc.state.followTarget) return;
+
+        final latRaw = payload['latitude'];
+        final lngRaw = payload['longitude'];
         if (latRaw is! num || lngRaw is! num) return;
+
         bloc.add(
           UpdateLiveLocationEvent(
             workerId: userId,
@@ -35,22 +42,19 @@ class RealtimeBridge {
           ),
         );
 
-        // Update worker path if tracking
-        if (userId == bloc.state.followTarget) {
-          final currentPath = bloc.state.workerPaths[userId] ?? [];
-          bloc.add(
-            UpdateWorkerPathEvent(
-              workerId: userId,
-              path: [
-                ...currentPath,
-                Position(
-                  latitude: latRaw.toDouble(),
-                  longitude: lngRaw.toDouble(),
-                ),
-              ],
-            ),
-          );
-        }
+        final currentPath = bloc.state.workerPaths[userId] ?? [];
+        bloc.add(
+          UpdateWorkerPathEvent(
+            workerId: userId,
+            path: [
+              ...currentPath,
+              Position(
+                latitude: latRaw.toDouble(),
+                longitude: lngRaw.toDouble(),
+              ),
+            ],
+          ),
+        );
       }),
     );
 
@@ -58,12 +62,19 @@ class RealtimeBridge {
       _ws.messagesOfType(WsMessageType.workerLocationBroadcast).listen((
         message,
       ) {
-        final update = message.data;
-        final userId = update['userId']?.toString();
-        final latRaw = update['latitude'];
-        final lngRaw = update['longitude'];
+        if (bloc.state.mapMode != MapMode.workers) return;
+
+        final raw = message.data;
+        final payload = (raw['data'] is Map) ? (raw['data'] as Map) : raw;
+
+        final userId = (payload['userId'] ?? payload['user_id'])?.toString();
         if (userId == null || userId.isEmpty) return;
+        if (userId != bloc.state.followTarget) return;
+
+        final latRaw = payload['latitude'];
+        final lngRaw = payload['longitude'];
         if (latRaw is! num || lngRaw is! num) return;
+
         bloc.add(
           UpdateLiveLocationEvent(
             workerId: userId,
@@ -72,21 +83,19 @@ class RealtimeBridge {
           ),
         );
 
-        if (userId == bloc.state.followTarget) {
-          final currentPath = bloc.state.workerPaths[userId] ?? [];
-          bloc.add(
-            UpdateWorkerPathEvent(
-              workerId: userId,
-              path: [
-                ...currentPath,
-                Position(
-                  latitude: latRaw.toDouble(),
-                  longitude: lngRaw.toDouble(),
-                ),
-              ],
-            ),
-          );
-        }
+        final currentPath = bloc.state.workerPaths[userId] ?? [];
+        bloc.add(
+          UpdateWorkerPathEvent(
+            workerId: userId,
+            path: [
+              ...currentPath,
+              Position(
+                latitude: latRaw.toDouble(),
+                longitude: lngRaw.toDouble(),
+              ),
+            ],
+          ),
+        );
       }),
     );
 

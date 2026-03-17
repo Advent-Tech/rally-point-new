@@ -99,3 +99,16 @@ class UpdateWorkerPathEvent extends CommandCenterEvent {
   @override
   List<Object> get props => [workerId, path];
 }
+
+class ShowMapPopupEvent extends CommandCenterEvent {
+  final MapPopup popup;
+
+  const ShowMapPopupEvent({required this.popup});
+
+  @override
+  List<Object> get props => [popup];
+}
+
+class HideMapPopupEvent extends CommandCenterEvent {}
+
+class ToggleMapPopupExpandedEvent extends CommandCenterEvent {}

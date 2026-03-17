@@ -20,7 +20,7 @@ class TrailLayer {
     }
   }
 
-  void updateTrails(Map<String, List<cc.Position>> workerPaths) async {
+  Future<void> updateTrails(Map<String, List<cc.Position>> workerPaths) async {
     if (_polylineManager == null) return;
 
     final Set<String> currentIds = workerPaths.keys.toSet();

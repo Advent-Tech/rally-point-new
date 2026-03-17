@@ -38,26 +38,6 @@ class WorkerTrackingBloc
     try {
       await _initialize();
 
-      // First, try to get live worker locations from Redis cache (immediate)
-      // This returns real-time positions of active workers
-      List<Map<String, dynamic>> liveWorkerData = [];
-      try {
-        final liveResponse = await _apiClient!.get(
-          '/api/locations/workers/team',
-        );
-        if (liveResponse.statusCode == 200 &&
-            liveResponse.data['workers'] != null) {
-          liveWorkerData = List<Map<String, dynamic>>.from(
-            liveResponse.data['workers'] ?? [],
-          );
-          debugPrint(
-            'WorkerTrackingBloc: Loaded ${liveWorkerData.length} live worker locations',
-          );
-        }
-      } catch (e) {
-        debugPrint('WorkerTrackingBloc: Live locations fetch failed: $e');
-      }
-
       // Fetch active workers from geofence (work sessions with territory info)
       final response = await _apiClient!.get(
         '/api/geofence/teams/${event.teamId}/workers/active',
@@ -88,22 +68,6 @@ class WorkerTrackingBloc
       for (int i = 0; i < workerJsonList.length; i++) {
         final stats = statsResults[i];
         final json = workerJsonList[i];
-
-        // Try to get live location from Redis data
-        final workerId =
-            json['worker_id']?.toString() ?? json['id']?.toString() ?? '';
-        final liveData = liveWorkerData.firstWhere(
-          (w) => w['user_id']?.toString() == workerId,
-          orElse: () => <String, dynamic>{},
-        );
-
-        // Merge live location into worker data if available
-        if (liveData.isNotEmpty &&
-            liveData['latitude'] != null &&
-            liveData['longitude'] != null) {
-          json['latitude'] = liveData['latitude'];
-          json['longitude'] = liveData['longitude'];
-        }
 
         workers.add(
           TrackedWorker.fromJson(

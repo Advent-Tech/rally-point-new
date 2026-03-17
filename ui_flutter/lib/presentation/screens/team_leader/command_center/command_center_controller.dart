@@ -1,5 +1,6 @@
 import 'dart:async';
-import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart';
+import 'dart:math';
+import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart' as mapbox;
 import 'command_center_bloc.dart';
 import 'command_center_state.dart';
 import 'layers/territory_layer.dart';
@@ -12,7 +13,7 @@ import 'services/bounds_calculator.dart';
 import 'command_center_event.dart';
 
 class CommandCenterController {
-  final MapboxMap mapController;
+  final mapbox.MapboxMap mapController;
   final CommandCenterBloc bloc;
 
   late TerritoryLayer _territoryLayer;
@@ -24,6 +25,8 @@ class CommandCenterController {
 
   StreamSubscription? _stateSubscription;
   CommandCenterState? _previousState;
+
+  Future<void> _stateQueue = Future.value();
 
   CommandCenterController({required this.mapController, required this.bloc}) {
     _initialize();
@@ -47,16 +50,24 @@ class CommandCenterController {
     await _breachLayer.initialize();
 
     // Listen to state changes
-    _stateSubscription = bloc.stream.listen(_handleStateChange);
+    _stateSubscription = bloc.stream.listen(_enqueueStateChange);
+
+    // Apply current state immediately in case the bloc emitted updates
+    // before the subscription was attached (during async layer init).
+    _enqueueStateChange(bloc.state);
+  }
+
+  void _enqueueStateChange(CommandCenterState state) {
+    _stateQueue = _stateQueue.then((_) => _handleStateChange(state));
   }
 
   Future<void> handleMapTap(dynamic context) async {
-    final Point? tapPoint = switch (context) {
-      Point p => p,
+    final mapbox.Point? tapPoint = switch (context) {
+      mapbox.Point p => p,
       _ => () {
         try {
           final dynamic maybePoint = (context as dynamic).point;
-          return maybePoint is Point ? maybePoint : null;
+          return maybePoint is mapbox.Point ? maybePoint : null;
         } catch (_) {
           return null;
         }
@@ -65,8 +76,65 @@ class CommandCenterController {
 
     if (tapPoint == null) return;
 
+    final double geoThreshold = await _getAdaptiveGeoThreshold();
+    final _Pixel? tapPixel = await _pixelForPoint(tapPoint);
+
+    // 0. Check if tap is near any activity marker (donations/prayers)
+    final activityTargets = _activityLayer.getTapTargets();
+    ActivityTapTarget? closestActivity;
+    var closestActivityDist = double.infinity;
+    var closestActivityPxDist = double.infinity;
+    for (final t in activityTargets) {
+      if (tapPixel != null) {
+        final px = await _pixelForLatLng(t.latitude, t.longitude);
+        if (px != null) {
+          final d = _pixelDistance(tapPixel, px);
+          if (d < closestActivityPxDist) {
+            closestActivityPxDist = d;
+            closestActivity = t;
+          }
+          continue;
+        }
+      }
+
+      final d = _calculateDistance(
+        tapPoint.coordinates.lat.toDouble(),
+        tapPoint.coordinates.lng.toDouble(),
+        t.latitude,
+        t.longitude,
+      );
+      if (d < closestActivityDist) {
+        closestActivityDist = d;
+        closestActivity = t;
+      }
+    }
+    final bool activityHit = tapPixel != null
+        ? closestActivity != null && closestActivityPxDist < 32.0
+        : closestActivity != null &&
+              closestActivityDist < (geoThreshold * geoThreshold);
+    if (activityHit) {
+      final kind = switch (closestActivity.kind) {
+        ActivityTapKind.donation => MapPopupKind.activityDonation,
+        ActivityTapKind.prayer => MapPopupKind.activityPrayer,
+      };
+      bloc.add(
+        ShowMapPopupEvent(
+          popup: MapPopup(
+            kind: kind,
+            id: closestActivity.id,
+            latitude: closestActivity.latitude,
+            longitude: closestActivity.longitude,
+          ),
+        ),
+      );
+      return;
+    }
+
     final territories = bloc.state.territories;
-    if (territories.isEmpty) return;
+    if (territories.isEmpty) {
+      bloc.add(HideMapPopupEvent());
+      return;
+    }
 
     // 1. Check if tap is near any territory marker/centroid
     for (final territory in territories) {
@@ -74,22 +142,48 @@ class CommandCenterController {
         territory.id,
       );
       for (final annotation in annotations) {
-        if (annotation is CircleAnnotation) {
-          final distance = _calculateDistance(
-            tapPoint.coordinates.lat.toDouble(),
-            tapPoint.coordinates.lng.toDouble(),
-            annotation.geometry.coordinates.lat.toDouble(),
-            annotation.geometry.coordinates.lng.toDouble(),
-          );
+        if (annotation is mapbox.CircleAnnotation) {
+          final double markerLat = annotation.geometry.coordinates.lat
+              .toDouble();
+          final double markerLng = annotation.geometry.coordinates.lng
+              .toDouble();
 
-          // Threshold for "near" marker (adjust based on zoom if needed)
-          if (distance < 0.005) {
-            bloc.add(SelectTerritoryEvent(territoryId: territory.id));
+          bool hit = false;
+          if (tapPixel != null) {
+            final px = await _pixelForLatLng(markerLat, markerLng);
+            if (px != null) {
+              hit = _pixelDistance(tapPixel, px) < 32.0;
+            }
+          }
+
+          if (!hit) {
+            final distance = _calculateDistance(
+              tapPoint.coordinates.lat.toDouble(),
+              tapPoint.coordinates.lng.toDouble(),
+              markerLat,
+              markerLng,
+            );
+            hit = distance < (geoThreshold * geoThreshold);
+          }
+
+          if (hit) {
+            bloc.add(
+              ShowMapPopupEvent(
+                popup: MapPopup(
+                  kind: MapPopupKind.territory,
+                  id: territory.id,
+                  latitude: markerLat,
+                  longitude: markerLng,
+                ),
+              ),
+            );
             return;
           }
         }
       }
     }
+
+    bloc.add(HideMapPopupEvent());
 
     // 2. Fallback: Check if point is inside any polygon (using basic hit testing)
     // For now, marker-based tapping is most reliable with annotations
@@ -107,19 +201,56 @@ class CommandCenterController {
         dLng * dLng); // squared distance is enough for comparison
   }
 
-  void _handleStateChange(CommandCenterState state) {
+  Future<_Pixel?> _pixelForPoint(mapbox.Point p) async {
+    try {
+      final dynamic dyn = mapController;
+      final dynamic px = await dyn.pixelForCoordinate(p);
+      final dx = (px as dynamic).x as num?;
+      final dy = (px as dynamic).y as num?;
+      if (dx == null || dy == null) return null;
+      return _Pixel(dx.toDouble(), dy.toDouble());
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<_Pixel?> _pixelForLatLng(double lat, double lng) async {
+    return _pixelForPoint(mapbox.Point(coordinates: mapbox.Position(lng, lat)));
+  }
+
+  double _pixelDistance(_Pixel a, _Pixel b) {
+    final dx = a.x - b.x;
+    final dy = a.y - b.y;
+    return sqrt(dx * dx + dy * dy);
+  }
+
+  Future<double> _getAdaptiveGeoThreshold() async {
+    try {
+      final zoom = await mapController.getCameraState().then((s) => s.zoom);
+      final z = zoom.toDouble();
+      const base = 0.005;
+      final scaled = base * pow(2.0, (10.0 - z));
+      if (scaled < base) return base;
+      if (scaled > 0.25) return 0.25;
+      return scaled;
+    } catch (_) {
+      return 0.005;
+    }
+  }
+
+  Future<void> _handleStateChange(CommandCenterState state) async {
     final previous = _previousState;
 
     // Clear layers when toggled off
     if (previous != null) {
       if (previous.showTerritories && !state.showTerritories) {
-        _territoryLayer.clear();
+        await _territoryLayer.clear();
       }
       if (previous.showWorkers && !state.showWorkers) {
-        _workerLayer.clear();
+        await _workerLayer.clear();
       }
       if (previous.showActivities && !state.showActivities) {
-        _activityLayer.clear();
+        await _activityLayer.clear();
       }
     }
 
@@ -128,7 +259,7 @@ class CommandCenterController {
             state.selectedTerritoryId != previous?.selectedTerritoryId ||
             (previous?.showTerritories == false && state.showTerritories)) &&
         state.showTerritories) {
-      _territoryLayer.updateTerritories(
+      await _territoryLayer.updateTerritories(
         state.territories,
         selectedId: state.selectedTerritoryId,
       );
@@ -138,7 +269,7 @@ class CommandCenterController {
     if ((state.liveLocations != previous?.liveLocations ||
             state.showWorkers != previous?.showWorkers) &&
         state.showWorkers) {
-      _workerLayer.updateWorkers(state.workers, state.liveLocations);
+      await _workerLayer.updateWorkers(state.workers, state.liveLocations);
     }
 
     // Update activities if changed
@@ -146,19 +277,29 @@ class CommandCenterController {
             state.prayerRequests != previous?.prayerRequests ||
             state.showActivities != previous?.showActivities) &&
         state.showActivities) {
-      _activityLayer.updateActivities(state.donations, state.prayerRequests);
+      await _activityLayer.updateActivities(
+        state.donations,
+        state.prayerRequests,
+      );
+    }
+
+    if (previous != null && previous.showActivities && !state.showActivities) {
+      await _activityLayer.clear();
     }
 
     // Update trails if changed
     if ((state.workerPaths != previous?.workerPaths ||
             state.showTrails != previous?.showTrails) &&
         state.showTrails) {
-      _trailLayer.updateTrails(state.workerPaths);
+      await _trailLayer.updateTrails(state.workerPaths);
     }
 
     // Update breaches
     if (state.breachedWorkerIds != previous?.breachedWorkerIds) {
-      _breachLayer.updateBreaches(state.breachedWorkerIds, state.liveLocations);
+      await _breachLayer.updateBreaches(
+        state.breachedWorkerIds,
+        state.liveLocations,
+      );
     }
 
     // Handle camera changes
@@ -184,12 +325,33 @@ class CommandCenterController {
     CommandCenterState? previous,
   ) {
     // Follow mode
-    if (state.followTarget != previous?.followTarget) {
-      if (state.followTarget != null &&
-          state.liveLocations.containsKey(state.followTarget)) {
-        final position = state.liveLocations[state.followTarget]!;
-        _cameraController.follow(position.latitude, position.longitude);
+    final followId = state.followTarget;
+    if (followId != null) {
+      final pos = state.liveLocations[followId];
+      final prevPos = previous?.liveLocations[followId];
+
+      // Start follow when target changes and we have any location (GPS live or last-known entry)
+      if (followId != previous?.followTarget) {
+        if (pos != null) {
+          _cameraController.easeTo(
+            latitude: pos.latitude,
+            longitude: pos.longitude,
+            zoom: 16.0,
+            priority: CameraPriority.follow,
+          );
+        }
       } else {
+        // While following, keep camera updated when position changes (e.g. websocket updates)
+        if (pos != null && pos != prevPos) {
+          _cameraController.easeTo(
+            latitude: pos.latitude,
+            longitude: pos.longitude,
+            priority: CameraPriority.follow,
+          );
+        }
+      }
+    } else {
+      if (previous?.followTarget != null) {
         _cameraController.stopFollow();
       }
     }
@@ -247,4 +409,11 @@ class CommandCenterController {
     _trailLayer.dispose();
     _breachLayer.dispose();
   }
+}
+
+class _Pixel {
+  final double x;
+  final double y;
+
+  const _Pixel(this.x, this.y);
 }
