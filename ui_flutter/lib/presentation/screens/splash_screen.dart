@@ -78,9 +78,7 @@ class _SplashScreenState extends State<SplashScreen>
 
     // Colors based on theme
     final backgroundGradient = LinearGradient(
-      colors: isDark
-          ? const [AppColors.backgroundDark, AppColors.navyBlue]
-          : const [AppColors.backgroundLight, Color(0xFFEFF6FF)],
+      colors: const [AppColors.backgroundDark, AppColors.navyBlue],
       begin: Alignment.topLeft,
       end: Alignment.bottomRight,
     );
@@ -99,24 +97,10 @@ class _SplashScreenState extends State<SplashScreen>
         children: [
           Positioned.fill(
             child: DecoratedBox(
-              decoration: BoxDecoration(gradient: backgroundGradient),
-            ),
-          ),
-          Positioned(
-            top: -90,
-            left: -60,
-            child: _GlassBlob(
-              color: (isDark ? AppColors.accent : AppColors.secondary)
-                  .withValues(alpha: 0.35),
-              size: 240,
-            ),
-          ),
-          Positioned(
-            bottom: -110,
-            right: -90,
-            child: _GlassBlob(
-              color: indicatorColor.withValues(alpha: 0.28),
-              size: 280,
+              decoration: BoxDecoration(
+                color: isDark ? null : Colors.white,
+                gradient: isDark ? backgroundGradient : null,
+              ),
             ),
           ),
           Center(
@@ -202,7 +186,15 @@ class _GlassLogoCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final surface = isDark
         ? AppColors.surfaceDark.withValues(alpha: 0.50)
-        : AppColors.surfaceLight.withValues(alpha: 0.65);
+        : Colors.white.withValues(alpha: 0.92);
+
+    final borderColor = isDark
+        ? Colors.white.withValues(alpha: 0.14)
+        : Colors.black.withValues(alpha: 0.06);
+
+    final shadowColor = isDark
+        ? Colors.black.withValues(alpha: 0.35)
+        : Colors.black.withValues(alpha: 0.06);
 
     return ClipRRect(
       borderRadius: BorderRadius.circular(28),
@@ -210,66 +202,26 @@ class _GlassLogoCard extends StatelessWidget {
         children: [
           BackdropFilter(
             filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
-            child: const SizedBox(width: 240, height: 160),
+            child: const SizedBox(width: 280, height: 180),
           ),
           Container(
-            width: 240,
-            height: 160,
+            width: 280,
+            height: 180,
             decoration: BoxDecoration(
               color: surface,
               borderRadius: BorderRadius.circular(28),
-              border: Border.all(
-                color: Colors.white.withValues(alpha: isDark ? 0.14 : 0.22),
-              ),
+              border: Border.all(color: borderColor),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withValues(alpha: isDark ? 0.35 : 0.10),
-                  blurRadius: 30,
-                  offset: const Offset(0, 12),
+                  color: shadowColor,
+                  blurRadius: isDark ? 30 : 18,
+                  offset: Offset(0, isDark ? 12 : 8),
                 ),
               ],
             ),
-            child: Stack(
-              children: [
-                Positioned(
-                  top: -40,
-                  right: -55,
-                  child: _GlassBlob(
-                    color: accent.withValues(alpha: 0.25),
-                    size: 160,
-                  ),
-                ),
-                Positioned(
-                  bottom: -45,
-                  left: -50,
-                  child: _GlassBlob(
-                    color: (isDark ? AppColors.accent : AppColors.secondary)
-                        .withValues(alpha: 0.22),
-                    size: 170,
-                  ),
-                ),
-                Center(child: child),
-              ],
-            ),
+            child: Stack(children: [Center(child: child)]),
           ),
         ],
-      ),
-    );
-  }
-}
-
-class _GlassBlob extends StatelessWidget {
-  final Color color;
-  final double size;
-
-  const _GlassBlob({required this.color, required this.size});
-
-  @override
-  Widget build(BuildContext context) {
-    return ClipOval(
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 22, sigmaY: 22),
-        child: Container(width: size, height: size, color: color),
       ),
     );
   }

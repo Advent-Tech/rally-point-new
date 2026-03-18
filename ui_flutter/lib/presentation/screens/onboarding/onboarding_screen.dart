@@ -29,16 +29,28 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       description:
           'See assigned territories, check in, and log visits in seconds.',
       accentColors: [AppColors.secondary, AppColors.primary],
-      heroBuilder: (context) =>
-          const Icon(Icons.map_outlined, size: 72, color: Colors.white),
+      heroBuilder: (context) {
+        final isDark = Theme.of(context).brightness == Brightness.dark;
+        return Icon(
+          Icons.map_outlined,
+          size: 72,
+          color: isDark ? Colors.white : AppColors.navyBlue,
+        );
+      },
     ),
     OnboardingSlide(
       title: 'Stay connected',
       description:
           'Coordinate with your team and follow progress in real time.',
       accentColors: [AppColors.success, AppColors.accent],
-      heroBuilder: (context) =>
-          const Icon(Icons.groups_2_outlined, size: 72, color: Colors.white),
+      heroBuilder: (context) {
+        final isDark = Theme.of(context).brightness == Brightness.dark;
+        return Icon(
+          Icons.groups_2_outlined,
+          size: 72,
+          color: isDark ? Colors.white : AppColors.navyBlue,
+        );
+      },
     ),
   ];
 
@@ -79,9 +91,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         : AppColors.buttonPrimaryLight;
 
     final backgroundGradient = LinearGradient(
-      colors: isDark
-          ? const [AppColors.backgroundDark, AppColors.navyBlue]
-          : const [AppColors.backgroundLight, Color(0xFFEFF6FF)],
+      colors: const [AppColors.backgroundDark, AppColors.navyBlue],
       begin: Alignment.topLeft,
       end: Alignment.bottomRight,
     );
@@ -92,24 +102,10 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           children: [
             Positioned.fill(
               child: DecoratedBox(
-                decoration: BoxDecoration(gradient: backgroundGradient),
-              ),
-            ),
-            Positioned(
-              top: -80,
-              left: -60,
-              child: _GlassBlob(
-                color: (isDark ? AppColors.accent : AppColors.secondary)
-                    .withValues(alpha: 0.35),
-                size: 220,
-              ),
-            ),
-            Positioned(
-              bottom: -100,
-              right: -80,
-              child: _GlassBlob(
-                color: primaryColor.withValues(alpha: 0.30),
-                size: 260,
+                decoration: BoxDecoration(
+                  color: isDark ? null : Colors.white,
+                  gradient: isDark ? backgroundGradient : null,
+                ),
               ),
             ),
             Column(
@@ -120,40 +116,61 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                     vertical: 8,
                   ),
                   child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      SizedBox(
-                        width: 72,
-                        child: _currentPage < _slides.length - 1
-                            ? TextButton(
-                                onPressed: _skip,
-                                child: Text(
-                                  'Skip',
-                                  style: TextStyle(
-                                    color: isDark
-                                        ? Colors.white70
-                                        : AppColors.textSecondaryLight,
+                      Expanded(
+                        child: Align(
+                          alignment: Alignment.centerLeft,
+                          child: _currentPage < _slides.length - 1
+                              ? TextButton(
+                                  onPressed: _skip,
+                                  style: TextButton.styleFrom(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 14,
+                                      vertical: 10,
+                                    ),
+                                    backgroundColor: isDark
+                                        ? Colors.white.withValues(alpha: 0.06)
+                                        : AppColors.navyBlue.withValues(
+                                            alpha: 0.06,
+                                          ),
+                                    foregroundColor: isDark
+                                        ? Colors.white
+                                        : AppColors.navyBlue,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(999),
+                                    ),
                                   ),
-                                ),
-                              )
-                            : const SizedBox.shrink(),
+                                  child: const Text('Skip'),
+                                )
+                              : const SizedBox.shrink(),
+                        ),
                       ),
                       _PageIndicator(
                         count: _slides.length,
                         index: _currentPage,
                         color: primaryColor,
                       ),
-                      SizedBox(
-                        width: 72,
-                        child: TextButton(
-                          onPressed: () => context.go('/login'),
-                          child: Text(
-                            'Sign in',
-                            style: TextStyle(
-                              color: isDark
-                                  ? Colors.white70
-                                  : AppColors.textSecondaryLight,
+                      Expanded(
+                        child: Align(
+                          alignment: Alignment.centerRight,
+                          child: TextButton(
+                            onPressed: () => context.go('/login'),
+                            style: TextButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 14,
+                                vertical: 10,
+                              ),
+                              backgroundColor: isDark
+                                  ? primaryColor.withValues(alpha: 0.18)
+                                  : primaryColor.withValues(alpha: 0.12),
+                              foregroundColor: isDark
+                                  ? Colors.white
+                                  : AppColors.navyBlue,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(999),
+                              ),
                             ),
+                            child: const Text('Sign in'),
                           ),
                         ),
                       ),
@@ -339,7 +356,15 @@ class _GlassHero extends StatelessWidget {
   Widget build(BuildContext context) {
     final surface = isDark
         ? AppColors.surfaceDark.withValues(alpha: 0.55)
-        : AppColors.surfaceLight.withValues(alpha: 0.65);
+        : Colors.white.withValues(alpha: 0.92);
+
+    final borderColor = isDark
+        ? Colors.white.withValues(alpha: 0.16)
+        : Colors.black.withValues(alpha: 0.06);
+
+    final shadowColor = isDark
+        ? Colors.black.withValues(alpha: 0.35)
+        : Colors.black.withValues(alpha: 0.06);
 
     return ClipRRect(
       borderRadius: BorderRadius.circular(28),
@@ -355,57 +380,18 @@ class _GlassHero extends StatelessWidget {
             decoration: BoxDecoration(
               color: surface,
               borderRadius: BorderRadius.circular(28),
-              border: Border.all(
-                color: Colors.white.withValues(alpha: isDark ? 0.16 : 0.22),
-              ),
+              border: Border.all(color: borderColor),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withValues(alpha: isDark ? 0.35 : 0.12),
-                  blurRadius: 30,
-                  offset: const Offset(0, 12),
+                  color: shadowColor,
+                  blurRadius: isDark ? 30 : 18,
+                  offset: Offset(0, isDark ? 12 : 8),
                 ),
               ],
             ),
-            child: Stack(
-              children: [
-                Positioned(
-                  top: -40,
-                  right: -50,
-                  child: _GlassBlob(
-                    color: accentColors.first.withValues(alpha: 0.35),
-                    size: 150,
-                  ),
-                ),
-                Positioned(
-                  bottom: -50,
-                  left: -45,
-                  child: _GlassBlob(
-                    color: accentColors.last.withValues(alpha: 0.30),
-                    size: 170,
-                  ),
-                ),
-                Center(child: child),
-              ],
-            ),
+            child: Stack(children: [Center(child: child)]),
           ),
         ],
-      ),
-    );
-  }
-}
-
-class _GlassBlob extends StatelessWidget {
-  final Color color;
-  final double size;
-
-  const _GlassBlob({required this.color, required this.size});
-
-  @override
-  Widget build(BuildContext context) {
-    return ClipOval(
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 22, sigmaY: 22),
-        child: Container(width: size, height: size, color: color),
       ),
     );
   }
