@@ -260,8 +260,8 @@ class LocationStatusBanner extends StatelessWidget {
     final bool showActive = isGpsTracking || isActive;
     final Color color = showActive ? AppColors.success : AppColors.warning;
     final String text = isGpsTracking
-        ? 'GPS Tracking Active'
-        : (statusText ?? (isActive ? 'Location Active' : 'Location Inactive'));
+        ? 'Session Tracking Active'
+        : (statusText ?? (isActive ? 'Session Active' : 'Session Inactive'));
 
     return GestureDetector(
       onTap: onTap,

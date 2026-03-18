@@ -221,7 +221,7 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           );
           Navigator.pop(ctx);
-          context.go('/territory');
+          context.go('/home');
         },
       ),
     );
@@ -876,7 +876,24 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
               ),
             ),
-
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Session Tracking',
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    const SessionTrackingCard(),
+                  ],
+                ),
+              ),
+            ),
             const SliverToBoxAdapter(child: SizedBox(height: 8)),
 
             // Quick Actions Section Header
@@ -991,25 +1008,6 @@ class _HomeScreenState extends State<HomeScreen> {
             const SliverToBoxAdapter(child: SizedBox(height: 24)),
 
             // Session Tracking Card
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Session Tracking',
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    const SessionTrackingCard(),
-                  ],
-                ),
-              ),
-            ),
-
             const SliverToBoxAdapter(child: SizedBox(height: 24)),
 
             // Ministry Overview Section - Hidden by default, show on button press

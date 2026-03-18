@@ -44,7 +44,13 @@ class WorkSessionActive extends WorkSessionState {
   }
 
   @override
-  List<Object?> get props => [session, todayVisits, autoTrackingEnabled, currentLatitude, currentLongitude];
+  List<Object?> get props => [
+    session,
+    todayVisits,
+    autoTrackingEnabled,
+    currentLatitude,
+    currentLongitude,
+  ];
 }
 
 /// Not currently checked in
@@ -52,7 +58,10 @@ class WorkSessionInactive extends WorkSessionState {
   final WorkSession? lastSession;
   final bool autoTrackingEnabled;
 
-  const WorkSessionInactive({this.lastSession, this.autoTrackingEnabled = false});
+  const WorkSessionInactive({
+    this.lastSession,
+    this.autoTrackingEnabled = false,
+  });
 
   WorkSessionInactive copyWith({
     WorkSession? lastSession,
@@ -128,30 +137,82 @@ class WorkSession extends Equatable {
   }
 
   factory WorkSession.fromJson(Map<String, dynamic> json) {
+    String? resolveTerritoryName() {
+      final direct =
+          json['territory_name']?.toString() ??
+          json['territoryName']?.toString() ??
+          json['entity_name']?.toString() ??
+          json['entityName']?.toString();
+      if (direct != null && direct.isNotEmpty) return direct;
+
+      final territory = json['territory'];
+      if (territory is Map) {
+        final t = territory.cast<String, dynamic>();
+        final nested =
+            t['territory_name']?.toString() ??
+            t['territoryName']?.toString() ??
+            t['entity_name']?.toString() ??
+            t['entityName']?.toString() ??
+            t['name']?.toString();
+        if (nested != null && nested.isNotEmpty) return nested;
+      }
+
+      final assignment = json['assignment'];
+      if (assignment is Map) {
+        final a = assignment.cast<String, dynamic>();
+        final nested =
+            a['territory_name']?.toString() ??
+            a['entity_name']?.toString() ??
+            a['name']?.toString();
+        if (nested != null && nested.isNotEmpty) return nested;
+      }
+
+      final solid =
+          json['territory_solid']?.toString() ??
+          json['territorySolid']?.toString();
+      if (solid != null && solid.isNotEmpty) return 'Territory $solid';
+
+      return null;
+    }
+
     return WorkSession(
       id: json['id']?.toString() ?? '',
-      workerId: json['worker_id']?.toString() ?? json['workerId']?.toString() ?? '',
-      territoryId: json['territory_id']?.toString() ?? json['territoryId']?.toString() ?? '',
-      territoryName: json['territory_name']?.toString() ?? json['territoryName']?.toString() ?? 'Unknown Territory',
+      workerId:
+          json['worker_id']?.toString() ?? json['workerId']?.toString() ?? '',
+      territoryId:
+          json['territory_id']?.toString() ??
+          json['territoryId']?.toString() ??
+          '',
+      territoryName: resolveTerritoryName() ?? 'Unknown Territory',
       checkInTime: json['check_in_time'] != null
-          ? DateTime.tryParse(json['check_in_time'].toString()) ?? DateTime.now()
+          ? DateTime.tryParse(json['check_in_time'].toString()) ??
+                DateTime.now()
           : (json['checkInTime'] != null
-              ? DateTime.tryParse(json['checkInTime'].toString()) ?? DateTime.now()
-              : DateTime.now()),
+                ? DateTime.tryParse(json['checkInTime'].toString()) ??
+                      DateTime.now()
+                : DateTime.now()),
       checkOutTime: json['check_out_time'] != null
           ? DateTime.tryParse(json['check_out_time'].toString())
           : (json['checkOutTime'] != null
-              ? DateTime.tryParse(json['checkOutTime'].toString())
-              : null),
-      checkInLatitude: (json['check_in_latitude'] ?? json['checkInLatitude'])?.toDouble(),
-      checkInLongitude: (json['check_in_longitude'] ?? json['checkInLongitude'])?.toDouble(),
+                ? DateTime.tryParse(json['checkOutTime'].toString())
+                : null),
+      checkInLatitude: (json['check_in_latitude'] ?? json['checkInLatitude'])
+          ?.toDouble(),
+      checkInLongitude: (json['check_in_longitude'] ?? json['checkInLongitude'])
+          ?.toDouble(),
       visitsCount: json['visits_count'] ?? json['visitsCount'] ?? 0,
       notes: json['notes']?.toString(),
     );
   }
 
   @override
-  List<Object?> get props => [id, workerId, territoryId, checkInTime, checkOutTime];
+  List<Object?> get props => [
+    id,
+    workerId,
+    territoryId,
+    checkInTime,
+    checkOutTime,
+  ];
 }
 
 /// Visit record model
@@ -213,14 +274,16 @@ class VisitRecord extends Equatable {
   factory VisitRecord.fromJson(Map<String, dynamic> json) {
     return VisitRecord(
       id: json['id']?.toString() ?? '',
-      sessionId: json['session_id']?.toString() ?? json['sessionId']?.toString() ?? '',
+      sessionId:
+          json['session_id']?.toString() ?? json['sessionId']?.toString() ?? '',
       address: json['address']?.toString() ?? '',
       outcome: json['outcome']?.toString() ?? 'visited',
       timestamp: json['timestamp'] != null
           ? DateTime.tryParse(json['timestamp'].toString()) ?? DateTime.now()
           : (json['created_at'] != null
-              ? DateTime.tryParse(json['created_at'].toString()) ?? DateTime.now()
-              : DateTime.now()),
+                ? DateTime.tryParse(json['created_at'].toString()) ??
+                      DateTime.now()
+                : DateTime.now()),
       notes: json['notes']?.toString(),
       latitude: (json['latitude'] ?? json['lat'])?.toDouble(),
       longitude: (json['longitude'] ?? json['lng'])?.toDouble(),

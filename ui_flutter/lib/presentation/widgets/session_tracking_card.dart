@@ -200,7 +200,7 @@ class SessionTrackingCard extends StatelessWidget {
             ),
             const SizedBox(height: 12),
             Text(
-              'Start a session from the GPS Tracking button to begin tracking your work.',
+              'Start a session to begin tracking your work.',
               style: theme.textTheme.bodyMedium?.copyWith(
                 color: theme.colorScheme.onSurfaceVariant,
               ),
