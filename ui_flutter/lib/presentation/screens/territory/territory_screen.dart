@@ -9,6 +9,7 @@ import '../../../data/models/territory_model.dart';
 import '../../../services/coach_marks_service.dart';
 import '../../blocs/territory/territory_bloc.dart';
 import '../../blocs/work_session/work_session_bloc.dart';
+import '../../widgets/territory_map_widget.dart';
 import '../../widgets/widgets.dart';
 
 class TerritoryScreen extends StatefulWidget {
@@ -507,7 +508,7 @@ class _MapTab extends StatefulWidget {
 
 class _MapTabState extends State<_MapTab> {
   GeoTerritory? _selectedTerritory;
-  // final List<VisitMarker> _visitMarkers = [];
+  final List<VisitMarker> _visitMarkers = [];
   double? _userLatitude;
   double? _userLongitude;
   bool _showTapHint = false;
@@ -675,22 +676,22 @@ class _MapTabState extends State<_MapTab> {
   }) {
     return Stack(
       children: [
-        // Map widget removed - use Command Center instead
-        Container(
-          color: Colors.grey[100],
-          child: Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(Icons.map_outlined, size: 64, color: Colors.grey[400]),
-                const SizedBox(height: 16),
-                Text(
-                  'Map view has moved to Command Center',
-                  style: TextStyle(color: Colors.grey[600]),
-                ),
-              ],
-            ),
-          ),
+        TerritoryMapWidget(
+          territories: territories,
+          selectedTerritory: _selectedTerritory,
+          onTerritoryTap: (territory) {
+            setState(() => _selectedTerritory = territory);
+            _showTerritoryDetailMap(context, territory);
+          },
+          showLabels: true,
+          showZoomControls: true,
+          visitMarkers: _visitMarkers,
+          allowAddVisit: true,
+          onAddVisit: (lat, lng) => _showAddVisitDialog(context, lat, lng),
+          fitToTerritories: true,
+          userLatitude: _userLatitude,
+          userLongitude: _userLongitude,
+          dotOnly: true,
         ),
         // Territory count badge
         Positioned(
@@ -1021,7 +1022,21 @@ class _MapTabState extends State<_MapTab> {
                   onPressed: () {
                     // Add the visit marker
                     setState(() {
-                      // Visit markers functionality removed with map widget
+                      _visitMarkers.add(
+                        VisitMarker(
+                          id: DateTime.now().millisecondsSinceEpoch.toString(),
+                          latitude: latitude,
+                          longitude: longitude,
+                          address: addressController.text.isNotEmpty
+                              ? addressController.text
+                              : null,
+                          outcome: selectedOutcome,
+                          notes: notesController.text.isNotEmpty
+                              ? notesController.text
+                              : null,
+                          timestamp: DateTime.now(),
+                        ),
+                      );
                     });
                     Navigator.pop(context);
                     AppSnackbar.success(
