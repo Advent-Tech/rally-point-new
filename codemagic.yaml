@@ -97,6 +97,14 @@ workflows:
             --key-id "$APP_STORE_CONNECT_KEY_IDENTIFIER" \
             --issuer-id "$APP_STORE_CONNECT_ISSUER_ID" \
             --private-key @env:APP_STORE_CONNECT_PRIVATE_KEY
+
+          echo "Polling App Store Connect for build availability..."
+          echo "(If this step errors, paste the output and I'll adjust the command for the Codemagic CLI version.)"
+          for i in $(seq 1 20); do
+            echo "Attempt $i/20"
+            app-store-connect builds list --app-id 6760635304 || true
+            sleep 30
+          done
     artifacts:
       - ui_flutter/build/ios/ipa/*.ipa
     publishing:
