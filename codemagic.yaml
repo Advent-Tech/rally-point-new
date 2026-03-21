@@ -71,15 +71,25 @@ workflows:
             --export-options-plist=$HOME/export_options.plist
     artifacts:
       - ui_flutter/build/ios/ipa/*.ipa
-    publishing:
-      app_store_connect:
-        api_key: $APP_STORE_CONNECT_PRIVATE_KEY
-        key_id: $APP_STORE_CONNECT_KEY_IDENTIFIER
-        issuer_id: $APP_STORE_CONNECT_ISSUER_ID
-        submit_to_testflight: true
-      email:
-        recipients:
-          - streams.app.2030@gmail.com
+
+      - name: Upload IPA to App Store Connect (manual)
+        script: |
+          set -e
+          IPA_PATH=$(ls -1 build/ios/ipa/*.ipa | head -n 1)
+          echo "IPA: $IPA_PATH"
+ 
+          app-store-connect publish \
+          --path "$IPA_PATH" \
+          --key-id "$APP_STORE_CONNECT_KEY_IDENTIFIER" \
+          --issuer-id "$APP_STORE_CONNECT_ISSUER_ID" \
+          --private-key @env:APP_STORE_CONNECT_PRIVATE_KEY
+ 
+      - name: Debug - list builds (manual)
+        script: |
+          set -x
+          app-store-connect --version || true
+          app-store-connect builds list --app-id 6760635304 || true
+
 
   android-workflow:
     name: Rally Point Android
