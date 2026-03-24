@@ -10,7 +10,7 @@ workflows:
         - "iOS build"
       vars:
         PROJECT_DIR: "ui_flutter"
-        BUNDLE_ID: "com.rallypoint.rallypointapp"
+        BUNDLE_ID: "com.lightpoint.lightpointapp"
     scripts:
       - name: Set up Mapbox
         script: |
