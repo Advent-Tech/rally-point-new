@@ -12,7 +12,6 @@ workflows:
         PROJECT_DIR: "ui_flutter"
         BUNDLE_ID: "com.lightpoint.lightpointapp"
         APPLE_APP_ID: "6761075004"
-        ASC_PROVIDER: "REPLACE_WITH_PROVIDER_SHORT_NAME"
     scripts:
       - name: Set up Mapbox
         script: |
@@ -150,22 +149,6 @@ workflows:
           echo "Filtering apps list by expected bundle id: $BUNDLE_ID"
           app-store-connect apps list | grep -i "$BUNDLE_ID" || true
 
-      - name: Debug App Store Connect providers
-        script: |
-          set -euo pipefail
-          mkdir -p "$HOME/.appstoreconnect/private_keys"
-          cp "$HOME/AuthKey.p8" "$HOME/.appstoreconnect/private_keys/AuthKey_${APP_STORE_CONNECT_KEY_IDENTIFIER}.p8"
-          chmod 600 "$HOME/.appstoreconnect/private_keys/AuthKey_${APP_STORE_CONNECT_KEY_IDENTIFIER}.p8"
-          echo "Listing providers for this API key:"
-          xcrun altool --list-providers \
-            --apiKey "$APP_STORE_CONNECT_KEY_IDENTIFIER" \
-            --apiIssuer "$APP_STORE_CONNECT_ISSUER_ID"
-          if [ -z "${ASC_PROVIDER:-}" ] || [ "$ASC_PROVIDER" = "REPLACE_WITH_PROVIDER_SHORT_NAME" ]; then
-            echo "ASC_PROVIDER is not configured. Replace REPLACE_WITH_PROVIDER_SHORT_NAME with provider short name from the list above." >&2
-            exit 1
-          fi
-          echo "Using ASC_PROVIDER=$ASC_PROVIDER"
-
       - name: Upload IPA to App Store Connect (manual)
         script: |
           set -euo pipefail
@@ -181,15 +164,17 @@ workflows:
 
           echo "IPA: $IPA_PATH"
 
-          xcrun altool --upload-app --type ios \
-            -f "$IPA_PATH" \
-            --apiKey "$APP_STORE_CONNECT_KEY_IDENTIFIER" \
-            --apiIssuer "$APP_STORE_CONNECT_ISSUER_ID" \
-            --asc-provider "$ASC_PROVIDER"
+          app-store-connect publish \
+            --path "$IPA_PATH" \
+            --key-id "$APP_STORE_CONNECT_KEY_IDENTIFIER" \
+            --issuer-id "$APP_STORE_CONNECT_ISSUER_ID" \
+            --private-key @env:APP_STORE_CONNECT_PRIVATE_KEY
 
           echo "Upload completed. Verifying App Store Connect API access context..."
           app-store-connect apps list | grep -i "$BUNDLE_ID" || true
           app-store-connect builds list --app-id "$APPLE_APP_ID" || true
+          echo "Unfiltered builds snapshot (this CLI may use a different app-id type):"
+          app-store-connect builds list || true
 
           echo "Polling App Store Connect for build availability (up to 60 minutes)..."
           echo "Expected app-id: $APPLE_APP_ID"
@@ -197,6 +182,7 @@ workflows:
           for i in $(seq 1 120); do
             echo "Attempt $i/120 at $(date -u +%Y-%m-%dT%H:%M:%SZ)"
             app-store-connect builds list --app-id "$APPLE_APP_ID" || true
+            app-store-connect builds list || true
             echo "Fallback check by app listing in same key context:"
             app-store-connect apps list | grep -i "$BUNDLE_ID" || true
             sleep 30
