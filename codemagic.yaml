@@ -67,8 +67,14 @@ workflows:
       - name: Build IPA
         script: |
           cd $PROJECT_DIR
+          BUILD_NUMBER="${CM_BUILD_ID:-$CM_BUILD_NUMBER}"
+          if ! [[ "$BUILD_NUMBER" =~ ^[0-9]+$ ]]; then
+            echo "Resolved BUILD_NUMBER=$BUILD_NUMBER is not numeric; falling back to CM_BUILD_NUMBER=$CM_BUILD_NUMBER"
+            BUILD_NUMBER="$CM_BUILD_NUMBER"
+          fi
+          echo "Using iOS build-number=$BUILD_NUMBER"
           flutter build ipa --release -v \
-            --build-number=$CM_BUILD_NUMBER \
+            --build-number="$BUILD_NUMBER" \
             --export-options-plist=$HOME/export_options.plist
 
       - name: Debug - list IPA outputs
@@ -154,6 +160,14 @@ workflows:
             app-store-connect apps list | grep -i "$BUNDLE_ID" || true
             sleep 30
           done
+
+      - name: Debug post-upload build states
+        script: |
+          set -euo pipefail
+          echo "Final build state snapshot for app-id=$APPLE_APP_ID"
+          app-store-connect builds list --app-id "$APPLE_APP_ID" || true
+          echo "Attempting to list INVALID processing-state builds (if supported by this CLI version)..."
+          app-store-connect builds list --app-id "$APPLE_APP_ID" --processing-state INVALID || true
     artifacts:
       - ui_flutter/build/ios/ipa/*.ipa
     publishing:
