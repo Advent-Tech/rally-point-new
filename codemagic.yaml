@@ -120,6 +120,10 @@ workflows:
             echo "Bundle ID mismatch: expected $BUNDLE_ID, got $IPA_BUNDLE_ID" >&2
             exit 1
           fi
+          if ! [[ "$IPA_BUILD" =~ ^[0-9]+$ ]]; then
+            echo "Invalid CFBundleVersion=$IPA_BUILD (must be numeric/incrementing for TestFlight)." >&2
+            exit 1
+          fi
 
       - name: Debug App Store Connect app visibility
         script: |
