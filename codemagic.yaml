@@ -102,7 +102,7 @@ workflows:
           echo "(If this step errors, paste the output and I'll adjust the command for the Codemagic CLI version.)"
           for i in $(seq 1 20); do
             echo "Attempt $i/20"
-            app-store-connect builds list --app-id 6760635304 || true
+            app-store-connect builds list --app-id 6761075004 || true
             sleep 30
           done
     artifacts:
