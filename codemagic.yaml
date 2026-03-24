@@ -76,10 +76,10 @@ workflows:
             fi
           done
           if [ -z "$BUILD_NUMBER" ]; then
-            BUILD_NUMBER="$(date +%s)"
-            echo "No numeric CI build number found; using timestamp fallback: $BUILD_NUMBER"
+            BUILD_NUMBER="$(date -u +%s)"
+            echo "No numeric CI build number found; using UTC timestamp fallback: $BUILD_NUMBER"
           fi
-          echo "Using iOS build-number=$BUILD_NUMBER"
+          echo "Using monotonic iOS build-number=$BUILD_NUMBER"
           echo "$BUILD_NUMBER" > /tmp/expected_ios_build_number.txt
           flutter build ipa --release -v \
             --build-number="$BUILD_NUMBER" \
@@ -170,31 +170,43 @@ workflows:
             --issuer-id "$APP_STORE_CONNECT_ISSUER_ID" \
             --private-key @env:APP_STORE_CONNECT_PRIVATE_KEY
 
-          echo "Upload completed. Verifying App Store Connect API access context..."
-          app-store-connect apps list | grep -i "$BUNDLE_ID" || true
-          app-store-connect builds list --app-id "$APPLE_APP_ID" || true
-          echo "Unfiltered builds snapshot (this CLI may use a different app-id type):"
-          app-store-connect builds list || true
-
-          echo "Polling App Store Connect for build availability (up to 60 minutes)..."
-          echo "Expected app-id: $APPLE_APP_ID"
-          echo "Expected bundle-id: $BUNDLE_ID"
-          for i in $(seq 1 120); do
-            echo "Attempt $i/120 at $(date -u +%Y-%m-%dT%H:%M:%SZ)"
-            app-store-connect builds list --app-id "$APPLE_APP_ID" || true
-            app-store-connect builds list || true
-            echo "Fallback check by app listing in same key context:"
-            app-store-connect apps list | grep -i "$BUNDLE_ID" || true
-            sleep 30
-          done
+          echo "UPLOAD SUCCEEDED means transport succeeded only."
+          echo "Next stage is Apple processing/visibility in App Store Connect."
 
       - name: Debug post-upload build states
         script: |
           set -euo pipefail
-          echo "Final build state snapshot for app-id=$APPLE_APP_ID"
-          app-store-connect builds list --app-id "$APPLE_APP_ID" || true
-          echo "Attempting to list INVALID processing-state builds (if supported by this CLI version)..."
-          app-store-connect builds list --app-id "$APPLE_APP_ID" --processing-state INVALID || true
+          TARGET_BUILD="$(cat /tmp/expected_ios_build_number.txt 2>/dev/null || true)"
+          if [ -z "${TARGET_BUILD:-}" ]; then
+            echo "Missing TARGET_BUILD from /tmp/expected_ios_build_number.txt" >&2
+            exit 1
+          fi
+
+          echo "Polling processing state for build=$TARGET_BUILD app-id=$APPLE_APP_ID (20 minutes max)..."
+          FOUND=0
+          for i in $(seq 1 40); do
+            echo "Attempt $i/40 at $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+            OUT="$(app-store-connect builds list --app-id "$APPLE_APP_ID" 2>&1 || true)"
+            BLOCK="$(echo "$OUT" | awk -v v="$TARGET_BUILD" 'BEGIN{RS="-- Build --"} $0 ~ ("Version: " v) {print "-- Build --"$0}')"
+            if [ -n "$BLOCK" ]; then
+              FOUND=1
+              STATE="$(echo "$BLOCK" | awk -F': ' '/Processing state:/ {print $2; exit}')"
+              [ -z "${STATE:-}" ] && STATE="UNKNOWN"
+              echo "Build detected. Processing state=$STATE"
+              echo "$BLOCK" | awk '/Id:|Processing state:|Version:|Uploaded date:|Expiration date:|Min os version:/{print}'
+              if [ "$STATE" = "VALID" ] || [ "$STATE" = "INVALID" ]; then
+                break
+              fi
+            else
+              echo "Build $TARGET_BUILD not visible yet for app-id=$APPLE_APP_ID"
+            fi
+            sleep 30
+          done
+
+          if [ "$FOUND" -eq 0 ]; then
+            echo "WARNING: Build $TARGET_BUILD not visible within 20 minutes." >&2
+            echo "Next action: Check App Store Connect UI (TestFlight + Activity) and Apple processing emails." >&2
+          fi
     artifacts:
       - ui_flutter/build/ios/ipa/*.ipa
     publishing:
