@@ -67,12 +67,20 @@ workflows:
       - name: Build IPA
         script: |
           cd $PROJECT_DIR
-          BUILD_NUMBER="${CM_BUILD_ID:-$CM_BUILD_NUMBER}"
-          if ! [[ "$BUILD_NUMBER" =~ ^[0-9]+$ ]]; then
-            echo "Resolved BUILD_NUMBER=$BUILD_NUMBER is not numeric; falling back to CM_BUILD_NUMBER=$CM_BUILD_NUMBER"
-            BUILD_NUMBER="$CM_BUILD_NUMBER"
+          echo "Raw CI vars: CM_BUILD_ID=${CM_BUILD_ID:-<unset>} CM_BUILD_NUMBER=${CM_BUILD_NUMBER:-<unset>}"
+          BUILD_NUMBER=""
+          for CANDIDATE in "${CM_BUILD_ID:-}" "${CM_BUILD_NUMBER:-}"; do
+            if [[ "$CANDIDATE" =~ ^[0-9]+$ ]]; then
+              BUILD_NUMBER="$CANDIDATE"
+              break
+            fi
+          done
+          if [ -z "$BUILD_NUMBER" ]; then
+            BUILD_NUMBER="$(date +%s)"
+            echo "No numeric CI build number found; using timestamp fallback: $BUILD_NUMBER"
           fi
           echo "Using iOS build-number=$BUILD_NUMBER"
+          echo "$BUILD_NUMBER" > /tmp/expected_ios_build_number.txt
           flutter build ipa --release -v \
             --build-number="$BUILD_NUMBER" \
             --export-options-plist=$HOME/export_options.plist
@@ -84,6 +92,8 @@ workflows:
           echo "BUNDLE_ID=$BUNDLE_ID"
           echo "APPLE_APP_ID=$APPLE_APP_ID"
           echo "CM_BUILD_NUMBER=$CM_BUILD_NUMBER"
+          echo "Expected iOS build number file:"
+          cat /tmp/expected_ios_build_number.txt || true
           ls -la "$CM_BUILD_DIR/$PROJECT_DIR/build/ios" || true
           ls -la "$CM_BUILD_DIR/$PROJECT_DIR/build/ios/ipa" || true
           echo "Generated export_options.plist:"
@@ -112,9 +122,11 @@ workflows:
           IPA_BUNDLE_ID="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$APP_PATH/Info.plist")"
           IPA_VERSION="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$APP_PATH/Info.plist")"
           IPA_BUILD="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$APP_PATH/Info.plist")"
+          EXPECTED_BUILD="$(cat /tmp/expected_ios_build_number.txt 2>/dev/null || true)"
           echo "IPA CFBundleIdentifier=$IPA_BUNDLE_ID"
           echo "IPA CFBundleShortVersionString=$IPA_VERSION"
           echo "IPA CFBundleVersion=$IPA_BUILD"
+          echo "Expected CFBundleVersion=$EXPECTED_BUILD"
 
           if [ "$IPA_BUNDLE_ID" != "$BUNDLE_ID" ]; then
             echo "Bundle ID mismatch: expected $BUNDLE_ID, got $IPA_BUNDLE_ID" >&2
@@ -122,6 +134,10 @@ workflows:
           fi
           if ! [[ "$IPA_BUILD" =~ ^[0-9]+$ ]]; then
             echo "Invalid CFBundleVersion=$IPA_BUILD (must be numeric/incrementing for TestFlight)." >&2
+            exit 1
+          fi
+          if [ -n "$EXPECTED_BUILD" ] && [ "$IPA_BUILD" != "$EXPECTED_BUILD" ]; then
+            echo "CFBundleVersion mismatch: expected $EXPECTED_BUILD, got $IPA_BUILD" >&2
             exit 1
           fi
 
