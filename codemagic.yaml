@@ -149,67 +149,14 @@ workflows:
           echo "Filtering apps list by expected bundle id: $BUNDLE_ID"
           app-store-connect apps list | grep -i "$BUNDLE_ID" || true
 
-      - name: Upload IPA to App Store Connect (manual)
-        script: |
-          set -euo pipefail
-
-          IPA_DIR="$CM_BUILD_DIR/$PROJECT_DIR/build/ios/ipa"
-          echo "Looking for IPA in: $IPA_DIR"
-
-          IPA_PATH="$(find "$IPA_DIR" -maxdepth 2 -name "*.ipa" -print -quit || true)"
-          if [ -z "${IPA_PATH:-}" ]; then
-            echo "No IPA found under $IPA_DIR" >&2
-            exit 1
-          fi
-
-          echo "IPA: $IPA_PATH"
-
-          app-store-connect publish \
-            --path "$IPA_PATH" \
-            --key-id "$APP_STORE_CONNECT_KEY_IDENTIFIER" \
-            --issuer-id "$APP_STORE_CONNECT_ISSUER_ID" \
-            --private-key @env:APP_STORE_CONNECT_PRIVATE_KEY
-
-          echo "UPLOAD SUCCEEDED means transport succeeded only."
-          echo "Next stage is Apple processing/visibility in App Store Connect."
-
-      - name: Debug post-upload build states
-        script: |
-          set -euo pipefail
-          TARGET_BUILD="$(cat /tmp/expected_ios_build_number.txt 2>/dev/null || true)"
-          if [ -z "${TARGET_BUILD:-}" ]; then
-            echo "Missing TARGET_BUILD from /tmp/expected_ios_build_number.txt" >&2
-            exit 1
-          fi
-
-          echo "Polling processing state for build=$TARGET_BUILD app-id=$APPLE_APP_ID (20 minutes max)..."
-          FOUND=0
-          for i in $(seq 1 40); do
-            echo "Attempt $i/40 at $(date -u +%Y-%m-%dT%H:%M:%SZ)"
-            OUT="$(app-store-connect builds list --app-id "$APPLE_APP_ID" 2>&1 || true)"
-            BLOCK="$(echo "$OUT" | awk -v v="$TARGET_BUILD" 'BEGIN{RS="-- Build --"} $0 ~ ("Version: " v) {print "-- Build --"$0}')"
-            if [ -n "$BLOCK" ]; then
-              FOUND=1
-              STATE="$(echo "$BLOCK" | awk -F': ' '/Processing state:/ {print $2; exit}')"
-              [ -z "${STATE:-}" ] && STATE="UNKNOWN"
-              echo "Build detected. Processing state=$STATE"
-              echo "$BLOCK" | awk '/Id:|Processing state:|Version:|Uploaded date:|Expiration date:|Min os version:/{print}'
-              if [ "$STATE" = "VALID" ] || [ "$STATE" = "INVALID" ]; then
-                break
-              fi
-            else
-              echo "Build $TARGET_BUILD not visible yet for app-id=$APPLE_APP_ID"
-            fi
-            sleep 30
-          done
-
-          if [ "$FOUND" -eq 0 ]; then
-            echo "WARNING: Build $TARGET_BUILD not visible within 20 minutes." >&2
-            echo "Next action: Check App Store Connect UI (TestFlight + Activity) and Apple processing emails." >&2
-          fi
     artifacts:
       - ui_flutter/build/ios/ipa/*.ipa
     publishing:
+      app_store_connect:
+        api_key: $APP_STORE_CONNECT_PRIVATE_KEY
+        key_id: $APP_STORE_CONNECT_KEY_IDENTIFIER
+        issuer_id: $APP_STORE_CONNECT_ISSUER_ID
+        submit_to_testflight: true
       email:
         recipients:
           - streams.app.2030@gmail.com
