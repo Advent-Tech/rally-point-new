@@ -423,6 +423,132 @@ func (r *deliveryRepository) GetTeamDonationDeliveryStats(teamID uuid.UUID, days
 	return stats, nil
 }
 
+// GetAllBookSaleDeliveries returns all deliveries with delivery_type='book_sale'
+func (r *deliveryRepository) GetAllBookSaleDeliveries(limit, offset int) ([]*domain.Delivery, error) {
+	query := `SELECT id, team_id, worker_id, worker_name, recipient_name, recipient_phone, recipient_email,
+		address, latitude, longitude, delivery_type, priority, status, notes, scheduled_date, completed_at,
+		territory_id, territory_name, household_id, donation_amount, payment_method, payment_status,
+		stripe_payment_id, receipt_number, receipt_url, is_offline, synced_at, offline_id,
+		created_by, created_at, updated_at
+		FROM deliveries WHERE delivery_type = 'book_sale' ORDER BY created_at DESC LIMIT $1 OFFSET $2`
+
+	return r.scanDeliveries(r.db.Query(query, limit, offset))
+}
+
+// GetTeamBookSaleDeliveries returns team-specific deliveries with delivery_type='book_sale'
+func (r *deliveryRepository) GetTeamBookSaleDeliveries(teamID uuid.UUID, limit, offset int) ([]*domain.Delivery, error) {
+	query := `SELECT id, team_id, worker_id, worker_name, recipient_name, recipient_phone, recipient_email,
+		address, latitude, longitude, delivery_type, priority, status, notes, scheduled_date, completed_at,
+		territory_id, territory_name, household_id, donation_amount, payment_method, payment_status,
+		stripe_payment_id, receipt_number, receipt_url, is_offline, synced_at, offline_id,
+		created_by, created_at, updated_at
+		FROM deliveries WHERE delivery_type = 'book_sale' AND team_id = $1 ORDER BY created_at DESC LIMIT $2 OFFSET $3`
+
+	return r.scanDeliveries(r.db.Query(query, teamID, limit, offset))
+}
+
+func (r *deliveryRepository) GetGlobalBookSaleStats(days int) (*domain.BookSaleStats, error) {
+	dateFilter := ""
+	if days > 0 {
+		dateFilter = fmt.Sprintf("AND d.created_at >= NOW() - INTERVAL '%d days'", days)
+	}
+
+	query := fmt.Sprintf(`
+		WITH book_rows AS (
+			SELECT
+				COALESCE(di.item_name, 'Book') AS item_name,
+				COALESCE(di.quantity, 1) AS quantity,
+				COALESCE(d.donation_amount, 0) AS sale_total
+			FROM deliveries d
+			LEFT JOIN LATERAL (
+				SELECT item_name, quantity
+				FROM delivery_items
+				WHERE delivery_id = d.id
+				ORDER BY created_at ASC
+				LIMIT 1
+			) di ON true
+			WHERE d.delivery_type = 'book_sale' %s
+		),
+		top_book AS (
+			SELECT item_name, SUM(quantity) AS total_qty
+			FROM book_rows
+			GROUP BY item_name
+			ORDER BY total_qty DESC, item_name ASC
+			LIMIT 1
+		)
+		SELECT
+			COUNT(*)::int AS total_sales,
+			COALESCE(SUM(sale_total), 0) AS total_amount,
+			COALESCE(SUM(quantity), 0)::int AS total_books,
+			COALESCE(AVG(sale_total), 0) AS average_sale,
+			COALESCE((SELECT item_name FROM top_book), '') AS top_book_title
+		FROM book_rows
+	`, dateFilter)
+
+	stats := &domain.BookSaleStats{}
+	if err := r.db.QueryRow(query).Scan(
+		&stats.TotalSales,
+		&stats.TotalAmount,
+		&stats.TotalBooks,
+		&stats.AverageSale,
+		&stats.TopBookTitle,
+	); err != nil {
+		return nil, err
+	}
+	return stats, nil
+}
+
+func (r *deliveryRepository) GetTeamBookSaleStats(teamID uuid.UUID, days int) (*domain.BookSaleStats, error) {
+	dateFilter := ""
+	if days > 0 {
+		dateFilter = fmt.Sprintf("AND d.created_at >= NOW() - INTERVAL '%d days'", days)
+	}
+
+	query := fmt.Sprintf(`
+		WITH book_rows AS (
+			SELECT
+				COALESCE(di.item_name, 'Book') AS item_name,
+				COALESCE(di.quantity, 1) AS quantity,
+				COALESCE(d.donation_amount, 0) AS sale_total
+			FROM deliveries d
+			LEFT JOIN LATERAL (
+				SELECT item_name, quantity
+				FROM delivery_items
+				WHERE delivery_id = d.id
+				ORDER BY created_at ASC
+				LIMIT 1
+			) di ON true
+			WHERE d.delivery_type = 'book_sale' AND d.team_id = $1 %s
+		),
+		top_book AS (
+			SELECT item_name, SUM(quantity) AS total_qty
+			FROM book_rows
+			GROUP BY item_name
+			ORDER BY total_qty DESC, item_name ASC
+			LIMIT 1
+		)
+		SELECT
+			COUNT(*)::int AS total_sales,
+			COALESCE(SUM(sale_total), 0) AS total_amount,
+			COALESCE(SUM(quantity), 0)::int AS total_books,
+			COALESCE(AVG(sale_total), 0) AS average_sale,
+			COALESCE((SELECT item_name FROM top_book), '') AS top_book_title
+		FROM book_rows
+	`, dateFilter)
+
+	stats := &domain.BookSaleStats{}
+	if err := r.db.QueryRow(query, teamID).Scan(
+		&stats.TotalSales,
+		&stats.TotalAmount,
+		&stats.TotalBooks,
+		&stats.AverageSale,
+		&stats.TopBookTitle,
+	); err != nil {
+		return nil, err
+	}
+	return stats, nil
+}
+
 // Stats methods - basic implementations
 func (r *deliveryRepository) GetDeliveryStats(teamID uuid.UUID, days int) (*domain.DeliveryStats, error) {
 	// Simplified statuses: pending, completed, failed, cancelled

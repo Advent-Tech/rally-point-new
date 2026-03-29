@@ -60,8 +60,20 @@ func (s *deliveryService) publishNotify(subject string, event map[string]interfa
 func (s *deliveryService) CreateDelivery(creatorID uuid.UUID, req *domain.CreateDeliveryRequest) (*domain.DeliveryWithItems, error) {
 	// Validate request based on delivery type
 	isDonation := req.DeliveryType == domain.DeliveryTypeDonation
-	if !isDonation && len(req.Items) == 0 {
+	isBookSale := req.DeliveryType == domain.DeliveryTypeBookSale
+	if !isDonation && !isBookSale && len(req.Items) == 0 {
 		return nil, fmt.Errorf("literature delivery must have at least one item")
+	}
+	if isBookSale {
+		if req.BookTitle == "" {
+			return nil, fmt.Errorf("book_title is required for book_sale")
+		}
+		if req.BookQuantity <= 0 {
+			return nil, fmt.Errorf("book_quantity must be greater than 0 for book_sale")
+		}
+		if req.BookUnitPrice <= 0 {
+			return nil, fmt.Errorf("book_unit_price must be greater than 0 for book_sale")
+		}
 	}
 
 	// Determine worker ID - use provided worker or creator as default
@@ -158,8 +170,32 @@ func (s *deliveryService) CreateDelivery(creatorID uuid.UUID, req *domain.Create
 		return nil, fmt.Errorf("failed to create delivery: %w", err)
 	}
 
-	// Create delivery items (for literature deliveries)
+	// Create delivery items
 	var items []*domain.DeliveryItem
+	if isBookSale {
+		bookItemName := req.BookTitle
+		if req.BookCode != "" {
+			bookItemName = fmt.Sprintf("%s (%s)", req.BookTitle, req.BookCode)
+		}
+		bookDescription := ""
+		if req.BookLanguage != "" {
+			bookDescription = fmt.Sprintf("language=%s", req.BookLanguage)
+		}
+		bookItem := &domain.DeliveryItem{
+			ID:          uuid.New(),
+			DeliveryID:  delivery.ID,
+			ItemType:    domain.ItemTypeBook,
+			ItemName:    bookItemName,
+			Quantity:    req.BookQuantity,
+			Description: &bookDescription,
+			CreatedAt:   time.Now(),
+		}
+		if err := s.deliveryRepo.CreateDeliveryItem(bookItem); err != nil {
+			return nil, fmt.Errorf("failed to create book sale item: %w", err)
+		}
+		items = append(items, bookItem)
+	}
+
 	for _, itemReq := range req.Items {
 		item := &domain.DeliveryItem{
 			ID:         uuid.New(),
@@ -191,7 +227,10 @@ func (s *deliveryService) CreateDelivery(creatorID uuid.UUID, req *domain.Create
 	if delivery.TeamID != uuid.Nil {
 		notifTitle := fmt.Sprintf("New donation from %s", delivery.RecipientName)
 		notifBody := fmt.Sprintf("Recorded by %s", delivery.WorkerName)
-		if !isDonation {
+		if isBookSale {
+			notifTitle = fmt.Sprintf("New book sale: %s", delivery.RecipientName)
+			notifBody = fmt.Sprintf("%s sold by %s", req.BookTitle, delivery.WorkerName)
+		} else if !isDonation {
 			notifTitle = fmt.Sprintf("New literature delivery: %s", delivery.RecipientName)
 			notifBody = fmt.Sprintf("Delivery to %s", delivery.Address)
 		}
@@ -835,6 +874,54 @@ func (s *deliveryService) GetTeamDonationDeliveryStats(teamID uuid.UUID, days in
 	return s.deliveryRepo.GetTeamDonationDeliveryStats(teamID, days)
 }
 
+// GetAllBookSales returns book-sale deliveries formatted as BookSaleView
+func (s *deliveryService) GetAllBookSales(limit, offset int) ([]*domain.BookSaleView, error) {
+	if limit <= 0 {
+		limit = domain.DefaultDeliveryLimit
+	}
+	if limit > domain.MaxDeliveryLimit {
+		limit = domain.MaxDeliveryLimit
+	}
+
+	deliveries, err := s.deliveryRepo.GetAllBookSaleDeliveries(limit, offset)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get book sales: %w", err)
+	}
+
+	return s.convertDeliveriesToBookSaleViews(deliveries), nil
+}
+
+// GetTeamBookSales returns team-specific book-sale deliveries formatted as BookSaleView
+func (s *deliveryService) GetTeamBookSales(teamID uuid.UUID, limit, offset int) ([]*domain.BookSaleView, error) {
+	if limit <= 0 {
+		limit = domain.DefaultDeliveryLimit
+	}
+	if limit > domain.MaxDeliveryLimit {
+		limit = domain.MaxDeliveryLimit
+	}
+
+	deliveries, err := s.deliveryRepo.GetTeamBookSaleDeliveries(teamID, limit, offset)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get team book sales: %w", err)
+	}
+
+	return s.convertDeliveriesToBookSaleViews(deliveries), nil
+}
+
+func (s *deliveryService) GetGlobalBookSaleStats(days int) (*domain.BookSaleStats, error) {
+	if days < 0 {
+		days = 0
+	}
+	return s.deliveryRepo.GetGlobalBookSaleStats(days)
+}
+
+func (s *deliveryService) GetTeamBookSaleStats(teamID uuid.UUID, days int) (*domain.BookSaleStats, error) {
+	if days < 0 {
+		days = 0
+	}
+	return s.deliveryRepo.GetTeamBookSaleStats(teamID, days)
+}
+
 // convertDeliveriesToDonationViews converts delivery records to donation view format
 func (s *deliveryService) convertDeliveriesToDonationViews(deliveries []*domain.Delivery) []*domain.DonationView {
 	var views []*domain.DonationView
@@ -877,6 +964,83 @@ func (s *deliveryService) convertDeliveriesToDonationViews(deliveries []*domain.
 			view.Status = "cancelled"
 		default:
 			view.Status = d.Status
+		}
+
+		views = append(views, view)
+	}
+	return views
+}
+
+func (s *deliveryService) convertDeliveriesToBookSaleViews(deliveries []*domain.Delivery) []*domain.BookSaleView {
+	var views []*domain.BookSaleView
+	for _, d := range deliveries {
+		items, _ := s.deliveryRepo.GetItemsByDeliveryID(d.ID)
+
+		var firstItem *domain.DeliveryItem
+		if len(items) > 0 {
+			firstItem = items[0]
+		}
+
+		bookTitle := "Book"
+		quantity := 1
+		bookCode := ""
+		bookLanguage := ""
+
+		if firstItem != nil {
+			bookTitle = firstItem.ItemName
+			quantity = firstItem.Quantity
+			if firstItem.Description != nil {
+				bookLanguage = *firstItem.Description
+			}
+		}
+
+		totalAmount := 0.0
+		if d.DonationAmount != nil {
+			totalAmount = *d.DonationAmount
+		}
+
+		unitPrice := 0.0
+		if quantity > 0 {
+			unitPrice = totalAmount / float64(quantity)
+		}
+
+		view := &domain.BookSaleView{
+			ID:            d.ID,
+			WorkerID:      d.WorkerID,
+			WorkerName:    d.WorkerName,
+			TeamID:        d.TeamID,
+			BuyerName:     d.RecipientName,
+			BuyerPhone:    d.RecipientPhone,
+			BuyerEmail:    d.RecipientEmail,
+			BuyerAddress:  d.Address,
+			Latitude:      d.Latitude,
+			Longitude:     d.Longitude,
+			BookCode:      &bookCode,
+			BookTitle:     bookTitle,
+			BookLanguage:  &bookLanguage,
+			Quantity:      quantity,
+			UnitPrice:     unitPrice,
+			TotalAmount:   totalAmount,
+			Currency:      "USD",
+			PaymentMethod: "cash",
+			ReceiptNumber: "",
+			Notes:         d.Notes,
+			Status:        d.Status,
+			SoldAt:        d.CompletedAt,
+			CreatedAt:     d.CreatedAt,
+			UpdatedAt:     d.UpdatedAt,
+		}
+		if d.PaymentMethod != nil {
+			view.PaymentMethod = *d.PaymentMethod
+		}
+		if d.ReceiptNumber != nil {
+			view.ReceiptNumber = *d.ReceiptNumber
+		}
+		if bookCode == "" {
+			view.BookCode = nil
+		}
+		if bookLanguage == "" {
+			view.BookLanguage = nil
 		}
 
 		views = append(views, view)

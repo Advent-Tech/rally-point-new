@@ -26,6 +26,53 @@ import '../../widgets/states/empty_state.dart';
 /// Date filter options
 enum DateFilter { today, thisWeek, thisMonth, all }
 
+class _BookOption {
+  final String code;
+  final String title;
+  final String language;
+  final double unitPrice;
+  final String assetPath;
+
+  const _BookOption({
+    required this.code,
+    required this.title,
+    required this.language,
+    required this.unitPrice,
+    required this.assetPath,
+  });
+}
+
+const List<_BookOption> _bookCatalog = [
+  _BookOption(
+    code: 'GC_EN',
+    title: 'The Great Controversy Book, Thrive Magazine, & Doorknob Bag',
+    language: 'english',
+    unitPrice: 2.50,
+    assetPath: 'assets/books/great_contoversy.png',
+  ),
+  _BookOption(
+    code: 'GC_ES',
+    title: 'The Great Controversy Book, Thrive Magazine, & Doorknob Bag (Spanish)',
+    language: 'spanish',
+    unitPrice: 2.50,
+    assetPath: 'assets/books/great_contoversy_spanish.png',
+  ),
+  _BookOption(
+    code: 'WLD_EN',
+    title: 'When Light and Darkness Collide, Thrive Magazine, & Doorknob Bag',
+    language: 'english',
+    unitPrice: 2.50,
+    assetPath: 'assets/books/whenLDcollide.png',
+  ),
+  _BookOption(
+    code: 'WLD_ES',
+    title: 'When Light and Darkness Collide, Thrive Magazine, & Doorknob Bag (Spanish)',
+    language: 'spanish',
+    unitPrice: 2.50,
+    assetPath: 'assets/books/whenLDcollide_spanish.png',
+  ),
+];
+
 /// Simplified Delivery Screen for field workers
 /// Workers record donations on the spot - no pending states
 class DeliveryScreen extends StatefulWidget {
@@ -57,7 +104,10 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
     height: 1.4,
   );
   static final _tooltipRadius = BorderRadius.circular(14);
-  static const _tooltipPadding = EdgeInsets.symmetric(horizontal: 18, vertical: 16);
+  static const _tooltipPadding = EdgeInsets.symmetric(
+    horizontal: 18,
+    vertical: 16,
+  );
 
   @override
   void initState() {
@@ -114,7 +164,7 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
   void _maybeShowCoachMarks() {
     if (_coachMarksChecked) return;
     _coachMarksChecked = true;
-    CoachMarksService.hasBeenShown('delivery').then((shown) {
+    CoachMarksService().hasBeenShown('delivery').then((shown) {
       if (!shown && mounted) {
         Future.delayed(const Duration(milliseconds: 800), () {
           if (mounted) {
@@ -123,7 +173,7 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
               _showcaseRecord,
               _showcaseFilters,
             ]);
-            CoachMarksService.markAsShown('delivery');
+            CoachMarksService().markAsShown('delivery');
           }
         });
       }
@@ -141,227 +191,259 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
       builder: (_) {
         _maybeShowCoachMarks();
         return Scaffold(
-      appBar: AppBar(
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () {
-            if (context.canPop()) {
-              context.pop();
-            } else {
-              context.go('/home');
-            }
-          },
-        ),
-        title: const Text('Field Activity'),
-        actions: [
-          const RoleBadge(),
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: () {
-              context.read<DeliveryBloc>().add(const DeliveryRefresh());
-            },
-          ),
-        ],
-      ),
-      body: BlocConsumer<DeliveryBloc, DeliveryState>(
-        listener: (context, state) {
-          if (state is DeliveryError) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(state.message),
-                backgroundColor: AppColors.error,
+          appBar: AppBar(
+            leading: IconButton(
+              icon: const Icon(Icons.arrow_back),
+              onPressed: () {
+                if (context.canPop()) {
+                  context.pop();
+                } else {
+                  context.go('/home');
+                }
+              },
+            ),
+            title: const Text('Field Activity'),
+            actions: [
+              const RoleBadge(),
+              IconButton(
+                icon: const Icon(Icons.refresh),
+                onPressed: () {
+                  context.read<DeliveryBloc>().add(const DeliveryRefresh());
+                },
               ),
-            );
-          } else if (state is DeliveryCreateSuccess) {
-            SuccessOverlay.show(context, message: 'Recorded successfully!').then((_) {
-              if (context.mounted) {
-                context.read<DeliveryBloc>().add(const DeliveryLoadList());
+            ],
+          ),
+          body: BlocConsumer<DeliveryBloc, DeliveryState>(
+            listener: (context, state) {
+              if (state is DeliveryError) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(state.message),
+                    backgroundColor: AppColors.error,
+                  ),
+                );
+              } else if (state is DeliveryCreateSuccess) {
+                SuccessOverlay.show(
+                  context,
+                  message: 'Recorded successfully!',
+                ).then((_) {
+                  if (context.mounted) {
+                    context.read<DeliveryBloc>().add(const DeliveryLoadList());
+                  }
+                });
               }
-            });
-          }
-        },
-        builder: (context, state) {
-          List<DeliveryModel> filteredDeliveries = [];
-          List<DeliveryModel> todayDeliveries = [];
-
-          if (state is DeliveryListLoaded) {
-            filteredDeliveries = _filterDeliveries(state.deliveries);
-            // Always calculate today's totals for the summary card
-            final now = DateTime.now();
-            final today = DateTime(now.year, now.month, now.day);
-            todayDeliveries = state.deliveries.where((d) {
-              final createdAt = d.createdAt ?? d.completedAt;
-              if (createdAt == null) return false;
-              // Convert to local time for proper date comparison (backend returns UTC)
-              final localCreatedAt = createdAt.toLocal();
-              final localDate = DateTime(
-                localCreatedAt.year,
-                localCreatedAt.month,
-                localCreatedAt.day,
-              );
-              return localDate.isAtSameMomentAs(today);
-            }).toList();
-          }
-
-          // Calculate today's totals for summary (donations only)
-          final donations = todayDeliveries.toList();
-          final totalDonationAmount = donations.fold<double>(
-            0,
-            (sum, d) => sum + (d.donationAmount ?? 0),
-          );
-
-          return RefreshIndicator(
-            onRefresh: () async {
-              context.read<DeliveryBloc>().add(const DeliveryRefresh());
             },
-            child: SingleChildScrollView(
-              physics: const AlwaysScrollableScrollPhysics(),
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Today's Summary Card
-                  Showcase(
-                    key: _showcaseSummary,
-                    title: "Today's Summary",
-                    description: 'See your daily donation totals at a glance. This updates as you record donations.',
-                    titleTextStyle: _tooltipTitleStyle,
-                    descTextStyle: _tooltipDescStyle,
-                    tooltipBorderRadius: _tooltipRadius,
-                    tooltipPadding: _tooltipPadding,
-                    targetBorderRadius: BorderRadius.circular(20),
-                    child: _TodaySummaryCard(
-                      donationsCount: donations.length,
-                      donationsAmount: totalDonationAmount,
-                      isDark: isDark,
-                    ),
-                  ),
-                  const SizedBox(height: 24),
+            builder: (context, state) {
+              List<DeliveryModel> filteredDeliveries = [];
+              List<DeliveryModel> todayDeliveries = [];
 
-                  // Action Button - Record Donation
-                  Showcase(
-                    key: _showcaseRecord,
-                    title: 'Record Donation',
-                    description: 'Tap here to record a new donation. Your GPS location is automatically captured.',
-                    titleTextStyle: _tooltipTitleStyle,
-                    descTextStyle: _tooltipDescStyle,
-                    tooltipBorderRadius: _tooltipRadius,
-                    tooltipPadding: _tooltipPadding,
-                    targetBorderRadius: BorderRadius.circular(16),
-                    child: _ActionButton(
-                      icon: Icons.volunteer_activism,
-                      label: 'Record Donation',
-                      color: AppColors.success,
-                      onTap: () => _showRecordSheet(context),
-                    ),
-                  ),
-                  const SizedBox(height: 24),
+              if (state is DeliveryListLoaded) {
+                filteredDeliveries = _filterDeliveries(state.deliveries);
+                // Always calculate today's totals for the summary card
+                final now = DateTime.now();
+                final today = DateTime(now.year, now.month, now.day);
+                todayDeliveries = state.deliveries.where((d) {
+                  final createdAt = d.createdAt ?? d.completedAt;
+                  if (createdAt == null) return false;
+                  // Convert to local time for proper date comparison (backend returns UTC)
+                  final localCreatedAt = createdAt.toLocal();
+                  final localDate = DateTime(
+                    localCreatedAt.year,
+                    localCreatedAt.month,
+                    localCreatedAt.day,
+                  );
+                  return localDate.isAtSameMomentAs(today);
+                }).toList();
+              }
 
-                  // Date Filter Chips
-                  Showcase(
-                    key: _showcaseFilters,
-                    title: 'Filter Activity',
-                    description: 'Filter your donation history by Today, This Week, This Month, or view All records.',
-                    titleTextStyle: _tooltipTitleStyle,
-                    descTextStyle: _tooltipDescStyle,
-                    tooltipBorderRadius: _tooltipRadius,
-                    tooltipPadding: _tooltipPadding,
-                    targetBorderRadius: BorderRadius.circular(20),
-                    child: SingleChildScrollView(
-                      scrollDirection: Axis.horizontal,
-                      child: Row(
-                        children: DateFilter.values.map((filter) {
-                          final isSelected = _selectedFilter == filter;
-                          return Padding(
-                            padding: const EdgeInsets.only(right: 8),
-                            child: FilterChip(
-                              label: Text(_getChipLabel(filter)),
-                              selected: isSelected,
-                              onSelected: (selected) {
-                                setState(() => _selectedFilter = filter);
-                              },
-                              selectedColor: AppColors.primary.withAlpha(40),
-                              checkmarkColor: AppColors.primary,
-                              backgroundColor: isDark
-                                  ? AppColors.surfaceDark
-                                  : AppColors.surfaceLight,
-                              labelStyle: TextStyle(
-                                color: isSelected
-                                    ? AppColors.primary
-                                    : (isDark
-                                          ? AppColors.textPrimaryDark
-                                          : AppColors.textPrimaryLight),
-                                fontWeight: isSelected
-                                    ? FontWeight.bold
-                                    : FontWeight.normal,
-                              ),
-                            ),
-                          );
-                        }).toList(),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
+              // Calculate today's totals for summary
+              final donations = todayDeliveries.where((d) => d.isDonation).toList();
+              final bookSales = todayDeliveries.where((d) => d.isBookSale).toList();
+              final totalDonationAmount = donations.fold<double>(
+                0,
+                (sum, d) => sum + (d.donationAmount ?? 0),
+              );
+              final totalBookSalesAmount = bookSales.fold<double>(
+                0,
+                (sum, d) => sum + (d.donationAmount ?? 0),
+              );
 
-                  // Activity List Header
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              return RefreshIndicator(
+                onRefresh: () async {
+                  context.read<DeliveryBloc>().add(const DeliveryRefresh());
+                },
+                child: SingleChildScrollView(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        _getFilterLabel(),
-                        style: Theme.of(context).textTheme.titleMedium
-                            ?.copyWith(fontWeight: FontWeight.bold),
-                      ),
-                      Text(
-                        '${filteredDeliveries.length} records',
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: isDark
-                              ? AppColors.textSecondaryDark
-                              : AppColors.textSecondaryLight,
+                      // Today's Summary Card
+                      Showcase(
+                        key: _showcaseSummary,
+                        title: "Today's Summary",
+                        description:
+                            'See your daily donation totals at a glance. This updates as you record donations.',
+                        titleTextStyle: _tooltipTitleStyle,
+                        descTextStyle: _tooltipDescStyle,
+                        tooltipBorderRadius: _tooltipRadius,
+                        tooltipPadding: _tooltipPadding,
+                        targetBorderRadius: BorderRadius.circular(20),
+                        child: _TodaySummaryCard(
+                          donationsCount: donations.length,
+                          donationsAmount: totalDonationAmount,
+                          bookSalesCount: bookSales.length,
+                          bookSalesAmount: totalBookSalesAmount,
+                          isDark: isDark,
                         ),
                       ),
+                      const SizedBox(height: 24),
+
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Showcase(
+                              key: _showcaseRecord,
+                              title: 'Record Donation',
+                              description:
+                                  'Tap here to record a new donation. Your GPS location is automatically captured.',
+                              titleTextStyle: _tooltipTitleStyle,
+                              descTextStyle: _tooltipDescStyle,
+                              tooltipBorderRadius: _tooltipRadius,
+                              tooltipPadding: _tooltipPadding,
+                              targetBorderRadius: BorderRadius.circular(16),
+                              child: _ActionButton(
+                                icon: Icons.volunteer_activism,
+                                label: 'Record Donation',
+                                color: AppColors.success,
+                                onTap: () => _showRecordSheet(context),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: _ActionButton(
+                              icon: Icons.menu_book_rounded,
+                              label: 'Record Book Sale',
+                              color: AppColors.primary,
+                              onTap: () => _showBookSaleSheet(context),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 24),
+
+                      // Date Filter Chips
+                      Showcase(
+                        key: _showcaseFilters,
+                        title: 'Filter Activity',
+                        description:
+                            'Filter your donation history by Today, This Week, This Month, or view All records.',
+                        titleTextStyle: _tooltipTitleStyle,
+                        descTextStyle: _tooltipDescStyle,
+                        tooltipBorderRadius: _tooltipRadius,
+                        tooltipPadding: _tooltipPadding,
+                        targetBorderRadius: BorderRadius.circular(20),
+                        child: SingleChildScrollView(
+                          scrollDirection: Axis.horizontal,
+                          child: Row(
+                            children: DateFilter.values.map((filter) {
+                              final isSelected = _selectedFilter == filter;
+                              return Padding(
+                                padding: const EdgeInsets.only(right: 8),
+                                child: FilterChip(
+                                  label: Text(_getChipLabel(filter)),
+                                  selected: isSelected,
+                                  onSelected: (selected) {
+                                    setState(() => _selectedFilter = filter);
+                                  },
+                                  selectedColor: AppColors.primary.withAlpha(
+                                    40,
+                                  ),
+                                  checkmarkColor: AppColors.primary,
+                                  backgroundColor: isDark
+                                      ? AppColors.surfaceDark
+                                      : AppColors.surfaceLight,
+                                  labelStyle: TextStyle(
+                                    color: isSelected
+                                        ? AppColors.primary
+                                        : (isDark
+                                              ? AppColors.textPrimaryDark
+                                              : AppColors.textPrimaryLight),
+                                    fontWeight: isSelected
+                                        ? FontWeight.bold
+                                        : FontWeight.normal,
+                                  ),
+                                ),
+                              );
+                            }).toList(),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+
+                      // Activity List Header
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            _getFilterLabel(),
+                            style: Theme.of(context).textTheme.titleMedium
+                                ?.copyWith(fontWeight: FontWeight.bold),
+                          ),
+                          Text(
+                            '${filteredDeliveries.length} records',
+                            style: Theme.of(context).textTheme.bodySmall
+                                ?.copyWith(
+                                  color: isDark
+                                      ? AppColors.textSecondaryDark
+                                      : AppColors.textSecondaryLight,
+                                ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+
+                      if (state is DeliveryLoading)
+                        const Center(
+                          child: Padding(
+                            padding: EdgeInsets.all(32),
+                            child: CircularProgressIndicator(),
+                          ),
+                        )
+                      else if (filteredDeliveries.isEmpty)
+                        const EmptyState(
+                          icon: Icons.receipt_long_outlined,
+                          title: 'No records yet',
+                          description:
+                              'Tap above to record a donation or book sale.',
+                          compact: true,
+                        )
+                      else
+                        ListView.builder(
+                          shrinkWrap: true,
+                          physics: const NeverScrollableScrollPhysics(),
+                          itemCount: filteredDeliveries.length,
+                          itemBuilder: (context, index) {
+                            final delivery = filteredDeliveries[index];
+                            return StaggeredFadeIn(
+                              index: index,
+                              child: _ActivityCard(
+                                delivery: delivery,
+                                isDark: isDark,
+                                onTap: () =>
+                                    _showDetailSheet(context, delivery),
+                              ),
+                            );
+                          },
+                        ),
                     ],
                   ),
-                  const SizedBox(height: 12),
-
-                  if (state is DeliveryLoading)
-                    const Center(
-                      child: Padding(
-                        padding: EdgeInsets.all(32),
-                        child: CircularProgressIndicator(),
-                      ),
-                    )
-                  else if (filteredDeliveries.isEmpty)
-                    const EmptyState(
-                      icon: Icons.volunteer_activism_outlined,
-                      title: 'No donations yet',
-                      description: 'Tap the button above to record your first donation.',
-                      compact: true,
-                    )
-                  else
-                    ListView.builder(
-                      shrinkWrap: true,
-                      physics: const NeverScrollableScrollPhysics(),
-                      itemCount: filteredDeliveries.length,
-                      itemBuilder: (context, index) {
-                        final delivery = filteredDeliveries[index];
-                        return StaggeredFadeIn(
-                          index: index,
-                          child: _ActivityCard(
-                            delivery: delivery,
-                            isDark: isDark,
-                            onTap: () => _showDetailSheet(context, delivery),
-                          ),
-                        );
-                      },
-                    ),
-                ],
-              ),
-            ),
-          );
-        },
-      ),
-    );
+                ),
+              );
+            },
+          ),
+        );
       },
     );
   }
@@ -387,6 +469,18 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
       builder: (sheetContext) => BlocProvider.value(
         value: context.read<DeliveryBloc>(),
         child: const _RecordDonationSheet(),
+      ),
+    );
+  }
+
+  void _showBookSaleSheet(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (sheetContext) => BlocProvider.value(
+        value: context.read<DeliveryBloc>(),
+        child: const _RecordBookSaleSheet(),
       ),
     );
   }
@@ -441,12 +535,19 @@ class _DeliveryDetailSheet extends StatelessWidget {
                   width: 48,
                   height: 48,
                   decoration: BoxDecoration(
-                    color: AppColors.success.withAlpha(30),
+                    color: (delivery.isBookSale
+                            ? AppColors.primary
+                            : AppColors.success)
+                        .withAlpha(30),
                     borderRadius: BorderRadius.circular(12),
                   ),
-                  child: const Icon(
-                    Icons.volunteer_activism,
-                    color: AppColors.success,
+                  child: Icon(
+                    delivery.isBookSale
+                        ? Icons.menu_book_rounded
+                        : Icons.volunteer_activism,
+                    color: delivery.isBookSale
+                        ? AppColors.primary
+                        : AppColors.success,
                   ),
                 ),
                 const SizedBox(width: 16),
@@ -462,7 +563,7 @@ class _DeliveryDetailSheet extends StatelessWidget {
                         ),
                       ),
                       Text(
-                        'Donation',
+                        delivery.isBookSale ? 'Book Sale' : 'Donation',
                         style: TextStyle(
                           color: isDark
                               ? AppColors.textSecondaryDark
@@ -483,6 +584,12 @@ class _DeliveryDetailSheet extends StatelessWidget {
             ),
             const SizedBox(height: 20),
             _DetailRow(label: 'Address', value: delivery.address),
+            if (delivery.isBookSale && delivery.bookTitle != null)
+              _DetailRow(label: 'Book', value: delivery.bookTitle!),
+            if (delivery.isBookSale && delivery.bookQuantity != null)
+              _DetailRow(label: 'Quantity', value: '${delivery.bookQuantity}'),
+            if (delivery.isBookSale && delivery.bookLanguage != null)
+              _DetailRow(label: 'Language', value: delivery.bookLanguage!),
             if (delivery.recipientPhone != null)
               _DetailRow(label: 'Phone', value: delivery.recipientPhone!),
             if (delivery.paymentMethod != null)
@@ -502,7 +609,8 @@ class _DeliveryDetailSheet extends StatelessWidget {
             if (delivery.latitude != null && delivery.longitude != null)
               _DetailRow(
                 label: 'Location',
-                value: '${delivery.latitude!.toStringAsFixed(5)}, ${delivery.longitude!.toStringAsFixed(5)}',
+                value:
+                    '${delivery.latitude!.toStringAsFixed(5)}, ${delivery.longitude!.toStringAsFixed(5)}',
               ),
             const SizedBox(height: 16),
             // View Receipt Button
@@ -534,11 +642,15 @@ class _DeliveryDetailSheet extends StatelessWidget {
 class _TodaySummaryCard extends StatelessWidget {
   final int donationsCount;
   final double donationsAmount;
+  final int bookSalesCount;
+  final double bookSalesAmount;
   final bool isDark;
 
   const _TodaySummaryCard({
     required this.donationsCount,
     required this.donationsAmount,
+    required this.bookSalesCount,
+    required this.bookSalesAmount,
     required this.isDark,
   });
 
@@ -589,6 +701,11 @@ class _TodaySummaryCard extends StatelessWidget {
           Text(
             '$donationsCount donations',
             style: const TextStyle(color: Colors.white70, fontSize: 14),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            '\$${bookSalesAmount.toStringAsFixed(2)} from $bookSalesCount book sales',
+            style: const TextStyle(color: Colors.white70, fontSize: 13),
           ),
         ],
       ),
@@ -644,7 +761,6 @@ class _ActionButton extends StatelessWidget {
   }
 }
 
-
 class _ActivityCard extends StatelessWidget {
   final DeliveryModel delivery;
   final bool isDark;
@@ -658,7 +774,8 @@ class _ActivityCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const color = AppColors.success;
+    final isBookSale = delivery.isBookSale;
+    final color = isBookSale ? AppColors.primary : AppColors.success;
     final time = delivery.createdAt ?? delivery.completedAt;
 
     return Card(
@@ -685,8 +802,10 @@ class _ActivityCard extends StatelessWidget {
                   color: color.withAlpha(20),
                   borderRadius: BorderRadius.circular(10),
                 ),
-                child: const Icon(
-                  Icons.volunteer_activism,
+                child: Icon(
+                  isBookSale
+                      ? Icons.menu_book_rounded
+                      : Icons.volunteer_activism,
                   color: color,
                   size: 22,
                 ),
@@ -714,7 +833,9 @@ class _ActivityCard extends StatelessWidget {
                         ],
                         Expanded(
                           child: Text(
-                            delivery.address,
+                            isBookSale && (delivery.bookTitle?.isNotEmpty ?? false)
+                                ? delivery.bookTitle!
+                                : delivery.address,
                             style: TextStyle(
                               fontSize: 13,
                               color: isDark
@@ -1230,15 +1351,17 @@ class _RecordDonationSheetState extends State<_RecordDonationSheet> {
                         children: [
                           Text(
                             'Record Donation',
-                            style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                              fontWeight: FontWeight.bold,
-                            ),
+                            style: Theme.of(context).textTheme.titleLarge
+                                ?.copyWith(fontWeight: FontWeight.bold),
                           ),
                           Text(
                             'Step ${_currentStep + 1} of 3 — ${_stepLabels[_currentStep]}',
-                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                              color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
-                            ),
+                            style: Theme.of(context).textTheme.bodySmall
+                                ?.copyWith(
+                                  color: isDark
+                                      ? AppColors.textSecondaryDark
+                                      : AppColors.textSecondaryLight,
+                                ),
                           ),
                         ],
                       ),
@@ -1262,30 +1385,42 @@ class _RecordDonationSheetState extends State<_RecordDonationSheet> {
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               decoration: BoxDecoration(
-                color: (_latitude != null ? AppColors.success : AppColors.warning).withAlpha(20),
+                color:
+                    (_latitude != null ? AppColors.success : AppColors.warning)
+                        .withAlpha(20),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   if (_isGettingLocation)
-                    const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2))
+                    const SizedBox(
+                      width: 14,
+                      height: 14,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
                   else
                     Icon(
-                      _latitude != null ? Icons.location_on : Icons.location_off,
+                      _latitude != null
+                          ? Icons.location_on
+                          : Icons.location_off,
                       size: 16,
-                      color: _latitude != null ? AppColors.success : AppColors.warning,
+                      color: _latitude != null
+                          ? AppColors.success
+                          : AppColors.warning,
                     ),
                   const SizedBox(width: 8),
                   Text(
                     _isGettingLocation
                         ? 'Getting location...'
                         : _latitude != null
-                            ? 'Location captured${_territoryName != null ? ' ($_territoryName)' : ''}'
-                            : 'Location not available',
+                        ? 'Location captured${_territoryName != null ? ' ($_territoryName)' : ''}'
+                        : 'Location not available',
                     style: TextStyle(
                       fontSize: 12,
-                      color: _latitude != null ? AppColors.success : AppColors.warning,
+                      color: _latitude != null
+                          ? AppColors.success
+                          : AppColors.warning,
                     ),
                   ),
                 ],
@@ -1309,7 +1444,12 @@ class _RecordDonationSheetState extends State<_RecordDonationSheet> {
 
           // Navigation buttons
           Padding(
-            padding: EdgeInsets.fromLTRB(24, 8, 24, MediaQuery.of(context).padding.bottom + 16),
+            padding: EdgeInsets.fromLTRB(
+              24,
+              8,
+              24,
+              MediaQuery.of(context).padding.bottom + 16,
+            ),
             child: Row(
               children: [
                 if (_currentStep > 0)
@@ -1333,15 +1473,24 @@ class _RecordDonationSheetState extends State<_RecordDonationSheet> {
                           ),
                         )
                       : FilledButton.icon(
-                          onPressed: _isSubmitting || _isProcessingPayment ? null : _submit,
+                          onPressed: _isSubmitting || _isProcessingPayment
+                              ? null
+                              : _submit,
                           icon: _isSubmitting || _isProcessingPayment
                               ? const SizedBox(
                                   width: 18,
                                   height: 18,
-                                  child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: Colors.white,
+                                  ),
                                 )
                               : const Icon(Icons.check, size: 18),
-                          label: Text(_isSubmitting || _isProcessingPayment ? 'Processing...' : 'Confirm & Submit'),
+                          label: Text(
+                            _isSubmitting || _isProcessingPayment
+                                ? 'Processing...'
+                                : 'Confirm & Submit',
+                          ),
                           style: FilledButton.styleFrom(
                             backgroundColor: AppColors.success,
                           ),
@@ -1369,8 +1518,9 @@ class _RecordDonationSheetState extends State<_RecordDonationSheet> {
               label: 'Donor Name',
               prefixIcon: Icons.person_outline,
               realtimeValidation: true,
-              validator: (value) =>
-                  (value == null || value.trim().isEmpty) ? 'Name is required' : null,
+              validator: (value) => (value == null || value.trim().isEmpty)
+                  ? 'Name is required'
+                  : null,
             ),
             const SizedBox(height: 16),
             CustomTextField(
@@ -1404,7 +1554,9 @@ class _RecordDonationSheetState extends State<_RecordDonationSheet> {
               controller: _amountController,
               label: 'Donation Amount (\$)',
               prefixIcon: Icons.attach_money,
-              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              keyboardType: const TextInputType.numberWithOptions(
+                decimal: true,
+              ),
               realtimeValidation: true,
               validator: (value) {
                 if (value == null || value.trim().isEmpty) {
@@ -1420,7 +1572,9 @@ class _RecordDonationSheetState extends State<_RecordDonationSheet> {
             const SizedBox(height: 16),
             Text(
               'Payment Method',
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w500),
+              style: Theme.of(
+                context,
+              ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w500),
             ),
             const SizedBox(height: 8),
             Row(
@@ -1458,7 +1612,9 @@ class _RecordDonationSheetState extends State<_RecordDonationSheet> {
                         'A payment link will be sent to the phone number. The donor will complete payment on their own device.',
                         style: TextStyle(
                           fontSize: 13,
-                          color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                          color: isDark
+                              ? AppColors.textSecondaryDark
+                              : AppColors.textSecondaryLight,
                         ),
                       ),
                     ),
@@ -1482,7 +1638,9 @@ class _RecordDonationSheetState extends State<_RecordDonationSheet> {
   // Step 3: Review & Confirm
   Widget _buildStep3(bool isDark) {
     final amount = double.tryParse(_amountController.text) ?? 0;
-    final secondaryColor = isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight;
+    final secondaryColor = isDark
+        ? AppColors.textSecondaryDark
+        : AppColors.textSecondaryLight;
 
     return SingleChildScrollView(
       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
@@ -1500,12 +1658,18 @@ class _RecordDonationSheetState extends State<_RecordDonationSheet> {
           children: [
             Text(
               'Review Donation',
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.bold,
-              ),
+              style: Theme.of(
+                context,
+              ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 16),
-            _ReviewRow(label: 'Donor', value: _nameController.text.trim().isNotEmpty ? _nameController.text.trim() : '—', color: secondaryColor),
+            _ReviewRow(
+              label: 'Donor',
+              value: _nameController.text.trim().isNotEmpty
+                  ? _nameController.text.trim()
+                  : '—',
+              color: secondaryColor,
+            ),
             const Divider(height: 24),
             _ReviewRow(
               label: 'Amount',
@@ -1518,22 +1682,42 @@ class _RecordDonationSheetState extends State<_RecordDonationSheet> {
               color: secondaryColor,
             ),
             const Divider(height: 24),
-            _ReviewRow(label: 'Payment', value: _paymentMethod == 'cash' ? 'Cash' : 'Payment Link', color: secondaryColor),
+            _ReviewRow(
+              label: 'Payment',
+              value: _paymentMethod == 'cash' ? 'Cash' : 'Payment Link',
+              color: secondaryColor,
+            ),
             if (_addressController.text.trim().isNotEmpty) ...[
               const Divider(height: 24),
-              _ReviewRow(label: 'Address', value: _addressController.text.trim(), color: secondaryColor),
+              _ReviewRow(
+                label: 'Address',
+                value: _addressController.text.trim(),
+                color: secondaryColor,
+              ),
             ],
             if (_phoneController.text.trim().isNotEmpty) ...[
               const Divider(height: 24),
-              _ReviewRow(label: 'Phone', value: _phoneController.text.trim(), color: secondaryColor),
+              _ReviewRow(
+                label: 'Phone',
+                value: _phoneController.text.trim(),
+                color: secondaryColor,
+              ),
             ],
             if (_notesController.text.trim().isNotEmpty) ...[
               const Divider(height: 24),
-              _ReviewRow(label: 'Notes', value: _notesController.text.trim(), color: secondaryColor),
+              _ReviewRow(
+                label: 'Notes',
+                value: _notesController.text.trim(),
+                color: secondaryColor,
+              ),
             ],
             if (_territoryName != null) ...[
               const Divider(height: 24),
-              _ReviewRow(label: 'Territory', value: _territoryName!, color: secondaryColor),
+              _ReviewRow(
+                label: 'Territory',
+                value: _territoryName!,
+                color: secondaryColor,
+              ),
             ],
           ],
         ),
@@ -1627,6 +1811,443 @@ class _PaymentChip extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _RecordBookSaleSheet extends StatefulWidget {
+  const _RecordBookSaleSheet();
+
+  @override
+  State<_RecordBookSaleSheet> createState() => _RecordBookSaleSheetState();
+}
+
+class _RecordBookSaleSheetState extends State<_RecordBookSaleSheet> {
+  final _formKey = GlobalKey<FormState>();
+  final _nameController = TextEditingController();
+  final _addressController = TextEditingController();
+  final _phoneController = TextEditingController();
+  final _notesController = TextEditingController();
+  final _quantityController = TextEditingController(text: '1');
+
+  int _selectedBookIndex = 0;
+  String _paymentMethod = 'cash';
+  bool _isSubmitting = false;
+  bool _isGettingLocation = false;
+  double? _latitude;
+  double? _longitude;
+  String? _teamId;
+  String? _workerId;
+  String? _territoryId;
+  String? _territoryName;
+
+  _BookOption get _selectedBook => _bookCatalog[_selectedBookIndex];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadUserData();
+    _getCurrentLocation();
+  }
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _addressController.dispose();
+    _phoneController.dispose();
+    _notesController.dispose();
+    _quantityController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _loadUserData() async {
+    try {
+      final storage = await LocalStorage.getInstance();
+      final userData = storage.getUserData();
+      setState(() {
+        _teamId =
+            userData?['team_id']?.toString() ?? userData?['teamId']?.toString();
+        _workerId =
+            userData?['id']?.toString() ?? userData?['worker_id']?.toString();
+      });
+    } catch (e) {
+      debugPrint('Error loading user data: $e');
+    }
+  }
+
+  Future<void> _getCurrentLocation() async {
+    setState(() => _isGettingLocation = true);
+    try {
+      LocationPermission permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+      }
+      if (permission == LocationPermission.denied ||
+          permission == LocationPermission.deniedForever) {
+        setState(() => _isGettingLocation = false);
+        return;
+      }
+      final position = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.high,
+        timeLimit: const Duration(seconds: 10),
+      );
+      setState(() {
+        _latitude = position.latitude;
+        _longitude = position.longitude;
+        _isGettingLocation = false;
+      });
+      await _findTerritory();
+    } catch (_) {
+      setState(() => _isGettingLocation = false);
+    }
+  }
+
+  Future<void> _findTerritory() async {
+    if (_latitude == null || _longitude == null || _workerId == null) return;
+    try {
+      final repository = TerritoryRepository();
+      final result = await repository.getMyAssignments(workerId: _workerId);
+      if (result is ApiSuccess) {
+        final assignments = (result as ApiSuccess).data;
+        for (final assignment in assignments) {
+          if (assignment.geometry == null) continue;
+          if (_isPointInTerritory(
+            _latitude!,
+            _longitude!,
+            assignment.geometry!,
+          )) {
+            setState(() {
+              _territoryId = assignment.territoryId;
+              _territoryName = assignment.entityName;
+            });
+            break;
+          }
+        }
+      }
+    } catch (_) {}
+  }
+
+  bool _isPointInTerritory(
+    double lat,
+    double lng,
+    Map<String, dynamic> geometry,
+  ) {
+    final type = geometry['type'] as String?;
+    final coordinates = geometry['coordinates'];
+    if (coordinates == null) return false;
+    if (type == 'Polygon') {
+      final ring = (coordinates[0] as List).map<List<double>>((coord) {
+        final c = coord as List;
+        return [c[0].toDouble(), c[1].toDouble()];
+      }).toList();
+      return _isPointInPolygon(lat, lng, ring);
+    } else if (type == 'MultiPolygon') {
+      for (var poly in coordinates) {
+        final ring = (poly[0] as List).map<List<double>>((coord) {
+          final c = coord as List;
+          return [c[0].toDouble(), c[1].toDouble()];
+        }).toList();
+        if (_isPointInPolygon(lat, lng, ring)) return true;
+      }
+    }
+    return false;
+  }
+
+  bool _isPointInPolygon(double lat, double lng, List<List<double>> polygon) {
+    bool inside = false;
+    final n = polygon.length;
+    for (int i = 0, j = n - 1; i < n; j = i++) {
+      final xi = polygon[i][0], yi = polygon[i][1];
+      final xj = polygon[j][0], yj = polygon[j][1];
+      if (((yi > lat) != (yj > lat)) &&
+          (lng < (xj - xi) * (lat - yi) / (yj - yi) + xi)) {
+        inside = !inside;
+      }
+    }
+    return inside;
+  }
+
+  Future<void> _submit() async {
+    if (!(_formKey.currentState?.validate() ?? false)) return;
+
+    if (_teamId == null || _teamId!.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('You must be assigned to a team'),
+          backgroundColor: AppColors.error,
+        ),
+      );
+      return;
+    }
+
+    setState(() => _isSubmitting = true);
+    final quantity = int.tryParse(_quantityController.text.trim()) ?? 1;
+    final totalAmount = _selectedBook.unitPrice * quantity;
+
+    final request = CreateDeliveryRequest(
+      teamId: _teamId!,
+      recipientName: _nameController.text.trim(),
+      address: _addressController.text.trim().isNotEmpty
+          ? _addressController.text.trim()
+          : 'Location recorded',
+      recipientPhone: _phoneController.text.trim().isNotEmpty
+          ? _phoneController.text.trim()
+          : null,
+      latitude: _latitude,
+      longitude: _longitude,
+      deliveryType: 'book_sale',
+      donationAmount: totalAmount,
+      paymentMethod: _paymentMethod,
+      bookCode: _selectedBook.code,
+      bookTitle: _selectedBook.title,
+      bookLanguage: _selectedBook.language,
+      bookQuantity: quantity,
+      bookUnitPrice: _selectedBook.unitPrice,
+      notes: _notesController.text.trim().isNotEmpty
+          ? _notesController.text.trim()
+          : null,
+      territoryId: _territoryId,
+      territoryName: _territoryName,
+      items: const [],
+    );
+
+    context.read<DeliveryBloc>().add(DeliveryCreate(request: request));
+    if (mounted) Navigator.pop(context);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final quantity = int.tryParse(_quantityController.text.trim()) ?? 1;
+    final totalAmount = _selectedBook.unitPrice * quantity;
+
+    return Container(
+      decoration: BoxDecoration(
+        color: isDark ? AppColors.backgroundDark : Colors.white,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      constraints: BoxConstraints(
+        maxHeight: MediaQuery.of(context).size.height * 0.9,
+      ),
+      padding: EdgeInsets.only(
+        bottom: MediaQuery.of(context).viewInsets.bottom,
+      ),
+      child: Column(
+        children: [
+          const SizedBox(height: 10),
+          Container(
+            width: 40,
+            height: 4,
+            decoration: BoxDecoration(
+              color: isDark ? AppColors.borderDark : AppColors.borderLight,
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+          const SizedBox(height: 14),
+          const Text(
+            'Record Book Sale',
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+          ),
+          const SizedBox(height: 10),
+          Expanded(
+            child: Form(
+              key: _formKey,
+              child: ListView(
+                padding: const EdgeInsets.fromLTRB(20, 8, 20, 16),
+                children: [
+                  Text(
+                    'Book',
+                    style: TextStyle(
+                      color: isDark
+                          ? AppColors.textSecondaryDark
+                          : AppColors.textSecondaryLight,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  SizedBox(
+                    height: 220,
+                    child: ListView.separated(
+                      scrollDirection: Axis.horizontal,
+                      itemCount: _bookCatalog.length,
+                      separatorBuilder: (_, _) => const SizedBox(width: 12),
+                      itemBuilder: (context, index) {
+                        final book = _bookCatalog[index];
+                        final isSelected = _selectedBookIndex == index;
+                        return GestureDetector(
+                          onTap: () => setState(() => _selectedBookIndex = index),
+                          child: Container(
+                            width: 180,
+                            padding: const EdgeInsets.all(10),
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(14),
+                              border: Border.all(
+                                color: isSelected
+                                    ? AppColors.primary
+                                    : (isDark
+                                          ? AppColors.borderDark
+                                          : AppColors.borderLight),
+                                width: isSelected ? 2 : 1,
+                              ),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Expanded(
+                                  child: Image.asset(
+                                    book.assetPath,
+                                    fit: BoxFit.contain,
+                                    errorBuilder: (_, _, _) => Container(
+                                      color: Colors.grey.shade100,
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(height: 8),
+                                Text(
+                                  book.title,
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                                Text(
+                                  '\$${book.unitPrice.toStringAsFixed(2)}',
+                                  style: const TextStyle(
+                                    color: AppColors.primary,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  CustomTextField(
+                    controller: _nameController,
+                    label: 'Buyer Name *',
+                    hint: 'Enter buyer name',
+                    validator: (value) {
+                      if (value == null || value.trim().isEmpty) {
+                        return 'Buyer name is required';
+                      }
+                      return null;
+                    },
+                  ),
+                  const SizedBox(height: 12),
+                  CustomTextField(
+                    controller: _addressController,
+                    label: 'Address',
+                    hint: 'Address (optional)',
+                  ),
+                  const SizedBox(height: 12),
+                  CustomTextField(
+                    controller: _phoneController,
+                    label: 'Phone',
+                    hint: 'Phone (optional)',
+                    keyboardType: TextInputType.phone,
+                  ),
+                  const SizedBox(height: 12),
+                  CustomTextField(
+                    controller: _quantityController,
+                    label: 'Quantity *',
+                    hint: 'Enter quantity',
+                    keyboardType: TextInputType.number,
+                    validator: (value) {
+                      final q = int.tryParse(value ?? '');
+                      if (q == null || q <= 0) return 'Enter valid quantity';
+                      return null;
+                    },
+                    onChanged: (_) => setState(() {}),
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    'Payment Method',
+                    style: TextStyle(
+                      color: isDark
+                          ? AppColors.textSecondaryDark
+                          : AppColors.textSecondaryLight,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      _PaymentChip(
+                        label: 'Cash',
+                        icon: Icons.payments,
+                        isSelected: _paymentMethod == 'cash',
+                        onTap: () => setState(() => _paymentMethod = 'cash'),
+                      ),
+                      const SizedBox(width: 8),
+                      _PaymentChip(
+                        label: 'Online',
+                        icon: Icons.link,
+                        isSelected: _paymentMethod == 'online',
+                        onTap: () => setState(() => _paymentMethod = 'online'),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  CustomTextField(
+                    controller: _notesController,
+                    label: 'Notes',
+                    hint: 'Optional notes',
+                    maxLines: 2,
+                  ),
+                  const SizedBox(height: 12),
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: AppColors.primary.withAlpha(18),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Selected: ${_selectedBook.title}'),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Total: \$${totalAmount.toStringAsFixed(2)} (${_selectedBook.unitPrice.toStringAsFixed(2)} x $quantity)',
+                          style: const TextStyle(fontWeight: FontWeight.w700),
+                        ),
+                        if (_isGettingLocation)
+                          const Padding(
+                            padding: EdgeInsets.only(top: 6),
+                            child: Text('Detecting location...'),
+                          ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 4, 20, 20),
+            child: SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: _isSubmitting ? null : _submit,
+                icon: _isSubmitting
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.check_circle_outline),
+                label: Text(
+                  _isSubmitting
+                      ? 'Saving...'
+                      : 'Record Sale (\$${totalAmount.toStringAsFixed(2)})',
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -2003,7 +2624,7 @@ class _ReceiptDialog extends StatelessWidget {
             ),
             const SizedBox(height: 4),
             Text(
-              'Donation Receipt',
+              delivery.isBookSale ? 'Book Sale Receipt' : 'Donation Receipt',
               style: const TextStyle(color: AppColors.textSecondaryLight),
             ),
             const SizedBox(height: 16),
@@ -2034,9 +2655,13 @@ class _ReceiptDialog extends StatelessWidget {
               ).format(delivery.createdAt ?? DateTime.now()),
             ),
             _ReceiptRow(
-              label: 'Donor',
+              label: delivery.isBookSale ? 'Buyer' : 'Donor',
               value: delivery.recipientName,
             ),
+            if (delivery.isBookSale && delivery.bookTitle != null)
+              _ReceiptRow(label: 'Book', value: delivery.bookTitle!),
+            if (delivery.isBookSale && delivery.bookQuantity != null)
+              _ReceiptRow(label: 'Qty', value: '${delivery.bookQuantity}'),
             _ReceiptRow(
               label: 'Payment Method',
               value: (delivery.paymentMethod ?? 'cash').toUpperCase(),
@@ -2072,7 +2697,7 @@ class _ReceiptDialog extends StatelessWidget {
 
             // Footer
             const Text(
-              'Thank you for your generous donation!',
+              'Thank you!',
               textAlign: TextAlign.center,
               style: TextStyle(fontStyle: FontStyle.italic),
             ),
@@ -2135,4 +2760,3 @@ class _ReceiptRow extends StatelessWidget {
     );
   }
 }
-

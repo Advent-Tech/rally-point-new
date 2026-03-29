@@ -129,6 +129,21 @@ class _WorkerActivityScreenState extends State<WorkerActivityScreen>
         debugPrint('Failed to load donations: $e');
       }
 
+      // Add book sales from worker deliveries into donation-like activity feed
+      final bookSaleActivities = _deliveries
+          .where((d) => d.deliveryType == 'book_sale')
+          .map(
+            (d) => WorkerDonation(
+              id: d.id,
+              amount: d.amount ?? 0,
+              timestamp: d.completedAt ?? DateTime.now(),
+              donorName: d.bookTitle ?? d.recipientName,
+              donationType: 'book_sale',
+            ),
+          )
+          .toList();
+      _donations = [..._donations, ...bookSaleActivities];
+
       setState(() => _isLoading = false);
     } catch (e) {
       setState(() {
@@ -1363,6 +1378,9 @@ class WorkerDelivery {
   final String recipientName;
   final String address;
   final String status;
+  final String deliveryType;
+  final double? amount;
+  final String? bookTitle;
   final double? latitude;
   final double? longitude;
   final DateTime? completedAt;
@@ -1372,6 +1390,9 @@ class WorkerDelivery {
     required this.recipientName,
     required this.address,
     required this.status,
+    required this.deliveryType,
+    this.amount,
+    this.bookTitle,
     this.latitude,
     this.longitude,
     this.completedAt,
@@ -1385,6 +1406,11 @@ class WorkerDelivery {
       recipientName: delivery['recipient_name']?.toString() ?? 'Unknown',
       address: delivery['address']?.toString() ?? '',
       status: delivery['status']?.toString() ?? 'pending',
+      deliveryType: delivery['delivery_type']?.toString() ?? 'door_to_door',
+      amount: delivery['donation_amount'] != null
+          ? double.tryParse(delivery['donation_amount'].toString())
+          : null,
+      bookTitle: delivery['book_title']?.toString(),
       latitude: delivery['latitude'] != null
           ? double.tryParse(delivery['latitude'].toString())
           : null,
@@ -1406,12 +1432,14 @@ class WorkerDonation {
   final double amount;
   final DateTime timestamp;
   final String? donorName;
+  final String donationType;
 
   WorkerDonation({
     required this.id,
     required this.amount,
     required this.timestamp,
     this.donorName,
+    this.donationType = 'donation',
   });
 
   factory WorkerDonation.fromJson(Map<String, dynamic> json) {
@@ -1422,6 +1450,7 @@ class WorkerDonation {
           ? DateTime.parse(json['created_at'].toString())
           : DateTime.now(),
       donorName: json['donor_name']?.toString(),
+      donationType: json['donation_type']?.toString() ?? 'donation',
     );
   }
 }

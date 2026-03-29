@@ -60,6 +60,16 @@ class DeliveryModel {
   final String? receiptNumber;
   @JsonKey(name: 'receipt_url')
   final String? receiptUrl;
+  @JsonKey(name: 'book_code')
+  final String? bookCode;
+  @JsonKey(name: 'book_title')
+  final String? bookTitle;
+  @JsonKey(name: 'book_language')
+  final String? bookLanguage;
+  @JsonKey(name: 'book_quantity')
+  final int? bookQuantity;
+  @JsonKey(name: 'book_unit_price')
+  final double? bookUnitPrice;
 
   // Offline sync
   @JsonKey(name: 'is_offline')
@@ -99,6 +109,11 @@ class DeliveryModel {
     this.stripePaymentId,
     this.receiptNumber,
     this.receiptUrl,
+    this.bookCode,
+    this.bookTitle,
+    this.bookLanguage,
+    this.bookQuantity,
+    this.bookUnitPrice,
     this.isOffline = false,
     this.syncedAt,
     this.offlineId,
@@ -122,6 +137,7 @@ class DeliveryModel {
   bool get isDoorToDoor => deliveryType == 'door_to_door';
   bool get isPersonToPerson => deliveryType == 'person_to_person';
   bool get isDonation => deliveryType == 'donation';
+  bool get isBookSale => deliveryType == 'book_sale';
 
   bool get isHighPriority => priority == 'high' || priority == 'urgent';
 
@@ -156,6 +172,8 @@ class DeliveryModel {
         return 'Person to Person';
       case 'donation':
         return 'Donation';
+      case 'book_sale':
+        return 'Book Sale';
       default:
         return deliveryType;
     }
@@ -191,6 +209,11 @@ class DeliveryModel {
     String? stripePaymentId,
     String? receiptNumber,
     String? receiptUrl,
+    String? bookCode,
+    String? bookTitle,
+    String? bookLanguage,
+    int? bookQuantity,
+    double? bookUnitPrice,
     bool? isOffline,
     DateTime? syncedAt,
     String? offlineId,
@@ -225,6 +248,11 @@ class DeliveryModel {
       stripePaymentId: stripePaymentId ?? this.stripePaymentId,
       receiptNumber: receiptNumber ?? this.receiptNumber,
       receiptUrl: receiptUrl ?? this.receiptUrl,
+      bookCode: bookCode ?? this.bookCode,
+      bookTitle: bookTitle ?? this.bookTitle,
+      bookLanguage: bookLanguage ?? this.bookLanguage,
+      bookQuantity: bookQuantity ?? this.bookQuantity,
+      bookUnitPrice: bookUnitPrice ?? this.bookUnitPrice,
       isOffline: isOffline ?? this.isOffline,
       syncedAt: syncedAt ?? this.syncedAt,
       offlineId: offlineId ?? this.offlineId,
@@ -335,6 +363,16 @@ class CreateDeliveryRequest {
   final double? donationAmount;
   @JsonKey(name: 'payment_method')
   final String? paymentMethod; // cash, card, online
+  @JsonKey(name: 'book_code')
+  final String? bookCode;
+  @JsonKey(name: 'book_title')
+  final String? bookTitle;
+  @JsonKey(name: 'book_language')
+  final String? bookLanguage;
+  @JsonKey(name: 'book_quantity')
+  final int? bookQuantity;
+  @JsonKey(name: 'book_unit_price')
+  final double? bookUnitPrice;
 
   // Offline sync
   @JsonKey(name: 'offline_id')
@@ -360,6 +398,11 @@ class CreateDeliveryRequest {
     this.householdId,
     this.donationAmount,
     this.paymentMethod,
+    this.bookCode,
+    this.bookTitle,
+    this.bookLanguage,
+    this.bookQuantity,
+    this.bookUnitPrice,
     this.offlineId,
   });
 
@@ -368,6 +411,7 @@ class CreateDeliveryRequest {
 
   // Helper to check if this is a donation request
   bool get isDonation => deliveryType == 'donation';
+  bool get isBookSale => deliveryType == 'book_sale';
 }
 
 @JsonSerializable()
