@@ -1982,10 +1982,22 @@ class _RecordBookSaleSheetState extends State<_RecordBookSaleSheet> {
       );
       return;
     }
+    if (_latitude == null || _longitude == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Location is required. Please enable GPS and retry.'),
+          backgroundColor: AppColors.error,
+        ),
+      );
+      return;
+    }
 
     setState(() => _isSubmitting = true);
     final quantity = int.tryParse(_quantityController.text.trim()) ?? 1;
     final totalAmount = _selectedBook.unitPrice * quantity;
+    final languageLabel = _selectedBook.language == 'spanish'
+        ? 'Spanish'
+        : 'English';
 
     final request = CreateDeliveryRequest(
       teamId: _teamId!,
@@ -2011,7 +2023,14 @@ class _RecordBookSaleSheetState extends State<_RecordBookSaleSheet> {
           : null,
       territoryId: _territoryId,
       territoryName: _territoryName,
-      items: const [],
+      // Keep one explicit item for backward compatibility with older backend validation.
+      items: [
+        DeliveryItem(
+          name: _selectedBook.title,
+          quantity: quantity,
+          description: 'book_code=${_selectedBook.code};language=$languageLabel',
+        ),
+      ],
     );
 
     context.read<DeliveryBloc>().add(DeliveryCreate(request: request));

@@ -172,7 +172,7 @@ func (s *deliveryService) CreateDelivery(creatorID uuid.UUID, req *domain.Create
 
 	// Create delivery items
 	var items []*domain.DeliveryItem
-	if isBookSale {
+	if isBookSale && len(req.Items) == 0 {
 		bookItemName := req.BookTitle
 		if req.BookCode != "" {
 			bookItemName = fmt.Sprintf("%s (%s)", req.BookTitle, req.BookCode)
