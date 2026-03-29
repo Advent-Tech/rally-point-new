@@ -5,7 +5,7 @@
   "packages": [
     {
       "name": "rally_point",
-      "version": "1.0.0+1",
+      "version": "1.0.0+2",
       "dependencies": [
         "audioplayers",
         "bloc",
