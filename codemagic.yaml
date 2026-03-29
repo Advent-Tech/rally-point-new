@@ -12,6 +12,7 @@ workflows:
         PROJECT_DIR: "ui_flutter"
         BUNDLE_ID: "com.lightpoint.lightpointapp"
         APPLE_APP_ID: "6761075004"
+        API_BASE_URL: "https://backend.lightsquads.com"
     scripts:
       - name: Set up Mapbox
         script: |
@@ -83,6 +84,7 @@ workflows:
           echo "$BUILD_NUMBER" > /tmp/expected_ios_build_number.txt
           flutter build ipa --release -v \
             --build-number="$BUILD_NUMBER" \
+            --dart-define=API_BASE_URL="$API_BASE_URL" \
             --export-options-plist=$HOME/export_options.plist
 
       - name: Debug - list IPA outputs
@@ -173,6 +175,7 @@ workflows:
       vars:
         PROJECT_DIR: "ui_flutter"
         BUNDLE_ID: "com.lightpoint.lightpointapp"
+        API_BASE_URL: "https://backend.lightsquads.com"
         FIREBASE_TESTER_GROUPS: "internal-testers"
     scripts:
       - name: Set up Mapbox
@@ -213,6 +216,7 @@ workflows:
           echo "Using iOS build-number=$BUILD_NUMBER"
           flutter build ipa --release \
             --build-number="$BUILD_NUMBER" \
+            --dart-define=API_BASE_URL="$API_BASE_URL" \
             --export-method ad-hoc
       - name: Upload IPA to Firebase App Distribution
         script: |

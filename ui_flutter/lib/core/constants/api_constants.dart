@@ -5,6 +5,11 @@ class ApiConstants {
   // Base URLs
   // Production Server
   static const String prodBaseUrl = 'https://backend.lightsquads.com';
+  // Override with: --dart-define=API_BASE_URL=https://your-api-host
+  static const String configuredBaseUrl = String.fromEnvironment(
+    'API_BASE_URL',
+    defaultValue: prodBaseUrl,
+  );
   static const String devBaseUrl = 'http://10.0.2.2:8080'; // Android emulator
   static const String devBaseUrlIOS = 'http://localhost:8080'; // iOS simulator
 

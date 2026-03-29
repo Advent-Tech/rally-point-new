@@ -73,13 +73,12 @@ class ApiClient {
       );
 
   String _getBaseUrl() {
-    // Use localhost for web development, production URL for mobile
+    // Use localhost for web development.
     if (kIsWeb) {
       return 'http://localhost:8080';
     }
-    // For mobile: use devBaseUrl for Android emulator, devBaseUrlIOS for iOS
-    // In production, use prodBaseUrl
-    return ApiConstants.prodBaseUrl;
+    // For mobile release builds, allow explicit API host override via dart-define.
+    return ApiConstants.configuredBaseUrl;
   }
 
   void _setupInterceptors() {

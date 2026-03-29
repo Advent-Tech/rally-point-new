@@ -98,7 +98,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
       final response = await _api.post(
         ApiConstants.refreshToken,
         data: {'refresh_token': refreshToken},
-      );
+      ).timeout(const Duration(seconds: 12));
 
       if (response.statusCode == 200) {
         final data = response.data;
@@ -144,7 +144,9 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
       }
 
       // Try to get current user
-      final response = await _api.get(ApiConstants.userMe);
+      final response = await _api
+          .get(ApiConstants.userMe)
+          .timeout(const Duration(seconds: 12));
       if (response.statusCode == 200) {
         final user = UserModel.fromJson(response.data);
         await _local.saveUserData(response.data);
