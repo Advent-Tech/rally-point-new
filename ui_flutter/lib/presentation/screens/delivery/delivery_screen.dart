@@ -464,6 +464,7 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
   void _showRecordSheet(BuildContext context) {
     showModalBottomSheet(
       context: context,
+      useRootNavigator: true,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (sheetContext) => BlocProvider.value(
@@ -476,6 +477,7 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
   void _showBookSaleSheet(BuildContext context) {
     showModalBottomSheet(
       context: context,
+      useRootNavigator: true,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (sheetContext) => BlocProvider.value(
@@ -2227,7 +2229,12 @@ class _RecordBookSaleSheetState extends State<_RecordBookSaleSheet> {
             ),
           ),
           Padding(
-            padding: const EdgeInsets.fromLTRB(20, 4, 20, 20),
+            padding: EdgeInsets.fromLTRB(
+              20,
+              4,
+              20,
+              20 + MediaQuery.of(context).padding.bottom,
+            ),
             child: SizedBox(
               width: double.infinity,
               child: ElevatedButton.icon(
