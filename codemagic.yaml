@@ -161,6 +161,88 @@ workflows:
         recipients:
           - streams.app.2030@gmail.com
 
+  ios-firebase:
+    name: iOS Firebase Distribution
+    instance_type: mac_mini_m2
+    max_build_duration: 60
+    environment:
+      flutter: stable
+      xcode: latest
+      groups:
+        - "iOS build"
+      vars:
+        PROJECT_DIR: "ui_flutter"
+        BUNDLE_ID: "com.lightpoint.lightpointapp"
+        FIREBASE_TESTER_GROUPS: "internal-testers"
+    scripts:
+      - name: Set up Mapbox
+        script: |
+          echo "machine api.mapbox.com login mapbox password $MAPBOX_DOWNLOAD_TOKEN" > ~/.netrc
+          chmod 600 ~/.netrc
+      - name: Install dependencies
+        script: |
+          cd $PROJECT_DIR
+          flutter pub get
+      - name: Update CocoaPods specs
+        script: |
+          cd $PROJECT_DIR/ios
+          pod repo update
+          pod install --repo-update
+      - name: Set up keychain
+        script: keychain initialize
+      - name: Fetch Ad Hoc signing files
+        script: |
+          app-store-connect fetch-signing-files "$BUNDLE_ID" --type IOS_APP_ADHOC --create
+      - name: Add certificates to keychain
+        script: keychain add-certificates
+      - name: Configure Xcode code signing
+        script: xcode-project use-profiles
+      - name: Build Ad Hoc IPA
+        script: |
+          cd $PROJECT_DIR
+          BUILD_NUMBER=""
+          for CANDIDATE in "${CM_BUILD_ID:-}" "${CM_BUILD_NUMBER:-}"; do
+            if [[ "$CANDIDATE" =~ ^[0-9]+$ ]]; then
+              BUILD_NUMBER="$CANDIDATE"
+              break
+            fi
+          done
+          if [ -z "$BUILD_NUMBER" ]; then
+            BUILD_NUMBER="$(date -u +%s)"
+          fi
+          echo "Using iOS build-number=$BUILD_NUMBER"
+          flutter build ipa --release \
+            --build-number="$BUILD_NUMBER" \
+            --export-method ad-hoc
+      - name: Upload IPA to Firebase App Distribution
+        script: |
+          set -euo pipefail
+          if [ -z "${FIREBASE_APP_ID_IOS:-}" ]; then
+            echo "FIREBASE_APP_ID_IOS is not set" >&2
+            exit 1
+          fi
+          if [ -z "${FIREBASE_TOKEN:-}" ]; then
+            echo "FIREBASE_TOKEN is not set" >&2
+            exit 1
+          fi
+          IPA_PATH="$(find "$CM_BUILD_DIR/$PROJECT_DIR/build/ios/ipa" -maxdepth 2 -name "*.ipa" -print -quit || true)"
+          if [ -z "${IPA_PATH:-}" ]; then
+            echo "No IPA found for Firebase upload" >&2
+            exit 1
+          fi
+          npm install -g firebase-tools
+          firebase appdistribution:distribute "$IPA_PATH" \
+            --app "$FIREBASE_APP_ID_IOS" \
+            --groups "$FIREBASE_TESTER_GROUPS" \
+            --release-notes "Codemagic iOS build ${CM_BUILD_ID:-unknown}" \
+            --token "$FIREBASE_TOKEN"
+    artifacts:
+      - ui_flutter/build/ios/ipa/*.ipa
+    publishing:
+      email:
+        recipients:
+          - streams.app.2030@gmail.com
+
   android-workflow:
     name: Rally Point Android
     instance_type: linux
