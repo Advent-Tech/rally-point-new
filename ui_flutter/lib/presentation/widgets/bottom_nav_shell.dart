@@ -3,7 +3,6 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import '../../core/theme/app_colors.dart';
 import '../blocs/auth/auth_bloc.dart';
-import 'help/help_fab.dart';
 
 class BottomNavShell extends StatelessWidget {
   final Widget child;
@@ -100,7 +99,7 @@ class BottomNavShell extends StatelessWidget {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
-      body: Stack(children: [child, const HelpFab()]),
+      body: child,
       extendBody: true,
       bottomNavigationBar: Container(
         margin: const EdgeInsets.only(left: 16, right: 16, bottom: 16),

@@ -128,6 +128,7 @@ flutter:
 
   assets:
     - assets/
+    - assets/books/
     - assets/images/
     - assets/icons/
 
