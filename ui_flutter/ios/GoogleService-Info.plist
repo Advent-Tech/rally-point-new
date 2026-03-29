@@ -2,22 +2,18 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-	<key>CLIENT_ID</key>
-	<string>503617293297-3ucabe481l9ael20j1u75n8sokci3kq9.apps.googleusercontent.com</string>
-	<key>REVERSED_CLIENT_ID</key>
-	<string>com.googleusercontent.apps.503617293297-3ucabe481l9ael20j1u75n8sokci3kq9</string>
 	<key>API_KEY</key>
-	<string>AIzaSyA99KiQhG5Z-cSdSvPtHEPxfbL9r1weGRQ</string>
+	<string>AIzaSyBLFGhYRqoEepQd4f40rPWfAfd5g1Pmx4s</string>
 	<key>GCM_SENDER_ID</key>
-	<string>503617293297</string>
+	<string>225319214032</string>
 	<key>PLIST_VERSION</key>
 	<string>1</string>
 	<key>BUNDLE_ID</key>
-	<string>com.rallypoint.lightpoint</string>
+	<string>com.lightpoint.lightpointapp</string>
 	<key>PROJECT_ID</key>
-	<string>rally-point-mobile</string>
+	<string>light-point-43027</string>
 	<key>STORAGE_BUCKET</key>
-	<string>rally-point-mobile.firebasestorage.app</string>
+	<string>light-point-43027.firebasestorage.app</string>
 	<key>IS_ADS_ENABLED</key>
 	<false></false>
 	<key>IS_ANALYTICS_ENABLED</key>
@@ -29,8 +25,6 @@
 	<key>IS_SIGNIN_ENABLED</key>
 	<true></true>
 	<key>GOOGLE_APP_ID</key>
-	<string>1:503617293297:ios:c9167de8a4465b03a4d250</string>
-	<key>DATABASE_URL</key>
-	<string>https://rally-point-mobile-default-rtdb.firebaseio.com</string>
+	<string>1:225319214032:ios:85a233b3383859e237b7d5</string>
 </dict>
 </plist>

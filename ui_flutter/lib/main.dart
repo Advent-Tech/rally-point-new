@@ -43,8 +43,12 @@ Future<bool> loadHelpMode() async {
 /// Background FCM handler — must be top-level
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
-  await Firebase.initializeApp();
-  debugPrint('FCM background message: ${message.messageId}');
+  try {
+    await Firebase.initializeApp();
+    debugPrint('FCM background message: ${message.messageId}');
+  } catch (e) {
+    debugPrint('FCM background init failed: $e');
+  }
 }
 
 void main() async {
@@ -56,9 +60,17 @@ void main() async {
     HttpOverrides.global = _DevHttpOverrides();
   }
 
-  // Initialize Firebase
-  await Firebase.initializeApp();
-  FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
+  // Initialize Firebase, but do not block app launch if config is invalid/missing.
+  var firebaseReady = false;
+  try {
+    await Firebase.initializeApp();
+    firebaseReady = true;
+  } catch (e) {
+    debugPrint('Firebase initialization failed: $e');
+  }
+  if (firebaseReady) {
+    FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
+  }
 
   // Set preferred orientations
   await SystemChrome.setPreferredOrientations([
