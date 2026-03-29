@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_sound/flutter_sound.dart';
+import 'package:permission_handler/permission_handler.dart';
 import '../../core/theme/app_colors.dart';
 import '../blocs/walkie/walkie_bloc.dart';
 import '../blocs/auth/auth_bloc.dart';
@@ -65,15 +66,14 @@ class _WalkieBottomSheetState extends State<WalkieBottomSheet> {
     if (authState is AuthAuthenticated) {
       teamId ??= authState.user.teamId;
       userId = authState.user.id;
-      userName = authState.user.fullName; // Use fullName to get proper display name
+      userName =
+          authState.user.fullName; // Use fullName to get proper display name
     }
 
     if (teamId != null) {
-      _walkieBloc.add(WalkieLoadChannels(
-        teamId: teamId,
-        userId: userId,
-        userName: userName,
-      ));
+      _walkieBloc.add(
+        WalkieLoadChannels(teamId: teamId, userId: userId, userName: userName),
+      );
     }
   }
 
@@ -130,10 +130,7 @@ class _WalkieBottomSheetState extends State<WalkieBottomSheet> {
                       ),
                       borderRadius: BorderRadius.circular(12),
                     ),
-                    child: const Icon(
-                      Icons.speaker_phone,
-                      color: Colors.white,
-                    ),
+                    child: const Icon(Icons.speaker_phone, color: Colors.white),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
@@ -142,9 +139,8 @@ class _WalkieBottomSheetState extends State<WalkieBottomSheet> {
                       children: [
                         Text(
                           'Walkie Talkie',
-                          style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.bold,
-                          ),
+                          style: Theme.of(context).textTheme.titleMedium
+                              ?.copyWith(fontWeight: FontWeight.bold),
                         ),
                         BlocBuilder<WalkieBloc, WalkieState>(
                           builder: (context, state) {
@@ -158,9 +154,12 @@ class _WalkieBottomSheetState extends State<WalkieBottomSheet> {
                             }
                             return Text(
                               subtitle,
-                              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
-                              ),
+                              style: Theme.of(context).textTheme.bodySmall
+                                  ?.copyWith(
+                                    color: isDark
+                                        ? AppColors.textSecondaryDark
+                                        : AppColors.textSecondaryLight,
+                                  ),
                             );
                           },
                         ),
@@ -224,6 +223,10 @@ class _WalkieBottomSheetState extends State<WalkieBottomSheet> {
   }
 
   Widget _buildErrorView(String message) {
+    final isMicPermissionError = message.toLowerCase().contains(
+      'microphone permission',
+    );
+
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(24),
@@ -238,6 +241,13 @@ class _WalkieBottomSheetState extends State<WalkieBottomSheet> {
               onPressed: _loadChannels,
               child: const Text('Retry'),
             ),
+            if (isMicPermissionError) ...[
+              const SizedBox(height: 8),
+              TextButton(
+                onPressed: openAppSettings,
+                child: const Text('Open Settings'),
+              ),
+            ],
           ],
         ),
       ),
@@ -252,14 +262,18 @@ class _WalkieBottomSheetState extends State<WalkieBottomSheet> {
           Icon(
             Icons.speaker_phone,
             size: 48,
-            color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+            color: isDark
+                ? AppColors.textSecondaryDark
+                : AppColors.textSecondaryLight,
           ),
           const SizedBox(height: 12),
           Text(
             'No Team Assigned',
             style: TextStyle(
               fontWeight: FontWeight.w600,
-              color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+              color: isDark
+                  ? AppColors.textSecondaryDark
+                  : AppColors.textSecondaryLight,
             ),
           ),
         ],
@@ -281,17 +295,23 @@ class _WalkieBottomSheetState extends State<WalkieBottomSheet> {
           channel: channel,
           isDark: isDark,
           onTap: () {
-            _walkieBloc.add(WalkieJoinChannel(
-              channelId: channel.id,
-              channelName: channel.name,
-            ));
+            _walkieBloc.add(
+              WalkieJoinChannel(
+                channelId: channel.id,
+                channelName: channel.name,
+              ),
+            );
           },
         );
       },
     );
   }
 
-  Widget _buildActiveChannel(WalkieInChannel state, bool isDark, double bottomPadding) {
+  Widget _buildActiveChannel(
+    WalkieInChannel state,
+    bool isDark,
+    double bottomPadding,
+  ) {
     return Column(
       children: [
         // Current speaker indicator
@@ -326,7 +346,10 @@ class _WalkieBottomSheetState extends State<WalkieBottomSheet> {
               itemCount: state.participants.length,
               itemBuilder: (context, index) {
                 final participant = state.participants[index];
-                return _ParticipantChip(participant: participant, isDark: isDark);
+                return _ParticipantChip(
+                  participant: participant,
+                  isDark: isDark,
+                );
               },
             ),
           ),
@@ -339,18 +362,24 @@ class _WalkieBottomSheetState extends State<WalkieBottomSheet> {
                     'No messages yet\nHold the button to talk',
                     textAlign: TextAlign.center,
                     style: TextStyle(
-                      color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                      color: isDark
+                          ? AppColors.textSecondaryDark
+                          : AppColors.textSecondaryLight,
                     ),
                   ),
                 )
               : ListView.builder(
                   reverse: true,
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 8,
+                  ),
                   itemCount: state.messages.length,
                   itemBuilder: (context, index) {
                     // With reverse: true, index 0 = bottom of screen.
                     // Messages are stored oldest-first, so reverse the index to show newest at bottom.
-                    final message = state.messages[state.messages.length - 1 - index];
+                    final message =
+                        state.messages[state.messages.length - 1 - index];
                     return _CompactMessageTile(
                       message: message,
                       isDark: isDark,
@@ -391,7 +420,11 @@ class _WalkieBottomSheetState extends State<WalkieBottomSheet> {
                 ),
                 GestureDetector(
                   onTap: () => _setReplyingTo(null),
-                  child: const Icon(Icons.close, size: 18, color: AppColors.primary),
+                  child: const Icon(
+                    Icons.close,
+                    size: 18,
+                    color: AppColors.primary,
+                  ),
                 ),
               ],
             ),
@@ -400,27 +433,11 @@ class _WalkieBottomSheetState extends State<WalkieBottomSheet> {
         // Push-to-talk button
         Padding(
           padding: EdgeInsets.fromLTRB(16, 8, 16, 16 + bottomPadding),
-          child: Row(
-            children: [
-              // Leave button
-              IconButton(
-                onPressed: () => _walkieBloc.add(const WalkieLeaveChannel()),
-                icon: const Icon(Icons.exit_to_app),
-                style: IconButton.styleFrom(
-                  backgroundColor: Colors.grey.withAlpha(30),
-                ),
-              ),
-              const SizedBox(width: 12),
-              // PTT button
-              Expanded(
-                child: _CompactPTTButton(
-                  isSpeaking: state.isSpeaking,
-                  isMuted: state.isMuted,
-                  onStartSpeaking: () => _walkieBloc.add(const WalkieStartSpeaking()),
-                  onStopSpeaking: () => _walkieBloc.add(const WalkieStopSpeaking()),
-                ),
-              ),
-            ],
+          child: _CompactPTTButton(
+            isSpeaking: state.isSpeaking,
+            isMuted: state.isMuted,
+            onStartSpeaking: () => _walkieBloc.add(const WalkieStartSpeaking()),
+            onStopSpeaking: () => _walkieBloc.add(const WalkieStopSpeaking()),
           ),
         ),
       ],
@@ -459,7 +476,9 @@ class _ChannelTile extends StatelessWidget {
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Icon(
-                  channel.channelType == 'team' ? Icons.groups : Icons.speaker_phone,
+                  channel.channelType == 'team'
+                      ? Icons.groups
+                      : Icons.speaker_phone,
                   color: AppColors.primary,
                 ),
               ),
@@ -478,7 +497,9 @@ class _ChannelTile extends StatelessWidget {
                           width: 8,
                           height: 8,
                           decoration: BoxDecoration(
-                            color: channel.isActive ? AppColors.success : Colors.grey,
+                            color: channel.isActive
+                                ? AppColors.success
+                                : Colors.grey,
                             shape: BoxShape.circle,
                           ),
                         ),
@@ -487,7 +508,9 @@ class _ChannelTile extends StatelessWidget {
                           '${channel.participantCount} online',
                           style: TextStyle(
                             fontSize: 12,
-                            color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                            color: isDark
+                                ? AppColors.textSecondaryDark
+                                : AppColors.textSecondaryLight,
                           ),
                         ),
                       ],
@@ -553,7 +576,11 @@ class _ParticipantChip extends StatelessWidget {
                       color: Colors.red,
                       shape: BoxShape.circle,
                     ),
-                    child: const Icon(Icons.mic_off, size: 10, color: Colors.white),
+                    child: const Icon(
+                      Icons.mic_off,
+                      size: 10,
+                      color: Colors.white,
+                    ),
                   ),
                 ),
             ],
@@ -565,7 +592,9 @@ class _ParticipantChip extends StatelessWidget {
               participant.displayName.split(' ').first,
               style: TextStyle(
                 fontSize: 10,
-                color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                color: isDark
+                    ? AppColors.textSecondaryDark
+                    : AppColors.textSecondaryLight,
               ),
               textAlign: TextAlign.center,
               maxLines: 1,
@@ -663,8 +692,7 @@ class _CompactMessageTileState extends State<_CompactMessageTile> {
       } catch (e) {
         if (mounted) setState(() => _hasError = true);
       }
-    } else {
-    }
+    } else {}
   }
 
   String _formatDuration(Duration duration) {
@@ -683,25 +711,25 @@ class _CompactMessageTileState extends State<_CompactMessageTile> {
             }
           : null,
       child: Padding(
-        padding: const EdgeInsets.only(bottom: 12),
+        padding: const EdgeInsets.only(bottom: 8),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             CircleAvatar(
-              radius: 16,
+              radius: 14,
               backgroundColor: AppColors.primary.withAlpha(50),
               child: Text(
                 widget.message.senderName.isNotEmpty
                     ? widget.message.senderName[0].toUpperCase()
                     : '?',
                 style: const TextStyle(
-                  fontSize: 12,
+                  fontSize: 11,
                   fontWeight: FontWeight.bold,
                   color: AppColors.primary,
                 ),
               ),
             ),
-            const SizedBox(width: 10),
+            const SizedBox(width: 8),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -712,7 +740,7 @@ class _CompactMessageTileState extends State<_CompactMessageTile> {
                         child: Text(
                           widget.message.senderName,
                           style: const TextStyle(
-                            fontSize: 13,
+                            fontSize: 14,
                             fontWeight: FontWeight.w600,
                           ),
                           overflow: TextOverflow.ellipsis,
@@ -722,7 +750,7 @@ class _CompactMessageTileState extends State<_CompactMessageTile> {
                       Text(
                         _formatTime(widget.message.createdAt),
                         style: TextStyle(
-                          fontSize: 10,
+                          fontSize: 11,
                           color: widget.isDark
                               ? AppColors.textSecondaryDark
                               : AppColors.textSecondaryLight,
@@ -730,7 +758,7 @@ class _CompactMessageTileState extends State<_CompactMessageTile> {
                       ),
                     ],
                   ),
-                  const SizedBox(height: 4),
+                  const SizedBox(height: 3),
                   _buildContent(context),
                 ],
               ),
@@ -748,113 +776,88 @@ class _CompactMessageTileState extends State<_CompactMessageTile> {
           ? _duration
           : Duration(milliseconds: widget.message.audioDurationMs ?? 0);
       final progress = totalDuration.inMilliseconds > 0
-          ? (_position.inMilliseconds / totalDuration.inMilliseconds)
-              .clamp(0.0, 1.0)
+          ? (_position.inMilliseconds / totalDuration.inMilliseconds).clamp(
+              0.0,
+              1.0,
+            )
           : 0.0;
 
       return GestureDetector(
         onTap: _togglePlayback,
         child: Container(
-          padding: const EdgeInsets.all(10),
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
           decoration: BoxDecoration(
             color: _isPlaying
-                ? AppColors.primary.withAlpha(40)
-                : AppColors.primary.withAlpha(20),
-            borderRadius: BorderRadius.circular(14),
+                ? AppColors.primary.withAlpha(28)
+                : (widget.isDark
+                      ? Colors.white.withAlpha(10)
+                      : Colors.black.withAlpha(6)),
+            borderRadius: BorderRadius.circular(12),
             border: _isPlaying
-                ? Border.all(color: AppColors.primary.withAlpha(100))
-                : null,
+                ? Border.all(color: AppColors.primary.withAlpha(90))
+                : Border.all(color: Colors.grey.withAlpha(35)),
           ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+          child: Row(
             children: [
-              Row(
-                children: [
-                  AnimatedContainer(
-                    duration: const Duration(milliseconds: 200),
-                    width: 32,
-                    height: 32,
-                    decoration: BoxDecoration(
-                      color: _hasError
-                          ? AppColors.error
-                          : (_isPlaying
-                              ? AppColors.primary
-                              : AppColors.primary.withAlpha(150)),
-                      shape: BoxShape.circle,
+              AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                width: 30,
+                height: 30,
+                decoration: BoxDecoration(
+                  color: _hasError
+                      ? AppColors.error
+                      : (_isPlaying
+                            ? AppColors.primary.withAlpha(210)
+                            : AppColors.primary.withAlpha(140)),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  _hasError
+                      ? Icons.error_outline
+                      : (_isPlaying ? Icons.pause : Icons.play_arrow),
+                  size: 17,
+                  color: Colors.white,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _VoiceWaveform(
+                      progress: progress,
+                      isPlaying: _isPlaying,
+                      isDark: widget.isDark,
                     ),
-                    child: Icon(
-                      _hasError
-                          ? Icons.error_outline
-                          : (_isPlaying ? Icons.pause : Icons.play_arrow),
-                      size: 18,
-                      color: Colors.white,
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                    const SizedBox(height: 6),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        // Progress bar
-                        ClipRRect(
-                          borderRadius: BorderRadius.circular(2),
-                          child: LinearProgressIndicator(
-                            value: progress,
-                            backgroundColor: Colors.grey.withAlpha(50),
-                            valueColor: AlwaysStoppedAnimation<Color>(
-                              AppColors.primary,
-                            ),
-                            minHeight: 4,
+                        Text(
+                          _isPlaying || _position > Duration.zero
+                              ? _formatDuration(_position)
+                              : '00:00',
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: widget.isDark
+                                ? AppColors.textSecondaryDark
+                                : AppColors.textSecondaryLight,
                           ),
                         ),
-                        const SizedBox(height: 4),
-                        // Duration text
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Text(
-                              _isPlaying || _position > Duration.zero
-                                  ? _formatDuration(_position)
-                                  : '00:00',
-                              style: TextStyle(
-                                fontSize: 10,
-                                color: widget.isDark
-                                    ? AppColors.textSecondaryDark
-                                    : AppColors.textSecondaryLight,
-                              ),
-                            ),
-                            Text(
-                              widget.message.formattedDuration,
-                              style: TextStyle(
-                                fontSize: 10,
-                                color: widget.isDark
-                                    ? AppColors.textSecondaryDark
-                                    : AppColors.textSecondaryLight,
-                              ),
-                            ),
-                          ],
+                        Text(
+                          widget.message.formattedDuration,
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: widget.isDark
+                                ? AppColors.textSecondaryDark
+                                : AppColors.textSecondaryLight,
+                          ),
                         ),
                       ],
                     ),
-                  ),
-                ],
-              ),
-              // Tap to reply hint
-              if (widget.onReply != null)
-                Padding(
-                  padding: const EdgeInsets.only(top: 6),
-                  child: Text(
-                    'Long press to reply',
-                    style: TextStyle(
-                      fontSize: 9,
-                      color: (widget.isDark
-                              ? AppColors.textSecondaryDark
-                              : AppColors.textSecondaryLight)
-                          .withAlpha(150),
-                      fontStyle: FontStyle.italic,
-                    ),
-                  ),
+                  ],
                 ),
+              ),
             ],
           ),
         ),
@@ -910,6 +913,72 @@ class _CompactMessageTileState extends State<_CompactMessageTile> {
     if (diff.inMinutes < 60) return '${diff.inMinutes}m ago';
     if (diff.inHours < 24) return '${diff.inHours}h ago';
     return '${diff.inDays}d ago';
+  }
+}
+
+class _VoiceWaveform extends StatelessWidget {
+  final double progress;
+  final bool isPlaying;
+  final bool isDark;
+
+  const _VoiceWaveform({
+    required this.progress,
+    required this.isPlaying,
+    required this.isDark,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    const pattern = [
+      4.0,
+      8.0,
+      6.0,
+      10.0,
+      7.0,
+      5.0,
+      9.0,
+      6.0,
+      11.0,
+      7.0,
+      5.0,
+      8.0,
+      6.0,
+      10.0,
+      7.0,
+      4.0,
+    ];
+    final playedBars = (pattern.length * progress)
+        .clamp(0, pattern.length)
+        .toInt();
+
+    return SizedBox(
+      height: 14,
+      child: Row(
+        children: List.generate(pattern.length, (index) {
+          final isPlayed = index < playedBars;
+          return Expanded(
+            child: Align(
+              alignment: Alignment.center,
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 120),
+                height: pattern[index],
+                width: 2.6,
+                decoration: BoxDecoration(
+                  color: isPlayed
+                      ? AppColors.primary
+                      : (isPlaying
+                            ? AppColors.primary.withAlpha(90)
+                            : (isDark
+                                  ? Colors.white.withAlpha(36)
+                                  : Colors.black.withAlpha(28))),
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+          );
+        }),
+      ),
+    );
   }
 }
 
@@ -1006,6 +1075,9 @@ class _CompactPTTButtonState extends State<_CompactPTTButton>
   @override
   Widget build(BuildContext context) {
     final isActive = _isPressed || widget.isSpeaking;
+    final Color baseColor = widget.isMuted
+        ? Colors.grey
+        : (isActive ? const Color(0xFFD94C57) : const Color(0xFF2F6FE4));
 
     return Listener(
       onPointerDown: (_) => _onPressStart(),
@@ -1017,75 +1089,81 @@ class _CompactPTTButtonState extends State<_CompactPTTButton>
           return Transform.scale(
             scale: widget.isSpeaking ? _pulseAnimation.value : 1.0,
             child: AnimatedContainer(
-              duration: const Duration(milliseconds: 100),
+              duration: const Duration(milliseconds: 140),
               height: 56,
               decoration: BoxDecoration(
-                gradient: widget.isMuted
-                    ? null
-                    : LinearGradient(
-                        colors: isActive
-                            ? [AppColors.error, AppColors.error.withRed(200)]
-                            : [AppColors.primary, AppColors.secondary],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                      ),
-                color: widget.isMuted ? Colors.grey : null,
+                color: baseColor,
                 borderRadius: BorderRadius.circular(28),
-                boxShadow: isActive
-                    ? [
-                        BoxShadow(
-                          color: AppColors.error.withAlpha(150),
-                          blurRadius: 16,
-                          spreadRadius: 4,
-                        ),
-                      ]
-                    : [
-                        BoxShadow(
-                          color: AppColors.primary.withAlpha(50),
-                          blurRadius: 8,
-                          spreadRadius: 1,
-                        ),
-                      ],
+                border: Border.all(color: Colors.white.withAlpha(45)),
+                boxShadow: [
+                  BoxShadow(
+                    color: baseColor.withAlpha(isActive ? 110 : 70),
+                    blurRadius: isActive ? 14 : 8,
+                    spreadRadius: isActive ? 1.5 : 0.5,
+                  ),
+                ],
               ),
               child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  AnimatedSwitcher(
-                    duration: const Duration(milliseconds: 200),
-                    child: Icon(
-                      widget.isMuted
-                          ? Icons.mic_off
-                          : (isActive ? Icons.mic : Icons.mic_none),
-                      key: ValueKey(isActive),
-                      color: Colors.white,
-                      size: 26,
+                  const SizedBox(width: 8),
+                  Container(
+                    width: 40,
+                    height: 40,
+                    decoration: BoxDecoration(
+                      color: Colors.white.withAlpha(50),
+                      shape: BoxShape.circle,
+                    ),
+                    child: AnimatedSwitcher(
+                      duration: const Duration(milliseconds: 200),
+                      child: Icon(
+                        widget.isMuted
+                            ? Icons.mic_off
+                            : (isActive ? Icons.mic : Icons.mic_none),
+                        key: ValueKey(isActive),
+                        color: Colors.white,
+                        size: 22,
+                      ),
                     ),
                   ),
                   const SizedBox(width: 10),
-                  Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        widget.isMuted
-                            ? 'Muted'
-                            : (isActive ? 'Recording...' : 'Hold to talk'),
+                  const Spacer(),
+                  Expanded(
+                    flex: 2,
+                    child: Text(
+                      widget.isMuted
+                          ? 'Muted'
+                          : (isActive ? 'Release to send' : 'Hold to talk'),
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                  const Spacer(),
+                  if (isActive)
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 6,
+                      ),
+                      margin: const EdgeInsets.only(right: 8),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withAlpha(55),
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      child: Text(
+                        _formattedDuration,
                         style: const TextStyle(
                           color: Colors.white,
-                          fontSize: 15,
-                          fontWeight: FontWeight.bold,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
                         ),
                       ),
-                      if (isActive)
-                        Text(
-                          _formattedDuration,
-                          style: TextStyle(
-                            color: Colors.white.withAlpha(200),
-                            fontSize: 12,
-                          ),
-                        ),
-                    ],
-                  ),
+                    ),
+                  if (!isActive) const SizedBox(width: 8),
+                  if (isActive) const SizedBox(width: 8),
                 ],
               ),
             ),
@@ -1133,7 +1211,9 @@ class _PulsatingDotState extends State<_PulsatingDot>
             shape: BoxShape.circle,
             boxShadow: [
               BoxShadow(
-                color: AppColors.success.withAlpha((128 * _controller.value).toInt()),
+                color: AppColors.success.withAlpha(
+                  (128 * _controller.value).toInt(),
+                ),
                 blurRadius: 8 * _controller.value,
                 spreadRadius: 2 * _controller.value,
               ),
@@ -1176,109 +1256,76 @@ class _AudioLevelIndicatorState extends State<_AudioLevelIndicator>
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    // Use actual audio level, but ensure minimum visibility when recording
-    final displayLevel = widget.audioLevel > 0.01 ? widget.audioLevel : 0.0;
-    final hasSignal = displayLevel > 0.05;
+    final displayLevel = widget.audioLevel.clamp(0.0, 1.0);
+    final hasSignal = displayLevel > 0.04;
 
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      padding: const EdgeInsets.all(12),
+      margin: const EdgeInsets.fromLTRB(16, 6, 16, 4),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
         color: hasSignal
-            ? AppColors.success.withAlpha(20)
-            : (isDark ? Colors.grey[850] : Colors.grey[100]),
-        borderRadius: BorderRadius.circular(12),
+            ? AppColors.primary.withAlpha(18)
+            : Colors.grey.withAlpha(12),
+        borderRadius: BorderRadius.circular(14),
         border: Border.all(
           color: hasSignal
-              ? AppColors.success.withAlpha(100)
+              ? AppColors.primary.withAlpha(80)
               : Colors.grey.withAlpha(50),
         ),
       ),
       child: Row(
         children: [
-          // Mic icon with pulse
-          AnimatedBuilder(
-            animation: _animController,
-            builder: (context, child) {
-              return Container(
-                width: 40,
-                height: 40,
-                decoration: BoxDecoration(
-                  color: hasSignal
-                      ? AppColors.success
-                      : AppColors.error,
-                  shape: BoxShape.circle,
-                  boxShadow: [
-                    BoxShadow(
-                      color: (hasSignal ? AppColors.success : AppColors.error)
-                          .withAlpha((100 * _animController.value).toInt()),
-                      blurRadius: 8 * _animController.value,
-                      spreadRadius: 2 * _animController.value,
-                    ),
-                  ],
-                ),
-                child: const Icon(
-                  Icons.mic,
-                  color: Colors.white,
-                  size: 22,
-                ),
-              );
-            },
+          Container(
+            width: 30,
+            height: 30,
+            decoration: BoxDecoration(
+              color: hasSignal ? AppColors.primary : Colors.grey,
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(Icons.graphic_eq, color: Colors.white, size: 17),
           ),
-          const SizedBox(width: 12),
-          // Level bars and status
+          const SizedBox(width: 10),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  hasSignal ? 'Recording...' : 'No audio detected',
+                  hasSignal ? 'Listening…' : 'Waiting for voice…',
                   style: TextStyle(
                     fontWeight: FontWeight.w600,
-                    fontSize: 13,
-                    color: hasSignal ? AppColors.success : AppColors.error,
+                    fontSize: 12,
+                    color: hasSignal ? AppColors.primary : Colors.grey[700],
                   ),
                 ),
                 const SizedBox(height: 6),
-                // Audio level bars
                 Row(
-                  children: List.generate(20, (index) {
-                    final threshold = index / 20;
+                  children: List.generate(14, (index) {
+                    final threshold = index / 14;
                     final isActive = displayLevel > threshold;
-                    // Animate bars when no signal to show recording is active
-                    final animatedActive = !hasSignal &&
-                        index < 3 &&
-                        _animController.value > (index * 0.3);
+                    final animatedActive =
+                        !hasSignal &&
+                        index < 2 &&
+                        _animController.value > (index * 0.4);
+                    final baseHeight = 4.0 + (index.isEven ? 5.0 : 8.0);
 
                     return Expanded(
                       child: AnimatedContainer(
                         duration: const Duration(milliseconds: 100),
-                        height: 16,
-                        margin: const EdgeInsets.symmetric(horizontal: 1),
+                        height: (isActive || animatedActive)
+                            ? baseHeight + 2
+                            : baseHeight,
+                        margin: const EdgeInsets.symmetric(horizontal: 1.1),
                         decoration: BoxDecoration(
                           color: isActive
-                              ? _getBarColor(index / 20)
+                              ? AppColors.primary
                               : (animatedActive
-                                  ? Colors.grey.withAlpha(100)
-                                  : Colors.grey.withAlpha(30)),
+                                    ? Colors.grey.withAlpha(100)
+                                    : Colors.grey.withAlpha(30)),
                           borderRadius: BorderRadius.circular(2),
                         ),
                       ),
                     );
                   }),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  hasSignal
-                      ? 'Level: ${(displayLevel * 100).toInt()}%'
-                      : 'Speak into microphone',
-                  style: TextStyle(
-                    fontSize: 11,
-                    color: isDark
-                        ? AppColors.textSecondaryDark
-                        : AppColors.textSecondaryLight,
-                  ),
                 ),
               ],
             ),
@@ -1286,11 +1333,5 @@ class _AudioLevelIndicatorState extends State<_AudioLevelIndicator>
         ],
       ),
     );
-  }
-
-  Color _getBarColor(double level) {
-    if (level < 0.5) return AppColors.success;
-    if (level < 0.75) return Colors.orange;
-    return AppColors.error;
   }
 }

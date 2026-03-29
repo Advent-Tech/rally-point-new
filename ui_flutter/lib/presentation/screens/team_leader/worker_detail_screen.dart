@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import '../../../core/network/api_client.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../widgets/loading/skeleton_loader.dart';
 
 class WorkerDetailScreen extends StatefulWidget {
   final String workerId;
@@ -114,6 +115,25 @@ class _WorkerDetailScreenState extends State<WorkerDetailScreen>
         debugPrint('WorkerDetail territories error: $e');
       }
 
+      // Fallback for territory count:
+      // many live flows use geo assignments instead of custom_territories.
+      if (_territoriesAssigned == 0) {
+        try {
+          final response = await apiClient.get(
+            '/api/geo/assignments',
+            queryParameters: {'worker_id': widget.workerId, 'status': 'active'},
+          );
+          if (response.statusCode == 200 && response.data is Map) {
+            final data = response.data as Map;
+            _territoriesAssigned =
+                (data['count'] as num?)?.toInt() ??
+                ((data['assignments'] as List?)?.length ?? 0);
+          }
+        } catch (e) {
+          debugPrint('WorkerDetail geo-assignment fallback error: $e');
+        }
+      }
+
       // Worker completion percentage (used as coverage in this screen)
       try {
         final response = await apiClient.get(
@@ -126,6 +146,37 @@ class _WorkerDetailScreenState extends State<WorkerDetailScreen>
         }
       } catch (e) {
         debugPrint('WorkerDetail coverage stats error: $e');
+      }
+
+      // Fallback for donations:
+      // if donations table is empty for this worker, use donation-type deliveries.
+      if (_donations.isEmpty) {
+        try {
+          final response = await apiClient.get(
+            '/api/workers/${widget.workerId}/deliveries',
+            queryParameters: {'limit': 200, 'offset': 0},
+          );
+          if (response.statusCode == 200) {
+            final body = response.data;
+            final List<dynamic> rows = body is Map
+                ? (body['deliveries'] as List? ?? const [])
+                : (body is List ? body : const []);
+            final fallback = rows
+                .whereType<Map>()
+                .map(
+                  (e) => DonationItem.fromDeliveryJson(
+                    Map<String, dynamic>.from(e),
+                  ),
+                )
+                .whereType<DonationItem>()
+                .toList();
+            if (fallback.isNotEmpty) {
+              _donations = fallback;
+            }
+          }
+        } catch (e) {
+          debugPrint('WorkerDetail delivery->donation fallback error: $e');
+        }
       }
 
       if (!mounted) return;
@@ -170,7 +221,7 @@ class _WorkerDetailScreenState extends State<WorkerDetailScreen>
         ),
       ),
       body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
+          ? _buildLoadingSkeleton(context)
           : _error != null
           ? Center(
               child: Padding(
@@ -186,6 +237,60 @@ class _WorkerDetailScreenState extends State<WorkerDetailScreen>
                 _buildPrayersTab(context),
               ],
             ),
+    );
+  }
+
+  Widget _buildLoadingSkeleton(BuildContext context) {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16),
+      child: ShimmerEffect(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: const [
+                Expanded(child: _LoadingMetricCard()),
+                SizedBox(width: 12),
+                Expanded(child: _LoadingMetricCard()),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: const [
+                Expanded(child: _LoadingMetricCard()),
+                SizedBox(width: 12),
+                Expanded(child: _LoadingMetricCard()),
+              ],
+            ),
+            const SizedBox(height: 16),
+            const SkeletonBox(
+              width: double.infinity,
+              height: 42,
+              borderRadius: BorderRadius.all(Radius.circular(10)),
+            ),
+            const SizedBox(height: 20),
+            const SkeletonLine(width: 150, height: 22),
+            const SizedBox(height: 10),
+            const SkeletonBox(
+              width: double.infinity,
+              height: 180,
+              borderRadius: BorderRadius.all(Radius.circular(14)),
+            ),
+            const SizedBox(height: 16),
+            ...List.generate(
+              4,
+              (_) => const Padding(
+                padding: EdgeInsets.only(bottom: 10),
+                child: SkeletonBox(
+                  width: double.infinity,
+                  height: 86,
+                  borderRadius: BorderRadius.all(Radius.circular(12)),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -472,6 +577,19 @@ class _StatCard extends StatelessWidget {
   }
 }
 
+class _LoadingMetricCard extends StatelessWidget {
+  const _LoadingMetricCard();
+
+  @override
+  Widget build(BuildContext context) {
+    return const SkeletonBox(
+      width: double.infinity,
+      height: 122,
+      borderRadius: BorderRadius.all(Radius.circular(12)),
+    );
+  }
+}
+
 class _WeeklyChart extends StatelessWidget {
   final Map<String, int> byDay;
 
@@ -744,6 +862,40 @@ class DonationItem {
             (json['collected_at'] ?? json['created_at'] ?? '').toString(),
           ) ??
           DateTime.now(),
+    );
+  }
+
+  static DonationItem? fromDeliveryJson(Map<String, dynamic> json) {
+    final delivery = json['delivery'] is Map
+        ? Map<String, dynamic>.from(json['delivery'] as Map)
+        : json;
+
+    final deliveryType = (delivery['delivery_type'] ?? '')
+        .toString()
+        .toLowerCase();
+    final amount = (delivery['donation_amount'] as num?)?.toDouble() ?? 0;
+
+    if (deliveryType != 'donation' && amount <= 0) {
+      return null;
+    }
+
+    final recipientName = (delivery['recipient_name'] ?? 'Unknown donor')
+        .toString();
+    final address = (delivery['address'] ?? '').toString();
+    final paymentMethod = (delivery['payment_method'] ?? 'cash').toString();
+    final createdAt =
+        DateTime.tryParse(
+          (delivery['completed_at'] ?? delivery['created_at'] ?? '').toString(),
+        ) ??
+        DateTime.now();
+
+    return DonationItem(
+      id: (delivery['id'] ?? '').toString(),
+      amount: amount,
+      donorName: recipientName,
+      donorAddress: address,
+      paymentMethod: paymentMethod,
+      timestamp: createdAt,
     );
   }
 }

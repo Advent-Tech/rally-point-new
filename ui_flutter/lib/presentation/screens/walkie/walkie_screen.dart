@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_sound/flutter_sound.dart';
+import 'package:permission_handler/permission_handler.dart';
 import '../../../core/network/api_client.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../blocs/walkie/walkie_bloc.dart';
@@ -187,6 +188,10 @@ class _WalkieScreenState extends State<WalkieScreen> {
   }
 
   Widget _buildErrorView(String message, bool isDark) {
+    final isMicPermissionError = message.toLowerCase().contains(
+      'microphone permission',
+    );
+
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(24),
@@ -229,6 +234,13 @@ class _WalkieScreenState extends State<WalkieScreen> {
               icon: const Icon(Icons.refresh, size: 18),
               label: const Text('Retry'),
             ),
+            if (isMicPermissionError) ...[
+              const SizedBox(height: 8),
+              TextButton(
+                onPressed: openAppSettings,
+                child: const Text('Open Settings'),
+              ),
+            ],
           ],
         ),
       ),
@@ -482,36 +494,11 @@ class _WalkieScreenState extends State<WalkieScreen> {
         // Push-to-talk area
         Padding(
           padding: EdgeInsets.fromLTRB(16, 4, 16, 12 + bottomPadding),
-          child: Row(
-            children: [
-              // Leave channel button
-              Container(
-                width: 48,
-                height: 48,
-                decoration: BoxDecoration(
-                  color: isDark
-                      ? Colors.grey.withAlpha(40)
-                      : Colors.grey.withAlpha(25),
-                  borderRadius: BorderRadius.circular(24),
-                ),
-                child: IconButton(
-                  onPressed: () => _walkieBloc.add(const WalkieLeaveChannel()),
-                  icon: const Icon(Icons.exit_to_app, size: 22),
-                ),
-              ),
-              const SizedBox(width: 12),
-              // PTT button
-              Expanded(
-                child: _CompactPTTButton(
-                  isSpeaking: state.isSpeaking,
-                  isMuted: state.isMuted,
-                  onStartSpeaking: () =>
-                      _walkieBloc.add(const WalkieStartSpeaking()),
-                  onStopSpeaking: () =>
-                      _walkieBloc.add(const WalkieStopSpeaking()),
-                ),
-              ),
-            ],
+          child: _CompactPTTButton(
+            isSpeaking: state.isSpeaking,
+            isMuted: state.isMuted,
+            onStartSpeaking: () => _walkieBloc.add(const WalkieStartSpeaking()),
+            onStopSpeaking: () => _walkieBloc.add(const WalkieStopSpeaking()),
           ),
         ),
       ],
@@ -824,12 +811,12 @@ class _CompactMessageTileState extends State<_CompactMessageTile> {
             }
           : null,
       child: Padding(
-        padding: const EdgeInsets.only(bottom: 12),
+        padding: const EdgeInsets.only(bottom: 8),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             CircleAvatar(
-              radius: 16,
+              radius: 14,
               backgroundColor: AppColors.primary.withAlpha(50),
               backgroundImage: widget.message.senderAvatar != null
                   ? NetworkImage(widget.message.senderAvatar!)
@@ -840,14 +827,14 @@ class _CompactMessageTileState extends State<_CompactMessageTile> {
                           ? widget.message.senderName[0].toUpperCase()
                           : '?',
                       style: const TextStyle(
-                        fontSize: 12,
+                        fontSize: 11,
                         fontWeight: FontWeight.bold,
                         color: AppColors.primary,
                       ),
                     )
                   : null,
             ),
-            const SizedBox(width: 10),
+            const SizedBox(width: 8),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -858,7 +845,7 @@ class _CompactMessageTileState extends State<_CompactMessageTile> {
                         child: Text(
                           widget.message.senderName,
                           style: const TextStyle(
-                            fontSize: 13,
+                            fontSize: 14,
                             fontWeight: FontWeight.w600,
                           ),
                           overflow: TextOverflow.ellipsis,
@@ -868,7 +855,7 @@ class _CompactMessageTileState extends State<_CompactMessageTile> {
                       Text(
                         _formatTime(widget.message.createdAt),
                         style: TextStyle(
-                          fontSize: 10,
+                          fontSize: 11,
                           color: widget.isDark
                               ? AppColors.textSecondaryDark
                               : AppColors.textSecondaryLight,
@@ -876,7 +863,7 @@ class _CompactMessageTileState extends State<_CompactMessageTile> {
                       ),
                     ],
                   ),
-                  const SizedBox(height: 4),
+                  const SizedBox(height: 3),
                   _buildContent(context),
                 ],
               ),
@@ -903,55 +890,51 @@ class _CompactMessageTileState extends State<_CompactMessageTile> {
       return GestureDetector(
         onTap: _togglePlayback,
         child: Container(
-          padding: const EdgeInsets.all(10),
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
           decoration: BoxDecoration(
             color: _isPlaying
-                ? AppColors.primary.withAlpha(40)
-                : AppColors.primary.withAlpha(20),
-            borderRadius: BorderRadius.circular(14),
+                ? AppColors.primary.withAlpha(28)
+                : (widget.isDark
+                      ? Colors.white.withAlpha(10)
+                      : Colors.black.withAlpha(6)),
+            borderRadius: BorderRadius.circular(12),
             border: _isPlaying
-                ? Border.all(color: AppColors.primary.withAlpha(100))
-                : null,
+                ? Border.all(color: AppColors.primary.withAlpha(90))
+                : Border.all(color: Colors.grey.withAlpha(35)),
           ),
           child: Row(
             children: [
               AnimatedContainer(
                 duration: const Duration(milliseconds: 200),
-                width: 32,
-                height: 32,
+                width: 30,
+                height: 30,
                 decoration: BoxDecoration(
                   color: _hasError
                       ? AppColors.error
                       : (_isPlaying
-                            ? AppColors.primary
-                            : AppColors.primary.withAlpha(150)),
+                            ? AppColors.primary.withAlpha(210)
+                            : AppColors.primary.withAlpha(140)),
                   shape: BoxShape.circle,
                 ),
                 child: Icon(
                   _hasError
                       ? Icons.error_outline
                       : (_isPlaying ? Icons.pause : Icons.play_arrow),
-                  size: 18,
+                  size: 17,
                   color: Colors.white,
                 ),
               ),
-              const SizedBox(width: 10),
+              const SizedBox(width: 8),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(2),
-                      child: LinearProgressIndicator(
-                        value: progress,
-                        backgroundColor: Colors.grey.withAlpha(50),
-                        valueColor: const AlwaysStoppedAnimation<Color>(
-                          AppColors.primary,
-                        ),
-                        minHeight: 4,
-                      ),
+                    _VoiceWaveform(
+                      progress: progress,
+                      isPlaying: _isPlaying,
+                      isDark: widget.isDark,
                     ),
-                    const SizedBox(height: 4),
+                    const SizedBox(height: 6),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
@@ -960,7 +943,7 @@ class _CompactMessageTileState extends State<_CompactMessageTile> {
                               ? _formatDuration(_position)
                               : '00:00',
                           style: TextStyle(
-                            fontSize: 10,
+                            fontSize: 11,
                             color: widget.isDark
                                 ? AppColors.textSecondaryDark
                                 : AppColors.textSecondaryLight,
@@ -969,7 +952,7 @@ class _CompactMessageTileState extends State<_CompactMessageTile> {
                         Text(
                           widget.message.formattedDuration,
                           style: TextStyle(
-                            fontSize: 10,
+                            fontSize: 11,
                             color: widget.isDark
                                 ? AppColors.textSecondaryDark
                                 : AppColors.textSecondaryLight,
@@ -1025,6 +1008,72 @@ class _CompactMessageTileState extends State<_CompactMessageTile> {
       child: Text(
         widget.message.text ?? '',
         style: const TextStyle(fontSize: 13),
+      ),
+    );
+  }
+}
+
+class _VoiceWaveform extends StatelessWidget {
+  final double progress;
+  final bool isPlaying;
+  final bool isDark;
+
+  const _VoiceWaveform({
+    required this.progress,
+    required this.isPlaying,
+    required this.isDark,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    const pattern = [
+      4.0,
+      8.0,
+      6.0,
+      10.0,
+      7.0,
+      5.0,
+      9.0,
+      6.0,
+      11.0,
+      7.0,
+      5.0,
+      8.0,
+      6.0,
+      10.0,
+      7.0,
+      4.0,
+    ];
+    final playedBars = (pattern.length * progress)
+        .clamp(0, pattern.length)
+        .toInt();
+
+    return SizedBox(
+      height: 14,
+      child: Row(
+        children: List.generate(pattern.length, (index) {
+          final isPlayed = index < playedBars;
+          return Expanded(
+            child: Align(
+              alignment: Alignment.center,
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 120),
+                height: pattern[index],
+                width: 2.6,
+                decoration: BoxDecoration(
+                  color: isPlayed
+                      ? AppColors.primary
+                      : (isPlaying
+                            ? AppColors.primary.withAlpha(90)
+                            : (isDark
+                                  ? Colors.white.withAlpha(36)
+                                  : Colors.black.withAlpha(28))),
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+          );
+        }),
       ),
     );
   }
@@ -1123,6 +1172,9 @@ class _CompactPTTButtonState extends State<_CompactPTTButton>
   @override
   Widget build(BuildContext context) {
     final isActive = _isPressed || widget.isSpeaking;
+    final Color baseColor = widget.isMuted
+        ? Colors.grey
+        : (isActive ? const Color(0xFFD94C57) : const Color(0xFF2F6FE4));
 
     return Listener(
       onPointerDown: (_) => _onPressStart(),
@@ -1134,75 +1186,81 @@ class _CompactPTTButtonState extends State<_CompactPTTButton>
           return Transform.scale(
             scale: widget.isSpeaking ? _pulseAnimation.value : 1.0,
             child: AnimatedContainer(
-              duration: const Duration(milliseconds: 100),
+              duration: const Duration(milliseconds: 140),
               height: 56,
               decoration: BoxDecoration(
-                gradient: widget.isMuted
-                    ? null
-                    : LinearGradient(
-                        colors: isActive
-                            ? [AppColors.error, AppColors.error.withRed(200)]
-                            : [AppColors.primary, AppColors.secondary],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                      ),
-                color: widget.isMuted ? Colors.grey : null,
+                color: baseColor,
                 borderRadius: BorderRadius.circular(28),
-                boxShadow: isActive
-                    ? [
-                        BoxShadow(
-                          color: AppColors.error.withAlpha(150),
-                          blurRadius: 16,
-                          spreadRadius: 4,
-                        ),
-                      ]
-                    : [
-                        BoxShadow(
-                          color: AppColors.primary.withAlpha(50),
-                          blurRadius: 8,
-                          spreadRadius: 1,
-                        ),
-                      ],
+                border: Border.all(color: Colors.white.withAlpha(45)),
+                boxShadow: [
+                  BoxShadow(
+                    color: baseColor.withAlpha(isActive ? 110 : 70),
+                    blurRadius: isActive ? 14 : 8,
+                    spreadRadius: isActive ? 1.5 : 0.5,
+                  ),
+                ],
               ),
               child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  AnimatedSwitcher(
-                    duration: const Duration(milliseconds: 200),
-                    child: Icon(
-                      widget.isMuted
-                          ? Icons.mic_off
-                          : (isActive ? Icons.mic : Icons.mic_none),
-                      key: ValueKey(isActive),
-                      color: Colors.white,
-                      size: 26,
+                  const SizedBox(width: 8),
+                  Container(
+                    width: 40,
+                    height: 40,
+                    decoration: BoxDecoration(
+                      color: Colors.white.withAlpha(50),
+                      shape: BoxShape.circle,
+                    ),
+                    child: AnimatedSwitcher(
+                      duration: const Duration(milliseconds: 200),
+                      child: Icon(
+                        widget.isMuted
+                            ? Icons.mic_off
+                            : (isActive ? Icons.mic : Icons.mic_none),
+                        key: ValueKey(isActive),
+                        color: Colors.white,
+                        size: 22,
+                      ),
                     ),
                   ),
                   const SizedBox(width: 10),
-                  Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        widget.isMuted
-                            ? 'Muted'
-                            : (isActive ? 'Recording...' : 'Hold to talk'),
+                  const Spacer(),
+                  Expanded(
+                    flex: 2,
+                    child: Text(
+                      widget.isMuted
+                          ? 'Muted'
+                          : (isActive ? 'Release to send' : 'Hold to talk'),
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                  const Spacer(),
+                  if (isActive)
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 6,
+                      ),
+                      margin: const EdgeInsets.only(right: 8),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withAlpha(55),
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      child: Text(
+                        _formattedDuration,
                         style: const TextStyle(
                           color: Colors.white,
-                          fontSize: 15,
-                          fontWeight: FontWeight.bold,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
                         ),
                       ),
-                      if (isActive)
-                        Text(
-                          _formattedDuration,
-                          style: TextStyle(
-                            color: Colors.white.withAlpha(200),
-                            fontSize: 12,
-                          ),
-                        ),
-                    ],
-                  ),
+                    ),
+                  if (!isActive) const SizedBox(width: 8),
+                  if (isActive) const SizedBox(width: 8),
                 ],
               ),
             ),
@@ -1294,99 +1352,76 @@ class _AudioLevelIndicatorState extends State<_AudioLevelIndicator>
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final displayLevel = widget.audioLevel > 0.01 ? widget.audioLevel : 0.0;
-    final hasSignal = displayLevel > 0.05;
+    final displayLevel = widget.audioLevel.clamp(0.0, 1.0);
+    final hasSignal = displayLevel > 0.04;
 
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      padding: const EdgeInsets.all(12),
+      margin: const EdgeInsets.fromLTRB(16, 6, 16, 4),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
         color: hasSignal
-            ? AppColors.success.withAlpha(20)
-            : (isDark ? Colors.grey.withAlpha(20) : Colors.grey.withAlpha(15)),
-        borderRadius: BorderRadius.circular(12),
+            ? AppColors.primary.withAlpha(18)
+            : Colors.grey.withAlpha(12),
+        borderRadius: BorderRadius.circular(14),
         border: Border.all(
           color: hasSignal
-              ? AppColors.success.withAlpha(100)
-              : Colors.grey.withAlpha(50),
+              ? AppColors.primary.withAlpha(80)
+              : Colors.grey.withAlpha(55),
         ),
       ),
       child: Row(
         children: [
-          AnimatedBuilder(
-            animation: _animController,
-            builder: (context, child) {
-              return Container(
-                width: 36,
-                height: 36,
-                decoration: BoxDecoration(
-                  color: hasSignal ? AppColors.success : AppColors.error,
-                  shape: BoxShape.circle,
-                  boxShadow: [
-                    BoxShadow(
-                      color: (hasSignal ? AppColors.success : AppColors.error)
-                          .withAlpha((100 * _animController.value).toInt()),
-                      blurRadius: 8 * _animController.value,
-                      spreadRadius: 2 * _animController.value,
-                    ),
-                  ],
-                ),
-                child: const Icon(Icons.mic, color: Colors.white, size: 20),
-              );
-            },
+          Container(
+            width: 30,
+            height: 30,
+            decoration: BoxDecoration(
+              color: hasSignal ? AppColors.primary : Colors.grey,
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(Icons.graphic_eq, color: Colors.white, size: 17),
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: 10),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  hasSignal ? 'Recording...' : 'No audio detected',
+                  hasSignal ? 'Listening…' : 'Waiting for voice…',
                   style: TextStyle(
                     fontWeight: FontWeight.w600,
-                    fontSize: 13,
-                    color: hasSignal ? AppColors.success : AppColors.error,
+                    fontSize: 12,
+                    color: hasSignal ? AppColors.primary : Colors.grey[700],
                   ),
                 ),
                 const SizedBox(height: 6),
                 Row(
-                  children: List.generate(20, (index) {
-                    final threshold = index / 20;
+                  children: List.generate(14, (index) {
+                    final threshold = index / 14;
                     final isActive = displayLevel > threshold;
                     final animatedActive =
                         !hasSignal &&
-                        index < 3 &&
-                        _animController.value > (index * 0.3);
+                        index < 2 &&
+                        _animController.value > (index * 0.4);
+                    final baseHeight = 4.0 + (index.isEven ? 5.0 : 8.0);
 
                     return Expanded(
                       child: AnimatedContainer(
                         duration: const Duration(milliseconds: 100),
-                        height: 14,
-                        margin: const EdgeInsets.symmetric(horizontal: 1),
+                        height: (isActive || animatedActive)
+                            ? baseHeight + 2
+                            : baseHeight,
+                        margin: const EdgeInsets.symmetric(horizontal: 1.1),
                         decoration: BoxDecoration(
                           color: isActive
-                              ? _getBarColor(index / 20)
+                              ? AppColors.primary
                               : (animatedActive
-                                    ? Colors.grey.withAlpha(100)
-                                    : Colors.grey.withAlpha(30)),
+                                    ? AppColors.primary.withAlpha(90)
+                                    : Colors.grey.withAlpha(45)),
                           borderRadius: BorderRadius.circular(2),
                         ),
                       ),
                     );
                   }),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  hasSignal
-                      ? 'Level: ${(displayLevel * 100).toInt()}%'
-                      : 'Speak into microphone',
-                  style: TextStyle(
-                    fontSize: 11,
-                    color: isDark
-                        ? AppColors.textSecondaryDark
-                        : AppColors.textSecondaryLight,
-                  ),
                 ),
               ],
             ),
@@ -1394,11 +1429,5 @@ class _AudioLevelIndicatorState extends State<_AudioLevelIndicator>
         ],
       ),
     );
-  }
-
-  Color _getBarColor(double level) {
-    if (level < 0.5) return AppColors.success;
-    if (level < 0.75) return Colors.orange;
-    return AppColors.error;
   }
 }
