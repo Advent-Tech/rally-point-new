@@ -140,6 +140,7 @@ class _PopupCard extends StatelessWidget {
     Widget body;
     switch (popup.kind) {
       case cc.MapPopupKind.activityDonation:
+      case cc.MapPopupKind.activityBookSale:
         final d = _findDonation(state);
         body = d == null
             ? const Text('Details unavailable')
@@ -149,7 +150,11 @@ class _PopupCard extends StatelessWidget {
                 children: [
                   Text('${d.displayName} • ${d.formattedAmount}'),
                   const SizedBox(height: 4),
-                  Text('Status: ${d.statusDisplay}'),
+                  Text(
+                    popup.kind == cc.MapPopupKind.activityBookSale
+                        ? 'Status: ${d.statusDisplay} • Book Sale'
+                        : 'Status: ${d.statusDisplay}',
+                  ),
                   if (popup.expanded) ...[
                     const SizedBox(height: 8),
                     Text('Worker: ${d.workerName}'),
@@ -236,6 +241,7 @@ class _PopupCard extends StatelessWidget {
                   Expanded(
                     child: Text(switch (popup.kind) {
                       cc.MapPopupKind.activityDonation => 'Donation',
+                      cc.MapPopupKind.activityBookSale => 'Book Sale',
                       cc.MapPopupKind.activityPrayer => 'Prayer Request',
                       cc.MapPopupKind.territory => 'Territory',
                       cc.MapPopupKind.worker => 'Worker',

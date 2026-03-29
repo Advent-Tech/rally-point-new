@@ -7,8 +7,8 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
-	"rally-point/delivery-service/internal/domain"
 	"github.com/rally-point/shared/auth"
+	"rally-point/delivery-service/internal/domain"
 )
 
 type DeliveryHandler struct {
@@ -723,6 +723,91 @@ func (h *DeliveryHandler) GetGlobalDonationDeliveryStats(c *gin.Context) {
 	days, _ := strconv.Atoi(daysStr)
 
 	stats, err := h.deliveryService.GetGlobalDonationDeliveryStats(days)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, stats)
+}
+
+// GetAllBookSales returns all book_sale-type deliveries
+// GET /api/book-sales/all
+func (h *DeliveryHandler) GetAllBookSales(c *gin.Context) {
+	limitStr := c.DefaultQuery("limit", "50")
+	offsetStr := c.DefaultQuery("offset", "0")
+
+	limit, _ := strconv.Atoi(limitStr)
+	offset, _ := strconv.Atoi(offsetStr)
+
+	bookSales, err := h.deliveryService.GetAllBookSales(limit, offset)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"book_sales": bookSales,
+		"count":      len(bookSales),
+	})
+}
+
+// GetTeamBookSales returns team-specific book_sale-type deliveries
+// GET /api/book-sales/team/:teamId
+func (h *DeliveryHandler) GetTeamBookSales(c *gin.Context) {
+	teamIDStr := c.Param("teamId")
+	teamID, err := uuid.Parse(teamIDStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid team ID"})
+		return
+	}
+
+	limitStr := c.DefaultQuery("limit", "50")
+	offsetStr := c.DefaultQuery("offset", "0")
+
+	limit, _ := strconv.Atoi(limitStr)
+	offset, _ := strconv.Atoi(offsetStr)
+
+	bookSales, err := h.deliveryService.GetTeamBookSales(teamID, limit, offset)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"book_sales": bookSales,
+		"count":      len(bookSales),
+	})
+}
+
+// GetGlobalBookSaleStats returns global book sale stats
+// GET /api/book-sales/stats
+func (h *DeliveryHandler) GetGlobalBookSaleStats(c *gin.Context) {
+	daysStr := c.DefaultQuery("days", "0")
+	days, _ := strconv.Atoi(daysStr)
+
+	stats, err := h.deliveryService.GetGlobalBookSaleStats(days)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, stats)
+}
+
+// GetTeamBookSaleStats returns team-specific book sale stats
+// GET /api/book-sales/stats/team/:teamId
+func (h *DeliveryHandler) GetTeamBookSaleStats(c *gin.Context) {
+	teamIDStr := c.Param("teamId")
+	teamID, err := uuid.Parse(teamIDStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid team ID"})
+		return
+	}
+
+	daysStr := c.DefaultQuery("days", "0")
+	days, _ := strconv.Atoi(daysStr)
+
+	stats, err := h.deliveryService.GetTeamBookSaleStats(teamID, days)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return

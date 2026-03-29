@@ -115,6 +115,7 @@ class CommandCenterController {
     if (activityHit) {
       final kind = switch (closestActivity.kind) {
         ActivityTapKind.donation => MapPopupKind.activityDonation,
+        ActivityTapKind.bookSale => MapPopupKind.activityBookSale,
         ActivityTapKind.prayer => MapPopupKind.activityPrayer,
       };
       bloc.add(

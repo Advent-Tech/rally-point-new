@@ -26,6 +26,53 @@ import '../../widgets/states/empty_state.dart';
 /// Date filter options
 enum DateFilter { today, thisWeek, thisMonth, all }
 
+class _BookOption {
+  final String code;
+  final String title;
+  final String language;
+  final double unitPrice;
+  final String assetPath;
+
+  const _BookOption({
+    required this.code,
+    required this.title,
+    required this.language,
+    required this.unitPrice,
+    required this.assetPath,
+  });
+}
+
+const List<_BookOption> _bookCatalog = [
+  _BookOption(
+    code: 'GC_EN',
+    title: 'The Great Controversy Book, Thrive Magazine, & Doorknob Bag',
+    language: 'english',
+    unitPrice: 2.50,
+    assetPath: 'assets/books/great_contoversy.png',
+  ),
+  _BookOption(
+    code: 'GC_ES',
+    title: 'The Great Controversy Book, Thrive Magazine, & Doorknob Bag (Spanish)',
+    language: 'spanish',
+    unitPrice: 2.50,
+    assetPath: 'assets/books/great_contoversy_spanish.png',
+  ),
+  _BookOption(
+    code: 'WLD_EN',
+    title: 'When Light and Darkness Collide, Thrive Magazine, & Doorknob Bag',
+    language: 'english',
+    unitPrice: 2.50,
+    assetPath: 'assets/books/whenLDcollide.png',
+  ),
+  _BookOption(
+    code: 'WLD_ES',
+    title: 'When Light and Darkness Collide, Thrive Magazine, & Doorknob Bag (Spanish)',
+    language: 'spanish',
+    unitPrice: 2.50,
+    assetPath: 'assets/books/whenLDcollide_spanish.png',
+  ),
+];
+
 /// Simplified Delivery Screen for field workers
 /// Workers record donations on the spot - no pending states
 class DeliveryScreen extends StatefulWidget {
@@ -209,9 +256,14 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
                 }).toList();
               }
 
-              // Calculate today's totals for summary (donations only)
-              final donations = todayDeliveries.toList();
+              // Calculate today's totals for summary
+              final donations = todayDeliveries.where((d) => d.isDonation).toList();
+              final bookSales = todayDeliveries.where((d) => d.isBookSale).toList();
               final totalDonationAmount = donations.fold<double>(
+                0,
+                (sum, d) => sum + (d.donationAmount ?? 0),
+              );
+              final totalBookSalesAmount = bookSales.fold<double>(
                 0,
                 (sum, d) => sum + (d.donationAmount ?? 0),
               );
@@ -240,28 +292,44 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
                         child: _TodaySummaryCard(
                           donationsCount: donations.length,
                           donationsAmount: totalDonationAmount,
+                          bookSalesCount: bookSales.length,
+                          bookSalesAmount: totalBookSalesAmount,
                           isDark: isDark,
                         ),
                       ),
                       const SizedBox(height: 24),
 
-                      // Action Button - Record Donation
-                      Showcase(
-                        key: _showcaseRecord,
-                        title: 'Record Donation',
-                        description:
-                            'Tap here to record a new donation. Your GPS location is automatically captured.',
-                        titleTextStyle: _tooltipTitleStyle,
-                        descTextStyle: _tooltipDescStyle,
-                        tooltipBorderRadius: _tooltipRadius,
-                        tooltipPadding: _tooltipPadding,
-                        targetBorderRadius: BorderRadius.circular(16),
-                        child: _ActionButton(
-                          icon: Icons.volunteer_activism,
-                          label: 'Record Donation',
-                          color: AppColors.success,
-                          onTap: () => _showRecordSheet(context),
-                        ),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Showcase(
+                              key: _showcaseRecord,
+                              title: 'Record Donation',
+                              description:
+                                  'Tap here to record a new donation. Your GPS location is automatically captured.',
+                              titleTextStyle: _tooltipTitleStyle,
+                              descTextStyle: _tooltipDescStyle,
+                              tooltipBorderRadius: _tooltipRadius,
+                              tooltipPadding: _tooltipPadding,
+                              targetBorderRadius: BorderRadius.circular(16),
+                              child: _ActionButton(
+                                icon: Icons.volunteer_activism,
+                                label: 'Record Donation',
+                                color: AppColors.success,
+                                onTap: () => _showRecordSheet(context),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: _ActionButton(
+                              icon: Icons.menu_book_rounded,
+                              label: 'Record Book Sale',
+                              color: AppColors.primary,
+                              onTap: () => _showBookSaleSheet(context),
+                            ),
+                          ),
+                        ],
                       ),
                       const SizedBox(height: 24),
 
@@ -345,10 +413,10 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
                         )
                       else if (filteredDeliveries.isEmpty)
                         const EmptyState(
-                          icon: Icons.volunteer_activism_outlined,
-                          title: 'No donations yet',
+                          icon: Icons.receipt_long_outlined,
+                          title: 'No records yet',
                           description:
-                              'Tap the button above to record your first donation.',
+                              'Tap above to record a donation or book sale.',
                           compact: true,
                         )
                       else
@@ -405,6 +473,18 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
     );
   }
 
+  void _showBookSaleSheet(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (sheetContext) => BlocProvider.value(
+        value: context.read<DeliveryBloc>(),
+        child: const _RecordBookSaleSheet(),
+      ),
+    );
+  }
+
   void _showDetailSheet(BuildContext context, DeliveryModel delivery) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
@@ -455,12 +535,19 @@ class _DeliveryDetailSheet extends StatelessWidget {
                   width: 48,
                   height: 48,
                   decoration: BoxDecoration(
-                    color: AppColors.success.withAlpha(30),
+                    color: (delivery.isBookSale
+                            ? AppColors.primary
+                            : AppColors.success)
+                        .withAlpha(30),
                     borderRadius: BorderRadius.circular(12),
                   ),
-                  child: const Icon(
-                    Icons.volunteer_activism,
-                    color: AppColors.success,
+                  child: Icon(
+                    delivery.isBookSale
+                        ? Icons.menu_book_rounded
+                        : Icons.volunteer_activism,
+                    color: delivery.isBookSale
+                        ? AppColors.primary
+                        : AppColors.success,
                   ),
                 ),
                 const SizedBox(width: 16),
@@ -476,7 +563,7 @@ class _DeliveryDetailSheet extends StatelessWidget {
                         ),
                       ),
                       Text(
-                        'Donation',
+                        delivery.isBookSale ? 'Book Sale' : 'Donation',
                         style: TextStyle(
                           color: isDark
                               ? AppColors.textSecondaryDark
@@ -497,6 +584,12 @@ class _DeliveryDetailSheet extends StatelessWidget {
             ),
             const SizedBox(height: 20),
             _DetailRow(label: 'Address', value: delivery.address),
+            if (delivery.isBookSale && delivery.bookTitle != null)
+              _DetailRow(label: 'Book', value: delivery.bookTitle!),
+            if (delivery.isBookSale && delivery.bookQuantity != null)
+              _DetailRow(label: 'Quantity', value: '${delivery.bookQuantity}'),
+            if (delivery.isBookSale && delivery.bookLanguage != null)
+              _DetailRow(label: 'Language', value: delivery.bookLanguage!),
             if (delivery.recipientPhone != null)
               _DetailRow(label: 'Phone', value: delivery.recipientPhone!),
             if (delivery.paymentMethod != null)
@@ -549,11 +642,15 @@ class _DeliveryDetailSheet extends StatelessWidget {
 class _TodaySummaryCard extends StatelessWidget {
   final int donationsCount;
   final double donationsAmount;
+  final int bookSalesCount;
+  final double bookSalesAmount;
   final bool isDark;
 
   const _TodaySummaryCard({
     required this.donationsCount,
     required this.donationsAmount,
+    required this.bookSalesCount,
+    required this.bookSalesAmount,
     required this.isDark,
   });
 
@@ -604,6 +701,11 @@ class _TodaySummaryCard extends StatelessWidget {
           Text(
             '$donationsCount donations',
             style: const TextStyle(color: Colors.white70, fontSize: 14),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            '\$${bookSalesAmount.toStringAsFixed(2)} from $bookSalesCount book sales',
+            style: const TextStyle(color: Colors.white70, fontSize: 13),
           ),
         ],
       ),
@@ -672,7 +774,8 @@ class _ActivityCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const color = AppColors.success;
+    final isBookSale = delivery.isBookSale;
+    final color = isBookSale ? AppColors.primary : AppColors.success;
     final time = delivery.createdAt ?? delivery.completedAt;
 
     return Card(
@@ -699,8 +802,10 @@ class _ActivityCard extends StatelessWidget {
                   color: color.withAlpha(20),
                   borderRadius: BorderRadius.circular(10),
                 ),
-                child: const Icon(
-                  Icons.volunteer_activism,
+                child: Icon(
+                  isBookSale
+                      ? Icons.menu_book_rounded
+                      : Icons.volunteer_activism,
                   color: color,
                   size: 22,
                 ),
@@ -728,7 +833,9 @@ class _ActivityCard extends StatelessWidget {
                         ],
                         Expanded(
                           child: Text(
-                            delivery.address,
+                            isBookSale && (delivery.bookTitle?.isNotEmpty ?? false)
+                                ? delivery.bookTitle!
+                                : delivery.address,
                             style: TextStyle(
                               fontSize: 13,
                               color: isDark
@@ -1709,6 +1816,443 @@ class _PaymentChip extends StatelessWidget {
   }
 }
 
+class _RecordBookSaleSheet extends StatefulWidget {
+  const _RecordBookSaleSheet();
+
+  @override
+  State<_RecordBookSaleSheet> createState() => _RecordBookSaleSheetState();
+}
+
+class _RecordBookSaleSheetState extends State<_RecordBookSaleSheet> {
+  final _formKey = GlobalKey<FormState>();
+  final _nameController = TextEditingController();
+  final _addressController = TextEditingController();
+  final _phoneController = TextEditingController();
+  final _notesController = TextEditingController();
+  final _quantityController = TextEditingController(text: '1');
+
+  int _selectedBookIndex = 0;
+  String _paymentMethod = 'cash';
+  bool _isSubmitting = false;
+  bool _isGettingLocation = false;
+  double? _latitude;
+  double? _longitude;
+  String? _teamId;
+  String? _workerId;
+  String? _territoryId;
+  String? _territoryName;
+
+  _BookOption get _selectedBook => _bookCatalog[_selectedBookIndex];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadUserData();
+    _getCurrentLocation();
+  }
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _addressController.dispose();
+    _phoneController.dispose();
+    _notesController.dispose();
+    _quantityController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _loadUserData() async {
+    try {
+      final storage = await LocalStorage.getInstance();
+      final userData = storage.getUserData();
+      setState(() {
+        _teamId =
+            userData?['team_id']?.toString() ?? userData?['teamId']?.toString();
+        _workerId =
+            userData?['id']?.toString() ?? userData?['worker_id']?.toString();
+      });
+    } catch (e) {
+      debugPrint('Error loading user data: $e');
+    }
+  }
+
+  Future<void> _getCurrentLocation() async {
+    setState(() => _isGettingLocation = true);
+    try {
+      LocationPermission permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+      }
+      if (permission == LocationPermission.denied ||
+          permission == LocationPermission.deniedForever) {
+        setState(() => _isGettingLocation = false);
+        return;
+      }
+      final position = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.high,
+        timeLimit: const Duration(seconds: 10),
+      );
+      setState(() {
+        _latitude = position.latitude;
+        _longitude = position.longitude;
+        _isGettingLocation = false;
+      });
+      await _findTerritory();
+    } catch (_) {
+      setState(() => _isGettingLocation = false);
+    }
+  }
+
+  Future<void> _findTerritory() async {
+    if (_latitude == null || _longitude == null || _workerId == null) return;
+    try {
+      final repository = TerritoryRepository();
+      final result = await repository.getMyAssignments(workerId: _workerId);
+      if (result is ApiSuccess) {
+        final assignments = (result as ApiSuccess).data;
+        for (final assignment in assignments) {
+          if (assignment.geometry == null) continue;
+          if (_isPointInTerritory(
+            _latitude!,
+            _longitude!,
+            assignment.geometry!,
+          )) {
+            setState(() {
+              _territoryId = assignment.territoryId;
+              _territoryName = assignment.entityName;
+            });
+            break;
+          }
+        }
+      }
+    } catch (_) {}
+  }
+
+  bool _isPointInTerritory(
+    double lat,
+    double lng,
+    Map<String, dynamic> geometry,
+  ) {
+    final type = geometry['type'] as String?;
+    final coordinates = geometry['coordinates'];
+    if (coordinates == null) return false;
+    if (type == 'Polygon') {
+      final ring = (coordinates[0] as List).map<List<double>>((coord) {
+        final c = coord as List;
+        return [c[0].toDouble(), c[1].toDouble()];
+      }).toList();
+      return _isPointInPolygon(lat, lng, ring);
+    } else if (type == 'MultiPolygon') {
+      for (var poly in coordinates) {
+        final ring = (poly[0] as List).map<List<double>>((coord) {
+          final c = coord as List;
+          return [c[0].toDouble(), c[1].toDouble()];
+        }).toList();
+        if (_isPointInPolygon(lat, lng, ring)) return true;
+      }
+    }
+    return false;
+  }
+
+  bool _isPointInPolygon(double lat, double lng, List<List<double>> polygon) {
+    bool inside = false;
+    final n = polygon.length;
+    for (int i = 0, j = n - 1; i < n; j = i++) {
+      final xi = polygon[i][0], yi = polygon[i][1];
+      final xj = polygon[j][0], yj = polygon[j][1];
+      if (((yi > lat) != (yj > lat)) &&
+          (lng < (xj - xi) * (lat - yi) / (yj - yi) + xi)) {
+        inside = !inside;
+      }
+    }
+    return inside;
+  }
+
+  Future<void> _submit() async {
+    if (!(_formKey.currentState?.validate() ?? false)) return;
+
+    if (_teamId == null || _teamId!.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('You must be assigned to a team'),
+          backgroundColor: AppColors.error,
+        ),
+      );
+      return;
+    }
+
+    setState(() => _isSubmitting = true);
+    final quantity = int.tryParse(_quantityController.text.trim()) ?? 1;
+    final totalAmount = _selectedBook.unitPrice * quantity;
+
+    final request = CreateDeliveryRequest(
+      teamId: _teamId!,
+      recipientName: _nameController.text.trim(),
+      address: _addressController.text.trim().isNotEmpty
+          ? _addressController.text.trim()
+          : 'Location recorded',
+      recipientPhone: _phoneController.text.trim().isNotEmpty
+          ? _phoneController.text.trim()
+          : null,
+      latitude: _latitude,
+      longitude: _longitude,
+      deliveryType: 'book_sale',
+      donationAmount: totalAmount,
+      paymentMethod: _paymentMethod,
+      bookCode: _selectedBook.code,
+      bookTitle: _selectedBook.title,
+      bookLanguage: _selectedBook.language,
+      bookQuantity: quantity,
+      bookUnitPrice: _selectedBook.unitPrice,
+      notes: _notesController.text.trim().isNotEmpty
+          ? _notesController.text.trim()
+          : null,
+      territoryId: _territoryId,
+      territoryName: _territoryName,
+      items: const [],
+    );
+
+    context.read<DeliveryBloc>().add(DeliveryCreate(request: request));
+    if (mounted) Navigator.pop(context);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final quantity = int.tryParse(_quantityController.text.trim()) ?? 1;
+    final totalAmount = _selectedBook.unitPrice * quantity;
+
+    return Container(
+      decoration: BoxDecoration(
+        color: isDark ? AppColors.backgroundDark : Colors.white,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      constraints: BoxConstraints(
+        maxHeight: MediaQuery.of(context).size.height * 0.9,
+      ),
+      padding: EdgeInsets.only(
+        bottom: MediaQuery.of(context).viewInsets.bottom,
+      ),
+      child: Column(
+        children: [
+          const SizedBox(height: 10),
+          Container(
+            width: 40,
+            height: 4,
+            decoration: BoxDecoration(
+              color: isDark ? AppColors.borderDark : AppColors.borderLight,
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+          const SizedBox(height: 14),
+          const Text(
+            'Record Book Sale',
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+          ),
+          const SizedBox(height: 10),
+          Expanded(
+            child: Form(
+              key: _formKey,
+              child: ListView(
+                padding: const EdgeInsets.fromLTRB(20, 8, 20, 16),
+                children: [
+                  Text(
+                    'Book',
+                    style: TextStyle(
+                      color: isDark
+                          ? AppColors.textSecondaryDark
+                          : AppColors.textSecondaryLight,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  SizedBox(
+                    height: 220,
+                    child: ListView.separated(
+                      scrollDirection: Axis.horizontal,
+                      itemCount: _bookCatalog.length,
+                      separatorBuilder: (_, _) => const SizedBox(width: 12),
+                      itemBuilder: (context, index) {
+                        final book = _bookCatalog[index];
+                        final isSelected = _selectedBookIndex == index;
+                        return GestureDetector(
+                          onTap: () => setState(() => _selectedBookIndex = index),
+                          child: Container(
+                            width: 180,
+                            padding: const EdgeInsets.all(10),
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(14),
+                              border: Border.all(
+                                color: isSelected
+                                    ? AppColors.primary
+                                    : (isDark
+                                          ? AppColors.borderDark
+                                          : AppColors.borderLight),
+                                width: isSelected ? 2 : 1,
+                              ),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Expanded(
+                                  child: Image.asset(
+                                    book.assetPath,
+                                    fit: BoxFit.contain,
+                                    errorBuilder: (_, _, _) => Container(
+                                      color: Colors.grey.shade100,
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(height: 8),
+                                Text(
+                                  book.title,
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                                Text(
+                                  '\$${book.unitPrice.toStringAsFixed(2)}',
+                                  style: const TextStyle(
+                                    color: AppColors.primary,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  CustomTextField(
+                    controller: _nameController,
+                    label: 'Buyer Name *',
+                    hint: 'Enter buyer name',
+                    validator: (value) {
+                      if (value == null || value.trim().isEmpty) {
+                        return 'Buyer name is required';
+                      }
+                      return null;
+                    },
+                  ),
+                  const SizedBox(height: 12),
+                  CustomTextField(
+                    controller: _addressController,
+                    label: 'Address',
+                    hint: 'Address (optional)',
+                  ),
+                  const SizedBox(height: 12),
+                  CustomTextField(
+                    controller: _phoneController,
+                    label: 'Phone',
+                    hint: 'Phone (optional)',
+                    keyboardType: TextInputType.phone,
+                  ),
+                  const SizedBox(height: 12),
+                  CustomTextField(
+                    controller: _quantityController,
+                    label: 'Quantity *',
+                    hint: 'Enter quantity',
+                    keyboardType: TextInputType.number,
+                    validator: (value) {
+                      final q = int.tryParse(value ?? '');
+                      if (q == null || q <= 0) return 'Enter valid quantity';
+                      return null;
+                    },
+                    onChanged: (_) => setState(() {}),
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    'Payment Method',
+                    style: TextStyle(
+                      color: isDark
+                          ? AppColors.textSecondaryDark
+                          : AppColors.textSecondaryLight,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      _PaymentChip(
+                        label: 'Cash',
+                        icon: Icons.payments,
+                        isSelected: _paymentMethod == 'cash',
+                        onTap: () => setState(() => _paymentMethod = 'cash'),
+                      ),
+                      const SizedBox(width: 8),
+                      _PaymentChip(
+                        label: 'Online',
+                        icon: Icons.link,
+                        isSelected: _paymentMethod == 'online',
+                        onTap: () => setState(() => _paymentMethod = 'online'),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  CustomTextField(
+                    controller: _notesController,
+                    label: 'Notes',
+                    hint: 'Optional notes',
+                    maxLines: 2,
+                  ),
+                  const SizedBox(height: 12),
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: AppColors.primary.withAlpha(18),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Selected: ${_selectedBook.title}'),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Total: \$${totalAmount.toStringAsFixed(2)} (${_selectedBook.unitPrice.toStringAsFixed(2)} x $quantity)',
+                          style: const TextStyle(fontWeight: FontWeight.w700),
+                        ),
+                        if (_isGettingLocation)
+                          const Padding(
+                            padding: EdgeInsets.only(top: 6),
+                            child: Text('Detecting location...'),
+                          ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 4, 20, 20),
+            child: SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: _isSubmitting ? null : _submit,
+                icon: _isSubmitting
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.check_circle_outline),
+                label: Text(
+                  _isSubmitting
+                      ? 'Saving...'
+                      : 'Record Sale (\$${totalAmount.toStringAsFixed(2)})',
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 /// Payment Link Dialog - Sends SMS and waits for payment
 class _PaymentLinkDialog extends StatefulWidget {
   final double amount;
@@ -2080,7 +2624,7 @@ class _ReceiptDialog extends StatelessWidget {
             ),
             const SizedBox(height: 4),
             Text(
-              'Donation Receipt',
+              delivery.isBookSale ? 'Book Sale Receipt' : 'Donation Receipt',
               style: const TextStyle(color: AppColors.textSecondaryLight),
             ),
             const SizedBox(height: 16),
@@ -2110,7 +2654,14 @@ class _ReceiptDialog extends StatelessWidget {
                 'MMM d, yyyy h:mm a',
               ).format(delivery.createdAt ?? DateTime.now()),
             ),
-            _ReceiptRow(label: 'Donor', value: delivery.recipientName),
+            _ReceiptRow(
+              label: delivery.isBookSale ? 'Buyer' : 'Donor',
+              value: delivery.recipientName,
+            ),
+            if (delivery.isBookSale && delivery.bookTitle != null)
+              _ReceiptRow(label: 'Book', value: delivery.bookTitle!),
+            if (delivery.isBookSale && delivery.bookQuantity != null)
+              _ReceiptRow(label: 'Qty', value: '${delivery.bookQuantity}'),
             _ReceiptRow(
               label: 'Payment Method',
               value: (delivery.paymentMethod ?? 'cash').toUpperCase(),
@@ -2146,7 +2697,7 @@ class _ReceiptDialog extends StatelessWidget {
 
             // Footer
             const Text(
-              'Thank you for your generous donation!',
+              'Thank you!',
               textAlign: TextAlign.center,
               style: TextStyle(fontStyle: FontStyle.italic),
             ),

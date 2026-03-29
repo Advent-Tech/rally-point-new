@@ -289,17 +289,30 @@ class CommandCenterBloc extends Bloc<CommandCenterEvent, CommandCenterState> {
       final response = await _apiClient.get(
         '${ApiConstants.donations}/team/$teamId',
       );
+      final bookSalesResponse = await _apiClient.get(
+        '${ApiConstants.bookSales}/team/$teamId',
+      );
 
-      if (response.statusCode == 200) {
+      if (response.statusCode == 200 || bookSalesResponse.statusCode == 200) {
         final results = _extractList(
           response.data,
           keys: const ['results', 'data', 'donations'],
         );
-
-        return results
+        final donationItems = results
             .whereType<Map<String, dynamic>>()
             .map(DonationModel.fromJson)
             .toList();
+
+        final bookResults = _extractList(
+          bookSalesResponse.data,
+          keys: const ['results', 'data', 'book_sales'],
+        );
+        final bookAsDonations = bookResults
+            .whereType<Map<String, dynamic>>()
+            .map(_bookSaleToDonationModel)
+            .toList();
+
+        return [...donationItems, ...bookAsDonations];
       }
       return null;
     } catch (e) {
@@ -495,5 +508,38 @@ class CommandCenterBloc extends Bloc<CommandCenterEvent, CommandCenterState> {
       'entity_name': entityName,
       'entity_id': entityId,
     };
+  }
+
+  DonationModel _bookSaleToDonationModel(Map<String, dynamic> json) {
+    final receipt = (json['receipt_number'] as String?) ?? '';
+    final totalAmount = (json['total_amount'] as num?)?.toDouble() ?? 0.0;
+
+    return DonationModel.fromJson({
+      'id': json['id'],
+      'session_id': null,
+      'worker_id': json['worker_id'],
+      'worker_name': json['worker_name'] ?? 'Worker',
+      'team_id': json['team_id'],
+      'donor_name': json['buyer_name'] ?? 'Buyer',
+      'donor_phone': json['buyer_phone'],
+      'donor_email': json['buyer_email'],
+      'donor_address': json['buyer_address'] ?? '',
+      'latitude': json['latitude'],
+      'longitude': json['longitude'],
+      'amount': totalAmount,
+      'currency': json['currency'] ?? 'USD',
+      'donation_type': 'book_sale',
+      'purpose': json['book_title'],
+      'payment_method': json['payment_method'] ?? 'cash',
+      'payment_ref': null,
+      'receipt_number': receipt.isEmpty ? 'BOOK-SALE' : receipt,
+      'is_anonymous': false,
+      'notes': json['notes'],
+      'status': (json['status'] == 'completed') ? 'received' : (json['status'] ?? 'received'),
+      'collected_at': json['sold_at'] ?? json['created_at'],
+      'deposited_at': null,
+      'created_at': json['created_at'],
+      'updated_at': json['updated_at'],
+    });
   }
 }

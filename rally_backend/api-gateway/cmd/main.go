@@ -579,6 +579,15 @@ func setupRouter(cfg *config.Config, jwtManager *auth.JWTManager, rateLimiter mi
 			donations.GET("/stats/worker/:workerId", serviceProxy.ProxyRequest("delivery"))
 		}
 
+		// Book sales routes
+		bookSales := protected.Group("/book-sales")
+		{
+			bookSales.GET("/all", serviceProxy.ProxyRequest("delivery"))
+			bookSales.GET("/stats", serviceProxy.ProxyRequest("delivery"))
+			bookSales.GET("/team/:teamId", serviceProxy.ProxyRequest("delivery"))
+			bookSales.GET("/stats/team/:teamId", serviceProxy.ProxyRequest("delivery"))
+		}
+
 		// Prayer request routes
 		prayerRequests := protected.Group("/prayer-requests")
 		{

@@ -175,6 +175,11 @@ class ApiConstants {
   static const String donationsTeam = '/api/donations/team'; // + /{teamId}
   static const String donationsStats = '/api/donations/stats';
 
+  // Book Sale Endpoints
+  static const String bookSales = '/api/book-sales';
+  static const String bookSalesTeam = '/api/book-sales/team'; // + /{teamId}
+  static const String bookSalesStats = '/api/book-sales/stats';
+
   // Notification Endpoints
   static const String notifications = '/api/notifications';
   static const String notificationsDeviceToken =

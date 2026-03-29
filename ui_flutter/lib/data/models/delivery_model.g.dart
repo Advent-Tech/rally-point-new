@@ -45,6 +45,11 @@ DeliveryModel _$DeliveryModelFromJson(Map<String, dynamic> json) =>
       stripePaymentId: json['stripe_payment_id'] as String?,
       receiptNumber: json['receipt_number'] as String?,
       receiptUrl: json['receipt_url'] as String?,
+      bookCode: json['book_code'] as String?,
+      bookTitle: json['book_title'] as String?,
+      bookLanguage: json['book_language'] as String?,
+      bookQuantity: (json['book_quantity'] as num?)?.toInt(),
+      bookUnitPrice: (json['book_unit_price'] as num?)?.toDouble(),
       isOffline: json['is_offline'] as bool? ?? false,
       syncedAt: json['synced_at'] == null
           ? null
@@ -83,6 +88,11 @@ Map<String, dynamic> _$DeliveryModelToJson(DeliveryModel instance) =>
       'stripe_payment_id': instance.stripePaymentId,
       'receipt_number': instance.receiptNumber,
       'receipt_url': instance.receiptUrl,
+      'book_code': instance.bookCode,
+      'book_title': instance.bookTitle,
+      'book_language': instance.bookLanguage,
+      'book_quantity': instance.bookQuantity,
+      'book_unit_price': instance.bookUnitPrice,
       'is_offline': instance.isOffline,
       'synced_at': instance.syncedAt?.toIso8601String(),
       'offline_id': instance.offlineId,
@@ -167,6 +177,11 @@ CreateDeliveryRequest _$CreateDeliveryRequestFromJson(
       householdId: json['household_id'] as String?,
       donationAmount: (json['donation_amount'] as num?)?.toDouble(),
       paymentMethod: json['payment_method'] as String?,
+      bookCode: json['book_code'] as String?,
+      bookTitle: json['book_title'] as String?,
+      bookLanguage: json['book_language'] as String?,
+      bookQuantity: (json['book_quantity'] as num?)?.toInt(),
+      bookUnitPrice: (json['book_unit_price'] as num?)?.toDouble(),
       offlineId: json['offline_id'] as String?,
     );
 
@@ -192,6 +207,11 @@ Map<String, dynamic> _$CreateDeliveryRequestToJson(
       'household_id': instance.householdId,
       'donation_amount': instance.donationAmount,
       'payment_method': instance.paymentMethod,
+      'book_code': instance.bookCode,
+      'book_title': instance.bookTitle,
+      'book_language': instance.bookLanguage,
+      'book_quantity': instance.bookQuantity,
+      'book_unit_price': instance.bookUnitPrice,
       'offline_id': instance.offlineId,
     };
 

@@ -6,7 +6,13 @@ import '../../../../data/models/prayer_request_model.dart';
 
 enum MapMode { overview, workers, territories }
 
-enum MapPopupKind { activityDonation, activityPrayer, territory, worker }
+enum MapPopupKind {
+  activityDonation,
+  activityBookSale,
+  activityPrayer,
+  territory,
+  worker,
+}
 
 class MapPopup extends Equatable {
   final MapPopupKind kind;

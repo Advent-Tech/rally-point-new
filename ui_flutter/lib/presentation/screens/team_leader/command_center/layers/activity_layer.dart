@@ -17,12 +17,15 @@ class ActivityLayer {
     final targets = <ActivityTapTarget>[];
 
     for (final id in _donationRegistry.domainIds) {
+      final donation = _donationRegistry.getEntity(id);
       final annotations = _donationRegistry.getAnnotations(id);
       for (final a in annotations) {
         if (a is CircleAnnotation) {
           targets.add(
             ActivityTapTarget(
-              kind: ActivityTapKind.donation,
+              kind: donation?.donationType == 'book_sale'
+                  ? ActivityTapKind.bookSale
+                  : ActivityTapKind.donation,
               id: id,
               latitude: a.geometry.coordinates.lat.toDouble(),
               longitude: a.geometry.coordinates.lng.toDouble(),
@@ -113,6 +116,7 @@ class ActivityLayer {
           donationModel.latitude != null &&
           donationModel.longitude != null) {
         donationsToRegister.add(MapEntry(donationModel, circlesToAdd.length));
+        final isBookSale = donationModel.donationType == 'book_sale';
         circlesToAdd.add(
           CircleAnnotationOptions(
             geometry: Point(
@@ -121,7 +125,10 @@ class ActivityLayer {
                 donationModel.latitude!,
               ),
             ),
-            circleColor: const Color(0xFF10B981).toARGB32(), // Emerald 500
+            circleColor: (isBookSale
+                    ? const Color(0xFF3B82F6) // blue for books
+                    : const Color(0xFF10B981))
+                .toARGB32(),
             circleRadius: 12.0,
             circleStrokeColor: const Color(0xFFFFFFFF).toARGB32(),
             circleStrokeWidth: 3.0,
@@ -200,7 +207,7 @@ class ActivityLayer {
   }
 }
 
-enum ActivityTapKind { donation, prayer }
+enum ActivityTapKind { donation, bookSale, prayer }
 
 class ActivityTapTarget {
   final ActivityTapKind kind;

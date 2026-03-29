@@ -237,6 +237,15 @@ func setupRouter(deliveryHandler *handler.DeliveryHandler, receiptHandler *handl
 			donations.GET("/stats/worker/:workerId", receiptHandler.GetWorkerDonationStats)
 		}
 
+		// Book sales management (delivery-backed)
+		bookSales := protected.Group("/book-sales")
+		{
+			bookSales.GET("/all", deliveryHandler.GetAllBookSales)
+			bookSales.GET("/stats", deliveryHandler.GetGlobalBookSaleStats)
+			bookSales.GET("/team/:teamId", deliveryHandler.GetTeamBookSales)
+			bookSales.GET("/stats/team/:teamId", deliveryHandler.GetTeamBookSaleStats)
+		}
+
 		// Payment management (Stripe)
 		payments := protected.Group("/payments")
 		{

@@ -130,6 +130,13 @@ type CreateDeliveryRequest struct {
 	DonationAmount float64 `json:"donation_amount,omitempty"` // Amount in cents
 	PaymentMethod  string  `json:"payment_method,omitempty"`  // "cash", "card", "online"
 
+	// Book sale fields (only for delivery_type = "book_sale")
+	BookCode      string  `json:"book_code,omitempty"`
+	BookTitle     string  `json:"book_title,omitempty"`
+	BookLanguage  string  `json:"book_language,omitempty"` // english, spanish
+	BookQuantity  int     `json:"book_quantity,omitempty"`
+	BookUnitPrice float64 `json:"book_unit_price,omitempty"`
+
 	// Offline support
 	OfflineID string `json:"offline_id,omitempty"` // Client-generated ID for offline records
 }
@@ -268,6 +275,42 @@ type DonationDeliveryStats struct {
 	PendingDeposit     float64 `json:"pending_deposit"`
 }
 
+// BookSaleView represents a delivery with delivery_type='book_sale'
+type BookSaleView struct {
+	ID            uuid.UUID  `json:"id"`
+	WorkerID      uuid.UUID  `json:"worker_id"`
+	WorkerName    string     `json:"worker_name"`
+	TeamID        uuid.UUID  `json:"team_id"`
+	BuyerName     string     `json:"buyer_name"`
+	BuyerPhone    *string    `json:"buyer_phone,omitempty"`
+	BuyerEmail    *string    `json:"buyer_email,omitempty"`
+	BuyerAddress  string     `json:"buyer_address,omitempty"`
+	Latitude      float64    `json:"latitude"`
+	Longitude     float64    `json:"longitude"`
+	BookCode      *string    `json:"book_code,omitempty"`
+	BookTitle     string     `json:"book_title"`
+	BookLanguage  *string    `json:"book_language,omitempty"`
+	Quantity      int        `json:"quantity"`
+	UnitPrice     float64    `json:"unit_price"`
+	TotalAmount   float64    `json:"total_amount"`
+	Currency      string     `json:"currency"`
+	PaymentMethod string     `json:"payment_method"`
+	ReceiptNumber string     `json:"receipt_number"`
+	Notes         *string    `json:"notes,omitempty"`
+	Status        string     `json:"status"`
+	SoldAt        *time.Time `json:"sold_at,omitempty"`
+	CreatedAt     time.Time  `json:"created_at"`
+	UpdatedAt     time.Time  `json:"updated_at"`
+}
+
+type BookSaleStats struct {
+	TotalSales   int     `json:"total_sales"`
+	TotalAmount  float64 `json:"total_amount"`
+	TotalBooks   int     `json:"total_books"`
+	AverageSale  float64 `json:"average_sale"`
+	TopBookTitle string  `json:"top_book_title"`
+}
+
 // DeliveryRepository defines the interface for delivery data access
 type DeliveryRepository interface {
 	// Delivery management
@@ -313,6 +356,12 @@ type DeliveryRepository interface {
 	GetGlobalDonationDeliveryStats(days int) (*DonationDeliveryStats, error)
 	GetTeamDonationDeliveryStats(teamID uuid.UUID, days int) (*DonationDeliveryStats, error)
 
+	// Book sale deliveries (delivery_type = 'book_sale')
+	GetAllBookSaleDeliveries(limit, offset int) ([]*Delivery, error)
+	GetTeamBookSaleDeliveries(teamID uuid.UUID, limit, offset int) ([]*Delivery, error)
+	GetGlobalBookSaleStats(days int) (*BookSaleStats, error)
+	GetTeamBookSaleStats(teamID uuid.UUID, days int) (*BookSaleStats, error)
+
 	// Visit counting for achievements
 	GetCompletedVisitCount(workerID uuid.UUID) (int, error)
 	GetCompletedTerritoryCount(workerID uuid.UUID) (int, error)
@@ -353,6 +402,12 @@ type DeliveryService interface {
 	GetTeamDonationDeliveries(teamID uuid.UUID, limit, offset int) ([]*DonationView, error)
 	GetGlobalDonationDeliveryStats(days int) (*DonationDeliveryStats, error)
 	GetTeamDonationDeliveryStats(teamID uuid.UUID, days int) (*DonationDeliveryStats, error)
+
+	// Book sale deliveries (delivery_type = 'book_sale')
+	GetAllBookSales(limit, offset int) ([]*BookSaleView, error)
+	GetTeamBookSales(teamID uuid.UUID, limit, offset int) ([]*BookSaleView, error)
+	GetGlobalBookSaleStats(days int) (*BookSaleStats, error)
+	GetTeamBookSaleStats(teamID uuid.UUID, days int) (*BookSaleStats, error)
 }
 
 // RouteOptimizer defines the interface for route optimization
@@ -380,6 +435,7 @@ const (
 	DeliveryTypeDoorToDoor     = "door_to_door"     // Literature delivery to address
 	DeliveryTypePersonToPerson = "person_to_person" // Direct handoff to specific person
 	DeliveryTypeDonation       = "donation"         // Donation collection
+	DeliveryTypeBookSale       = "book_sale"        // Book sale collection
 
 	// Priority levels
 	PriorityLow    = "low"
