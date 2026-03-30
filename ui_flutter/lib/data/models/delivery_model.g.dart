@@ -140,14 +140,16 @@ Map<String, dynamic> _$DeliveryRouteToJson(DeliveryRoute instance) =>
     };
 
 DeliveryItem _$DeliveryItemFromJson(Map<String, dynamic> json) => DeliveryItem(
-      name: json['name'] as String,
+      itemType: json['item_type'] as String? ?? 'book',
+      name: json['item_name'] as String,
       quantity: (json['quantity'] as num?)?.toInt() ?? 1,
       description: json['description'] as String?,
     );
 
 Map<String, dynamic> _$DeliveryItemToJson(DeliveryItem instance) =>
     <String, dynamic>{
-      'name': instance.name,
+      'item_type': instance.itemType,
+      'item_name': instance.name,
       'quantity': instance.quantity,
       'description': instance.description,
     };

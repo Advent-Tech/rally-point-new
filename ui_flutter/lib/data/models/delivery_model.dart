@@ -315,11 +315,15 @@ class DeliveryRoute {
 
 @JsonSerializable()
 class DeliveryItem {
+  @JsonKey(name: 'item_type')
+  final String itemType;
+  @JsonKey(name: 'item_name')
   final String name;
   final int quantity;
   final String? description;
 
   const DeliveryItem({
+    this.itemType = 'book',
     required this.name,
     this.quantity = 1,
     this.description,

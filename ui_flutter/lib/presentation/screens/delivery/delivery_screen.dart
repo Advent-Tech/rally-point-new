@@ -2026,6 +2026,7 @@ class _RecordBookSaleSheetState extends State<_RecordBookSaleSheet> {
       // Keep one explicit item for backward compatibility with older backend validation.
       items: [
         DeliveryItem(
+          itemType: 'book',
           name: _selectedBook.title,
           quantity: quantity,
           description: 'book_code=${_selectedBook.code};language=$languageLabel',
