@@ -7,6 +7,7 @@ import '../../blocs/work_session/work_session_bloc.dart';
 import '../../blocs/delivery/delivery_bloc.dart';
 import '../../widgets/custom_button.dart';
 import '../../widgets/custom_text_field.dart';
+import '../../widgets/navigation/app_back_button.dart';
 import '../../../data/models/delivery_model.dart';
 
 /// Unified Field Action Screen for quick on-spot tasks
@@ -79,10 +80,7 @@ class _FieldActionScreenState extends State<FieldActionScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Field Actions'),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => context.go('/home'),
-        ),
+        leading: AppBackButton.leading(context, fallbackRoute: '/home'),
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(20),
@@ -101,9 +99,9 @@ class _FieldActionScreenState extends State<FieldActionScreen> {
             // Quick Actions Grid
             Text(
               'Quick Actions',
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.bold,
-              ),
+              style: Theme.of(
+                context,
+              ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 16),
             Row(
@@ -198,7 +196,8 @@ class _FieldActionScreenState extends State<FieldActionScreen> {
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (sheetContext) => _QuickDonationSheet(currentPosition: _currentPosition),
+      builder: (sheetContext) =>
+          _QuickDonationSheet(currentPosition: _currentPosition),
     );
   }
 }
@@ -241,8 +240,8 @@ class _LocationStatusCard extends StatelessWidget {
                   color: isLoading
                       ? AppColors.warning.withOpacity(0.2)
                       : error != null
-                          ? AppColors.error.withOpacity(0.2)
-                          : AppColors.success.withOpacity(0.2),
+                      ? AppColors.error.withOpacity(0.2)
+                      : AppColors.success.withOpacity(0.2),
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: isLoading
@@ -252,7 +251,9 @@ class _LocationStatusCard extends StatelessWidget {
                       )
                     : Icon(
                         error != null ? Icons.location_off : Icons.my_location,
-                        color: error != null ? AppColors.error : AppColors.success,
+                        color: error != null
+                            ? AppColors.error
+                            : AppColors.success,
                         size: 20,
                       ),
               ),
@@ -265,8 +266,8 @@ class _LocationStatusCard extends StatelessWidget {
                       isLoading
                           ? 'Getting Location...'
                           : error != null
-                              ? 'Location Unavailable'
-                              : 'Location Ready',
+                          ? 'Location Unavailable'
+                          : 'Location Ready',
                       style: Theme.of(context).textTheme.titleSmall?.copyWith(
                         fontWeight: FontWeight.bold,
                       ),
@@ -275,23 +276,22 @@ class _LocationStatusCard extends StatelessWidget {
                       Text(
                         '${position!.latitude.toStringAsFixed(5)}, ${position!.longitude.toStringAsFixed(5)}',
                         style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                          color: isDark
+                              ? AppColors.textSecondaryDark
+                              : AppColors.textSecondaryLight,
                         ),
                       )
                     else if (error != null)
                       Text(
                         error!,
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: AppColors.error,
-                        ),
+                        style: Theme.of(
+                          context,
+                        ).textTheme.bodySmall?.copyWith(color: AppColors.error),
                       ),
                   ],
                 ),
               ),
-              IconButton(
-                icon: const Icon(Icons.refresh),
-                onPressed: onRefresh,
-              ),
+              IconButton(icon: const Icon(Icons.refresh), onPressed: onRefresh),
             ],
           ),
           const SizedBox(height: 12),
@@ -300,7 +300,10 @@ class _LocationStatusCard extends StatelessWidget {
             builder: (context, state) {
               final isActive = state is WorkSessionActive;
               return Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 8,
+                ),
                 decoration: BoxDecoration(
                   color: isActive
                       ? AppColors.success.withOpacity(0.1)
@@ -310,7 +313,9 @@ class _LocationStatusCard extends StatelessWidget {
                 child: Row(
                   children: [
                     Icon(
-                      isActive ? Icons.play_circle_filled : Icons.pause_circle_filled,
+                      isActive
+                          ? Icons.play_circle_filled
+                          : Icons.pause_circle_filled,
                       color: isActive ? AppColors.success : AppColors.warning,
                       size: 16,
                     ),
@@ -384,15 +389,17 @@ class _QuickActionTile extends StatelessWidget {
               const SizedBox(height: 12),
               Text(
                 label,
-                style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                  fontWeight: FontWeight.bold,
-                ),
+                style: Theme.of(
+                  context,
+                ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 4),
               Text(
                 description,
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                  color: isDark
+                      ? AppColors.textSecondaryDark
+                      : AppColors.textSecondaryLight,
                 ),
               ),
             ],
@@ -426,20 +433,26 @@ class _RecentActivityList extends StatelessWidget {
             Icon(
               Icons.history,
               size: 48,
-              color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+              color: isDark
+                  ? AppColors.textSecondaryDark
+                  : AppColors.textSecondaryLight,
             ),
             const SizedBox(height: 8),
             Text(
               'No activity today',
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                color: isDark
+                    ? AppColors.textSecondaryDark
+                    : AppColors.textSecondaryLight,
               ),
             ),
             const SizedBox(height: 4),
             Text(
               'Your visits, deliveries, and donations will appear here',
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                color: isDark
+                    ? AppColors.textSecondaryDark
+                    : AppColors.textSecondaryLight,
               ),
               textAlign: TextAlign.center,
             ),
@@ -515,14 +528,17 @@ class _QuickDeliverySheetState extends State<_QuickDeliverySheet> {
                     color: AppColors.accent.withOpacity(0.2),
                     borderRadius: BorderRadius.circular(12),
                   ),
-                  child: const Icon(Icons.local_shipping, color: AppColors.accent),
+                  child: const Icon(
+                    Icons.local_shipping,
+                    color: AppColors.accent,
+                  ),
                 ),
                 const SizedBox(width: 12),
                 Text(
                   'Quick Delivery',
-                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
+                  style: Theme.of(
+                    context,
+                  ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
                 ),
               ],
             ),
@@ -530,7 +546,9 @@ class _QuickDeliverySheetState extends State<_QuickDeliverySheet> {
             Text(
               'Create and complete a delivery in one step',
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                color: isDark
+                    ? AppColors.textSecondaryDark
+                    : AppColors.textSecondaryLight,
               ),
             ),
             const SizedBox(height: 24),
@@ -538,9 +556,9 @@ class _QuickDeliverySheetState extends State<_QuickDeliverySheet> {
             // Delivery Type
             Text(
               'Delivery Type',
-              style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                fontWeight: FontWeight.w600,
-              ),
+              style: Theme.of(
+                context,
+              ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
             ),
             const SizedBox(height: 8),
             Row(
@@ -559,7 +577,8 @@ class _QuickDeliverySheetState extends State<_QuickDeliverySheet> {
                     icon: Icons.person_pin_circle,
                     label: 'Person to Person',
                     isSelected: _deliveryType == 'person_to_person',
-                    onTap: () => setState(() => _deliveryType = 'person_to_person'),
+                    onTap: () =>
+                        setState(() => _deliveryType = 'person_to_person'),
                   ),
                 ),
               ],
@@ -586,13 +605,17 @@ class _QuickDeliverySheetState extends State<_QuickDeliverySheet> {
             if (widget.currentPosition != null)
               Row(
                 children: [
-                  const Icon(Icons.check_circle, size: 14, color: AppColors.success),
+                  const Icon(
+                    Icons.check_circle,
+                    size: 14,
+                    color: AppColors.success,
+                  ),
                   const SizedBox(width: 6),
                   Text(
                     'GPS location will be recorded',
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: AppColors.success,
-                    ),
+                    style: Theme.of(
+                      context,
+                    ).textTheme.bodySmall?.copyWith(color: AppColors.success),
                   ),
                 ],
               )
@@ -603,9 +626,9 @@ class _QuickDeliverySheetState extends State<_QuickDeliverySheet> {
                   const SizedBox(width: 6),
                   Text(
                     'No GPS location available',
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: AppColors.warning,
-                    ),
+                    style: Theme.of(
+                      context,
+                    ).textTheme.bodySmall?.copyWith(color: AppColors.warning),
                   ),
                 ],
               ),
@@ -662,7 +685,9 @@ class _TypeOption extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
         decoration: BoxDecoration(
-          color: isSelected ? AppColors.primary.withOpacity(0.1) : Colors.transparent,
+          color: isSelected
+              ? AppColors.primary.withOpacity(0.1)
+              : Colors.transparent,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
             color: isSelected ? AppColors.primary : AppColors.borderLight,
@@ -675,7 +700,9 @@ class _TypeOption extends StatelessWidget {
             Icon(
               icon,
               size: 20,
-              color: isSelected ? AppColors.primary : AppColors.textSecondaryLight,
+              color: isSelected
+                  ? AppColors.primary
+                  : AppColors.textSecondaryLight,
             ),
             const SizedBox(width: 6),
             Text(
@@ -758,14 +785,17 @@ class _QuickDonationSheetState extends State<_QuickDonationSheet> {
                     color: AppColors.success.withOpacity(0.2),
                     borderRadius: BorderRadius.circular(12),
                   ),
-                  child: const Icon(Icons.volunteer_activism, color: AppColors.success),
+                  child: const Icon(
+                    Icons.volunteer_activism,
+                    color: AppColors.success,
+                  ),
                 ),
                 const SizedBox(width: 12),
                 Text(
                   'Collect Donation',
-                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
+                  style: Theme.of(
+                    context,
+                  ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
                 ),
               ],
             ),
@@ -773,7 +803,9 @@ class _QuickDonationSheetState extends State<_QuickDonationSheet> {
             Text(
               'Record donation with GPS location',
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                color: isDark
+                    ? AppColors.textSecondaryDark
+                    : AppColors.textSecondaryLight,
               ),
             ),
             const SizedBox(height: 24),
@@ -806,9 +838,9 @@ class _QuickDonationSheetState extends State<_QuickDonationSheet> {
             // Payment Type
             Text(
               'Payment Type',
-              style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                fontWeight: FontWeight.w600,
-              ),
+              style: Theme.of(
+                context,
+              ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
             ),
             const SizedBox(height: 8),
             Row(
@@ -847,13 +879,17 @@ class _QuickDonationSheetState extends State<_QuickDonationSheet> {
             if (widget.currentPosition != null)
               Row(
                 children: [
-                  const Icon(Icons.check_circle, size: 14, color: AppColors.success),
+                  const Icon(
+                    Icons.check_circle,
+                    size: 14,
+                    color: AppColors.success,
+                  ),
                   const SizedBox(width: 6),
                   Text(
                     'GPS location will be recorded',
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: AppColors.success,
-                    ),
+                    style: Theme.of(
+                      context,
+                    ).textTheme.bodySmall?.copyWith(color: AppColors.success),
                   ),
                 ],
               )
@@ -864,9 +900,9 @@ class _QuickDonationSheetState extends State<_QuickDonationSheet> {
                   const SizedBox(width: 6),
                   Text(
                     'No GPS location available',
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: AppColors.warning,
-                    ),
+                    style: Theme.of(
+                      context,
+                    ).textTheme.bodySmall?.copyWith(color: AppColors.warning),
                   ),
                 ],
               ),

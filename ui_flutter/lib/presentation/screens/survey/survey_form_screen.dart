@@ -66,7 +66,9 @@ class _SurveyFormScreenState extends State<SurveyFormScreen> {
         permission = await Geolocator.requestPermission();
         if (permission == LocationPermission.denied) {
           if (widget.survey.requiresLocation) {
-            _showLocationError('Location permission is required for this survey');
+            _showLocationError(
+              'Location permission is required for this survey',
+            );
           }
           return;
         }
@@ -74,7 +76,9 @@ class _SurveyFormScreenState extends State<SurveyFormScreen> {
 
       if (permission == LocationPermission.deniedForever) {
         if (widget.survey.requiresLocation) {
-          _showLocationError('Location permission is permanently denied. Please enable it in settings.');
+          _showLocationError(
+            'Location permission is permanently denied. Please enable it in settings.',
+          );
         }
         return;
       }
@@ -122,7 +126,8 @@ class _SurveyFormScreenState extends State<SurveyFormScreen> {
     }
 
     // Check if location is required
-    if (widget.survey.requiresLocation && (_latitude == null || _longitude == null)) {
+    if (widget.survey.requiresLocation &&
+        (_latitude == null || _longitude == null)) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: const Text('This survey requires your GPS location'),
@@ -160,28 +165,33 @@ class _SurveyFormScreenState extends State<SurveyFormScreen> {
     for (final question in _questions) {
       final answer = _answers[question.id];
       if (answer != null) {
-        final answerMap = <String, dynamic>{
-          'question_id': question.id,
-        };
+        final answerMap = <String, dynamic>{'question_id': question.id};
 
         if (question.isChoiceQuestion) {
           // Radio, checkbox, select questions
           if (answer is List) {
-            answerMap['selected_options'] = answer.map((e) => e?.toString() ?? '').where((e) => e.isNotEmpty).toList();
+            answerMap['selected_options'] = answer
+                .map((e) => e?.toString() ?? '')
+                .where((e) => e.isNotEmpty)
+                .toList();
           } else {
             answerMap['selected_options'] = [answer.toString()];
           }
         } else if (question.isPhotoQuestion) {
           // Photo question - list of photo paths/urls
           if (answer is List) {
-            answerMap['photo_urls'] = answer.map((e) => e?.toString() ?? '').where((e) => e.isNotEmpty).toList();
+            answerMap['photo_urls'] = answer
+                .map((e) => e?.toString() ?? '')
+                .where((e) => e.isNotEmpty)
+                .toList();
           } else {
             answerMap['photo_urls'] = <String>[];
           }
         } else if (question.isSignatureQuestion) {
           // Signature question - convert Uint8List to base64 string
           if (answer is Uint8List) {
-            answerMap['signature_url'] = 'data:image/png;base64,${base64Encode(answer)}';
+            answerMap['signature_url'] =
+                'data:image/png;base64,${base64Encode(answer)}';
           } else if (answer is String && answer.isNotEmpty) {
             answerMap['signature_url'] = answer;
           } else {
@@ -202,12 +212,14 @@ class _SurveyFormScreenState extends State<SurveyFormScreen> {
       }
     }
 
-    context.read<SurveyBloc>().add(SurveySubmit(
-      surveyId: widget.survey.id,
-      answers: answersList,
-      latitude: _latitude,
-      longitude: _longitude,
-    ));
+    context.read<SurveyBloc>().add(
+      SurveySubmit(
+        surveyId: widget.survey.id,
+        answers: answersList,
+        latitude: _latitude,
+        longitude: _longitude,
+      ),
+    );
   }
 
   bool _hasAnswer(SurveyQuestion question) {
@@ -242,7 +254,7 @@ class _SurveyFormScreenState extends State<SurveyFormScreen> {
         appBar: AppBar(
           title: Text(widget.survey.title),
           leading: IconButton(
-            icon: const Icon(Icons.close),
+            icon: const Icon(Icons.arrow_back),
             onPressed: () => _showExitConfirmation(context),
           ),
         ),
@@ -272,11 +284,12 @@ class _SurveyFormScreenState extends State<SurveyFormScreen> {
                         children: [
                           Text(
                             'Question ${_currentQuestionIndex + 1} of ${_questions.length}',
-                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                              color: isDark
-                                  ? AppColors.textSecondaryDark
-                                  : AppColors.textSecondaryLight,
-                            ),
+                            style: Theme.of(context).textTheme.bodySmall
+                                ?.copyWith(
+                                  color: isDark
+                                      ? AppColors.textSecondaryDark
+                                      : AppColors.textSecondaryLight,
+                                ),
                           ),
                           if (_latitude != null)
                             Row(
@@ -289,10 +302,11 @@ class _SurveyFormScreenState extends State<SurveyFormScreen> {
                                 const SizedBox(width: 4),
                                 Text(
                                   'Location captured',
-                                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                    color: AppColors.success,
-                                    fontSize: 11,
-                                  ),
+                                  style: Theme.of(context).textTheme.bodySmall
+                                      ?.copyWith(
+                                        color: AppColors.success,
+                                        fontSize: 11,
+                                      ),
                                 ),
                               ],
                             ),
@@ -362,7 +376,9 @@ class _SurveyFormScreenState extends State<SurveyFormScreen> {
                                     text: 'Next',
                                     onPressed: () {
                                       _pageController.nextPage(
-                                        duration: const Duration(milliseconds: 300),
+                                        duration: const Duration(
+                                          milliseconds: 300,
+                                        ),
                                         curve: Curves.easeInOut,
                                       );
                                     },
@@ -370,7 +386,9 @@ class _SurveyFormScreenState extends State<SurveyFormScreen> {
                                 : CustomButton(
                                     text: 'Submit',
                                     isLoading: _isSubmitting,
-                                    onPressed: _isSubmitting ? null : _submitSurvey,
+                                    onPressed: _isSubmitting
+                                        ? null
+                                        : _submitSurvey,
                                   ),
                           ),
                         ],
@@ -394,9 +412,9 @@ class _SurveyFormScreenState extends State<SurveyFormScreen> {
             const SizedBox(height: 24),
             Text(
               'No Questions',
-              style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                fontWeight: FontWeight.bold,
-              ),
+              style: Theme.of(
+                context,
+              ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 8),
             const Text(
@@ -404,10 +422,7 @@ class _SurveyFormScreenState extends State<SurveyFormScreen> {
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 24),
-            CustomButton(
-              text: 'Go Back',
-              onPressed: () => context.pop(),
-            ),
+            CustomButton(text: 'Go Back', onPressed: () => context.pop()),
           ],
         ),
       ),
@@ -425,9 +440,9 @@ class _SurveyFormScreenState extends State<SurveyFormScreen> {
             Expanded(
               child: Text(
                 question.text,
-                style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                  fontWeight: FontWeight.w600,
-                ),
+                style: Theme.of(
+                  context,
+                ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w600),
               ),
             ),
             if (question.isRequired)
@@ -469,13 +484,16 @@ class _SurveyFormScreenState extends State<SurveyFormScreen> {
 
         // Auto-advance for single-select questions (radio, boolean, select, rating)
         // but not for checkbox (multiple select) or text fields
-        final isSingleSelect = question.questionType == QuestionType.radio ||
+        final isSingleSelect =
+            question.questionType == QuestionType.radio ||
             question.questionType == QuestionType.boolean ||
             question.questionType == QuestionType.yesNo ||
             question.questionType == QuestionType.select ||
             question.questionType == QuestionType.rating;
 
-        if (isSingleSelect && value != null && _currentQuestionIndex < _questions.length - 1) {
+        if (isSingleSelect &&
+            value != null &&
+            _currentQuestionIndex < _questions.length - 1) {
           // Small delay to show the selection before advancing
           Future.delayed(const Duration(milliseconds: 350), () {
             if (mounted) {
@@ -504,9 +522,7 @@ class _SurveyFormScreenState extends State<SurveyFormScreen> {
             child: const Text('Cancel'),
           ),
           ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.error,
-            ),
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.error),
             onPressed: () {
               Navigator.pop(ctx);
               context.pop();

@@ -41,7 +41,8 @@ class _CreateSurveyScreenState extends State<CreateSurveyScreen> {
       final storage = await LocalStorage.getInstance();
       final userData = storage.getUserData();
       setState(() {
-        _teamId = userData?['team_id']?.toString() ?? userData?['teamId']?.toString();
+        _teamId =
+            userData?['team_id']?.toString() ?? userData?['teamId']?.toString();
         _isLoadingTeam = false;
       });
     } catch (e) {
@@ -51,12 +52,14 @@ class _CreateSurveyScreenState extends State<CreateSurveyScreen> {
 
   void _addQuestion() {
     setState(() {
-      _questions.add(_QuestionData(
-        textController: TextEditingController(),
-        questionType: 'text',
-        isRequired: false,
-        options: [],
-      ));
+      _questions.add(
+        _QuestionData(
+          textController: TextEditingController(),
+          questionType: 'text',
+          isRequired: false,
+          options: [],
+        ),
+      );
     });
   }
 
@@ -153,10 +156,7 @@ class _CreateSurveyScreenState extends State<CreateSurveyScreen> {
       },
       failure: (error, _) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(error),
-            backgroundColor: AppColors.error,
-          ),
+          SnackBar(content: Text(error), backgroundColor: AppColors.error),
         );
       },
     );
@@ -180,7 +180,7 @@ class _CreateSurveyScreenState extends State<CreateSurveyScreen> {
       appBar: AppBar(
         title: const Text('Create Survey'),
         leading: IconButton(
-          icon: const Icon(Icons.close),
+          icon: const Icon(Icons.arrow_back),
           onPressed: () => _showExitConfirmation(context),
         ),
         actions: [
@@ -200,125 +200,76 @@ class _CreateSurveyScreenState extends State<CreateSurveyScreen> {
       body: _isLoadingTeam
           ? const Center(child: CircularProgressIndicator())
           : _teamId == null || _teamId!.isEmpty
-              ? _buildNoTeamState(context)
-              : Form(
-                  key: _formKey,
-                  child: ListView(
+          ? _buildNoTeamState(context)
+          : Form(
+              key: _formKey,
+              child: ListView(
+                padding: const EdgeInsets.all(16),
+                children: [
+                  // Survey Details Section
+                  _buildSectionHeader('Survey Details', Icons.info_outline),
+                  const SizedBox(height: 12),
+                  CustomTextField(
+                    controller: _titleController,
+                    label: 'Survey Title',
+                    hint: 'Enter a descriptive title',
+                    prefixIcon: Icons.title,
+                    validator: (value) {
+                      if (value == null || value.trim().isEmpty) {
+                        return 'Title is required';
+                      }
+                      return null;
+                    },
+                  ),
+                  const SizedBox(height: 16),
+                  CustomTextField(
+                    controller: _descriptionController,
+                    label: 'Description (Optional)',
+                    hint: 'Describe the purpose of this survey',
+                    prefixIcon: Icons.description_outlined,
+                    maxLines: 3,
+                  ),
+                  const SizedBox(height: 16),
+
+                  // Requires Location Toggle
+                  Container(
                     padding: const EdgeInsets.all(16),
-                    children: [
-                      // Survey Details Section
-                      _buildSectionHeader('Survey Details', Icons.info_outline),
-                      const SizedBox(height: 12),
-                      CustomTextField(
-                        controller: _titleController,
-                        label: 'Survey Title',
-                        hint: 'Enter a descriptive title',
-                        prefixIcon: Icons.title,
-                        validator: (value) {
-                          if (value == null || value.trim().isEmpty) {
-                            return 'Title is required';
-                          }
-                          return null;
-                        },
+                    decoration: BoxDecoration(
+                      color: isDark
+                          ? AppColors.surfaceDark
+                          : AppColors.surfaceLight,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: isDark
+                            ? AppColors.borderDark
+                            : AppColors.borderLight,
                       ),
-                      const SizedBox(height: 16),
-                      CustomTextField(
-                        controller: _descriptionController,
-                        label: 'Description (Optional)',
-                        hint: 'Describe the purpose of this survey',
-                        prefixIcon: Icons.description_outlined,
-                        maxLines: 3,
-                      ),
-                      const SizedBox(height: 16),
-
-                      // Requires Location Toggle
-                      Container(
-                        padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(
-                          color: isDark ? AppColors.surfaceDark : AppColors.surfaceLight,
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(
-                            color: isDark ? AppColors.borderDark : AppColors.borderLight,
+                    ),
+                    child: Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: AppColors.primary.withAlpha(20),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: const Icon(
+                            Icons.location_on,
+                            color: AppColors.primary,
+                            size: 24,
                           ),
                         ),
-                        child: Row(
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.all(8),
-                              decoration: BoxDecoration(
-                                color: AppColors.primary.withAlpha(20),
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: const Icon(
-                                Icons.location_on,
-                                color: AppColors.primary,
-                                size: 24,
-                              ),
-                            ),
-                            const SizedBox(width: 16),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  const Text(
-                                    'Require GPS Location',
-                                    style: TextStyle(fontWeight: FontWeight.w600),
-                                  ),
-                                  Text(
-                                    'Workers must be at the location to submit',
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      color: isDark
-                                          ? AppColors.textSecondaryDark
-                                          : AppColors.textSecondaryLight,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            Switch(
-                              value: _requiresLocation,
-                              onChanged: (value) {
-                                setState(() => _requiresLocation = value);
-                              },
-                              activeColor: AppColors.primary,
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 32),
-
-                      // Questions Section
-                      Row(
-                        children: [
-                          Expanded(
-                            child: _buildSectionHeader('Questions', Icons.quiz_outlined),
-                          ),
-                          TextButton.icon(
-                            onPressed: _addQuestion,
-                            icon: const Icon(Icons.add, size: 18),
-                            label: const Text('Add Question'),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-
-                      // Drag hint
-                      if (_questions.length > 1)
-                        Padding(
-                          padding: const EdgeInsets.only(bottom: 8),
-                          child: Row(
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Icon(
-                                Icons.drag_indicator,
-                                size: 16,
-                                color: isDark
-                                    ? AppColors.textSecondaryDark
-                                    : AppColors.textSecondaryLight,
+                              const Text(
+                                'Require GPS Location',
+                                style: TextStyle(fontWeight: FontWeight.w600),
                               ),
-                              const SizedBox(width: 4),
                               Text(
-                                'Drag to reorder questions',
+                                'Workers must be at the location to submit',
                                 style: TextStyle(
                                   fontSize: 12,
                                   color: isDark
@@ -329,74 +280,132 @@ class _CreateSurveyScreenState extends State<CreateSurveyScreen> {
                             ],
                           ),
                         ),
+                        Switch(
+                          value: _requiresLocation,
+                          onChanged: (value) {
+                            setState(() => _requiresLocation = value);
+                          },
+                          activeColor: AppColors.primary,
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 32),
 
-                      // Questions List with drag-drop reordering
-                      ReorderableListView.builder(
-                        shrinkWrap: true,
-                        physics: const NeverScrollableScrollPhysics(),
-                        buildDefaultDragHandles: false,
-                        itemCount: _questions.length,
-                        onReorder: (oldIndex, newIndex) {
-                          setState(() {
-                            if (newIndex > oldIndex) {
-                              newIndex -= 1;
-                            }
-                            final item = _questions.removeAt(oldIndex);
-                            _questions.insert(newIndex, item);
-                          });
-                        },
-                        proxyDecorator: (child, index, animation) {
-                          return Material(
-                            elevation: 4,
-                            color: Colors.transparent,
-                            borderRadius: BorderRadius.circular(12),
-                            child: child,
-                          );
-                        },
-                        itemBuilder: (context, index) {
-                          return ReorderableDragStartListener(
-                            key: ValueKey('question_${_questions[index].hashCode}'),
-                            index: index,
-                            child: _QuestionCard(
-                              index: index,
-                              data: _questions[index],
-                              isDark: isDark,
-                              onRemove: () => _removeQuestion(index),
-                              onChanged: () => setState(() {}),
-                              showDragHandle: _questions.length > 1,
-                            ),
-                          );
-                        },
-                      ),
-
-                      const SizedBox(height: 24),
-
-                      // Add Question Button
-                      OutlinedButton.icon(
-                        onPressed: _addQuestion,
-                        icon: const Icon(Icons.add),
-                        label: const Text('Add Another Question'),
-                        style: OutlinedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(vertical: 16),
-                          side: BorderSide(
-                            color: isDark ? AppColors.borderDark : AppColors.borderLight,
-                          ),
+                  // Questions Section
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _buildSectionHeader(
+                          'Questions',
+                          Icons.quiz_outlined,
                         ),
                       ),
-
-                      const SizedBox(height: 32),
-
-                      // Create Button
-                      CustomButton(
-                        text: 'Create Survey',
-                        isLoading: _isLoading,
-                        onPressed: _isLoading ? null : _createSurvey,
+                      TextButton.icon(
+                        onPressed: _addQuestion,
+                        icon: const Icon(Icons.add, size: 18),
+                        label: const Text('Add Question'),
                       ),
-
-                      const SizedBox(height: 32),
                     ],
                   ),
-                ),
+                  const SizedBox(height: 12),
+
+                  // Drag hint
+                  if (_questions.length > 1)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.drag_indicator,
+                            size: 16,
+                            color: isDark
+                                ? AppColors.textSecondaryDark
+                                : AppColors.textSecondaryLight,
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            'Drag to reorder questions',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: isDark
+                                  ? AppColors.textSecondaryDark
+                                  : AppColors.textSecondaryLight,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+
+                  // Questions List with drag-drop reordering
+                  ReorderableListView.builder(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    buildDefaultDragHandles: false,
+                    itemCount: _questions.length,
+                    onReorder: (oldIndex, newIndex) {
+                      setState(() {
+                        if (newIndex > oldIndex) {
+                          newIndex -= 1;
+                        }
+                        final item = _questions.removeAt(oldIndex);
+                        _questions.insert(newIndex, item);
+                      });
+                    },
+                    proxyDecorator: (child, index, animation) {
+                      return Material(
+                        elevation: 4,
+                        color: Colors.transparent,
+                        borderRadius: BorderRadius.circular(12),
+                        child: child,
+                      );
+                    },
+                    itemBuilder: (context, index) {
+                      return ReorderableDragStartListener(
+                        key: ValueKey('question_${_questions[index].hashCode}'),
+                        index: index,
+                        child: _QuestionCard(
+                          index: index,
+                          data: _questions[index],
+                          isDark: isDark,
+                          onRemove: () => _removeQuestion(index),
+                          onChanged: () => setState(() {}),
+                          showDragHandle: _questions.length > 1,
+                        ),
+                      );
+                    },
+                  ),
+
+                  const SizedBox(height: 24),
+
+                  // Add Question Button
+                  OutlinedButton.icon(
+                    onPressed: _addQuestion,
+                    icon: const Icon(Icons.add),
+                    label: const Text('Add Another Question'),
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      side: BorderSide(
+                        color: isDark
+                            ? AppColors.borderDark
+                            : AppColors.borderLight,
+                      ),
+                    ),
+                  ),
+
+                  const SizedBox(height: 32),
+
+                  // Create Button
+                  CustomButton(
+                    text: 'Create Survey',
+                    isLoading: _isLoading,
+                    onPressed: _isLoading ? null : _createSurvey,
+                  ),
+
+                  const SizedBox(height: 32),
+                ],
+              ),
+            ),
     );
   }
 
@@ -407,9 +416,9 @@ class _CreateSurveyScreenState extends State<CreateSurveyScreen> {
         const SizedBox(width: 8),
         Text(
           title,
-          style: Theme.of(context).textTheme.titleMedium?.copyWith(
-            fontWeight: FontWeight.bold,
-          ),
+          style: Theme.of(
+            context,
+          ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
         ),
       ],
     );
@@ -438,9 +447,9 @@ class _CreateSurveyScreenState extends State<CreateSurveyScreen> {
             const SizedBox(height: 24),
             Text(
               'No Team',
-              style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                fontWeight: FontWeight.bold,
-              ),
+              style: Theme.of(
+                context,
+              ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 8),
             const Text(
@@ -448,10 +457,7 @@ class _CreateSurveyScreenState extends State<CreateSurveyScreen> {
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 24),
-            CustomButton(
-              text: 'Go Back',
-              onPressed: () => context.pop(),
-            ),
+            CustomButton(text: 'Go Back', onPressed: () => context.pop()),
           ],
         ),
       ),
@@ -459,7 +465,9 @@ class _CreateSurveyScreenState extends State<CreateSurveyScreen> {
   }
 
   void _showExitConfirmation(BuildContext context) {
-    if (_titleController.text.isEmpty && _questions.length == 1 && _questions[0].textController.text.isEmpty) {
+    if (_titleController.text.isEmpty &&
+        _questions.length == 1 &&
+        _questions[0].textController.text.isEmpty) {
       context.pop();
       return;
     }
@@ -545,8 +553,16 @@ class _QuestionCardState extends State<_QuestionCard> {
     {'value': 'textarea', 'label': 'Long Text', 'icon': Icons.notes},
     {'value': 'number', 'label': 'Number', 'icon': Icons.numbers},
     {'value': 'date', 'label': 'Date', 'icon': Icons.calendar_today},
-    {'value': 'select', 'label': 'Dropdown', 'icon': Icons.arrow_drop_down_circle},
-    {'value': 'radio', 'label': 'Single Choice', 'icon': Icons.radio_button_checked},
+    {
+      'value': 'select',
+      'label': 'Dropdown',
+      'icon': Icons.arrow_drop_down_circle,
+    },
+    {
+      'value': 'radio',
+      'label': 'Single Choice',
+      'icon': Icons.radio_button_checked,
+    },
     {'value': 'checkbox', 'label': 'Multiple Choice', 'icon': Icons.check_box},
     {'value': 'boolean', 'label': 'Yes/No', 'icon': Icons.toggle_on},
     {'value': 'rating', 'label': 'Rating (1-5)', 'icon': Icons.star},
@@ -633,7 +649,10 @@ class _QuestionCardState extends State<_QuestionCard> {
                   ),
                 ),
                 IconButton(
-                  icon: const Icon(Icons.delete_outline, color: AppColors.error),
+                  icon: const Icon(
+                    Icons.delete_outline,
+                    color: AppColors.error,
+                  ),
                   onPressed: widget.onRemove,
                   tooltip: 'Remove question',
                 ),
@@ -660,8 +679,9 @@ class _QuestionCardState extends State<_QuestionCard> {
                 ),
                 prefixIcon: Icon(
                   _questionTypes.firstWhere(
-                    (t) => t['value'] == widget.data.questionType,
-                  )['icon'] as IconData,
+                        (t) => t['value'] == widget.data.questionType,
+                      )['icon']
+                      as IconData,
                 ),
               ),
               items: _questionTypes.map((type) {
@@ -720,7 +740,10 @@ class _QuestionCardState extends State<_QuestionCard> {
               ...List.generate(widget.data.options.length, (index) {
                 return Container(
                   margin: const EdgeInsets.only(bottom: 8),
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 8,
+                  ),
                   decoration: BoxDecoration(
                     color: widget.isDark
                         ? AppColors.surfaceDark
@@ -738,8 +761,8 @@ class _QuestionCardState extends State<_QuestionCard> {
                         widget.data.questionType == 'radio'
                             ? Icons.radio_button_off
                             : widget.data.questionType == 'select'
-                                ? Icons.circle_outlined
-                                : Icons.check_box_outline_blank,
+                            ? Icons.circle_outlined
+                            : Icons.check_box_outline_blank,
                         size: 18,
                         color: AppColors.textSecondaryLight,
                       ),

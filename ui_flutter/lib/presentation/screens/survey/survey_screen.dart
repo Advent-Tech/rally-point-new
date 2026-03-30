@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:showcaseview/showcaseview.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/storage/local_storage.dart';
 import '../../../data/models/survey_model.dart';
+import '../../../services/coach_marks_service.dart';
 import '../../blocs/auth/auth_bloc.dart';
 import '../../blocs/survey/survey_bloc.dart';
-import '../../widgets/custom_button.dart';
 import '../../widgets/role_badge.dart';
 import '../../widgets/states/empty_state.dart';
 import 'survey_form_screen.dart';
@@ -26,6 +27,9 @@ class _SurveyScreenState extends State<SurveyScreen>
   bool _isTeamLeader = false;
   bool _isInitialized = false;
   String? _teamId;
+  bool _coachMarksChecked = false;
+  final _showcaseSurveyTabs = GlobalKey();
+  final _showcaseSurveyList = GlobalKey();
 
   @override
   void initState() {
@@ -48,6 +52,24 @@ class _SurveyScreenState extends State<SurveyScreen>
     context.read<SurveyBloc>().add(
       SurveyRefresh(isLeader: _isTeamLeader, teamId: _teamId),
     );
+  }
+
+  void _maybeShowCoachMarks() {
+    if (_coachMarksChecked) return;
+    _coachMarksChecked = true;
+
+    final stepId = _isTeamLeader ? 'survey_leader' : 'survey_worker';
+    CoachMarksService().hasBeenShown(stepId).then((shown) {
+      if (shown || !mounted) return;
+      Future.delayed(const Duration(milliseconds: 800), () {
+        if (!mounted) return;
+        final sequence = _isTeamLeader
+            ? [_showcaseSurveyList]
+            : [_showcaseSurveyTabs, _showcaseSurveyList];
+        ShowcaseView.get().startShowCase(sequence);
+        CoachMarksService().markAsShown(stepId);
+      });
+    });
   }
 
   Future<void> _checkIfTeamLeader() async {
@@ -155,101 +177,129 @@ class _SurveyScreenState extends State<SurveyScreen>
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Surveys'),
-        // Only show tabs for workers (Available + My Responses)
-        // Leaders get a single view with no tabs
-        bottom: _isTeamLeader
-            ? null
-            : TabBar(
-                controller: _tabController,
-                tabs: const [
-                  Tab(text: 'Available'),
-                  Tab(text: 'My Responses'),
-                ],
-              ),
-        actions: [
-          const RoleBadge(),
-          IconButton(icon: const Icon(Icons.refresh), onPressed: _loadSurveys),
-        ],
-      ),
-      // NOTE: FAB removed - survey creation is now admin-only via admin panel
-      body: BlocBuilder<SurveyBloc, SurveyState>(
-        builder: (context, state) {
-          if (state is SurveyLoading) {
-            return const Center(child: CircularProgressIndicator());
-          }
-
-          if (state is SurveyError) {
-            return Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Icon(
-                    Icons.error_outline,
-                    size: 64,
-                    color: AppColors.error,
+    return ShowCaseWidget(
+      onFinish: () {},
+      enableAutoScroll: true,
+      builder: (_) {
+        _maybeShowCoachMarks();
+        return Scaffold(
+          appBar: AppBar(
+            title: const Text('Surveys'),
+            // Only show tabs for workers (Available + My Responses)
+            // Leaders get a single view with no tabs
+            bottom: _isTeamLeader
+                ? null
+                : PreferredSize(
+                    preferredSize: const Size.fromHeight(kTextTabBarHeight),
+                    child: Showcase(
+                      key: _showcaseSurveyTabs,
+                      title: 'Survey Tabs',
+                      description:
+                          'Switch between available surveys and your submitted responses.',
+                      child: TabBar(
+                        controller: _tabController,
+                        tabs: const [
+                          Tab(text: 'Available'),
+                          Tab(text: 'My Responses'),
+                        ],
+                      ),
+                    ),
                   ),
-                  const SizedBox(height: 16),
-                  Text(state.message),
-                  const SizedBox(height: 16),
-                  ElevatedButton(
-                    onPressed: () {
-                      context.read<SurveyBloc>().add(
-                        SurveyRefresh(isLeader: false, teamId: null),
-                      );
-                    },
-                    child: const Text('Retry'),
-                  ),
-                ],
+            actions: [
+              const RoleBadge(),
+              IconButton(
+                icon: const Icon(Icons.refresh),
+                onPressed: _loadSurveys,
               ),
-            );
-          }
-
-          if (state is SurveyLoaded) {
-            // Leaders see a single list view, workers see tabs
-            if (_isTeamLeader) {
-              return _AvailableSurveysTab(
-                isDark: isDark,
-                surveys: state.availableSurveys,
-                isLeader: true,
-              );
-            }
-            return TabBarView(
-              controller: _tabController,
-              children: [
-                _AvailableSurveysTab(
-                  isDark: isDark,
-                  surveys: state.availableSurveys,
-                  isLeader: false,
-                ),
-                _MyResponsesTab(isDark: isDark, responses: state.myResponses),
-              ],
-            );
-          }
-
-          // Default empty state
-          if (_isTeamLeader) {
-            return _AvailableSurveysTab(
-              isDark: isDark,
-              surveys: const [],
-              isLeader: true,
-            );
-          }
-          return TabBarView(
-            controller: _tabController,
-            children: [
-              _AvailableSurveysTab(
-                isDark: isDark,
-                surveys: const [],
-                isLeader: false,
-              ),
-              _MyResponsesTab(isDark: isDark, responses: const []),
             ],
-          );
-        },
-      ),
+          ),
+          // NOTE: FAB removed - survey creation is now admin-only via admin panel
+          body: Showcase(
+            key: _showcaseSurveyList,
+            title: 'Survey List',
+            description:
+                'Open a survey to fill it out or review submitted responses and details.',
+            child: BlocBuilder<SurveyBloc, SurveyState>(
+              builder: (context, state) {
+                if (state is SurveyLoading) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+
+                if (state is SurveyError) {
+                  return Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Icon(
+                          Icons.error_outline,
+                          size: 64,
+                          color: AppColors.error,
+                        ),
+                        const SizedBox(height: 16),
+                        Text(state.message),
+                        const SizedBox(height: 16),
+                        ElevatedButton(
+                          onPressed: () {
+                            context.read<SurveyBloc>().add(
+                              SurveyRefresh(isLeader: false, teamId: null),
+                            );
+                          },
+                          child: const Text('Retry'),
+                        ),
+                      ],
+                    ),
+                  );
+                }
+
+                if (state is SurveyLoaded) {
+                  // Leaders see a single list view, workers see tabs
+                  if (_isTeamLeader) {
+                    return _AvailableSurveysTab(
+                      isDark: isDark,
+                      surveys: state.availableSurveys,
+                      isLeader: true,
+                    );
+                  }
+                  return TabBarView(
+                    controller: _tabController,
+                    children: [
+                      _AvailableSurveysTab(
+                        isDark: isDark,
+                        surveys: state.availableSurveys,
+                        isLeader: false,
+                      ),
+                      _MyResponsesTab(
+                        isDark: isDark,
+                        responses: state.myResponses,
+                      ),
+                    ],
+                  );
+                }
+
+                // Default empty state
+                if (_isTeamLeader) {
+                  return _AvailableSurveysTab(
+                    isDark: isDark,
+                    surveys: const [],
+                    isLeader: true,
+                  );
+                }
+                return TabBarView(
+                  controller: _tabController,
+                  children: [
+                    _AvailableSurveysTab(
+                      isDark: isDark,
+                      surveys: const [],
+                      isLeader: false,
+                    ),
+                    _MyResponsesTab(isDark: isDark, responses: const []),
+                  ],
+                );
+              },
+            ),
+          ),
+        );
+      },
     );
   }
 }

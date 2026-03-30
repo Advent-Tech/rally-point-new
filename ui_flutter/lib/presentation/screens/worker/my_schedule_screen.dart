@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../blocs/worker_schedule/worker_schedule_bloc.dart';
 import '../../blocs/schedule/schedule_bloc.dart';
 import '../../blocs/work_session/work_session_bloc.dart';
 import '../../widgets/animations/staggered_fade_in.dart';
+import '../../widgets/navigation/app_back_button.dart';
 import '../../widgets/states/empty_state.dart';
 
 class MyScheduleScreen extends StatefulWidget {
@@ -29,12 +29,13 @@ class _MyScheduleScreenState extends State<MyScheduleScreen> {
 
   void _loadSchedules() {
     // Load a week's worth of schedules
-    final startOfWeek = _selectedDate.subtract(Duration(days: _selectedDate.weekday - 1));
+    final startOfWeek = _selectedDate.subtract(
+      Duration(days: _selectedDate.weekday - 1),
+    );
     final endOfWeek = startOfWeek.add(const Duration(days: 6));
-    _scheduleBloc.add(WorkerScheduleLoadRange(
-      startDate: startOfWeek,
-      endDate: endOfWeek,
-    ));
+    _scheduleBloc.add(
+      WorkerScheduleLoadRange(startDate: startOfWeek, endDate: endOfWeek),
+    );
   }
 
   @override
@@ -68,12 +69,16 @@ class _MyScheduleScreenState extends State<MyScheduleScreen> {
           FilledButton(
             onPressed: () {
               Navigator.pop(ctx);
-              _scheduleBloc.add(WorkerScheduleStartSession(scheduleId: schedule.id));
+              _scheduleBloc.add(
+                WorkerScheduleStartSession(scheduleId: schedule.id),
+              );
               // Also start work session
-              context.read<WorkSessionBloc>().add(WorkSessionCheckIn(
-                territoryId: schedule.territoryId ?? '',
-                territoryName: schedule.territoryName ?? 'Unknown Territory',
-              ));
+              context.read<WorkSessionBloc>().add(
+                WorkSessionCheckIn(
+                  territoryId: schedule.territoryId ?? '',
+                  territoryName: schedule.territoryName ?? 'Unknown Territory',
+                ),
+              );
             },
             child: const Text('Start Session'),
           ),
@@ -91,10 +96,7 @@ class _MyScheduleScreenState extends State<MyScheduleScreen> {
       child: Scaffold(
         appBar: AppBar(
           title: const Text('My Schedule'),
-          leading: IconButton(
-            icon: const Icon(Icons.arrow_back),
-            onPressed: () => context.go('/home'),
-          ),
+          leading: AppBackButton.leading(context, fallbackRoute: '/home'),
           actions: [
             IconButton(
               icon: const Icon(Icons.refresh),
@@ -160,14 +162,21 @@ class _MyScheduleScreenState extends State<MyScheduleScreen> {
     );
   }
 
-  Widget _buildCalendarView(BuildContext context, WorkerScheduleRangeLoaded state, bool isDark) {
+  Widget _buildCalendarView(
+    BuildContext context,
+    WorkerScheduleRangeLoaded state,
+    bool isDark,
+  ) {
     final schedulesByDate = state.schedulesByDate;
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
 
     // Generate list of days in the week
     final startOfWeek = state.startDate;
-    final days = List.generate(7, (index) => startOfWeek.add(Duration(days: index)));
+    final days = List.generate(
+      7,
+      (index) => startOfWeek.add(Duration(days: index)),
+    );
 
     return Column(
       children: [
@@ -181,16 +190,18 @@ class _MyScheduleScreenState extends State<MyScheduleScreen> {
                 icon: const Icon(Icons.chevron_left),
                 onPressed: () {
                   setState(() {
-                    _selectedDate = _selectedDate.subtract(const Duration(days: 7));
+                    _selectedDate = _selectedDate.subtract(
+                      const Duration(days: 7),
+                    );
                   });
                   _loadSchedules();
                 },
               ),
               Text(
                 '${DateFormat('MMM d').format(state.startDate)} - ${DateFormat('MMM d, yyyy').format(state.endDate)}',
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.bold,
-                ),
+                style: Theme.of(
+                  context,
+                ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
               ),
               IconButton(
                 icon: const Icon(Icons.chevron_right),
@@ -214,7 +225,13 @@ class _MyScheduleScreenState extends State<MyScheduleScreen> {
             children: days.map((day) {
               final isToday = day == today;
               final hasSchedule = schedulesByDate.containsKey(day);
-              final isSelected = day == DateTime(_selectedDate.year, _selectedDate.month, _selectedDate.day);
+              final isSelected =
+                  day ==
+                  DateTime(
+                    _selectedDate.year,
+                    _selectedDate.month,
+                    _selectedDate.day,
+                  );
 
               return Expanded(
                 child: GestureDetector(
@@ -227,8 +244,10 @@ class _MyScheduleScreenState extends State<MyScheduleScreen> {
                       color: isSelected
                           ? AppColors.primary
                           : isToday
-                              ? AppColors.primary.withOpacity(0.2)
-                              : isDark ? AppColors.surfaceDark : AppColors.surfaceLight,
+                          ? AppColors.primary.withOpacity(0.2)
+                          : isDark
+                          ? AppColors.surfaceDark
+                          : AppColors.surfaceLight,
                       borderRadius: BorderRadius.circular(12),
                       border: Border.all(
                         color: isToday ? AppColors.primary : Colors.transparent,
@@ -244,7 +263,9 @@ class _MyScheduleScreenState extends State<MyScheduleScreen> {
                             fontSize: 12,
                             color: isSelected
                                 ? Colors.white
-                                : isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                                : isDark
+                                ? AppColors.textSecondaryDark
+                                : AppColors.textSecondaryLight,
                           ),
                         ),
                         const SizedBox(height: 4),
@@ -262,7 +283,9 @@ class _MyScheduleScreenState extends State<MyScheduleScreen> {
                             width: 6,
                             height: 6,
                             decoration: BoxDecoration(
-                              color: isSelected ? Colors.white : AppColors.primary,
+                              color: isSelected
+                                  ? Colors.white
+                                  : AppColors.primary,
                               shape: BoxShape.circle,
                             ),
                           ),
@@ -281,7 +304,12 @@ class _MyScheduleScreenState extends State<MyScheduleScreen> {
         Expanded(
           child: _buildScheduleList(
             context,
-            schedulesByDate[DateTime(_selectedDate.year, _selectedDate.month, _selectedDate.day)] ?? [],
+            schedulesByDate[DateTime(
+                  _selectedDate.year,
+                  _selectedDate.month,
+                  _selectedDate.day,
+                )] ??
+                [],
             isDark,
           ),
         ),
@@ -289,16 +317,25 @@ class _MyScheduleScreenState extends State<MyScheduleScreen> {
     );
   }
 
-  Widget _buildDayView(BuildContext context, WorkerScheduleLoaded state, bool isDark) {
+  Widget _buildDayView(
+    BuildContext context,
+    WorkerScheduleLoaded state,
+    bool isDark,
+  ) {
     return _buildScheduleList(context, state.schedules, isDark);
   }
 
-  Widget _buildScheduleList(BuildContext context, List<ScheduleEntry> schedules, bool isDark) {
+  Widget _buildScheduleList(
+    BuildContext context,
+    List<ScheduleEntry> schedules,
+    bool isDark,
+  ) {
     if (schedules.isEmpty) {
       return const EmptyState(
         icon: Icons.calendar_month_outlined,
         title: 'No schedule set',
-        description: 'No shifts scheduled for this day. Your team leader will assign your schedule.',
+        description:
+            'No shifts scheduled for this day. Your team leader will assign your schedule.',
         compact: true,
       );
     }
@@ -316,7 +353,9 @@ class _MyScheduleScreenState extends State<MyScheduleScreen> {
                 ? () => _showStartSessionDialog(context, schedule)
                 : null,
             onComplete: schedule.status == 'in_progress'
-                ? () => _scheduleBloc.add(WorkerScheduleCompleteSession(scheduleId: schedule.id))
+                ? () => _scheduleBloc.add(
+                    WorkerScheduleCompleteSession(scheduleId: schedule.id),
+                  )
                 : null,
           ),
         );
@@ -330,11 +369,7 @@ class _ScheduleCard extends StatelessWidget {
   final VoidCallback? onStart;
   final VoidCallback? onComplete;
 
-  const _ScheduleCard({
-    required this.schedule,
-    this.onStart,
-    this.onComplete,
-  });
+  const _ScheduleCard({required this.schedule, this.onStart, this.onComplete});
 
   Color _getStatusColor() {
     switch (schedule.status) {
@@ -377,11 +412,19 @@ class _ScheduleCard extends StatelessWidget {
         color: isDark ? AppColors.surfaceDark : AppColors.surfaceLight,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: schedule.isNow ? statusColor : (isDark ? AppColors.borderDark : AppColors.borderLight),
+          color: schedule.isNow
+              ? statusColor
+              : (isDark ? AppColors.borderDark : AppColors.borderLight),
           width: schedule.isNow ? 2 : 1,
         ),
         boxShadow: schedule.isNow
-            ? [BoxShadow(color: statusColor.withOpacity(0.2), blurRadius: 8, offset: const Offset(0, 2))]
+            ? [
+                BoxShadow(
+                  color: statusColor.withOpacity(0.2),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
+                ),
+              ]
             : null,
       ),
       child: Column(
@@ -403,7 +446,9 @@ class _ScheduleCard extends StatelessWidget {
                     Text(
                       schedule.endTime,
                       style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                        color: isDark
+                            ? AppColors.textSecondaryDark
+                            : AppColors.textSecondaryLight,
                       ),
                     ),
                   ],
@@ -427,13 +472,19 @@ class _ScheduleCard extends StatelessWidget {
                           Icon(_getStatusIcon(), color: statusColor, size: 18),
                           const SizedBox(width: 6),
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 2,
+                            ),
                             decoration: BoxDecoration(
                               color: statusColor.withOpacity(0.2),
                               borderRadius: BorderRadius.circular(4),
                             ),
                             child: Text(
-                              schedule.status.toUpperCase().replaceAll('_', ' '),
+                              schedule.status.toUpperCase().replaceAll(
+                                '_',
+                                ' ',
+                              ),
                               style: TextStyle(
                                 fontSize: 10,
                                 fontWeight: FontWeight.bold,
@@ -450,7 +501,9 @@ class _ScheduleCard extends StatelessWidget {
                             Icon(
                               Icons.location_on,
                               size: 16,
-                              color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                              color: isDark
+                                  ? AppColors.textSecondaryDark
+                                  : AppColors.textSecondaryLight,
                             ),
                             const SizedBox(width: 4),
                             Expanded(
@@ -467,10 +520,13 @@ class _ScheduleCard extends StatelessWidget {
                           padding: const EdgeInsets.only(top: 4),
                           child: Text(
                             schedule.notes!,
-                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                              color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
-                              fontStyle: FontStyle.italic,
-                            ),
+                            style: Theme.of(context).textTheme.bodySmall
+                                ?.copyWith(
+                                  color: isDark
+                                      ? AppColors.textSecondaryDark
+                                      : AppColors.textSecondaryLight,
+                                  fontStyle: FontStyle.italic,
+                                ),
                             maxLines: 2,
                             overflow: TextOverflow.ellipsis,
                           ),

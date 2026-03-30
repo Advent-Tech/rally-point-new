@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../widgets/navigation/app_back_button.dart';
 import '../../../core/network/api_client.dart';
 import '../../../core/theme/app_colors.dart';
 
@@ -80,6 +81,7 @@ class _AchievementsScreenState extends State<AchievementsScreen>
 
     return Scaffold(
       appBar: AppBar(
+        leading: AppBackButton.leading(context, fallbackRoute: '/home'),
         title: const Text('Achievements'),
         centerTitle: true,
         bottom: TabBar(

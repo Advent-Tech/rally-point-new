@@ -5,6 +5,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../data/models/target_models.dart';
 import '../../../data/repositories/targets_repository.dart';
 import '../../blocs/auth/auth_bloc.dart';
+import '../../widgets/navigation/app_back_button.dart';
 
 class LeaderTargetsScreen extends StatefulWidget {
   const LeaderTargetsScreen({super.key});
@@ -82,6 +83,10 @@ class _LeaderTargetsScreenState extends State<LeaderTargetsScreen>
 
     return Scaffold(
       appBar: AppBar(
+        leading: AppBackButton.leading(
+          context,
+          fallbackRoute: '/leader/dashboard',
+        ),
         title: const Text('Targets'),
         centerTitle: true,
         bottom: TabBar(

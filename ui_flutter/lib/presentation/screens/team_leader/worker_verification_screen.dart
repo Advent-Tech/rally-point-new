@@ -1,18 +1,19 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../data/models/team_model.dart';
 import '../../blocs/auth/auth_bloc.dart';
 import '../../blocs/team/team_bloc.dart';
+import '../../widgets/navigation/app_back_button.dart';
 
 /// Screen for team leaders to verify (approve/reject) worker join requests
 class WorkerVerificationScreen extends StatefulWidget {
   const WorkerVerificationScreen({super.key});
 
   @override
-  State<WorkerVerificationScreen> createState() => _WorkerVerificationScreenState();
+  State<WorkerVerificationScreen> createState() =>
+      _WorkerVerificationScreenState();
 }
 
 class _WorkerVerificationScreenState extends State<WorkerVerificationScreen> {
@@ -47,7 +48,9 @@ class _WorkerVerificationScreenState extends State<WorkerVerificationScreen> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Are you sure you want to approve ${request.displayName ?? 'this worker'}?'),
+            Text(
+              'Are you sure you want to approve ${request.displayName ?? 'this worker'}?',
+            ),
             const SizedBox(height: 8),
             Text(
               'They will be added to your team and can start working immediately.',
@@ -63,10 +66,9 @@ class _WorkerVerificationScreenState extends State<WorkerVerificationScreen> {
           FilledButton(
             onPressed: () {
               Navigator.pop(ctx);
-              _teamBloc.add(TeamApproveJoinRequest(
-                requestId: request.id,
-                teamId: _teamId!,
-              ));
+              _teamBloc.add(
+                TeamApproveJoinRequest(requestId: request.id, teamId: _teamId!),
+              );
             },
             child: const Text('Approve'),
           ),
@@ -86,7 +88,9 @@ class _WorkerVerificationScreenState extends State<WorkerVerificationScreen> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Reject ${request.displayName ?? 'this worker'}\'s request to join?'),
+            Text(
+              'Reject ${request.displayName ?? 'this worker'}\'s request to join?',
+            ),
             const SizedBox(height: 16),
             TextField(
               controller: reasonController,
@@ -108,11 +112,15 @@ class _WorkerVerificationScreenState extends State<WorkerVerificationScreen> {
             style: FilledButton.styleFrom(backgroundColor: AppColors.error),
             onPressed: () {
               Navigator.pop(ctx);
-              _teamBloc.add(TeamRejectJoinRequest(
-                requestId: request.id,
-                teamId: _teamId!,
-                reason: reasonController.text.isNotEmpty ? reasonController.text : null,
-              ));
+              _teamBloc.add(
+                TeamRejectJoinRequest(
+                  requestId: request.id,
+                  teamId: _teamId!,
+                  reason: reasonController.text.isNotEmpty
+                      ? reasonController.text
+                      : null,
+                ),
+              );
             },
             child: const Text('Reject'),
           ),
@@ -128,15 +136,13 @@ class _WorkerVerificationScreenState extends State<WorkerVerificationScreen> {
     if (_teamId == null) {
       return Scaffold(
         appBar: AppBar(
-          leading: IconButton(
-            icon: const Icon(Icons.arrow_back),
-            onPressed: () => context.pop(),
+          leading: AppBackButton.leading(
+            context,
+            fallbackRoute: '/leader/dashboard',
           ),
           title: const Text('Worker Verification'),
         ),
-        body: const Center(
-          child: Text('No team assigned'),
-        ),
+        body: const Center(child: Text('No team assigned')),
       );
     }
 
@@ -144,15 +150,16 @@ class _WorkerVerificationScreenState extends State<WorkerVerificationScreen> {
       value: _teamBloc,
       child: Scaffold(
         appBar: AppBar(
-          leading: IconButton(
-            icon: const Icon(Icons.arrow_back),
-            onPressed: () => context.pop(),
+          leading: AppBackButton.leading(
+            context,
+            fallbackRoute: '/leader/dashboard',
           ),
           title: const Text('Worker Verification'),
           actions: [
             IconButton(
               icon: const Icon(Icons.refresh),
-              onPressed: () => _teamBloc.add(TeamLoadJoinRequests(teamId: _teamId!)),
+              onPressed: () =>
+                  _teamBloc.add(TeamLoadJoinRequests(teamId: _teamId!)),
             ),
           ],
         ),
@@ -187,13 +194,16 @@ class _WorkerVerificationScreenState extends State<WorkerVerificationScreen> {
                     Icon(
                       Icons.error_outline,
                       size: 64,
-                      color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                      color: isDark
+                          ? AppColors.textSecondaryDark
+                          : AppColors.textSecondaryLight,
                     ),
                     const SizedBox(height: 16),
                     Text(state.message),
                     const SizedBox(height: 16),
                     FilledButton(
-                      onPressed: () => _teamBloc.add(TeamLoadJoinRequests(teamId: _teamId!)),
+                      onPressed: () =>
+                          _teamBloc.add(TeamLoadJoinRequests(teamId: _teamId!)),
                       child: const Text('Retry'),
                     ),
                   ],
@@ -210,21 +220,24 @@ class _WorkerVerificationScreenState extends State<WorkerVerificationScreen> {
                       Icon(
                         Icons.verified_user_outlined,
                         size: 80,
-                        color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                        color: isDark
+                            ? AppColors.textSecondaryDark
+                            : AppColors.textSecondaryLight,
                       ),
                       const SizedBox(height: 24),
                       Text(
                         'No Pending Requests',
-                        style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                          fontWeight: FontWeight.bold,
-                        ),
+                        style: Theme.of(context).textTheme.headlineSmall
+                            ?.copyWith(fontWeight: FontWeight.bold),
                       ),
                       const SizedBox(height: 8),
                       Text(
                         'All worker join requests have been processed.',
                         textAlign: TextAlign.center,
                         style: TextStyle(
-                          color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                          color: isDark
+                              ? AppColors.textSecondaryDark
+                              : AppColors.textSecondaryLight,
                         ),
                       ),
                     ],
@@ -301,8 +314,9 @@ class _JoinRequestCard extends StatelessWidget {
                   child: request.profilePhotoUrl == null
                       ? Text(
                           (request.displayName?.isNotEmpty == true
-                              ? request.displayName![0]
-                              : 'W').toUpperCase(),
+                                  ? request.displayName![0]
+                                  : 'W')
+                              .toUpperCase(),
                           style: const TextStyle(
                             color: AppColors.primary,
                             fontWeight: FontWeight.bold,
@@ -318,15 +332,16 @@ class _JoinRequestCard extends StatelessWidget {
                     children: [
                       Text(
                         request.displayName ?? 'Unknown Worker',
-                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.bold,
-                        ),
+                        style: Theme.of(context).textTheme.titleMedium
+                            ?.copyWith(fontWeight: FontWeight.bold),
                       ),
                       if (request.email != null)
                         Text(
                           request.email!,
                           style: TextStyle(
-                            color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                            color: isDark
+                                ? AppColors.textSecondaryDark
+                                : AppColors.textSecondaryLight,
                             fontSize: 13,
                           ),
                         ),
@@ -334,7 +349,10 @@ class _JoinRequestCard extends StatelessWidget {
                   ),
                 ),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 4,
+                  ),
                   decoration: BoxDecoration(
                     color: AppColors.warning.withAlpha(30),
                     borderRadius: BorderRadius.circular(20),
@@ -359,13 +377,17 @@ class _JoinRequestCard extends StatelessWidget {
                     Icon(
                       Icons.phone_outlined,
                       size: 16,
-                      color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                      color: isDark
+                          ? AppColors.textSecondaryDark
+                          : AppColors.textSecondaryLight,
                     ),
                     const SizedBox(width: 8),
                     Text(
                       request.phone!,
                       style: TextStyle(
-                        color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                        color: isDark
+                            ? AppColors.textSecondaryDark
+                            : AppColors.textSecondaryLight,
                         fontSize: 13,
                       ),
                     ),
@@ -378,13 +400,17 @@ class _JoinRequestCard extends StatelessWidget {
                   Icon(
                     Icons.schedule_outlined,
                     size: 16,
-                    color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                    color: isDark
+                        ? AppColors.textSecondaryDark
+                        : AppColors.textSecondaryLight,
                   ),
                   const SizedBox(width: 8),
                   Text(
                     'Requested on ${dateFormat.format(request.requestedAt!)}',
                     style: TextStyle(
-                      color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                      color: isDark
+                          ? AppColors.textSecondaryDark
+                          : AppColors.textSecondaryLight,
                       fontSize: 13,
                     ),
                   ),

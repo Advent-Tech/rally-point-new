@@ -5,17 +5,14 @@ import '../../../core/theme/app_colors.dart';
 import '../../../data/models/chat_model.dart';
 import '../../blocs/auth/auth_bloc.dart';
 import '../../blocs/chat/chat_bloc.dart';
+import '../../widgets/navigation/app_back_button.dart';
 
 /// Screen that handles loading a team conversation and displaying chat
 class TeamChatScreen extends StatefulWidget {
   final String teamId;
   final String? teamName;
 
-  const TeamChatScreen({
-    super.key,
-    required this.teamId,
-    this.teamName,
-  });
+  const TeamChatScreen({super.key, required this.teamId, this.teamName});
 
   @override
   State<TeamChatScreen> createState() => _TeamChatScreenState();
@@ -37,14 +34,16 @@ class _TeamChatScreenState extends State<TeamChatScreen> {
     final authState = context.read<AuthBloc>().state;
     if (authState is AuthAuthenticated) {
       _currentUserId = authState.user.id;
-      _chatBloc.setCurrentUser(authState.user.id, authState.user.displayName ?? 'User');
+      _chatBloc.setCurrentUser(
+        authState.user.id,
+        authState.user.displayName ?? 'User',
+      );
     }
 
     // Load team conversation
-    _chatBloc.add(ChatGetTeamConversation(
-      teamId: widget.teamId,
-      teamName: widget.teamName,
-    ));
+    _chatBloc.add(
+      ChatGetTeamConversation(teamId: widget.teamId, teamName: widget.teamName),
+    );
 
     _messageController.addListener(_onTextChanged);
   }
@@ -56,10 +55,12 @@ class _TeamChatScreenState extends State<TeamChatScreen> {
     final hasText = _messageController.text.isNotEmpty;
     if (hasText != _isTyping) {
       _isTyping = hasText;
-      _chatBloc.add(ChatSendTyping(
-        conversationId: state.conversation.id,
-        isTyping: hasText,
-      ));
+      _chatBloc.add(
+        ChatSendTyping(
+          conversationId: state.conversation.id,
+          isTyping: hasText,
+        ),
+      );
     }
   }
 
@@ -93,10 +94,9 @@ class _TeamChatScreenState extends State<TeamChatScreen> {
     }
 
     debugPrint('TeamChatScreen: Adding ChatSendMessage event');
-    _chatBloc.add(ChatSendMessage(
-      conversationId: state.conversation.id,
-      content: text,
-    ));
+    _chatBloc.add(
+      ChatSendMessage(conversationId: state.conversation.id, content: text),
+    );
 
     _messageController.clear();
     _isTyping = false;
@@ -124,6 +124,7 @@ class _TeamChatScreenState extends State<TeamChatScreen> {
           if (state is ChatLoading) {
             return Scaffold(
               appBar: AppBar(
+                leading: AppBackButton.leading(context),
                 title: Text(widget.teamName ?? 'Team Chat'),
               ),
               body: const Center(child: CircularProgressIndicator()),
@@ -133,6 +134,7 @@ class _TeamChatScreenState extends State<TeamChatScreen> {
           if (state is ChatError) {
             return Scaffold(
               appBar: AppBar(
+                leading: AppBackButton.leading(context),
                 title: Text(widget.teamName ?? 'Team Chat'),
               ),
               body: Center(
@@ -142,7 +144,9 @@ class _TeamChatScreenState extends State<TeamChatScreen> {
                     Icon(
                       Icons.error_outline,
                       size: 64,
-                      color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                      color: isDark
+                          ? AppColors.textSecondaryDark
+                          : AppColors.textSecondaryLight,
                     ),
                     const SizedBox(height: 16),
                     Text(
@@ -153,17 +157,21 @@ class _TeamChatScreenState extends State<TeamChatScreen> {
                     Text(
                       state.message,
                       style: TextStyle(
-                        color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                        color: isDark
+                            ? AppColors.textSecondaryDark
+                            : AppColors.textSecondaryLight,
                       ),
                       textAlign: TextAlign.center,
                     ),
                     const SizedBox(height: 24),
                     ElevatedButton(
                       onPressed: () {
-                        _chatBloc.add(ChatGetTeamConversation(
-                          teamId: widget.teamId,
-                          teamName: widget.teamName,
-                        ));
+                        _chatBloc.add(
+                          ChatGetTeamConversation(
+                            teamId: widget.teamId,
+                            teamName: widget.teamName,
+                          ),
+                        );
                       },
                       child: const Text('Retry'),
                     ),
@@ -187,6 +195,7 @@ class _TeamChatScreenState extends State<TeamChatScreen> {
 
           return Scaffold(
             appBar: AppBar(
+              leading: AppBackButton.leading(context),
               title: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -196,7 +205,9 @@ class _TeamChatScreenState extends State<TeamChatScreen> {
                       subtitle,
                       style: TextStyle(
                         fontSize: 12,
-                        color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                        color: isDark
+                            ? AppColors.textSecondaryDark
+                            : AppColors.textSecondaryLight,
                       ),
                     ),
                 ],
@@ -205,7 +216,8 @@ class _TeamChatScreenState extends State<TeamChatScreen> {
                 if (state is ChatInConversation)
                   IconButton(
                     icon: const Icon(Icons.group),
-                    onPressed: () => _showParticipants(context, state.conversation),
+                    onPressed: () =>
+                        _showParticipants(context, state.conversation),
                   ),
                 PopupMenuButton<String>(
                   onSelected: (value) {
@@ -213,7 +225,10 @@ class _TeamChatScreenState extends State<TeamChatScreen> {
                   },
                   itemBuilder: (context) => [
                     const PopupMenuItem(value: 'mute', child: Text('Mute')),
-                    const PopupMenuItem(value: 'clear', child: Text('Clear chat')),
+                    const PopupMenuItem(
+                      value: 'clear',
+                      child: Text('Clear chat'),
+                    ),
                   ],
                 ),
               ],
@@ -222,22 +237,31 @@ class _TeamChatScreenState extends State<TeamChatScreen> {
               children: [
                 // Messages list
                 Expanded(
-                  child: (state is ChatLoading || state is ChatInitial || (state is ChatInConversation && state.isLoadingMessages))
+                  child:
+                      (state is ChatLoading ||
+                          state is ChatInitial ||
+                          (state is ChatInConversation &&
+                              state.isLoadingMessages))
                       ? _buildMessageShimmer(isDark)
                       : messages.isEmpty
-                          ? _buildEmptyMessages(context, isDark)
-                          : _buildMessagesList(messages, isDark),
+                      ? _buildEmptyMessages(context, isDark)
+                      : _buildMessagesList(messages, isDark),
                 ),
 
                 // Typing indicator
                 if (typingText != null)
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 8,
+                    ),
                     alignment: Alignment.centerLeft,
                     child: Text(
                       typingText,
                       style: TextStyle(
-                        color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                        color: isDark
+                            ? AppColors.textSecondaryDark
+                            : AppColors.textSecondaryLight,
                         fontStyle: FontStyle.italic,
                         fontSize: 13,
                       ),
@@ -290,21 +314,27 @@ class _TeamChatScreenState extends State<TeamChatScreen> {
           Icon(
             Icons.chat_bubble_outline,
             size: 64,
-            color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+            color: isDark
+                ? AppColors.textSecondaryDark
+                : AppColors.textSecondaryLight,
           ),
           const SizedBox(height: 16),
           Text(
             'No messages yet',
             style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                  color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
-                ),
+              color: isDark
+                  ? AppColors.textSecondaryDark
+                  : AppColors.textSecondaryLight,
+            ),
           ),
           const SizedBox(height: 8),
           Text(
             'Start the conversation with your team!',
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
-                ),
+              color: isDark
+                  ? AppColors.textSecondaryDark
+                  : AppColors.textSecondaryLight,
+            ),
           ),
         ],
       ),
@@ -319,10 +349,17 @@ class _TeamChatScreenState extends State<TeamChatScreen> {
       itemBuilder: (context, index) {
         final message = messages[index];
         final isMe = message.senderId == _currentUserId;
-        final showAvatar = !isMe && (index == 0 || messages[index - 1].senderId != message.senderId);
-        final showTime = index == messages.length - 1 ||
+        final showAvatar =
+            !isMe &&
+            (index == 0 || messages[index - 1].senderId != message.senderId);
+        final showTime =
+            index == messages.length - 1 ||
             messages[index + 1].senderId != message.senderId ||
-            (messages[index + 1].createdAt?.difference(message.createdAt ?? DateTime.now()).inMinutes ?? 0) > 5;
+            (messages[index + 1].createdAt
+                        ?.difference(message.createdAt ?? DateTime.now())
+                        .inMinutes ??
+                    0) >
+                5;
 
         return _MessageBubble(
           message: message,
@@ -359,7 +396,9 @@ class _TeamChatScreenState extends State<TeamChatScreen> {
             onPressed: () {
               // TODO: Implement file attachment
             },
-            color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+            color: isDark
+                ? AppColors.textSecondaryDark
+                : AppColors.textSecondaryLight,
           ),
           Expanded(
             child: TextField(
@@ -376,7 +415,10 @@ class _TeamChatScreenState extends State<TeamChatScreen> {
                 ),
                 filled: true,
                 fillColor: isDark ? Colors.grey[800] : Colors.grey[200],
-                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 10,
+                ),
               ),
               onSubmitted: (_) => _sendMessage(),
             ),
@@ -408,9 +450,9 @@ class _TeamChatScreenState extends State<TeamChatScreen> {
           children: [
             Text(
               'Participants (${conversation.participants.length})',
-              style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
+              style: Theme.of(
+                context,
+              ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 16),
             Flexible(
@@ -450,7 +492,11 @@ class _TeamChatScreenState extends State<TeamChatScreen> {
     );
   }
 
-  void _showMessageOptions(BuildContext context, ChatMessage message, bool isMe) {
+  void _showMessageOptions(
+    BuildContext context,
+    ChatMessage message,
+    bool isMe,
+  ) {
     showModalBottomSheet(
       context: context,
       shape: const RoundedRectangleBorder(
@@ -480,7 +526,10 @@ class _TeamChatScreenState extends State<TeamChatScreen> {
               ),
               ListTile(
                 leading: const Icon(Icons.delete, color: AppColors.error),
-                title: const Text('Delete', style: TextStyle(color: AppColors.error)),
+                title: const Text(
+                  'Delete',
+                  style: TextStyle(color: AppColors.error),
+                ),
                 onTap: () {
                   Navigator.pop(context);
                   _chatBloc.add(ChatDeleteMessage(messageId: message.id));
@@ -503,9 +552,7 @@ class _TeamChatScreenState extends State<TeamChatScreen> {
         content: TextField(
           controller: controller,
           maxLines: 4,
-          decoration: const InputDecoration(
-            border: OutlineInputBorder(),
-          ),
+          decoration: const InputDecoration(border: OutlineInputBorder()),
         ),
         actions: [
           TextButton(
@@ -514,10 +561,12 @@ class _TeamChatScreenState extends State<TeamChatScreen> {
           ),
           ElevatedButton(
             onPressed: () {
-              _chatBloc.add(ChatEditMessage(
-                messageId: message.id,
-                newContent: controller.text,
-              ));
+              _chatBloc.add(
+                ChatEditMessage(
+                  messageId: message.id,
+                  newContent: controller.text,
+                ),
+              );
               Navigator.pop(context);
             },
             child: const Text('Save'),
@@ -558,7 +607,9 @@ class _MessageBubble extends StatelessWidget {
         bottom: showTime ? 8 : 2,
       ),
       child: Row(
-        mainAxisAlignment: isMe ? MainAxisAlignment.end : MainAxisAlignment.start,
+        mainAxisAlignment: isMe
+            ? MainAxisAlignment.end
+            : MainAxisAlignment.start,
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
           if (!isMe && showAvatar)
@@ -586,7 +637,10 @@ class _MessageBubble extends StatelessWidget {
                 constraints: BoxConstraints(
                   maxWidth: MediaQuery.of(context).size.width * 0.75,
                 ),
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 10,
+                ),
                 decoration: BoxDecoration(
                   color: isMe
                       ? AppColors.primary
@@ -609,14 +663,18 @@ class _MessageBubble extends StatelessWidget {
                           style: TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.bold,
-                            color: isDark ? AppColors.textSecondaryDark : AppColors.primary,
+                            color: isDark
+                                ? AppColors.textSecondaryDark
+                                : AppColors.primary,
                           ),
                         ),
                       ),
                     Text(
                       message.content,
                       style: TextStyle(
-                        color: isMe ? Colors.white : (isDark ? Colors.white : Colors.black87),
+                        color: isMe
+                            ? Colors.white
+                            : (isDark ? Colors.white : Colors.black87),
                       ),
                     ),
                     if (showTime || message.isEdited || message.isSending)
@@ -631,7 +689,9 @@ class _MessageBubble extends StatelessWidget {
                                 fontSize: 11,
                                 color: isMe
                                     ? Colors.white70
-                                    : (isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight),
+                                    : (isDark
+                                          ? AppColors.textSecondaryDark
+                                          : AppColors.textSecondaryLight),
                               ),
                             ),
                             if (message.isEdited)
@@ -642,7 +702,9 @@ class _MessageBubble extends StatelessWidget {
                                   fontStyle: FontStyle.italic,
                                   color: isMe
                                       ? Colors.white70
-                                      : (isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight),
+                                      : (isDark
+                                            ? AppColors.textSecondaryDark
+                                            : AppColors.textSecondaryLight),
                                 ),
                               ),
                             if (message.isSending)
@@ -653,14 +715,20 @@ class _MessageBubble extends StatelessWidget {
                                   height: 12,
                                   child: CircularProgressIndicator(
                                     strokeWidth: 2,
-                                    color: isMe ? Colors.white70 : AppColors.primary,
+                                    color: isMe
+                                        ? Colors.white70
+                                        : AppColors.primary,
                                   ),
                                 ),
                               ),
                             if (message.hasFailed)
                               const Padding(
                                 padding: EdgeInsets.only(left: 4),
-                                child: Icon(Icons.error_outline, size: 14, color: AppColors.error),
+                                child: Icon(
+                                  Icons.error_outline,
+                                  size: 14,
+                                  color: AppColors.error,
+                                ),
                               ),
                           ],
                         ),

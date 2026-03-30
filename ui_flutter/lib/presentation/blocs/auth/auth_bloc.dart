@@ -106,9 +106,14 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
         if (data['refresh_token'] != null) {
           await _secure.saveRefreshToken(data['refresh_token']);
         }
-        if (data['expires_in'] != null) {
-          await _secure.saveTokenExpiry(data['expires_in']);
+        final expiresIn = data['expires_in'];
+        if (expiresIn is int) {
+          await _secure.saveTokenExpiry(expiresIn);
+        } else {
+          // Keep session durable if backend omits expires_in.
+          await _secure.saveTokenExpiry(60 * 60 * 24 * 30);
         }
+        _api.setAuthToken(data['access_token']);
         return true;
       }
       return false;
@@ -131,15 +136,15 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
         emit(AuthUnauthenticated());
         return;
       }
+      _api.setAuthToken(token);
 
       // Check if token is expired and try to refresh
       final isExpired = await _secure.isTokenExpired();
       if (isExpired) {
         final refreshed = await _tryRefreshToken();
         if (!refreshed) {
-          await _secure.clearTokens();
-          emit(AuthUnauthenticated());
-          return;
+          // If refresh fails, still try current token once (network hiccups/common clock drift).
+          // Logout should not happen aggressively for transient failures.
         }
       }
 
@@ -197,6 +202,8 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
         // Save token expiry
         if (authResponse.expiresIn != null) {
           await _secure.saveTokenExpiry(authResponse.expiresIn!);
+        } else {
+          await _secure.saveTokenExpiry(60 * 60 * 24 * 30);
         }
 
         // Get user profile if not included in response
@@ -370,6 +377,8 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
         // Save token expiry
         if (authResponse.expiresIn != null) {
           await _secure.saveTokenExpiry(authResponse.expiresIn!);
+        } else {
+          await _secure.saveTokenExpiry(60 * 60 * 24 * 30);
         }
 
         // Get user profile
@@ -442,7 +451,9 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
 
     final refreshed = await _tryRefreshToken();
     if (!refreshed) {
-      add(const AuthTokenExpired());
+      // Keep user signed in on transient refresh failures.
+      // Auth will naturally recover on next successful API call/refresh cycle.
+      debugPrint('AuthBloc: token refresh failed; preserving current session');
     }
   }
 

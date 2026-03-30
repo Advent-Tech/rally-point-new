@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:shimmer/shimmer.dart';
+import 'package:showcaseview/showcaseview.dart';
 import '../../blocs/auth/auth_bloc.dart';
 import '../../blocs/work_session/work_session_bloc.dart';
 import '../../blocs/territory/territory_bloc.dart';
@@ -12,8 +13,10 @@ import '../../blocs/delivery/delivery_bloc.dart';
 import '../../blocs/prayer_request/prayer_request_bloc.dart';
 import '../../blocs/location/location_bloc.dart';
 import '../../../core/network/api_client.dart';
+import '../../../core/constants/api_constants.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/theme.dart';
+import '../../../services/coach_marks_service.dart';
 import '../../widgets/widgets.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -33,6 +36,50 @@ class _HomeScreenState extends State<HomeScreen> {
   bool _showStats = false;
   List<dynamic> _workerTargets = [];
   bool _isLoadingTargets = true;
+  List<Map<String, dynamic>> _leaderRecentActivity = [];
+  bool _isLoadingLeaderActivity = false;
+  bool _workerCoachMarksChecked = false;
+  bool _leaderCoachMarksChecked = false;
+
+  final _showcaseWorkerTargets = GlobalKey();
+  final _showcaseWorkerSession = GlobalKey();
+  final _showcaseWorkerQuickActions = GlobalKey();
+
+  final _showcaseLeaderOverview = GlobalKey();
+  final _showcaseLeaderManagement = GlobalKey();
+  final _showcaseLeaderActivity = GlobalKey();
+
+  void _maybeShowHomeCoachMarks({required bool isLeader}) {
+    if (isLeader) {
+      if (_leaderCoachMarksChecked) return;
+      _leaderCoachMarksChecked = true;
+    } else {
+      if (_workerCoachMarksChecked) return;
+      _workerCoachMarksChecked = true;
+    }
+
+    final stepId = isLeader ? 'home_leader' : 'home_worker';
+    CoachMarksService().hasBeenShown(stepId).then((shown) {
+      if (shown || !mounted) return;
+
+      Future.delayed(const Duration(milliseconds: 900), () {
+        if (!mounted) return;
+        final sequence = isLeader
+            ? [
+                _showcaseLeaderOverview,
+                _showcaseLeaderManagement,
+                _showcaseLeaderActivity,
+              ]
+            : [
+                _showcaseWorkerTargets,
+                _showcaseWorkerSession,
+                _showcaseWorkerQuickActions,
+              ];
+        ShowcaseView.get().startShowCase(sequence);
+        CoachMarksService().markAsShown(stepId);
+      });
+    });
+  }
 
   @override
   void initState() {
@@ -67,6 +114,10 @@ class _HomeScreenState extends State<HomeScreen> {
           (authState.user.isTeamLeader || authState.user.isAdmin)) {
         // Load allocated territories for team leaders
         context.read<TerritoryBloc>().add(const TerritoryLoadMyAllocations());
+        final teamId = authState.user.teamId;
+        if (teamId != null && teamId.isNotEmpty) {
+          _loadLeaderRecentActivity(teamId);
+        }
       }
     });
   }
@@ -108,6 +159,121 @@ class _HomeScreenState extends State<HomeScreen> {
       if (mounted) {
         setState(() => _isLoadingTargets = false);
       }
+    }
+  }
+
+  Future<void> _loadLeaderRecentActivity(String teamId) async {
+    if (!mounted) return;
+    setState(() => _isLoadingLeaderActivity = true);
+
+    try {
+      final apiClient = await ApiClient.getInstance();
+
+      final responses = await Future.wait([
+        apiClient.get('/api/teams/$teamId/deliveries'),
+        apiClient.get('${ApiConstants.donationsTeam}/$teamId'),
+        apiClient.get('${ApiConstants.bookSalesTeam}/$teamId'),
+      ]);
+
+      final deliveriesResponse = responses[0];
+      final donationsResponse = responses[1];
+      final bookSalesResponse = responses[2];
+
+      final activities = <Map<String, dynamic>>[];
+
+      if (deliveriesResponse.statusCode == 200) {
+        final List<dynamic> deliveries = deliveriesResponse.data is List
+            ? deliveriesResponse.data
+            : (deliveriesResponse.data['deliveries'] ??
+                  deliveriesResponse.data['results'] ??
+                  const []);
+        for (final raw in deliveries.whereType<Map>()) {
+          final delivery = raw['delivery'] is Map ? raw['delivery'] : raw;
+          final data = Map<String, dynamic>.from(delivery as Map);
+          activities.add({
+            'id': data['id']?.toString() ?? '',
+            'type': 'delivery',
+            'title': 'Delivery completed',
+            'subtitle': 'Delivered to ${data['recipient_name'] ?? 'recipient'}',
+            'location': data['address']?.toString() ?? '',
+            'worker_name': data['worker_name']?.toString() ?? 'Worker',
+            'timestamp': data['created_at'] ?? data['completed_at'],
+            'amount': null,
+          });
+        }
+      }
+
+      if (donationsResponse.statusCode == 200) {
+        final List<dynamic> donations = donationsResponse.data is List
+            ? donationsResponse.data
+            : (donationsResponse.data['donations'] ??
+                  donationsResponse.data['results'] ??
+                  const []);
+        for (final raw in donations.whereType<Map>()) {
+          final data = Map<String, dynamic>.from(raw);
+          final amount = (data['amount'] as num? ?? 0).toDouble();
+          activities.add({
+            'id': data['id']?.toString() ?? '',
+            'type': 'donation',
+            'title': 'Donation collected',
+            'subtitle':
+                '${data['worker_name'] ?? 'Worker'} collected \$${amount.toStringAsFixed(2)}',
+            'location': data['donor_address']?.toString() ?? '',
+            'worker_name': data['worker_name']?.toString() ?? 'Worker',
+            'timestamp': data['created_at'] ?? data['collected_at'],
+            'amount': amount,
+          });
+        }
+      }
+
+      if (bookSalesResponse.statusCode == 200) {
+        final List<dynamic> sales = bookSalesResponse.data is List
+            ? bookSalesResponse.data
+            : (bookSalesResponse.data['book_sales'] ??
+                  bookSalesResponse.data['results'] ??
+                  bookSalesResponse.data['data'] ??
+                  const []);
+        for (final raw in sales.whereType<Map>()) {
+          final data = Map<String, dynamic>.from(raw);
+          final amount =
+              (data['total_amount'] as num? ?? data['amount'] as num? ?? 0)
+                  .toDouble();
+          final qty = (data['quantity'] as num? ?? 1).toInt();
+          final bookTitle = (data['book_title'] ?? 'Book').toString();
+          activities.add({
+            'id': data['id']?.toString() ?? '',
+            'type': 'book_sale',
+            'title': 'Book sold',
+            'subtitle': '$qty x $bookTitle • \$${amount.toStringAsFixed(2)}',
+            'location': data['buyer_address']?.toString() ?? '',
+            'worker_name': data['worker_name']?.toString() ?? 'Worker',
+            'timestamp': data['sold_at'] ?? data['created_at'],
+            'amount': amount,
+            'quantity': qty,
+          });
+        }
+      }
+
+      activities.sort((a, b) {
+        final aTime = DateTime.tryParse((a['timestamp'] ?? '').toString());
+        final bTime = DateTime.tryParse((b['timestamp'] ?? '').toString());
+        return (bTime ?? DateTime.fromMillisecondsSinceEpoch(0)).compareTo(
+          aTime ?? DateTime.fromMillisecondsSinceEpoch(0),
+        );
+      });
+
+      if (!mounted) return;
+      setState(() {
+        _leaderRecentActivity = activities.take(20).toList();
+        _isLoadingLeaderActivity = false;
+      });
+    } catch (e) {
+      debugPrint('Error loading leader activity: $e');
+      if (!mounted) return;
+      setState(() {
+        _leaderRecentActivity = [];
+        _isLoadingLeaderActivity = false;
+      });
     }
   }
 
@@ -196,6 +362,90 @@ class _HomeScreenState extends State<HomeScreen> {
 
     // Return up to 3 targets
     return targetData.values.take(3).toList();
+  }
+
+  IconData _leaderActivityIcon(String type) {
+    switch (type) {
+      case 'delivery':
+        return Icons.local_shipping;
+      case 'donation':
+        return Icons.volunteer_activism;
+      case 'book_sale':
+        return Icons.menu_book_rounded;
+      default:
+        return Icons.history;
+    }
+  }
+
+  Color _leaderActivityColor(String type) {
+    switch (type) {
+      case 'delivery':
+        return AppColors.success;
+      case 'donation':
+        return AppColors.accent;
+      case 'book_sale':
+        return AppColors.primary;
+      default:
+        return AppColors.secondary;
+    }
+  }
+
+  String _formatRelativeTime(DateTime? timestamp) {
+    if (timestamp == null) return '';
+    final now = DateTime.now();
+    final diff = now.difference(timestamp);
+    if (diff.inMinutes < 1) return 'just now';
+    if (diff.inMinutes < 60) return '${diff.inMinutes}m ago';
+    if (diff.inHours < 24) return '${diff.inHours}h ago';
+    return '${diff.inDays}d ago';
+  }
+
+  void _showLeaderActivityDetail(Map<String, dynamic> item) {
+    final type = (item['type'] ?? '').toString().toLowerCase();
+    showModalBottomSheet<void>(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(18)),
+      ),
+      builder: (ctx) {
+        final textTheme = Theme.of(ctx).textTheme;
+        return Padding(
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                (item['title'] ?? 'Activity').toString(),
+                style: textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(height: 10),
+              Text((item['subtitle'] ?? '').toString()),
+              if ((item['worker_name'] ?? '').toString().isNotEmpty) ...[
+                const SizedBox(height: 8),
+                Text('Worker: ${item['worker_name']}'),
+              ],
+              if ((item['location'] ?? '').toString().isNotEmpty) ...[
+                const SizedBox(height: 6),
+                Text('Location: ${item['location']}'),
+              ],
+              if (item['amount'] is num) ...[
+                const SizedBox(height: 6),
+                Text(
+                  'Amount: \$${(item['amount'] as num).toDouble().toStringAsFixed(2)}',
+                ),
+              ],
+              if (type == 'book_sale' && item['quantity'] != null) ...[
+                const SizedBox(height: 6),
+                Text('Quantity: ${item['quantity']}'),
+              ],
+            ],
+          ),
+        );
+      },
+    );
   }
 
   @override
@@ -299,32 +549,43 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    return MultiBlocProvider(
-      providers: [
-        BlocProvider.value(value: _workSessionBloc),
-        BlocProvider.value(value: _scheduleBloc),
-        BlocProvider.value(value: _prayerRequestBloc),
-        BlocProvider.value(value: _locationBloc),
-      ],
-      child: BlocBuilder<AuthBloc, AuthState>(
-        // Only rebuild when auth type changes or user role changes
-        buildWhen: (previous, current) {
-          // Rebuild if state type changed (e.g., from loading to authenticated)
-          if (previous.runtimeType != current.runtimeType) return true;
-          // If both are authenticated, only rebuild if role changed
-          if (previous is AuthAuthenticated && current is AuthAuthenticated) {
-            return previous.user.role != current.user.role ||
-                previous.user.id != current.user.id;
-          }
-          return false;
-        },
-        builder: (context, authState) {
-          if (authState is AuthAuthenticated &&
-              (authState.user.isTeamLeader || authState.user.isAdmin)) {
-            return _buildLeaderDashboard(context, authState, isDark);
-          }
-          return _buildWorkerHome(context, authState, isDark);
-        },
+    return ShowCaseWidget(
+      onFinish: () {},
+      enableAutoScroll: true,
+      builder: (_) => MultiBlocProvider(
+        providers: [
+          BlocProvider.value(value: _workSessionBloc),
+          BlocProvider.value(value: _scheduleBloc),
+          BlocProvider.value(value: _prayerRequestBloc),
+          BlocProvider.value(value: _locationBloc),
+        ],
+        child: BlocBuilder<AuthBloc, AuthState>(
+          // Only rebuild when auth type changes or user role changes
+          buildWhen: (previous, current) {
+            // Rebuild if state type changed (e.g., from loading to authenticated)
+            if (previous.runtimeType != current.runtimeType) return true;
+            // If both are authenticated, only rebuild if role changed
+            if (previous is AuthAuthenticated && current is AuthAuthenticated) {
+              return previous.user.role != current.user.role ||
+                  previous.user.id != current.user.id;
+            }
+            return false;
+          },
+          builder: (context, authState) {
+            final isLeader =
+                authState is AuthAuthenticated &&
+                (authState.user.isTeamLeader || authState.user.isAdmin);
+            _maybeShowHomeCoachMarks(isLeader: isLeader);
+            if (isLeader) {
+              return _buildLeaderDashboard(
+                context,
+                authState as AuthAuthenticated,
+                isDark,
+              );
+            }
+            return _buildWorkerHome(context, authState, isDark);
+          },
+        ),
       ),
     );
   }
@@ -464,114 +725,120 @@ class _HomeScreenState extends State<HomeScreen> {
 
             // Team Overview Stats Grid
             SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20),
-                child: BlocBuilder<TerritoryBloc, TerritoryState>(
-                  builder: (context, territoryState) {
-                    // Show shimmer loading while territory is loading
-                    if (territoryState is TerritoryLoading) {
-                      return const SkeletonOverviewGrid();
-                    }
+              child: Showcase(
+                key: _showcaseLeaderOverview,
+                title: 'Team Overview',
+                description:
+                    'Track workers, territories, deliveries, and survey progress in one place.',
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  child: BlocBuilder<TerritoryBloc, TerritoryState>(
+                    builder: (context, territoryState) {
+                      // Show shimmer loading while territory is loading
+                      if (territoryState is TerritoryLoading) {
+                        return const SkeletonOverviewGrid();
+                      }
 
-                    int territoryCount = 0;
-                    if (territoryState is TerritoryAllocationsLoaded) {
-                      territoryCount = territoryState.territories.length;
-                    } else if (territoryState is TerritoryAssignmentsLoaded) {
-                      territoryCount = territoryState.assignments.length;
-                    }
+                      int territoryCount = 0;
+                      if (territoryState is TerritoryAllocationsLoaded) {
+                        territoryCount = territoryState.territories.length;
+                      } else if (territoryState is TerritoryAssignmentsLoaded) {
+                        territoryCount = territoryState.assignments.length;
+                      }
 
-                    return Column(
-                      children: [
-                        Row(
-                          children: [
-                            Expanded(
-                              child: OverviewStatCard(
-                                icon: Icons.people_outline,
-                                iconBackgroundColor: AppColors.primary,
-                                title: 'Total Workers',
-                                value: '0',
-                                unit: 'workers',
-                                description: 'Team members',
-                                trendText: '0 online now',
+                      return Column(
+                        children: [
+                          Row(
+                            children: [
+                              Expanded(
+                                child: OverviewStatCard(
+                                  icon: Icons.people_outline,
+                                  iconBackgroundColor: AppColors.primary,
+                                  title: 'Total Workers',
+                                  value: '0',
+                                  unit: 'workers',
+                                  description: 'Team members',
+                                  trendText: '0 online now',
+                                ),
                               ),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: OverviewStatCard(
-                                icon: Icons.location_on_outlined,
-                                iconBackgroundColor: AppColors.secondary,
-                                title: 'Active Workers',
-                                value: '0',
-                                unit: 'tracking',
-                                description: 'Currently in field',
-                                trendText: 'No active tracking',
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: OverviewStatCard(
+                                  icon: Icons.location_on_outlined,
+                                  iconBackgroundColor: AppColors.secondary,
+                                  title: 'Active Workers',
+                                  value: '0',
+                                  unit: 'tracking',
+                                  description: 'Currently in field',
+                                  trendText: 'No active tracking',
+                                ),
                               ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 12),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: OverviewStatCard(
-                                icon: Icons.map_outlined,
-                                iconBackgroundColor: AppColors.warning,
-                                title: 'Territories',
-                                value: '$territoryCount',
-                                unit: 'areas',
-                                description: 'Assigned to team',
-                                trendText: 'All assigned',
+                            ],
+                          ),
+                          const SizedBox(height: 12),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: OverviewStatCard(
+                                  icon: Icons.map_outlined,
+                                  iconBackgroundColor: AppColors.warning,
+                                  title: 'Territories',
+                                  value: '$territoryCount',
+                                  unit: 'areas',
+                                  description: 'Assigned to team',
+                                  trendText: 'All assigned',
+                                ),
                               ),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: BlocBuilder<DeliveryBloc, DeliveryState>(
-                                builder: (context, deliveryState) {
-                                  int deliveryCount = 0;
-                                  if (deliveryState is DeliveryListLoaded) {
-                                    deliveryCount =
-                                        deliveryState.deliveries.length;
-                                  }
-                                  return OverviewStatCard(
-                                    icon: Icons.local_shipping_outlined,
-                                    iconBackgroundColor: AppColors.accent,
-                                    title: "Today's Deliveries",
-                                    value: '$deliveryCount',
-                                    unit: 'books',
-                                    description: 'Delivered today',
-                                    trendText: '$deliveryCount total',
-                                    trendColor: deliveryCount > 0
-                                        ? AppColors.success
-                                        : AppColors.error,
-                                  );
-                                },
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: BlocBuilder<DeliveryBloc, DeliveryState>(
+                                  builder: (context, deliveryState) {
+                                    int deliveryCount = 0;
+                                    if (deliveryState is DeliveryListLoaded) {
+                                      deliveryCount =
+                                          deliveryState.deliveries.length;
+                                    }
+                                    return OverviewStatCard(
+                                      icon: Icons.local_shipping_outlined,
+                                      iconBackgroundColor: AppColors.accent,
+                                      title: "Today's Deliveries",
+                                      value: '$deliveryCount',
+                                      unit: 'books',
+                                      description: 'Delivered today',
+                                      trendText: '$deliveryCount total',
+                                      trendColor: deliveryCount > 0
+                                          ? AppColors.success
+                                          : AppColors.error,
+                                    );
+                                  },
+                                ),
                               ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 12),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: OverviewStatCard(
-                                icon: Icons.assignment_outlined,
-                                iconBackgroundColor: AppColors.info,
-                                title: 'Completed Surveys',
-                                value: '0',
-                                unit: 'responses',
-                                description: 'Survey responses',
-                                trendText: 'This month',
-                                trendColor: AppColors.success,
+                            ],
+                          ),
+                          const SizedBox(height: 12),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: OverviewStatCard(
+                                  icon: Icons.assignment_outlined,
+                                  iconBackgroundColor: AppColors.info,
+                                  title: 'Completed Surveys',
+                                  value: '0',
+                                  unit: 'responses',
+                                  description: 'Survey responses',
+                                  trendText: 'This month',
+                                  trendColor: AppColors.success,
+                                ),
                               ),
-                            ),
-                            const Expanded(
-                              child: SizedBox(),
-                            ), // Empty space for odd number
-                          ],
-                        ),
-                      ],
-                    );
-                  },
+                              const Expanded(
+                                child: SizedBox(),
+                              ), // Empty space for odd number
+                            ],
+                          ),
+                        ],
+                      );
+                    },
+                  ),
                 ),
               ),
             ),
@@ -580,66 +847,71 @@ class _HomeScreenState extends State<HomeScreen> {
 
             // Management Section
             SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Team Management',
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.bold,
+              child: Showcase(
+                key: _showcaseLeaderManagement,
+                title: 'Team Management',
+                description:
+                    'Use these actions to verify workers, manage schedules, surveys, and reports.',
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Team Management',
+                        style: Theme.of(context).textTheme.titleMedium
+                            ?.copyWith(fontWeight: FontWeight.bold),
                       ),
-                    ),
-                    const SizedBox(height: 16),
-                    _ManagementListCard(
-                      items: [
-                        _ManagementItem(
-                          icon: Icons.verified_user,
-                          label: 'Verify Workers',
-                          description: 'Approve or reject join requests',
-                          color: AppColors.accent,
-                          onTap: () =>
-                              context.go('/leader/worker-verification'),
-                        ),
-                        _ManagementItem(
-                          icon: Icons.assignment,
-                          label: 'Manage Surveys',
-                          description: 'View surveys and responses',
-                          color: AppColors.warning,
-                          onTap: () => context.go('/survey'),
-                        ),
-                        _ManagementItem(
-                          icon: Icons.people,
-                          label: 'Team Members',
-                          description: 'View and manage your team',
-                          color: AppColors.primary,
-                          onTap: () => context.go('/team'),
-                        ),
-                        _ManagementItem(
-                          icon: Icons.calendar_month,
-                          label: 'Schedule Workers',
-                          description: 'Assign shifts and territories',
-                          color: AppColors.secondary,
-                          onTap: () => context.go('/schedule'),
-                        ),
-                        _ManagementItem(
-                          icon: Icons.bar_chart,
-                          label: 'Team Reports',
-                          description: 'View performance metrics',
-                          color: AppColors.success,
-                          onTap: () => context.go('/reports'),
-                        ),
-                        _ManagementItem(
-                          icon: Icons.article,
-                          label: 'News & Updates',
-                          description: 'View organization news',
-                          color: AppColors.info,
-                          onTap: () => context.go('/leader/blogs'),
-                        ),
-                      ],
-                    ),
-                  ],
+                      const SizedBox(height: 16),
+                      _ManagementListCard(
+                        items: [
+                          _ManagementItem(
+                            icon: Icons.verified_user,
+                            label: 'Verify Workers',
+                            description: 'Approve or reject join requests',
+                            color: AppColors.accent,
+                            onTap: () =>
+                                context.go('/leader/worker-verification'),
+                          ),
+                          _ManagementItem(
+                            icon: Icons.assignment,
+                            label: 'Manage Surveys',
+                            description: 'View surveys and responses',
+                            color: AppColors.warning,
+                            onTap: () => context.go('/survey'),
+                          ),
+                          _ManagementItem(
+                            icon: Icons.people,
+                            label: 'Team Members',
+                            description: 'View and manage your team',
+                            color: AppColors.primary,
+                            onTap: () => context.go('/team'),
+                          ),
+                          _ManagementItem(
+                            icon: Icons.calendar_month,
+                            label: 'Schedule Workers',
+                            description: 'Assign shifts and territories',
+                            color: AppColors.secondary,
+                            onTap: () => context.go('/schedule'),
+                          ),
+                          _ManagementItem(
+                            icon: Icons.bar_chart,
+                            label: 'Team Reports',
+                            description: 'View performance metrics',
+                            color: AppColors.success,
+                            onTap: () => context.go('/reports'),
+                          ),
+                          _ManagementItem(
+                            icon: Icons.article,
+                            label: 'News & Updates',
+                            description: 'View organization news',
+                            color: AppColors.info,
+                            onTap: () => context.go('/leader/blogs'),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ),
@@ -651,82 +923,116 @@ class _HomeScreenState extends State<HomeScreen> {
 
             // Recent Team Activity
             SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          'Recent Team Activity',
-                          style: Theme.of(context).textTheme.titleMedium
-                              ?.copyWith(fontWeight: FontWeight.bold),
-                        ),
-                        TextButton(
-                          onPressed: () => context.go('/reports'),
-                          child: const Text('View All'),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    Container(
-                      decoration: BoxDecoration(
-                        color: isDark
-                            ? AppColors.surfaceDark
-                            : AppColors.surfaceLight,
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(
-                          color: isDark
-                              ? AppColors.borderDark
-                              : AppColors.borderLight,
-                        ),
-                      ),
-                      child: Column(
+              child: Showcase(
+                key: _showcaseLeaderActivity,
+                title: 'Recent Team Activity',
+                description:
+                    'Review latest deliveries, donations, and book sales from your team.',
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          _ActivityItem(
-                            icon: Icons.assignment_turned_in,
-                            title: 'Survey Completed',
-                            subtitle: 'John D. completed "Customer Feedback"',
-                            time: '5 min ago',
-                            color: AppColors.success,
-                            isDark: isDark,
+                          Text(
+                            'Recent Team Activity',
+                            style: Theme.of(context).textTheme.titleMedium
+                                ?.copyWith(fontWeight: FontWeight.bold),
                           ),
-                          Divider(
-                            height: 1,
-                            indent: 72,
-                            color: isDark
-                                ? AppColors.borderDark
-                                : AppColors.borderLight,
-                          ),
-                          _ActivityItem(
-                            icon: Icons.login,
-                            title: 'Session Started',
-                            subtitle: 'Sarah M. checked in at Territory A',
-                            time: '15 min ago',
-                            color: AppColors.primary,
-                            isDark: isDark,
-                          ),
-                          Divider(
-                            height: 1,
-                            indent: 72,
-                            color: isDark
-                                ? AppColors.borderDark
-                                : AppColors.borderLight,
-                          ),
-                          _ActivityItem(
-                            icon: Icons.local_shipping,
-                            title: 'Delivery Made',
-                            subtitle: 'Mike T. delivered to 123 Main St',
-                            time: '32 min ago',
-                            color: AppColors.accent,
-                            isDark: isDark,
+                          TextButton(
+                            onPressed: () => context.go('/reports'),
+                            child: const Text('View All'),
                           ),
                         ],
                       ),
-                    ),
-                  ],
+                      const SizedBox(height: 12),
+                      Container(
+                        decoration: BoxDecoration(
+                          color: isDark
+                              ? AppColors.surfaceDark
+                              : AppColors.surfaceLight,
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(
+                            color: isDark
+                                ? AppColors.borderDark
+                                : AppColors.borderLight,
+                          ),
+                        ),
+                        child: _isLoadingLeaderActivity
+                            ? const Padding(
+                                padding: EdgeInsets.all(20),
+                                child: Center(
+                                  child: CircularProgressIndicator(),
+                                ),
+                              )
+                            : _leaderRecentActivity.isEmpty
+                            ? Padding(
+                                padding: const EdgeInsets.all(20),
+                                child: Text(
+                                  'No recent team activity yet.',
+                                  style: TextStyle(
+                                    color: isDark
+                                        ? AppColors.textSecondaryDark
+                                        : AppColors.textSecondaryLight,
+                                  ),
+                                ),
+                              )
+                            : Column(
+                                children: _leaderRecentActivity
+                                    .take(5)
+                                    .toList()
+                                    .asMap()
+                                    .entries
+                                    .map((entry) {
+                                      final index = entry.key;
+                                      final item = entry.value;
+                                      final type = (item['type'] ?? '')
+                                          .toString()
+                                          .toLowerCase();
+                                      final icon = _leaderActivityIcon(type);
+                                      final color = _leaderActivityColor(type);
+                                      final timestamp = DateTime.tryParse(
+                                        (item['timestamp'] ?? '').toString(),
+                                      );
+                                      return Column(
+                                        children: [
+                                          _ActivityItem(
+                                            icon: icon,
+                                            title: (item['title'] ?? 'Activity')
+                                                .toString(),
+                                            subtitle: (item['subtitle'] ?? '')
+                                                .toString(),
+                                            time: _formatRelativeTime(
+                                              timestamp,
+                                            ),
+                                            color: color,
+                                            isDark: isDark,
+                                            onTap: () =>
+                                                _showLeaderActivityDetail(item),
+                                          ),
+                                          if (index <
+                                              (_leaderRecentActivity.length > 5
+                                                  ? 4
+                                                  : _leaderRecentActivity
+                                                            .length -
+                                                        1))
+                                            Divider(
+                                              height: 1,
+                                              indent: 72,
+                                              color: isDark
+                                                  ? AppColors.borderDark
+                                                  : AppColors.borderLight,
+                                            ),
+                                        ],
+                                      );
+                                    })
+                                    .toList(),
+                              ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ),
@@ -812,16 +1118,22 @@ class _HomeScreenState extends State<HomeScreen> {
 
             // Target Banner
             SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.only(top: 8, bottom: 16),
-                child: _isLoadingTargets
-                    ? _TargetBannerShimmer()
-                    : _workerTargets.isEmpty
-                    ? NoTargetsBanner(onTap: () => context.push('/targets'))
-                    : TargetBanner(
-                        targets: _buildTargetBannerData(),
-                        onTap: () => context.push('/targets'),
-                      ),
+              child: Showcase(
+                key: _showcaseWorkerTargets,
+                title: "Today's Targets",
+                description:
+                    'Check your daily territory and donation targets here before starting field activity.',
+                child: Padding(
+                  padding: const EdgeInsets.only(top: 8, bottom: 16),
+                  child: _isLoadingTargets
+                      ? _TargetBannerShimmer()
+                      : _workerTargets.isEmpty
+                      ? NoTargetsBanner(onTap: () => context.push('/targets'))
+                      : TargetBanner(
+                          targets: _buildTargetBannerData(),
+                          onTap: () => context.push('/targets'),
+                        ),
+                ),
               ),
             ),
 
@@ -858,21 +1170,27 @@ class _HomeScreenState extends State<HomeScreen> {
 
             // Location Status Banner
             SliverToBoxAdapter(
-              child: Center(
-                child: BlocBuilder<WorkSessionBloc, WorkSessionState>(
-                  builder: (context, sessionState) {
-                    final isActive = sessionState is WorkSessionActive;
-                    return LocationStatusBanner(
-                      isActive: isActive,
-                      onTap: () {
-                        if (isActive) {
-                          _showEndSessionDialog(context);
-                        } else {
-                          _showTerritorySelectionSheet(context);
-                        }
-                      },
-                    );
-                  },
+              child: Showcase(
+                key: _showcaseWorkerSession,
+                title: 'Session Tracking',
+                description:
+                    'Start your session when entering a territory and end it when you complete your visit.',
+                child: Center(
+                  child: BlocBuilder<WorkSessionBloc, WorkSessionState>(
+                    builder: (context, sessionState) {
+                      final isActive = sessionState is WorkSessionActive;
+                      return LocationStatusBanner(
+                        isActive: isActive,
+                        onTap: () {
+                          if (isActive) {
+                            _showEndSessionDialog(context);
+                          } else {
+                            _showTerritorySelectionSheet(context);
+                          }
+                        },
+                      );
+                    },
+                  ),
                 ),
               ),
             ),
@@ -913,94 +1231,100 @@ class _HomeScreenState extends State<HomeScreen> {
 
             // Quick Actions Grid (Worker) - Large colorful tiles
             SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20),
-                child: BlocBuilder<WorkSessionBloc, WorkSessionState>(
-                  builder: (context, sessionState) {
-                    final allActions = [
-                      QuickActionTileData(
-                        icon: Icons.map,
-                        label: 'My Territory',
-                        subtitle: 'Manage areas',
-                        backgroundColor: QuickActionColors.territory,
-                        backgroundColorEnd: QuickActionColors.territoryEnd,
-                        onTap: () => context.go('/territory'),
-                      ),
-                      QuickActionTileData(
-                        icon: Icons.volunteer_activism,
-                        label: 'Donation',
-                        subtitle: 'Record gifts',
-                        backgroundColor: QuickActionColors.delivery,
-                        backgroundColorEnd: QuickActionColors.deliveryEnd,
-                        onTap: () => context.go('/delivery'),
-                      ),
-                      QuickActionTileData(
-                        icon: Icons.assignment,
-                        label: 'Survey Form',
-                        subtitle: 'Gather info',
-                        backgroundColor: QuickActionColors.survey,
-                        backgroundColorEnd: QuickActionColors.surveyEnd,
-                        onTap: () => context.go('/survey'),
-                      ),
-                      QuickActionTileData(
-                        icon: Icons.church,
-                        label: 'Prayer',
-                        subtitle: 'Track needs',
-                        backgroundColor: QuickActionColors.prayer,
-                        backgroundColorEnd: QuickActionColors.prayerEnd,
-                        onTap: () => context.go('/prayer-requests/new'),
-                      ),
-                      QuickActionTileData(
-                        icon: Icons.groups,
-                        label: 'Team Chat',
-                        subtitle: 'Team connect',
-                        backgroundColor: QuickActionColors.team,
-                        backgroundColorEnd: QuickActionColors.teamEnd,
-                        onTap: () => context.go('/chat'),
-                      ),
-                      QuickActionTileData(
-                        icon: Icons.article,
-                        label: 'News',
-                        subtitle: 'Latest updates',
-                        backgroundColor: QuickActionColors.news,
-                        backgroundColorEnd: QuickActionColors.newsEnd,
-                        onTap: () => context.go('/blogs'),
-                      ),
-                      QuickActionTileData(
-                        icon: Icons.emoji_events,
-                        label: 'Achievements',
-                        subtitle: 'View badges',
-                        backgroundColor: QuickActionColors.achievements,
-                        backgroundColorEnd: QuickActionColors.achievementsEnd,
-                        onTap: () => context.push('/achievements'),
-                      ),
-                    ];
+              child: Showcase(
+                key: _showcaseWorkerQuickActions,
+                title: 'Quick Actions',
+                description:
+                    'Jump quickly to Territory, Donation, Survey, Prayer, and Team Chat from here.',
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  child: BlocBuilder<WorkSessionBloc, WorkSessionState>(
+                    builder: (context, sessionState) {
+                      final allActions = [
+                        QuickActionTileData(
+                          icon: Icons.map,
+                          label: 'My Territory',
+                          subtitle: 'Manage areas',
+                          backgroundColor: QuickActionColors.territory,
+                          backgroundColorEnd: QuickActionColors.territoryEnd,
+                          onTap: () => context.go('/territory'),
+                        ),
+                        QuickActionTileData(
+                          icon: Icons.volunteer_activism,
+                          label: 'Donation',
+                          subtitle: 'Record gifts',
+                          backgroundColor: QuickActionColors.delivery,
+                          backgroundColorEnd: QuickActionColors.deliveryEnd,
+                          onTap: () => context.go('/delivery'),
+                        ),
+                        QuickActionTileData(
+                          icon: Icons.assignment,
+                          label: 'Survey Form',
+                          subtitle: 'Gather info',
+                          backgroundColor: QuickActionColors.survey,
+                          backgroundColorEnd: QuickActionColors.surveyEnd,
+                          onTap: () => context.go('/survey'),
+                        ),
+                        QuickActionTileData(
+                          icon: Icons.church,
+                          label: 'Prayer',
+                          subtitle: 'Track needs',
+                          backgroundColor: QuickActionColors.prayer,
+                          backgroundColorEnd: QuickActionColors.prayerEnd,
+                          onTap: () => context.go('/prayer-requests/new'),
+                        ),
+                        QuickActionTileData(
+                          icon: Icons.groups,
+                          label: 'Team Chat',
+                          subtitle: 'Team connect',
+                          backgroundColor: QuickActionColors.team,
+                          backgroundColorEnd: QuickActionColors.teamEnd,
+                          onTap: () => context.go('/chat'),
+                        ),
+                        QuickActionTileData(
+                          icon: Icons.article,
+                          label: 'News',
+                          subtitle: 'Latest updates',
+                          backgroundColor: QuickActionColors.news,
+                          backgroundColorEnd: QuickActionColors.newsEnd,
+                          onTap: () => context.go('/blogs'),
+                        ),
+                        QuickActionTileData(
+                          icon: Icons.emoji_events,
+                          label: 'Achievements',
+                          subtitle: 'View badges',
+                          backgroundColor: QuickActionColors.achievements,
+                          backgroundColorEnd: QuickActionColors.achievementsEnd,
+                          onTap: () => context.push('/achievements'),
+                        ),
+                      ];
 
-                    final displayedActions = _showAllTiles
-                        ? allActions
-                        : allActions.take(4).toList();
+                      final displayedActions = _showAllTiles
+                          ? allActions
+                          : allActions.take(4).toList();
 
-                    return Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        QuickActionGrid(actions: displayedActions),
-                        if (!_showAllTiles) ...[
-                          const SizedBox(height: 8),
-                          Center(
-                            child: TextButton.icon(
-                              onPressed: () {
-                                setState(() {
-                                  _showAllTiles = true;
-                                });
-                              },
-                              icon: const Icon(Icons.expand_more),
-                              label: const Text('View All'),
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          QuickActionGrid(actions: displayedActions),
+                          if (!_showAllTiles) ...[
+                            const SizedBox(height: 8),
+                            Center(
+                              child: TextButton.icon(
+                                onPressed: () {
+                                  setState(() {
+                                    _showAllTiles = true;
+                                  });
+                                },
+                                icon: const Icon(Icons.expand_more),
+                                label: const Text('View All'),
+                              ),
                             ),
-                          ),
+                          ],
                         ],
-                      ],
-                    );
-                  },
+                      );
+                    },
+                  ),
                 ),
               ),
             ),
@@ -2215,6 +2539,7 @@ class _ActivityItem extends StatelessWidget {
   final String time;
   final Color color;
   final bool isDark;
+  final VoidCallback? onTap;
 
   const _ActivityItem({
     required this.icon,
@@ -2223,11 +2548,13 @@ class _ActivityItem extends StatelessWidget {
     required this.time,
     required this.color,
     required this.isDark,
+    this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
     return ListTile(
+      onTap: onTap,
       leading: Container(
         width: 40,
         height: 40,

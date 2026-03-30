@@ -13,7 +13,8 @@ class PrayerRequestFormScreen extends StatefulWidget {
   const PrayerRequestFormScreen({super.key});
 
   @override
-  State<PrayerRequestFormScreen> createState() => _PrayerRequestFormScreenState();
+  State<PrayerRequestFormScreen> createState() =>
+      _PrayerRequestFormScreenState();
 }
 
 class _PrayerRequestFormScreenState extends State<PrayerRequestFormScreen> {
@@ -109,36 +110,40 @@ class _PrayerRequestFormScreenState extends State<PrayerRequestFormScreen> {
 
     setState(() => _isSubmitting = true);
 
-    context.read<PrayerRequestBloc>().add(PrayerRequestCreate(
-      requesterName: _requesterNameController.text.trim(),
-      requesterPhone: _requesterPhoneController.text.trim().isNotEmpty
-          ? _requesterPhoneController.text.trim()
-          : null,
-      requesterEmail: _requesterEmailController.text.trim().isNotEmpty
-          ? _requesterEmailController.text.trim()
-          : null,
-      requesterAddress: _requesterAddressController.text.trim().isNotEmpty
-          ? _requesterAddressController.text.trim()
-          : null,
-      latitude: _latitude,
-      longitude: _longitude,
-      prayerSubject: _prayerSubjectController.text.trim(),
-      prayerDetails: _prayerDetailsController.text.trim(),
-      prayerCategory: _selectedCategory,
-      requestType: _selectedRequestType,
-      preferredVisitDate: _selectedRequestType == PrayerRequestType.homeVisit &&
-              _preferredVisitDateController.text.trim().isNotEmpty
-          ? _preferredVisitDateController.text.trim()
-          : null,
-      preferredVisitTime: _selectedRequestType == PrayerRequestType.homeVisit &&
-              _preferredVisitTimeController.text.trim().isNotEmpty
-          ? _preferredVisitTimeController.text.trim()
-          : null,
-      urgency: _selectedUrgency,
-      notes: _notesController.text.trim().isNotEmpty
-          ? _notesController.text.trim()
-          : null,
-    ));
+    context.read<PrayerRequestBloc>().add(
+      PrayerRequestCreate(
+        requesterName: _requesterNameController.text.trim(),
+        requesterPhone: _requesterPhoneController.text.trim().isNotEmpty
+            ? _requesterPhoneController.text.trim()
+            : null,
+        requesterEmail: _requesterEmailController.text.trim().isNotEmpty
+            ? _requesterEmailController.text.trim()
+            : null,
+        requesterAddress: _requesterAddressController.text.trim().isNotEmpty
+            ? _requesterAddressController.text.trim()
+            : null,
+        latitude: _latitude,
+        longitude: _longitude,
+        prayerSubject: _prayerSubjectController.text.trim(),
+        prayerDetails: _prayerDetailsController.text.trim(),
+        prayerCategory: _selectedCategory,
+        requestType: _selectedRequestType,
+        preferredVisitDate:
+            _selectedRequestType == PrayerRequestType.homeVisit &&
+                _preferredVisitDateController.text.trim().isNotEmpty
+            ? _preferredVisitDateController.text.trim()
+            : null,
+        preferredVisitTime:
+            _selectedRequestType == PrayerRequestType.homeVisit &&
+                _preferredVisitTimeController.text.trim().isNotEmpty
+            ? _preferredVisitTimeController.text.trim()
+            : null,
+        urgency: _selectedUrgency,
+        notes: _notesController.text.trim().isNotEmpty
+            ? _notesController.text.trim()
+            : null,
+      ),
+    );
   }
 
   Future<void> _selectDate() async {
@@ -173,13 +178,19 @@ class _PrayerRequestFormScreenState extends State<PrayerRequestFormScreen> {
     return BlocListener<PrayerRequestBloc, PrayerRequestState>(
       listener: (context, state) {
         if (state is PrayerRequestSubmitSuccess) {
-          SuccessOverlay.show(context, message: 'Prayer request submitted!').then((_) {
+          SuccessOverlay.show(
+            context,
+            message: 'Prayer request submitted!',
+          ).then((_) {
             if (context.mounted) {
               final authState = context.read<AuthBloc>().state;
               if (authState is AuthAuthenticated) {
-                final isLeader = authState.user.role == 'team_leader' ||
+                final isLeader =
+                    authState.user.role == 'team_leader' ||
                     authState.user.role == 'admin';
-                context.go(isLeader ? '/leader/prayer-requests' : '/prayer-requests');
+                context.go(
+                  isLeader ? '/leader/prayer-requests' : '/prayer-requests',
+                );
               } else {
                 context.go('/prayer-requests');
               }
@@ -194,7 +205,7 @@ class _PrayerRequestFormScreenState extends State<PrayerRequestFormScreen> {
         appBar: AppBar(
           title: const Text('New Prayer Request'),
           leading: IconButton(
-            icon: const Icon(Icons.close),
+            icon: const Icon(Icons.arrow_back),
             onPressed: () => _showExitConfirmation(context),
           ),
           actions: [
@@ -203,14 +214,15 @@ class _PrayerRequestFormScreenState extends State<PrayerRequestFormScreen> {
                 padding: const EdgeInsets.only(right: 16),
                 child: Row(
                   children: [
-                    const Icon(Icons.location_on, size: 16, color: AppColors.success),
+                    const Icon(
+                      Icons.location_on,
+                      size: 16,
+                      color: AppColors.success,
+                    ),
                     const SizedBox(width: 4),
                     Text(
                       'GPS',
-                      style: TextStyle(
-                        color: AppColors.success,
-                        fontSize: 12,
-                      ),
+                      style: TextStyle(color: AppColors.success, fontSize: 12),
                     ),
                   ],
                 ),
@@ -290,21 +302,30 @@ class _PrayerRequestFormScreenState extends State<PrayerRequestFormScreen> {
               _buildDropdownField(
                 label: 'Prayer Category',
                 value: _selectedCategory,
-                items: PrayerCategory.all.map((c) => DropdownMenuItem(
-                  value: c,
-                  child: Text(PrayerCategory.getDisplayName(c)),
-                )).toList(),
-                onChanged: (value) => setState(() => _selectedCategory = value!),
+                items: PrayerCategory.all
+                    .map(
+                      (c) => DropdownMenuItem(
+                        value: c,
+                        child: Text(PrayerCategory.getDisplayName(c)),
+                      ),
+                    )
+                    .toList(),
+                onChanged: (value) =>
+                    setState(() => _selectedCategory = value!),
                 icon: Icons.category_outlined,
               ),
               const SizedBox(height: 12),
               _buildDropdownField(
                 label: 'Urgency',
                 value: _selectedUrgency,
-                items: PrayerUrgency.all.map((u) => DropdownMenuItem(
-                  value: u,
-                  child: Text(PrayerUrgency.getDisplayName(u)),
-                )).toList(),
+                items: PrayerUrgency.all
+                    .map(
+                      (u) => DropdownMenuItem(
+                        value: u,
+                        child: Text(PrayerUrgency.getDisplayName(u)),
+                      ),
+                    )
+                    .toList(),
                 onChanged: (value) => setState(() => _selectedUrgency = value!),
                 icon: Icons.priority_high,
               ),
@@ -358,15 +379,12 @@ class _PrayerRequestFormScreenState extends State<PrayerRequestFormScreen> {
       children: [
         Text(
           title,
-          style: Theme.of(context).textTheme.titleMedium?.copyWith(
-            fontWeight: FontWeight.w600,
-          ),
+          style: Theme.of(
+            context,
+          ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
         ),
         if (isRequired)
-          const Text(
-            ' *',
-            style: TextStyle(color: AppColors.error),
-          ),
+          const Text(' *', style: TextStyle(color: AppColors.error)),
       ],
     );
   }
@@ -415,8 +433,8 @@ class _PrayerRequestFormScreenState extends State<PrayerRequestFormScreen> {
           color: isSelected
               ? AppColors.primary.withAlpha(20)
               : isDark
-                  ? AppColors.cardDark
-                  : AppColors.cardLight,
+              ? AppColors.cardDark
+              : AppColors.cardLight,
           border: Border.all(
             color: isSelected ? AppColors.primary : Colors.transparent,
             width: 2,
@@ -469,9 +487,7 @@ class _PrayerRequestFormScreenState extends State<PrayerRequestFormScreen> {
       decoration: InputDecoration(
         labelText: label,
         prefixIcon: icon != null ? Icon(icon) : null,
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-        ),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
       ),
       validator: isRequired
           ? (value) {
@@ -498,9 +514,7 @@ class _PrayerRequestFormScreenState extends State<PrayerRequestFormScreen> {
       decoration: InputDecoration(
         labelText: label,
         prefixIcon: icon != null ? Icon(icon) : null,
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-        ),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
       ),
     );
   }
@@ -518,9 +532,7 @@ class _PrayerRequestFormScreenState extends State<PrayerRequestFormScreen> {
         labelText: label,
         prefixIcon: const Icon(Icons.calendar_today_outlined),
         suffixIcon: const Icon(Icons.arrow_drop_down),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-        ),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
       ),
     );
   }
@@ -538,9 +550,7 @@ class _PrayerRequestFormScreenState extends State<PrayerRequestFormScreen> {
         labelText: label,
         prefixIcon: const Icon(Icons.access_time_outlined),
         suffixIcon: const Icon(Icons.arrow_drop_down),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-        ),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
       ),
     );
   }
@@ -559,15 +569,14 @@ class _PrayerRequestFormScreenState extends State<PrayerRequestFormScreen> {
             child: const Text('Cancel'),
           ),
           ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.error,
-            ),
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.error),
             onPressed: () {
               Navigator.pop(ctx);
               // Navigate back to home based on user role
               final authState = context.read<AuthBloc>().state;
               if (authState is AuthAuthenticated) {
-                final isLeader = authState.user.role == 'team_leader' ||
+                final isLeader =
+                    authState.user.role == 'team_leader' ||
                     authState.user.role == 'admin';
                 context.go(isLeader ? '/leader/dashboard' : '/home');
               } else {

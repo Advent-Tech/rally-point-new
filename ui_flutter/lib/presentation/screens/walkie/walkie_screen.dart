@@ -9,6 +9,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../blocs/walkie/walkie_bloc.dart';
 import '../../blocs/auth/auth_bloc.dart';
 import '../../../data/models/walkie_model.dart';
+import '../../widgets/navigation/app_back_button.dart';
 
 class WalkieScreen extends StatefulWidget {
   const WalkieScreen({super.key});
@@ -86,6 +87,7 @@ class _WalkieScreenState extends State<WalkieScreen> {
       value: _walkieBloc,
       child: Scaffold(
         appBar: AppBar(
+          leading: AppBackButton.leading(context, fallbackRoute: '/home'),
           title: Row(
             children: [
               Container(
@@ -1174,7 +1176,7 @@ class _CompactPTTButtonState extends State<_CompactPTTButton>
     final isActive = _isPressed || widget.isSpeaking;
     final Color baseColor = widget.isMuted
         ? Colors.grey
-        : (isActive ? const Color(0xFFD94C57) : const Color(0xFF2F6FE4));
+        : (isActive ? AppColors.secondary : AppColors.primary);
 
     return Listener(
       onPointerDown: (_) => _onPressStart(),

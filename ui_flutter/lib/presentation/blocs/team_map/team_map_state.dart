@@ -121,34 +121,61 @@ class MapDonationMarker {
   final double latitude;
   final double longitude;
   final double amount;
+  final int quantity;
+  final String itemTitle;
   final String donorName;
   final String workerName;
   final String workerId;
+  final String activityType;
 
   const MapDonationMarker({
     required this.id,
     required this.latitude,
     required this.longitude,
     required this.amount,
+    this.quantity = 1,
+    this.itemTitle = '',
     required this.donorName,
     required this.workerName,
     required this.workerId,
+    this.activityType = 'donation',
   });
 
   factory MapDonationMarker.fromJson(Map<String, dynamic> json) {
+    final donationType = (json['donation_type'] ?? 'donation').toString();
     return MapDonationMarker(
       id: json['id']?.toString() ?? '',
       latitude: (json['latitude'] ?? 0.0).toDouble(),
       longitude: (json['longitude'] ?? 0.0).toDouble(),
       amount: (json['amount'] ?? 0.0).toDouble(),
+      quantity: (json['quantity'] as num? ?? 1).toInt(),
+      itemTitle: (json['purpose'] ?? '').toString(),
       donorName: json['donor_name'] ?? 'Anonymous',
       workerName: json['worker_name'] ?? json['collector_name'] ?? 'Unknown',
       workerId:
           json['worker_id']?.toString() ??
           json['collected_by_id']?.toString() ??
           '',
+      activityType: donationType,
     );
   }
+
+  factory MapDonationMarker.fromBookSaleJson(Map<String, dynamic> json) {
+    return MapDonationMarker(
+      id: json['id']?.toString() ?? '',
+      latitude: (json['latitude'] ?? 0.0).toDouble(),
+      longitude: (json['longitude'] ?? 0.0).toDouble(),
+      amount: (json['total_amount'] ?? json['amount'] ?? 0.0).toDouble(),
+      quantity: (json['quantity'] as num? ?? 1).toInt(),
+      itemTitle: (json['book_title'] ?? 'Book Sale').toString(),
+      donorName: (json['buyer_name'] ?? 'Buyer').toString(),
+      workerName: (json['worker_name'] ?? 'Unknown').toString(),
+      workerId: json['worker_id']?.toString() ?? '',
+      activityType: 'book_sale',
+    );
+  }
+
+  bool get isBookSale => activityType == 'book_sale';
 }
 
 class MapPrayerMarker {

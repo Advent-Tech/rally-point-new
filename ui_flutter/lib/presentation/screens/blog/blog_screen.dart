@@ -5,6 +5,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../data/models/blog_model.dart';
 import '../../blocs/blog/blog_bloc.dart';
+import '../../widgets/navigation/app_back_button.dart';
 import '../../widgets/role_badge.dart';
 import '../../widgets/animations/staggered_fade_in.dart';
 import '../../widgets/states/empty_state.dart';
@@ -56,7 +57,9 @@ class _BlogScreenState extends State<BlogScreen> {
     return BlocProvider.value(
       value: _blogBloc,
       child: Scaffold(
-        backgroundColor: isDark ? AppColors.backgroundDark : AppColors.backgroundLight,
+        backgroundColor: isDark
+            ? AppColors.backgroundDark
+            : AppColors.backgroundLight,
         appBar: AppBar(
           title: const Text('News & Updates'),
           backgroundColor: isDark ? AppColors.surfaceDark : Colors.white,
@@ -64,7 +67,7 @@ class _BlogScreenState extends State<BlogScreen> {
           elevation: 0,
           leading: IconButton(
             icon: const Icon(Icons.arrow_back),
-            onPressed: () => context.go('/home'),
+            onPressed: () => AppBackButton.handleBack(context),
           ),
           actions: const [RoleBadge()],
         ),
@@ -100,7 +103,9 @@ class _BlogScreenState extends State<BlogScreen> {
           Icon(
             Icons.error_outline,
             size: 64,
-            color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+            color: isDark
+                ? AppColors.textSecondaryDark
+                : AppColors.textSecondaryLight,
           ),
           const SizedBox(height: 16),
           Text(
@@ -115,7 +120,9 @@ class _BlogScreenState extends State<BlogScreen> {
           Text(
             message,
             style: TextStyle(
-              color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+              color: isDark
+                  ? AppColors.textSecondaryDark
+                  : AppColors.textSecondaryLight,
             ),
             textAlign: TextAlign.center,
           ),
@@ -211,9 +218,12 @@ class _BlogScreenState extends State<BlogScreen> {
                         fit: BoxFit.cover,
                         placeholder: (context, url) => Container(
                           color: AppColors.primary.withAlpha(30),
-                          child: const Center(child: CircularProgressIndicator()),
+                          child: const Center(
+                            child: CircularProgressIndicator(),
+                          ),
                         ),
-                        errorWidget: (context, url, error) => _buildPlaceholderImage(),
+                        errorWidget: (context, url, error) =>
+                            _buildPlaceholderImage(),
                       )
                     : _buildPlaceholderImage(),
               ),
@@ -229,7 +239,10 @@ class _BlogScreenState extends State<BlogScreen> {
                     Row(
                       children: [
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 4,
+                          ),
                           decoration: BoxDecoration(
                             color: AppColors.primary,
                             borderRadius: BorderRadius.circular(12),
@@ -248,7 +261,9 @@ class _BlogScreenState extends State<BlogScreen> {
                           blog.formattedDate,
                           style: TextStyle(
                             fontSize: 12,
-                            color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                            color: isDark
+                                ? AppColors.textSecondaryDark
+                                : AppColors.textSecondaryLight,
                           ),
                         ),
                       ],
@@ -259,7 +274,9 @@ class _BlogScreenState extends State<BlogScreen> {
                       style: TextStyle(
                         fontSize: 20,
                         fontWeight: FontWeight.bold,
-                        color: isDark ? Colors.white : AppColors.textPrimaryLight,
+                        color: isDark
+                            ? Colors.white
+                            : AppColors.textPrimaryLight,
                       ),
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
@@ -269,7 +286,9 @@ class _BlogScreenState extends State<BlogScreen> {
                       blog.shortExcerpt,
                       style: TextStyle(
                         fontSize: 14,
-                        color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                        color: isDark
+                            ? AppColors.textSecondaryDark
+                            : AppColors.textSecondaryLight,
                         height: 1.5,
                       ),
                       maxLines: 2,
@@ -298,7 +317,9 @@ class _BlogScreenState extends State<BlogScreen> {
                           style: TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.w500,
-                            color: isDark ? Colors.white : AppColors.textPrimaryLight,
+                            color: isDark
+                                ? Colors.white
+                                : AppColors.textPrimaryLight,
                           ),
                         ),
                         const Spacer(),
@@ -307,14 +328,18 @@ class _BlogScreenState extends State<BlogScreen> {
                             Icon(
                               Icons.visibility_outlined,
                               size: 16,
-                              color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                              color: isDark
+                                  ? AppColors.textSecondaryDark
+                                  : AppColors.textSecondaryLight,
                             ),
                             const SizedBox(width: 4),
                             Text(
                               '${blog.viewCount}',
                               style: TextStyle(
                                 fontSize: 12,
-                                color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                                color: isDark
+                                    ? AppColors.textSecondaryDark
+                                    : AppColors.textSecondaryLight,
                               ),
                             ),
                           ],
@@ -351,7 +376,9 @@ class _BlogScreenState extends State<BlogScreen> {
           children: [
             // Image thumbnail
             ClipRRect(
-              borderRadius: const BorderRadius.horizontal(left: Radius.circular(16)),
+              borderRadius: const BorderRadius.horizontal(
+                left: Radius.circular(16),
+              ),
               child: SizedBox(
                 width: 120,
                 height: 120,
@@ -359,10 +386,10 @@ class _BlogScreenState extends State<BlogScreen> {
                     ? CachedNetworkImage(
                         imageUrl: blog.imageUrl!,
                         fit: BoxFit.cover,
-                        placeholder: (context, url) => Container(
-                          color: AppColors.primary.withAlpha(30),
-                        ),
-                        errorWidget: (context, url, error) => _buildSmallPlaceholder(),
+                        placeholder: (context, url) =>
+                            Container(color: AppColors.primary.withAlpha(30)),
+                        errorWidget: (context, url, error) =>
+                            _buildSmallPlaceholder(),
                       )
                     : _buildSmallPlaceholder(),
               ),
@@ -389,7 +416,9 @@ class _BlogScreenState extends State<BlogScreen> {
                       style: TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.bold,
-                        color: isDark ? Colors.white : AppColors.textPrimaryLight,
+                        color: isDark
+                            ? Colors.white
+                            : AppColors.textPrimaryLight,
                       ),
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
@@ -401,21 +430,27 @@ class _BlogScreenState extends State<BlogScreen> {
                           blog.displayAuthorName,
                           style: TextStyle(
                             fontSize: 11,
-                            color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                            color: isDark
+                                ? AppColors.textSecondaryDark
+                                : AppColors.textSecondaryLight,
                           ),
                         ),
                         const Spacer(),
                         Icon(
                           Icons.visibility_outlined,
                           size: 14,
-                          color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                          color: isDark
+                              ? AppColors.textSecondaryDark
+                              : AppColors.textSecondaryLight,
                         ),
                         const SizedBox(width: 4),
                         Text(
                           '${blog.viewCount}',
                           style: TextStyle(
                             fontSize: 11,
-                            color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                            color: isDark
+                                ? AppColors.textSecondaryDark
+                                : AppColors.textSecondaryLight,
                           ),
                         ),
                       ],

@@ -11,7 +11,12 @@ class OverviewStatsBar extends StatelessWidget {
     return BlocBuilder<CommandCenterBloc, CommandCenterState>(
       builder: (context, state) {
         final activeWorkers = state.liveLocations.length;
-        final totalDonations = state.donations.length;
+        final totalDonations = state.donations
+            .where((d) => d.donationType != 'book_sale')
+            .length;
+        final totalBookSales = state.donations
+            .where((d) => d.donationType == 'book_sale')
+            .length;
         final totalPrayers = state.prayerRequests.length;
 
         return Container(
@@ -49,7 +54,19 @@ class OverviewStatsBar extends StatelessWidget {
                     icon: Icons.attach_money,
                     value: totalDonations.toString(),
                     label: 'Donations',
-                    color: Colors.blue,
+                    color: const Color(0xFF10B981),
+                  ),
+                  Container(
+                    width: 1,
+                    height: 40,
+                    color: Theme.of(context).dividerColor,
+                  ),
+                  _buildStatItem(
+                    context,
+                    icon: Icons.menu_book_rounded,
+                    value: totalBookSales.toString(),
+                    label: 'Books',
+                    color: const Color(0xFFF59E0B),
                   ),
                   Container(
                     width: 1,

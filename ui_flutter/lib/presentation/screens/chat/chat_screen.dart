@@ -4,6 +4,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../data/models/chat_model.dart';
 import '../../blocs/auth/auth_bloc.dart';
 import '../../blocs/chat/chat_bloc.dart';
+import '../../widgets/navigation/app_back_button.dart';
 
 class ChatScreen extends StatefulWidget {
   final String conversationId;
@@ -183,6 +184,7 @@ class _ChatScreenState extends State<ChatScreen> {
 
             return Scaffold(
               appBar: AppBar(
+                leading: AppBackButton.leading(context),
                 title: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -463,8 +465,17 @@ class _ChatScreenState extends State<ChatScreen> {
             ),
           ),
           const SizedBox(width: 8),
-          CircleAvatar(
-            backgroundColor: AppColors.primary,
+          Container(
+            width: 40,
+            height: 40,
+            decoration: const BoxDecoration(
+              shape: BoxShape.circle,
+              gradient: LinearGradient(
+                colors: [AppColors.primary, AppColors.secondary],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+            ),
             child: IconButton(
               icon: const Icon(Icons.send, color: Colors.white),
               onPressed: _sendMessage,
@@ -682,8 +693,15 @@ class _MessageBubble extends StatelessWidget {
                 ),
                 decoration: BoxDecoration(
                   color: isMe
-                      ? AppColors.primary
+                      ? null
                       : (isDark ? Colors.grey[800] : Colors.grey[200]),
+                  gradient: isMe
+                      ? const LinearGradient(
+                          colors: [AppColors.primary, AppColors.secondary],
+                          begin: Alignment.centerLeft,
+                          end: Alignment.centerRight,
+                        )
+                      : null,
                   borderRadius: BorderRadius.only(
                     topLeft: const Radius.circular(18),
                     topRight: const Radius.circular(18),

@@ -19,16 +19,31 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   final List<OnboardingSlide> _slides = [
     OnboardingSlide(
       title: 'Welcome to RallyPoint',
-      description: 'Track territories, visits, and prayer — together.',
+      description:
+          'One app for field ministry teams to track deliveries, donations, book sales, and prayer follow-ups.',
       accentColors: [AppColors.buttonPrimaryLight, AppColors.accent],
       heroBuilder: (context) =>
           const AppLogo(width: 160, height: 90, fit: BoxFit.contain),
     ),
     OnboardingSlide(
-      title: 'Track your field work',
+      title: 'Worker Flow',
       description:
-          'See assigned territories, check in, and log visits in seconds.',
+          'Open Territory to see assignments, then record donations or book sales from Field Activity in just a few taps.',
       accentColors: [AppColors.secondary, AppColors.primary],
+      heroBuilder: (context) {
+        final isDark = Theme.of(context).brightness == Brightness.dark;
+        return Icon(
+          Icons.assignment_turned_in_outlined,
+          size: 72,
+          color: isDark ? Colors.white : AppColors.navyBlue,
+        );
+      },
+    ),
+    OnboardingSlide(
+      title: 'Leader Flow',
+      description:
+          'Use dashboard analytics and Command Center map to monitor workers, territories, and daily activity in real time.',
+      accentColors: [AppColors.success, AppColors.accent],
       heroBuilder: (context) {
         final isDark = Theme.of(context).brightness == Brightness.dark;
         return Icon(
@@ -39,14 +54,14 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       },
     ),
     OnboardingSlide(
-      title: 'Stay connected',
+      title: 'Communication & Alerts',
       description:
-          'Coordinate with your team and follow progress in real time.',
-      accentColors: [AppColors.success, AppColors.accent],
+          'Stay synced with team chat, walkie-talkie, and push notifications for key updates.',
+      accentColors: [AppColors.warning, AppColors.primary],
       heroBuilder: (context) {
         final isDark = Theme.of(context).brightness == Brightness.dark;
         return Icon(
-          Icons.groups_2_outlined,
+          Icons.campaign_outlined,
           size: 72,
           color: isDark ? Colors.white : AppColors.navyBlue,
         );

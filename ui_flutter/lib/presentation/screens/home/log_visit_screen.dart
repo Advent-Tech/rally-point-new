@@ -5,6 +5,7 @@ import '../../blocs/work_session/work_session_bloc.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../widgets/custom_button.dart';
 import '../../widgets/animations/success_check.dart';
+import '../../widgets/navigation/app_back_button.dart';
 
 class LogVisitScreen extends StatefulWidget {
   const LogVisitScreen({super.key});
@@ -20,11 +21,36 @@ class _LogVisitScreenState extends State<LogVisitScreen> {
   String _selectedOutcome = 'contacted';
 
   final List<Map<String, dynamic>> _outcomes = [
-    {'value': 'contacted', 'label': 'Contacted', 'icon': Icons.check_circle, 'color': AppColors.success},
-    {'value': 'not_home', 'label': 'Not Home', 'icon': Icons.door_front_door, 'color': AppColors.warning},
-    {'value': 'interested', 'label': 'Interested', 'icon': Icons.star, 'color': AppColors.accent},
-    {'value': 'do_not_call', 'label': 'Do Not Call', 'icon': Icons.block, 'color': AppColors.error},
-    {'value': 'completed', 'label': 'Completed', 'icon': Icons.task_alt, 'color': AppColors.primary},
+    {
+      'value': 'contacted',
+      'label': 'Contacted',
+      'icon': Icons.check_circle,
+      'color': AppColors.success,
+    },
+    {
+      'value': 'not_home',
+      'label': 'Not Home',
+      'icon': Icons.door_front_door,
+      'color': AppColors.warning,
+    },
+    {
+      'value': 'interested',
+      'label': 'Interested',
+      'icon': Icons.star,
+      'color': AppColors.accent,
+    },
+    {
+      'value': 'do_not_call',
+      'label': 'Do Not Call',
+      'icon': Icons.block,
+      'color': AppColors.error,
+    },
+    {
+      'value': 'completed',
+      'label': 'Completed',
+      'icon': Icons.task_alt,
+      'color': AppColors.primary,
+    },
   ];
 
   @override
@@ -36,13 +62,21 @@ class _LogVisitScreenState extends State<LogVisitScreen> {
 
   void _submitVisit() async {
     if (_formKey.currentState!.validate()) {
-      context.read<WorkSessionBloc>().add(WorkSessionLogVisit(
-        address: _addressController.text.trim(),
-        outcome: _selectedOutcome,
-        notes: _notesController.text.trim().isEmpty ? null : _notesController.text.trim(),
-      ));
+      context.read<WorkSessionBloc>().add(
+        WorkSessionLogVisit(
+          address: _addressController.text.trim(),
+          outcome: _selectedOutcome,
+          notes: _notesController.text.trim().isEmpty
+              ? null
+              : _notesController.text.trim(),
+        ),
+      );
 
-      await SuccessOverlay.show(context, message: 'Visit logged!', duration: const Duration(milliseconds: 1200));
+      await SuccessOverlay.show(
+        context,
+        message: 'Visit logged!',
+        duration: const Duration(milliseconds: 1200),
+      );
       if (mounted) context.pop();
     }
   }
@@ -54,10 +88,7 @@ class _LogVisitScreenState extends State<LogVisitScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Log Visit'),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => context.pop(),
-        ),
+        leading: AppBackButton.leading(context, fallbackRoute: '/home'),
       ),
       body: BlocBuilder<WorkSessionBloc, WorkSessionState>(
         builder: (context, state) {
@@ -80,14 +111,13 @@ class _LogVisitScreenState extends State<LogVisitScreen> {
                   Text(
                     'You need to start a work session first',
                     style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                      color: isDark
+                          ? AppColors.textSecondaryDark
+                          : AppColors.textSecondaryLight,
                     ),
                   ),
                   const SizedBox(height: 24),
-                  CustomButton(
-                    text: 'Go Back',
-                    onPressed: () => context.pop(),
-                  ),
+                  CustomButton(text: 'Go Back', onPressed: () => context.pop()),
                 ],
               ),
             );
@@ -106,7 +136,9 @@ class _LogVisitScreenState extends State<LogVisitScreen> {
                     decoration: BoxDecoration(
                       color: AppColors.primary.withValues(alpha: 0.08),
                       borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: AppColors.primary.withValues(alpha: 0.2)),
+                      border: Border.all(
+                        color: AppColors.primary.withValues(alpha: 0.2),
+                      ),
                     ),
                     child: Row(
                       children: [
@@ -128,25 +160,24 @@ class _LogVisitScreenState extends State<LogVisitScreen> {
                             children: [
                               Text(
                                 'Working in',
-                                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                  color: AppColors.primary,
-                                ),
+                                style: Theme.of(context).textTheme.bodySmall
+                                    ?.copyWith(color: AppColors.primary),
                               ),
                               Text(
                                 state.session.territoryName,
-                                style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                                  fontWeight: FontWeight.bold,
-                                ),
+                                style: Theme.of(context).textTheme.titleMedium
+                                    ?.copyWith(fontWeight: FontWeight.bold),
                               ),
                             ],
                           ),
                         ),
                         Text(
                           state.session.formattedDuration,
-                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                            fontWeight: FontWeight.w500,
-                            color: AppColors.primary,
-                          ),
+                          style: Theme.of(context).textTheme.bodyMedium
+                              ?.copyWith(
+                                fontWeight: FontWeight.w500,
+                                color: AppColors.primary,
+                              ),
                         ),
                       ],
                     ),
@@ -204,12 +235,23 @@ class _LogVisitScreenState extends State<LogVisitScreen> {
                           });
                         },
                         child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 10,
+                          ),
                           decoration: BoxDecoration(
-                            color: isSelected ? color.withValues(alpha: 0.12) : (isDark ? AppColors.surfaceDark : AppColors.surfaceLight),
+                            color: isSelected
+                                ? color.withValues(alpha: 0.12)
+                                : (isDark
+                                      ? AppColors.surfaceDark
+                                      : AppColors.surfaceLight),
                             borderRadius: BorderRadius.circular(20),
                             border: Border.all(
-                              color: isSelected ? color : (isDark ? AppColors.borderDark : AppColors.borderLight),
+                              color: isSelected
+                                  ? color
+                                  : (isDark
+                                        ? AppColors.borderDark
+                                        : AppColors.borderLight),
                               width: isSelected ? 2 : 1,
                             ),
                           ),
@@ -219,14 +261,24 @@ class _LogVisitScreenState extends State<LogVisitScreen> {
                               Icon(
                                 outcome['icon'] as IconData,
                                 size: 18,
-                                color: isSelected ? color : (isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight),
+                                color: isSelected
+                                    ? color
+                                    : (isDark
+                                          ? AppColors.textSecondaryDark
+                                          : AppColors.textSecondaryLight),
                               ),
                               const SizedBox(width: 6),
                               Text(
                                 outcome['label'],
                                 style: TextStyle(
-                                  color: isSelected ? color : (isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight),
-                                  fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                                  color: isSelected
+                                      ? color
+                                      : (isDark
+                                            ? AppColors.textPrimaryDark
+                                            : AppColors.textPrimaryLight),
+                                  fontWeight: isSelected
+                                      ? FontWeight.bold
+                                      : FontWeight.normal,
                                 ),
                               ),
                             ],
@@ -280,12 +332,14 @@ class _LogVisitScreenState extends State<LogVisitScreen> {
                       children: [
                         Text(
                           "Today's Visits",
-                          style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                            fontWeight: FontWeight.bold,
-                          ),
+                          style: Theme.of(context).textTheme.titleSmall
+                              ?.copyWith(fontWeight: FontWeight.bold),
                         ),
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 4,
+                          ),
                           decoration: BoxDecoration(
                             color: AppColors.primary.withValues(alpha: 0.08),
                             borderRadius: BorderRadius.circular(12),
@@ -302,45 +356,63 @@ class _LogVisitScreenState extends State<LogVisitScreen> {
                       ],
                     ),
                     const SizedBox(height: 12),
-                    ...state.todayVisits.take(5).map((visit) => Container(
-                      margin: const EdgeInsets.only(bottom: 8),
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: isDark ? AppColors.surfaceDark : AppColors.surfaceLight,
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(
-                          color: isDark ? AppColors.borderDark : AppColors.borderLight,
-                        ),
-                      ),
-                      child: Row(
-                        children: [
-                          Text(
-                            visit.outcomeIcon,
-                            style: const TextStyle(fontSize: 20),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
+                    ...state.todayVisits
+                        .take(5)
+                        .map(
+                          (visit) => Container(
+                            margin: const EdgeInsets.only(bottom: 8),
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: isDark
+                                  ? AppColors.surfaceDark
+                                  : AppColors.surfaceLight,
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(
+                                color: isDark
+                                    ? AppColors.borderDark
+                                    : AppColors.borderLight,
+                              ),
+                            ),
+                            child: Row(
                               children: [
                                 Text(
-                                  visit.address,
-                                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                    fontWeight: FontWeight.w500,
-                                  ),
+                                  visit.outcomeIcon,
+                                  style: const TextStyle(fontSize: 20),
                                 ),
-                                Text(
-                                  visit.outcomeLabel,
-                                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                    color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        visit.address,
+                                        style: Theme.of(context)
+                                            .textTheme
+                                            .bodyMedium
+                                            ?.copyWith(
+                                              fontWeight: FontWeight.w500,
+                                            ),
+                                      ),
+                                      Text(
+                                        visit.outcomeLabel,
+                                        style: Theme.of(context)
+                                            .textTheme
+                                            .bodySmall
+                                            ?.copyWith(
+                                              color: isDark
+                                                  ? AppColors.textSecondaryDark
+                                                  : AppColors
+                                                        .textSecondaryLight,
+                                            ),
+                                      ),
+                                    ],
                                   ),
                                 ),
                               ],
                             ),
                           ),
-                        ],
-                      ),
-                    )),
+                        ),
                   ],
                 ],
               ),

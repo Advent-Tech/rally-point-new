@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_bloc/flutter_bloc.dart';
 import 'dart:ui';
-import '../blocs/auth/auth_bloc.dart';
 import '../../core/theme/app_colors.dart';
 import '../widgets/app_logo.dart';
 
@@ -57,13 +55,6 @@ class _SplashScreenState extends State<SplashScreen>
     );
 
     _controller.forward();
-
-    // Check auth status after animation
-    Future.delayed(const Duration(milliseconds: 1000), () {
-      if (mounted) {
-        context.read<AuthBloc>().add(const AuthCheckStatus());
-      }
-    });
   }
 
   @override

@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../data/models/team_model.dart';
 import '../../../data/models/territory_model.dart';
 import '../../blocs/auth/auth_bloc.dart';
 import '../../blocs/schedule/schedule_bloc.dart';
+import '../../widgets/navigation/app_back_button.dart';
 
 class ScheduleScreen extends StatefulWidget {
   final String? teamId;
@@ -39,9 +39,9 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => context.pop(),
+        leading: AppBackButton.leading(
+          context,
+          fallbackRoute: '/leader/dashboard',
         ),
         title: const Text('Schedule Management'),
         actions: [
@@ -66,7 +66,11 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const Icon(Icons.error_outline, size: 64, color: AppColors.error),
+                  const Icon(
+                    Icons.error_outline,
+                    size: 64,
+                    color: AppColors.error,
+                  ),
                   const SizedBox(height: 16),
                   Text(state.message),
                   const SizedBox(height: 16),
@@ -78,7 +82,9 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
                         teamId = authState.user.teamId;
                       }
                       if (teamId != null) {
-                        context.read<ScheduleBloc>().add(ScheduleLoadData(teamId: teamId));
+                        context.read<ScheduleBloc>().add(
+                          ScheduleLoadData(teamId: teamId),
+                        );
                       }
                     },
                     child: const Text('Retry'),
@@ -115,7 +121,11 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
     );
   }
 
-  Widget _buildLoadedContent(BuildContext context, ScheduleLoaded state, bool isDark) {
+  Widget _buildLoadedContent(
+    BuildContext context,
+    ScheduleLoaded state,
+    bool isDark,
+  ) {
     return Column(
       children: [
         // Date selector
@@ -130,8 +140,12 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
                   IconButton(
                     icon: const Icon(Icons.chevron_left),
                     onPressed: () {
-                      final newDate = state.selectedDate.subtract(const Duration(days: 1));
-                      context.read<ScheduleBloc>().add(ScheduleSelectDate(date: newDate));
+                      final newDate = state.selectedDate.subtract(
+                        const Duration(days: 1),
+                      );
+                      context.read<ScheduleBloc>().add(
+                        ScheduleSelectDate(date: newDate),
+                      );
                     },
                   ),
                   GestureDetector(
@@ -140,17 +154,21 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
                       children: [
                         Text(
                           _formatDate(state.selectedDate),
-                          style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                            fontWeight: FontWeight.bold,
-                          ),
+                          style: Theme.of(context).textTheme.titleLarge
+                              ?.copyWith(fontWeight: FontWeight.bold),
                         ),
                         Text(
-                          _isToday(state.selectedDate) ? 'Today' : _getDayName(state.selectedDate),
-                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: _isToday(state.selectedDate)
-                                ? AppColors.primary
-                                : (isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight),
-                          ),
+                          _isToday(state.selectedDate)
+                              ? 'Today'
+                              : _getDayName(state.selectedDate),
+                          style: Theme.of(context).textTheme.bodySmall
+                              ?.copyWith(
+                                color: _isToday(state.selectedDate)
+                                    ? AppColors.primary
+                                    : (isDark
+                                          ? AppColors.textSecondaryDark
+                                          : AppColors.textSecondaryLight),
+                              ),
                         ),
                       ],
                     ),
@@ -158,8 +176,12 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
                   IconButton(
                     icon: const Icon(Icons.chevron_right),
                     onPressed: () {
-                      final newDate = state.selectedDate.add(const Duration(days: 1));
-                      context.read<ScheduleBloc>().add(ScheduleSelectDate(date: newDate));
+                      final newDate = state.selectedDate.add(
+                        const Duration(days: 1),
+                      );
+                      context.read<ScheduleBloc>().add(
+                        ScheduleSelectDate(date: newDate),
+                      );
                     },
                   ),
                 ],
@@ -172,13 +194,17 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
                   scrollDirection: Axis.horizontal,
                   itemCount: 7,
                   itemBuilder: (context, index) {
-                    final date = DateTime.now().subtract(Duration(days: 3 - index));
+                    final date = DateTime.now().subtract(
+                      Duration(days: 3 - index),
+                    );
                     final isSelected = _isSameDay(date, state.selectedDate);
                     final isToday = _isToday(date);
 
                     return GestureDetector(
                       onTap: () {
-                        context.read<ScheduleBloc>().add(ScheduleSelectDate(date: date));
+                        context.read<ScheduleBloc>().add(
+                          ScheduleSelectDate(date: date),
+                        );
                       },
                       child: Container(
                         width: 48,
@@ -186,7 +212,9 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
                         decoration: BoxDecoration(
                           color: isSelected
                               ? AppColors.primary
-                              : (isToday ? AppColors.primary.withAlpha(30) : Colors.transparent),
+                              : (isToday
+                                    ? AppColors.primary.withAlpha(30)
+                                    : Colors.transparent),
                           borderRadius: BorderRadius.circular(12),
                           border: isToday && !isSelected
                               ? Border.all(color: AppColors.primary)
@@ -201,7 +229,9 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
                                 fontSize: 12,
                                 color: isSelected
                                     ? Colors.white
-                                    : (isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight),
+                                    : (isDark
+                                          ? AppColors.textSecondaryDark
+                                          : AppColors.textSecondaryLight),
                               ),
                             ),
                             const SizedBox(height: 4),
@@ -212,7 +242,9 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
                                 fontWeight: FontWeight.bold,
                                 color: isSelected
                                     ? Colors.white
-                                    : (isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight),
+                                    : (isDark
+                                          ? AppColors.textPrimaryDark
+                                          : AppColors.textPrimaryLight),
                               ),
                             ),
                           ],
@@ -236,13 +268,17 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
                       Icon(
                         Icons.event_busy,
                         size: 64,
-                        color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                        color: isDark
+                            ? AppColors.textSecondaryDark
+                            : AppColors.textSecondaryLight,
                       ),
                       const SizedBox(height: 16),
                       Text(
                         'No schedules for this day',
                         style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                          color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                          color: isDark
+                              ? AppColors.textSecondaryDark
+                              : AppColors.textSecondaryLight,
                         ),
                       ),
                       const SizedBox(height: 16),
@@ -262,7 +298,8 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
                     return _ScheduleCard(
                       entry: entry,
                       isDark: isDark,
-                      onEdit: () => _showEditScheduleDialog(context, entry, state),
+                      onEdit: () =>
+                          _showEditScheduleDialog(context, entry, state),
                       onDelete: () => _deleteSchedule(context, entry),
                     );
                   },
@@ -274,7 +311,9 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
 
   Future<void> _selectDate(BuildContext context) async {
     final state = context.read<ScheduleBloc>().state;
-    final initialDate = state is ScheduleLoaded ? state.selectedDate : DateTime.now();
+    final initialDate = state is ScheduleLoaded
+        ? state.selectedDate
+        : DateTime.now();
 
     final picked = await showDatePicker(
       context: context,
@@ -299,23 +338,37 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
         selectedDate: state.selectedDate,
         workers: state.workers,
         territories: state.territories,
-        onSave: (workerId, workerName, territoryId, territoryName, startTime, endTime) {
-          context.read<ScheduleBloc>().add(ScheduleCreate(
-            workerId: workerId,
-            workerName: workerName,
-            territoryId: territoryId,
-            territoryName: territoryName,
-            date: state.selectedDate,
-            startTime: startTime,
-            endTime: endTime,
-          ));
-          Navigator.pop(ctx);
-        },
+        onSave:
+            (
+              workerId,
+              workerName,
+              territoryId,
+              territoryName,
+              startTime,
+              endTime,
+            ) {
+              context.read<ScheduleBloc>().add(
+                ScheduleCreate(
+                  workerId: workerId,
+                  workerName: workerName,
+                  territoryId: territoryId,
+                  territoryName: territoryName,
+                  date: state.selectedDate,
+                  startTime: startTime,
+                  endTime: endTime,
+                ),
+              );
+              Navigator.pop(ctx);
+            },
       ),
     );
   }
 
-  void _showEditScheduleDialog(BuildContext context, ScheduleEntry entry, ScheduleLoaded state) {
+  void _showEditScheduleDialog(
+    BuildContext context,
+    ScheduleEntry entry,
+    ScheduleLoaded state,
+  ) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -325,18 +378,28 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
         workers: state.workers,
         territories: state.territories,
         existingEntry: entry,
-        onSave: (workerId, workerName, territoryId, territoryName, startTime, endTime) {
-          context.read<ScheduleBloc>().add(ScheduleUpdate(
-            scheduleId: entry.id,
-            workerId: workerId,
-            workerName: workerName,
-            territoryId: territoryId,
-            territoryName: territoryName,
-            startTime: startTime,
-            endTime: endTime,
-          ));
-          Navigator.pop(ctx);
-        },
+        onSave:
+            (
+              workerId,
+              workerName,
+              territoryId,
+              territoryName,
+              startTime,
+              endTime,
+            ) {
+              context.read<ScheduleBloc>().add(
+                ScheduleUpdate(
+                  scheduleId: entry.id,
+                  workerId: workerId,
+                  workerName: workerName,
+                  territoryId: territoryId,
+                  territoryName: territoryName,
+                  startTime: startTime,
+                  endTime: endTime,
+                ),
+              );
+              Navigator.pop(ctx);
+            },
       ),
     );
   }
@@ -346,7 +409,9 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Delete Schedule'),
-        content: Text('Are you sure you want to delete the schedule for ${entry.workerName}?'),
+        content: Text(
+          'Are you sure you want to delete the schedule for ${entry.workerName}?',
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
@@ -354,7 +419,9 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
           ),
           FilledButton(
             onPressed: () {
-              context.read<ScheduleBloc>().add(ScheduleDelete(scheduleId: entry.id));
+              context.read<ScheduleBloc>().add(
+                ScheduleDelete(scheduleId: entry.id),
+              );
               Navigator.pop(ctx);
             },
             style: FilledButton.styleFrom(backgroundColor: AppColors.error),
@@ -366,12 +433,33 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
   }
 
   String _formatDate(DateTime date) {
-    final months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    final months = [
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
+    ];
     return '${months[date.month - 1]} ${date.day}, ${date.year}';
   }
 
   String _getDayName(DateTime date) {
-    final days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+    final days = [
+      'Monday',
+      'Tuesday',
+      'Wednesday',
+      'Thursday',
+      'Friday',
+      'Saturday',
+      'Sunday',
+    ];
     return days[date.weekday - 1];
   }
 
@@ -382,7 +470,9 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
 
   bool _isToday(DateTime date) {
     final now = DateTime.now();
-    return date.year == now.year && date.month == now.month && date.day == now.day;
+    return date.year == now.year &&
+        date.month == now.month &&
+        date.day == now.day;
   }
 
   bool _isSameDay(DateTime a, DateTime b) {
@@ -444,9 +534,8 @@ class _ScheduleCard extends StatelessWidget {
                             children: [
                               Text(
                                 entry.workerName,
-                                style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                                  fontWeight: FontWeight.bold,
-                                ),
+                                style: Theme.of(context).textTheme.titleMedium
+                                    ?.copyWith(fontWeight: FontWeight.bold),
                               ),
                               const SizedBox(height: 4),
                               Row(
@@ -454,15 +543,22 @@ class _ScheduleCard extends StatelessWidget {
                                   Icon(
                                     Icons.map_outlined,
                                     size: 14,
-                                    color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                                    color: isDark
+                                        ? AppColors.textSecondaryDark
+                                        : AppColors.textSecondaryLight,
                                   ),
                                   const SizedBox(width: 4),
                                   Expanded(
                                     child: Text(
                                       entry.territoryName ?? 'No territory',
-                                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                        color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
-                                      ),
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .bodySmall
+                                          ?.copyWith(
+                                            color: isDark
+                                                ? AppColors.textSecondaryDark
+                                                : AppColors.textSecondaryLight,
+                                          ),
                                       overflow: TextOverflow.ellipsis,
                                     ),
                                   ),
@@ -472,7 +568,10 @@ class _ScheduleCard extends StatelessWidget {
                           ),
                         ),
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 4,
+                          ),
                           decoration: BoxDecoration(
                             color: _getStatusColor(entry.status).withAlpha(30),
                             borderRadius: BorderRadius.circular(8),
@@ -502,9 +601,8 @@ class _ScheduleCard extends StatelessWidget {
                             const SizedBox(width: 4),
                             Text(
                               '${_formatTime(entry.startTime)} - ${_formatTime(entry.endTime)}',
-                              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                fontWeight: FontWeight.w500,
-                              ),
+                              style: Theme.of(context).textTheme.bodyMedium
+                                  ?.copyWith(fontWeight: FontWeight.w500),
                             ),
                           ],
                         ),
@@ -518,7 +616,11 @@ class _ScheduleCard extends StatelessWidget {
                             ),
                             const SizedBox(width: 8),
                             IconButton(
-                              icon: const Icon(Icons.delete_outline, size: 20, color: AppColors.error),
+                              icon: const Icon(
+                                Icons.delete_outline,
+                                size: 20,
+                                color: AppColors.error,
+                              ),
                               onPressed: onDelete,
                               padding: EdgeInsets.zero,
                               constraints: const BoxConstraints(),
@@ -582,7 +684,15 @@ class _ScheduleFormSheet extends StatefulWidget {
   final List<TeamMember> workers;
   final List<TerritoryAssignment> territories;
   final ScheduleEntry? existingEntry;
-  final Function(String workerId, String workerName, String territoryId, String territoryName, String startTime, String endTime) onSave;
+  final Function(
+    String workerId,
+    String workerName,
+    String territoryId,
+    String territoryName,
+    String startTime,
+    String endTime,
+  )
+  onSave;
 
   const _ScheduleFormSheet({
     required this.selectedDate,
@@ -648,7 +758,9 @@ class _ScheduleFormSheetState extends State<_ScheduleFormSheet> {
                   width: 40,
                   height: 4,
                   decoration: BoxDecoration(
-                    color: isDark ? AppColors.borderDark : AppColors.borderLight,
+                    color: isDark
+                        ? AppColors.borderDark
+                        : AppColors.borderLight,
                     borderRadius: BorderRadius.circular(2),
                   ),
                 ),
@@ -657,18 +769,18 @@ class _ScheduleFormSheetState extends State<_ScheduleFormSheet> {
 
               Text(
                 widget.existingEntry != null ? 'Edit Schedule' : 'New Schedule',
-                style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                  fontWeight: FontWeight.bold,
-                ),
+                style: Theme.of(
+                  context,
+                ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 20),
 
               // Worker selection
               Text(
                 'Worker',
-                style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                  fontWeight: FontWeight.bold,
-                ),
+                style: Theme.of(
+                  context,
+                ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 8),
               DropdownButtonFormField<String>(
@@ -677,19 +789,25 @@ class _ScheduleFormSheetState extends State<_ScheduleFormSheet> {
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
                   ),
-                  hintText: widget.workers.isEmpty ? 'No workers available' : 'Select a worker',
+                  hintText: widget.workers.isEmpty
+                      ? 'No workers available'
+                      : 'Select a worker',
                 ),
                 items: widget.workers.map((worker) {
                   return DropdownMenuItem(
                     value: worker.userId,
-                    child: Text(worker.displayName ?? worker.email ?? 'Unknown'),
+                    child: Text(
+                      worker.displayName ?? worker.email ?? 'Unknown',
+                    ),
                   );
                 }).toList(),
-                onChanged: widget.workers.isEmpty ? null : (value) {
-                  setState(() {
-                    _selectedWorkerId = value;
-                  });
-                },
+                onChanged: widget.workers.isEmpty
+                    ? null
+                    : (value) {
+                        setState(() {
+                          _selectedWorkerId = value;
+                        });
+                      },
                 validator: (value) {
                   if (value == null) return 'Please select a worker';
                   return null;
@@ -701,9 +819,9 @@ class _ScheduleFormSheetState extends State<_ScheduleFormSheet> {
               // Territory selection
               Text(
                 'Territory',
-                style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                  fontWeight: FontWeight.bold,
-                ),
+                style: Theme.of(
+                  context,
+                ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 8),
               DropdownButtonFormField<String>(
@@ -712,7 +830,9 @@ class _ScheduleFormSheetState extends State<_ScheduleFormSheet> {
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
                   ),
-                  hintText: widget.territories.isEmpty ? 'No territories assigned' : 'Select a territory',
+                  hintText: widget.territories.isEmpty
+                      ? 'No territories assigned'
+                      : 'Select a territory',
                 ),
                 items: widget.territories.map((territory) {
                   final name = territory.entityName ?? territory.territorySolid;
@@ -721,11 +841,13 @@ class _ScheduleFormSheetState extends State<_ScheduleFormSheet> {
                     child: Text(name, overflow: TextOverflow.ellipsis),
                   );
                 }).toList(),
-                onChanged: widget.territories.isEmpty ? null : (value) {
-                  setState(() {
-                    _selectedTerritoryId = value;
-                  });
-                },
+                onChanged: widget.territories.isEmpty
+                    ? null
+                    : (value) {
+                        setState(() {
+                          _selectedTerritoryId = value;
+                        });
+                      },
                 validator: (value) {
                   if (value == null) return 'Please select a territory';
                   return null;
@@ -743,9 +865,8 @@ class _ScheduleFormSheetState extends State<_ScheduleFormSheet> {
                       children: [
                         Text(
                           'Start Time',
-                          style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                            fontWeight: FontWeight.bold,
-                          ),
+                          style: Theme.of(context).textTheme.titleSmall
+                              ?.copyWith(fontWeight: FontWeight.bold),
                         ),
                         const SizedBox(height: 8),
                         InkWell(
@@ -761,10 +882,15 @@ class _ScheduleFormSheetState extends State<_ScheduleFormSheet> {
                             }
                           },
                           child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 16,
+                            ),
                             decoration: BoxDecoration(
                               border: Border.all(
-                                color: isDark ? AppColors.borderDark : AppColors.borderLight,
+                                color: isDark
+                                    ? AppColors.borderDark
+                                    : AppColors.borderLight,
                               ),
                               borderRadius: BorderRadius.circular(12),
                             ),
@@ -787,9 +913,8 @@ class _ScheduleFormSheetState extends State<_ScheduleFormSheet> {
                       children: [
                         Text(
                           'End Time',
-                          style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                            fontWeight: FontWeight.bold,
-                          ),
+                          style: Theme.of(context).textTheme.titleSmall
+                              ?.copyWith(fontWeight: FontWeight.bold),
                         ),
                         const SizedBox(height: 8),
                         InkWell(
@@ -805,10 +930,15 @@ class _ScheduleFormSheetState extends State<_ScheduleFormSheet> {
                             }
                           },
                           child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 16,
+                            ),
                             decoration: BoxDecoration(
                               border: Border.all(
-                                color: isDark ? AppColors.borderDark : AppColors.borderLight,
+                                color: isDark
+                                    ? AppColors.borderDark
+                                    : AppColors.borderLight,
                               ),
                               borderRadius: BorderRadius.circular(12),
                             ),
@@ -834,7 +964,11 @@ class _ScheduleFormSheetState extends State<_ScheduleFormSheet> {
                 width: double.infinity,
                 child: FilledButton(
                   onPressed: _saveSchedule,
-                  child: Text(widget.existingEntry != null ? 'Update Schedule' : 'Create Schedule'),
+                  child: Text(
+                    widget.existingEntry != null
+                        ? 'Update Schedule'
+                        : 'Create Schedule',
+                  ),
                 ),
               ),
 
@@ -848,15 +982,21 @@ class _ScheduleFormSheetState extends State<_ScheduleFormSheet> {
 
   void _saveSchedule() {
     if (_formKey.currentState!.validate()) {
-      final worker = widget.workers.firstWhere((w) => w.userId == _selectedWorkerId);
-      final territory = widget.territories.firstWhere((t) => t.territoryId == _selectedTerritoryId);
+      final worker = widget.workers.firstWhere(
+        (w) => w.userId == _selectedWorkerId,
+      );
+      final territory = widget.territories.firstWhere(
+        (t) => t.territoryId == _selectedTerritoryId,
+      );
 
       final workerName = worker.displayName ?? worker.email ?? 'Unknown';
       final territoryName = territory.entityName ?? territory.territorySolid;
 
       // Format time as "HH:MM" string
-      final startTimeStr = '${_startTime.hour.toString().padLeft(2, '0')}:${_startTime.minute.toString().padLeft(2, '0')}';
-      final endTimeStr = '${_endTime.hour.toString().padLeft(2, '0')}:${_endTime.minute.toString().padLeft(2, '0')}';
+      final startTimeStr =
+          '${_startTime.hour.toString().padLeft(2, '0')}:${_startTime.minute.toString().padLeft(2, '0')}';
+      final endTimeStr =
+          '${_endTime.hour.toString().padLeft(2, '0')}:${_endTime.minute.toString().padLeft(2, '0')}';
 
       widget.onSave(
         _selectedWorkerId!,

@@ -52,6 +52,8 @@ class TeamDashboardStats extends Equatable {
   final int visitsThisWeek;
   final int totalDeliveries;
   final int totalDonations;
+  final int totalBookSales;
+  final double totalBookSalesAmount;
 
   const TeamDashboardStats({
     this.totalMembers = 0,
@@ -62,6 +64,8 @@ class TeamDashboardStats extends Equatable {
     this.visitsThisWeek = 0,
     this.totalDeliveries = 0,
     this.totalDonations = 0,
+    this.totalBookSales = 0,
+    this.totalBookSalesAmount = 0.0,
   });
 
   factory TeamDashboardStats.fromJson(Map<String, dynamic> json) {
@@ -77,6 +81,12 @@ class TeamDashboardStats extends Equatable {
       visitsThisWeek: json['visits_this_week'] ?? json['visitsThisWeek'] ?? 0,
       totalDeliveries: json['total_deliveries'] ?? json['totalDeliveries'] ?? 0,
       totalDonations: json['total_donations'] ?? json['totalDonations'] ?? 0,
+      totalBookSales: json['total_book_sales'] ?? json['totalBookSales'] ?? 0,
+      totalBookSalesAmount:
+          (json['total_book_sales_amount'] ??
+                  json['totalBookSalesAmount'] ??
+                  0.0)
+              .toDouble(),
     );
   }
 
@@ -90,6 +100,8 @@ class TeamDashboardStats extends Equatable {
     visitsThisWeek,
     totalDeliveries,
     totalDonations,
+    totalBookSales,
+    totalBookSalesAmount,
   ];
 }
 
@@ -181,6 +193,8 @@ class WorkerPerformance extends Equatable {
   final String? avatarUrl;
   final int donationsCount;
   final double donationsTotal;
+  final int bookSalesCount;
+  final double bookSalesTotal;
   final int prayersCount;
   final int territoriesAssigned;
   final double territoryCoverage;
@@ -193,6 +207,8 @@ class WorkerPerformance extends Equatable {
     this.avatarUrl,
     this.donationsCount = 0,
     this.donationsTotal = 0.0,
+    this.bookSalesCount = 0,
+    this.bookSalesTotal = 0.0,
     this.prayersCount = 0,
     this.territoriesAssigned = 0,
     this.territoryCoverage = 0.0,
@@ -212,6 +228,10 @@ class WorkerPerformance extends Equatable {
       donationsCount: json['donations_count'] ?? json['donationsCount'] ?? 0,
       donationsTotal: (json['donations_total'] ?? json['donationsTotal'] ?? 0.0)
           .toDouble(),
+      bookSalesCount: json['book_sales_count'] ?? json['bookSalesCount'] ?? 0,
+      bookSalesTotal:
+          (json['book_sales_total'] ?? json['bookSalesTotal'] ?? 0.0)
+              .toDouble(),
       prayersCount: json['prayers_count'] ?? json['prayersCount'] ?? 0,
       territoriesAssigned:
           json['territories_assigned'] ?? json['territoriesAssigned'] ?? 0,
@@ -231,10 +251,15 @@ class WorkerPerformance extends Equatable {
     name,
     donationsCount,
     donationsTotal,
+    bookSalesCount,
+    bookSalesTotal,
     prayersCount,
     territoryCoverage,
     isActive,
   ];
+
+  double get totalGiving => donationsTotal + bookSalesTotal;
+  int get totalGivingCount => donationsCount + bookSalesCount;
 }
 
 /// Territory statistics with coverage info

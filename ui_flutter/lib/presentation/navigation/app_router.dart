@@ -73,8 +73,19 @@ class AppRouter {
         // Always allow onboarding screen access (it handles its own exit)
         if (isOnboarding) return null;
 
-        // If still checking auth status, stay on splash
-        if (authState is AuthInitial || authState is AuthLoading) {
+        // If app is bootstrapping auth status, stay on splash.
+        if (authState is AuthInitial) {
+          return isSplash ? null : '/splash';
+        }
+
+        // During explicit auth actions (login/register/etc), keep user on auth pages.
+        if (authState is AuthLoading) {
+          // For login specifically, transition to splash to avoid login flicker
+          // while auth state resolves.
+          if (state.matchedLocation == '/login') {
+            return isSplash ? null : '/splash';
+          }
+          if (isAuthPage || isOnboarding) return null;
           return isSplash ? null : '/splash';
         }
 

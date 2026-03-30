@@ -5,7 +5,7 @@ import 'app_colors.dart';
 class AppTypography {
   AppTypography._();
 
-  static const String fontFamily = 'Inter';
+  static const String fontFamily = 'Manrope';
 
   // Light Theme Text Theme
   static const TextTheme textTheme = TextTheme(

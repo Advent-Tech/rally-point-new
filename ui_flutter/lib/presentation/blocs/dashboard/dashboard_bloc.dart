@@ -42,15 +42,17 @@ class DashboardBloc extends Bloc<DashboardEvent, DashboardState> {
         _fetchTeamAssignments(event.teamId),
         _fetchDeliveries(event.teamId),
         _fetchDonations(event.teamId),
+        _fetchBookSales(event.teamId),
         _fetchPrayerRequests(event.teamId),
       ]);
 
-      final members = results[0] as List<dynamic>;
-      final activeWorkers = results[1] as List<dynamic>;
-      final assignments = results[2] as List<dynamic>;
-      final deliveries = results[3] as List<dynamic>;
-      final donations = results[4] as List<dynamic>;
-      final prayers = results[5] as List<dynamic>;
+      final members = results[0];
+      final activeWorkers = results[1];
+      final assignments = results[2];
+      final deliveries = results[3];
+      final donations = results[4];
+      final bookSales = results[5];
+      final prayers = results[6];
 
       // Calculate completion percentage based on deliveries vs total housing units
       // This is more accurate than using completeness_percentage from API which may not update with deliveries
@@ -90,36 +92,42 @@ class DashboardBloc extends Bloc<DashboardEvent, DashboardState> {
             )
           : 0.0;
 
-      // Debug logging
-      print(
-        'DashboardBloc: Deliveries: ${deliveries.length}, Housing Units: $totalHousingUnits, Deliveries in territories: $totalDeliveriesInTerritories, Completion: $avgCompletion%',
-      );
-
       // Build activities from deliveries and donations (these are the actual "visits")
       final activities = _buildActivitiesFromDeliveriesAndDonations(
         deliveries,
         donations,
+        bookSales,
       );
 
       // Build worker performance from deliveries and assignments
       final workerPerformance = _buildWorkerPerformance(
         deliveries,
         donations,
+        bookSales,
         prayers,
         members,
         activeWorkers,
         assignments,
       );
 
+      final totalBookSalesAmount = bookSales.fold<double>(0.0, (sum, sale) {
+        final amount =
+            (sale['total_amount'] as num? ?? sale['amount'] as num? ?? 0)
+                .toDouble();
+        return sum + amount;
+      });
+
       final stats = TeamDashboardStats(
         totalMembers: members.length,
         activeWorkers: activeWorkers.length,
         totalTerritories: assignments.length,
         completionPercentage: avgCompletion,
-        visitsToday: _countVisitsToday(deliveries, donations),
-        visitsThisWeek: _countVisitsThisWeek(deliveries, donations),
+        visitsToday: _countVisitsToday(deliveries, donations, bookSales),
+        visitsThisWeek: _countVisitsThisWeek(deliveries, donations, bookSales),
         totalDeliveries: deliveries.length,
         totalDonations: donations.length,
+        totalBookSales: bookSales.length,
+        totalBookSalesAmount: totalBookSalesAmount,
       );
 
       // Build territory stats from assignments with delivery counts
@@ -128,6 +136,7 @@ class DashboardBloc extends Bloc<DashboardEvent, DashboardState> {
         members,
         deliveries,
         donations,
+        bookSales,
       );
 
       emit(
@@ -216,6 +225,21 @@ class DashboardBloc extends Bloc<DashboardEvent, DashboardState> {
     return [];
   }
 
+  Future<List<dynamic>> _fetchBookSales(String teamId) async {
+    try {
+      final response = await _api.get('${ApiConstants.bookSalesTeam}/$teamId');
+      if (response.statusCode == 200) {
+        return response.data is List
+            ? response.data
+            : (response.data['book_sales'] ??
+                  response.data['results'] ??
+                  response.data['data'] ??
+                  []);
+      }
+    } catch (_) {}
+    return [];
+  }
+
   Future<List<dynamic>> _fetchPrayerRequests(String teamId) async {
     try {
       final response = await _api.get('/api/prayer-requests/team/$teamId');
@@ -233,6 +257,7 @@ class DashboardBloc extends Bloc<DashboardEvent, DashboardState> {
   List<TeamActivity> _buildActivitiesFromDeliveriesAndDonations(
     List<dynamic> deliveries,
     List<dynamic> donations,
+    List<dynamic> bookSales,
   ) {
     final activities = <TeamActivity>[];
 
@@ -253,6 +278,43 @@ class DashboardBloc extends Bloc<DashboardEvent, DashboardState> {
                     DateTime.now()
               : DateTime.now(),
           metadata: {'status': delivery['status'], 'type': 'delivery'},
+        ),
+      );
+    }
+
+    // Add book sale activities
+    for (var sale in bookSales) {
+      final amount = (sale['total_amount'] ?? sale['amount'] ?? 0).toDouble();
+      final quantity = (sale['quantity'] as num? ?? 1).toInt();
+      final bookTitle =
+          sale['book_title']?.toString().trim().isNotEmpty == true
+          ? sale['book_title'].toString()
+          : 'Book Sale';
+
+      activities.add(
+        TeamActivity(
+          id: sale['id']?.toString() ?? '',
+          type: 'book_sale',
+          workerId: sale['worker_id']?.toString() ?? '',
+          workerName: sale['worker_name']?.toString() ?? 'Worker',
+          description: 'Sold $quantity x $bookTitle (\$${amount.toStringAsFixed(2)})',
+          territoryName:
+              sale['buyer_address']?.toString() ?? sale['location']?.toString(),
+          address:
+              sale['buyer_address']?.toString() ?? sale['location']?.toString(),
+          timestamp: sale['sold_at'] != null
+              ? DateTime.tryParse(sale['sold_at'].toString()) ?? DateTime.now()
+              : (sale['created_at'] != null
+                    ? DateTime.tryParse(sale['created_at'].toString()) ??
+                          DateTime.now()
+                    : DateTime.now()),
+          metadata: {
+            'type': 'book_sale',
+            'book_title': bookTitle,
+            'quantity': quantity,
+            'amount': amount,
+            'buyer_name': sale['buyer_name'],
+          },
         ),
       );
     }
@@ -288,7 +350,11 @@ class DashboardBloc extends Bloc<DashboardEvent, DashboardState> {
     return activities.take(20).toList();
   }
 
-  int _countVisitsToday(List<dynamic> deliveries, List<dynamic> donations) {
+  int _countVisitsToday(
+    List<dynamic> deliveries,
+    List<dynamic> donations,
+    List<dynamic> bookSales,
+  ) {
     final today = DateTime.now();
     int count = 0;
 
@@ -316,10 +382,27 @@ class DashboardBloc extends Bloc<DashboardEvent, DashboardState> {
       }
     }
 
+    for (var sale in bookSales) {
+      final soldAt = sale['sold_at'] ?? sale['created_at'];
+      final createdAt = soldAt != null
+          ? DateTime.tryParse(soldAt.toString())
+          : null;
+      if (createdAt != null &&
+          createdAt.year == today.year &&
+          createdAt.month == today.month &&
+          createdAt.day == today.day) {
+        count++;
+      }
+    }
+
     return count;
   }
 
-  int _countVisitsThisWeek(List<dynamic> deliveries, List<dynamic> donations) {
+  int _countVisitsThisWeek(
+    List<dynamic> deliveries,
+    List<dynamic> donations,
+    List<dynamic> bookSales,
+  ) {
     final now = DateTime.now();
     final weekStart = DateTime(
       now.year,
@@ -346,12 +429,23 @@ class DashboardBloc extends Bloc<DashboardEvent, DashboardState> {
       }
     }
 
+    for (var sale in bookSales) {
+      final soldAt = sale['sold_at'] ?? sale['created_at'];
+      final createdAt = soldAt != null
+          ? DateTime.tryParse(soldAt.toString())
+          : null;
+      if (createdAt != null && createdAt.isAfter(weekStart)) {
+        count++;
+      }
+    }
+
     return count;
   }
 
   List<WorkerPerformance> _buildWorkerPerformance(
     List<dynamic> deliveries,
     List<dynamic> donations,
+    List<dynamic> bookSales,
     List<dynamic> prayers,
     List<dynamic> members,
     List<dynamic> activeWorkers,
@@ -379,6 +473,21 @@ class DashboardBloc extends Bloc<DashboardEvent, DashboardState> {
         final amount = (donation['amount'] ?? 0).toDouble();
         workerDonationsTotal[workerId] =
             (workerDonationsTotal[workerId] ?? 0) + amount;
+      }
+    }
+
+    // Count book sales per worker
+    final workerBookSalesCount = <String, int>{};
+    final workerBookSalesTotal = <String, double>{};
+    for (var sale in bookSales) {
+      final workerId = sale['worker_id']?.toString();
+      if (workerId != null && workerId.isNotEmpty) {
+        workerBookSalesCount[workerId] = (workerBookSalesCount[workerId] ?? 0) + 1;
+        final amount =
+            (sale['total_amount'] as num? ?? sale['amount'] as num? ?? 0)
+                .toDouble();
+        workerBookSalesTotal[workerId] =
+            (workerBookSalesTotal[workerId] ?? 0) + amount;
       }
     }
 
@@ -428,6 +537,8 @@ class DashboardBloc extends Bloc<DashboardEvent, DashboardState> {
               member['avatarUrl']?.toString(),
           donationsCount: workerDonationsCount[id] ?? 0,
           donationsTotal: workerDonationsTotal[id] ?? 0.0,
+          bookSalesCount: workerBookSalesCount[id] ?? 0,
+          bookSalesTotal: workerBookSalesTotal[id] ?? 0.0,
           prayersCount: workerPrayersCount[id] ?? 0,
           territoriesAssigned: assignmentsForMember.length,
           territoryCoverage: territoryCoverage,
@@ -438,7 +549,7 @@ class DashboardBloc extends Bloc<DashboardEvent, DashboardState> {
 
     // Sort by donations total descending
     performanceList.sort(
-      (a, b) => b.donationsTotal.compareTo(a.donationsTotal),
+      (a, b) => b.totalGiving.compareTo(a.totalGiving),
     );
     return performanceList;
   }
@@ -464,6 +575,7 @@ class DashboardBloc extends Bloc<DashboardEvent, DashboardState> {
     List<dynamic> members,
     List<dynamic> deliveries,
     List<dynamic> donations,
+    List<dynamic> bookSales,
   ) {
     final territoryStats = <TerritoryStats>[];
 
@@ -500,6 +612,14 @@ class DashboardBloc extends Bloc<DashboardEvent, DashboardState> {
 
     for (var donation in donations) {
       final territoryId = donation['territory_id']?.toString();
+      if (territoryId != null && territoryId.isNotEmpty) {
+        totalVisitsPerTerritory[territoryId] =
+            (totalVisitsPerTerritory[territoryId] ?? 0) + 1;
+      }
+    }
+
+    for (var sale in bookSales) {
+      final territoryId = sale['territory_id']?.toString();
       if (territoryId != null && territoryId.isNotEmpty) {
         totalVisitsPerTerritory[territoryId] =
             (totalVisitsPerTerritory[territoryId] ?? 0) + 1;
@@ -584,9 +704,11 @@ class DashboardBloc extends Bloc<DashboardEvent, DashboardState> {
         await _initialize();
         final deliveries = await _fetchDeliveries(event.teamId);
         final donations = await _fetchDonations(event.teamId);
+        final bookSales = await _fetchBookSales(event.teamId);
         final activities = _buildActivitiesFromDeliveriesAndDonations(
           deliveries,
           donations,
+          bookSales,
         );
         emit(
           DashboardLoaded(

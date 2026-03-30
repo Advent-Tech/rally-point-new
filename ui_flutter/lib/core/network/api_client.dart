@@ -11,6 +11,8 @@ class ApiClient {
   late final Dio _dio;
   SecureStorage? _storage;
   String? _authToken;
+  bool _interceptorsConfigured = false;
+  Future<bool>? _refreshInFlight;
 
   ApiClient._() {
     _dio = Dio(_baseOptions);
@@ -61,16 +63,15 @@ class ApiClient {
   }
 
   BaseOptions get _baseOptions => BaseOptions(
-        baseUrl: _getBaseUrl(),
-        connectTimeout: const Duration(milliseconds: ApiConstants.connectionTimeout),
-        receiveTimeout: const Duration(milliseconds: ApiConstants.receiveTimeout),
-        followRedirects: true,
-        maxRedirects: 5,
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-        },
-      );
+    baseUrl: _getBaseUrl(),
+    connectTimeout: const Duration(
+      milliseconds: ApiConstants.connectionTimeout,
+    ),
+    receiveTimeout: const Duration(milliseconds: ApiConstants.receiveTimeout),
+    followRedirects: true,
+    maxRedirects: 5,
+    headers: {'Content-Type': 'application/json', 'Accept': 'application/json'},
+  );
 
   String _getBaseUrl() {
     // Use localhost for web development.
@@ -82,44 +83,70 @@ class ApiClient {
   }
 
   void _setupInterceptors() {
+    if (_interceptorsConfigured) return;
+    _interceptorsConfigured = true;
+
     // Auth Interceptor
-    _dio.interceptors.add(InterceptorsWrapper(
-      onRequest: (options, handler) async {
-        final token = await _storage?.getAccessToken();
-        if (token != null) {
-          options.headers['Authorization'] = 'Bearer $token';
-        }
-        return handler.next(options);
-      },
-      onError: (error, handler) async {
-        if (error.response?.statusCode == 401) {
-          // Try to refresh token
-          final refreshed = await _refreshToken();
-          if (refreshed) {
-            // Retry the request
-            final retryResponse = await _retryRequest(error.requestOptions);
-            return handler.resolve(retryResponse);
+    _dio.interceptors.add(
+      InterceptorsWrapper(
+        onRequest: (options, handler) async {
+          final token = await _storage?.getAccessToken();
+          if (token != null) {
+            options.headers['Authorization'] = 'Bearer $token';
           }
-        }
-        return handler.next(error);
-      },
-    ));
+          return handler.next(options);
+        },
+        onError: (error, handler) async {
+          final isRefreshCall = error.requestOptions.path.contains(
+            ApiConstants.refreshToken,
+          );
+          final alreadyRetried =
+              error.requestOptions.extra['retried_after_refresh'] == true;
+
+          if (!isRefreshCall &&
+              !alreadyRetried &&
+              error.response?.statusCode == 401) {
+            // Try to refresh token
+            final refreshed = await _refreshToken();
+            if (refreshed) {
+              // Retry the request
+              final retryResponse = await _retryRequest(error.requestOptions);
+              return handler.resolve(retryResponse);
+            }
+          }
+          return handler.next(error);
+        },
+      ),
+    );
 
     // Logging Interceptor (debug only) - body logging disabled for performance
     // Large responses (like geometry data) can cause 8000ms+ frame times when logged
     if (!kReleaseMode) {
-      _dio.interceptors.add(LogInterceptor(
-        requestHeader: false,
-        requestBody: false,
-        responseBody: false,
-        responseHeader: false,
-        error: true,
-        logPrint: (obj) => debugPrint(obj.toString()),
-      ));
+      _dio.interceptors.add(
+        LogInterceptor(
+          requestHeader: false,
+          requestBody: false,
+          responseBody: false,
+          responseHeader: false,
+          error: true,
+          logPrint: (obj) => debugPrint(obj.toString()),
+        ),
+      );
     }
   }
 
   Future<bool> _refreshToken() async {
+    if (_refreshInFlight != null) {
+      return _refreshInFlight!;
+    }
+
+    _refreshInFlight = _performRefresh();
+    final result = await _refreshInFlight!;
+    _refreshInFlight = null;
+    return result;
+  }
+
+  Future<bool> _performRefresh() async {
     try {
       final refreshToken = await _storage?.getRefreshToken();
       if (refreshToken == null) return false;
@@ -135,6 +162,13 @@ class ApiClient {
         if (data['refresh_token'] != null) {
           await _storage?.saveRefreshToken(data['refresh_token']);
         }
+        final expiresIn = data['expires_in'];
+        if (expiresIn is int) {
+          await _storage?.saveTokenExpiry(expiresIn);
+        } else {
+          await _storage?.saveTokenExpiry(60 * 60 * 24 * 30);
+        }
+        setAuthToken(data['access_token']);
         return true;
       }
     } catch (e) {
@@ -147,10 +181,8 @@ class ApiClient {
     final token = await _storage?.getAccessToken();
     final options = Options(
       method: requestOptions.method,
-      headers: {
-        ...requestOptions.headers,
-        'Authorization': 'Bearer $token',
-      },
+      extra: {...requestOptions.extra, 'retried_after_refresh': true},
+      headers: {...requestOptions.headers, 'Authorization': 'Bearer $token'},
     );
     return _dio.request(
       requestOptions.path,

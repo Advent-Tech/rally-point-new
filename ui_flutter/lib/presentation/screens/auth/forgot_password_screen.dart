@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/network/api_client.dart';
+import '../../widgets/navigation/app_back_button.dart';
 import '../../widgets/custom_text_field.dart';
 import '../../widgets/custom_button.dart';
 
@@ -68,10 +69,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => context.go('/login'),
-        ),
+        leading: AppBackButton.leading(context, fallbackRoute: '/login'),
         title: const Text('Reset Password'),
         backgroundColor: Colors.transparent,
         elevation: 0,

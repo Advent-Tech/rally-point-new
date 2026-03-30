@@ -30,6 +30,7 @@
         "form_builder_validators",
         "geolocator",
         "go_router",
+        "google_fonts",
         "hive",
         "hive_flutter",
         "image_picker",
@@ -229,6 +230,16 @@
         "test_api",
         "vector_math",
         "vm_service"
+      ]
+    },
+    {
+      "name": "google_fonts",
+      "version": "6.3.2",
+      "dependencies": [
+        "crypto",
+        "flutter",
+        "http",
+        "path_provider"
       ]
     },
     {

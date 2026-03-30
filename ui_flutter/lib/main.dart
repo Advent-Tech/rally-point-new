@@ -69,6 +69,24 @@ void main() async {
     debugPrint('Firebase initialization failed: $e');
   }
   if (firebaseReady) {
+    final options = Firebase.app().options;
+    debugPrint(
+      'Firebase ready: project=${options.projectId}, appId=${options.appId}, iosBundle=${options.iosBundleId}',
+    );
+    if (Platform.isIOS) {
+      const expectedIosBundleId = String.fromEnvironment(
+        'EXPECTED_IOS_BUNDLE_ID',
+        defaultValue: '',
+      );
+      if (expectedIosBundleId.isNotEmpty &&
+          options.iosBundleId != expectedIosBundleId) {
+        debugPrint(
+          'WARNING: Firebase iOS bundle mismatch. Firebase plist uses '
+          '"${options.iosBundleId}", expected "$expectedIosBundleId". '
+          'Push notifications may fail until GoogleService-Info.plist is replaced.',
+        );
+      }
+    }
     FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
   }
 
@@ -168,6 +186,12 @@ class _AppContent extends StatefulWidget {
 class _AppContentState extends State<_AppContent> {
   late final _router = AppRouter.router(context.read<AuthBloc>());
   bool _pushInitialized = false;
+
+  @override
+  void initState() {
+    super.initState();
+    context.read<AuthBloc>().add(const AuthCheckStatus());
+  }
 
   @override
   Widget build(BuildContext context) {

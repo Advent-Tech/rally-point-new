@@ -6,6 +6,7 @@ import '../../../data/models/prayer_request_model.dart';
 import '../../blocs/auth/auth_bloc.dart';
 import '../../blocs/prayer_request/prayer_request_bloc.dart';
 import '../../widgets/custom_button.dart';
+import '../../widgets/navigation/app_back_button.dart';
 import '../../widgets/role_badge.dart';
 import '../../widgets/states/empty_state.dart';
 
@@ -38,12 +39,12 @@ class _PrayerRequestScreenState extends State<PrayerRequestScreen>
   void _loadPrayerRequests() {
     final authState = context.read<AuthBloc>().state;
     if (authState is AuthAuthenticated) {
-      final isLeader = authState.user.role == 'team_leader' ||
+      final isLeader =
+          authState.user.role == 'team_leader' ||
           authState.user.role == 'admin';
-      context.read<PrayerRequestBloc>().add(PrayerRequestRefresh(
-        isLeader: isLeader,
-        teamId: authState.user.teamId,
-      ));
+      context.read<PrayerRequestBloc>().add(
+        PrayerRequestRefresh(isLeader: isLeader, teamId: authState.user.teamId),
+      );
     }
   }
 
@@ -53,6 +54,7 @@ class _PrayerRequestScreenState extends State<PrayerRequestScreen>
 
     return Scaffold(
       appBar: AppBar(
+        leading: AppBackButton.leading(context),
         title: const Text('Prayer Requests'),
         actions: [
           const RoleBadge(),
@@ -170,9 +172,9 @@ class _PrayerRequestScreenState extends State<PrayerRequestScreen>
               // Requester name
               Text(
                 request.requesterName,
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.w600,
-                ),
+                style: Theme.of(
+                  context,
+                ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
               ),
               const SizedBox(height: 4),
 
@@ -351,9 +353,7 @@ class _PrayerRequestScreenState extends State<PrayerRequestScreen>
   Widget _buildStatsView(PrayerRequestLoaded state, bool isDark) {
     final stats = state.stats;
     if (stats == null) {
-      return const Center(
-        child: Text('No statistics available'),
-      );
+      return const Center(child: Text('No statistics available'));
     }
 
     return SingleChildScrollView(
@@ -415,17 +415,19 @@ class _PrayerRequestScreenState extends State<PrayerRequestScreen>
           if (stats.byCategory != null && stats.byCategory!.isNotEmpty) ...[
             Text(
               'By Category',
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.w600,
-              ),
+              style: Theme.of(
+                context,
+              ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
             ),
             const SizedBox(height: 12),
-            ...stats.byCategory!.entries.map((entry) => _buildProgressItem(
-              PrayerCategory.getDisplayName(entry.key),
-              entry.value,
-              stats.totalRequests,
-              isDark,
-            )),
+            ...stats.byCategory!.entries.map(
+              (entry) => _buildProgressItem(
+                PrayerCategory.getDisplayName(entry.key),
+                entry.value,
+                stats.totalRequests,
+                isDark,
+              ),
+            ),
             const SizedBox(height: 24),
           ],
 
@@ -433,18 +435,20 @@ class _PrayerRequestScreenState extends State<PrayerRequestScreen>
           if (stats.byUrgency != null && stats.byUrgency!.isNotEmpty) ...[
             Text(
               'By Urgency',
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.w600,
-              ),
+              style: Theme.of(
+                context,
+              ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
             ),
             const SizedBox(height: 12),
-            ...stats.byUrgency!.entries.map((entry) => _buildProgressItem(
-              PrayerUrgency.getDisplayName(entry.key),
-              entry.value,
-              stats.totalRequests,
-              isDark,
-              color: _getUrgencyColor(entry.key),
-            )),
+            ...stats.byUrgency!.entries.map(
+              (entry) => _buildProgressItem(
+                PrayerUrgency.getDisplayName(entry.key),
+                entry.value,
+                stats.totalRequests,
+                isDark,
+                color: _getUrgencyColor(entry.key),
+              ),
+            ),
           ],
         ],
       ),
@@ -463,9 +467,7 @@ class _PrayerRequestScreenState extends State<PrayerRequestScreen>
       decoration: BoxDecoration(
         color: isDark ? AppColors.cardDark : AppColors.cardLight,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: color.withAlpha(50),
-        ),
+        border: Border.all(color: color.withAlpha(50)),
       ),
       child: Column(
         children: [
@@ -545,17 +547,11 @@ class _PrayerRequestScreenState extends State<PrayerRequestScreen>
         children: [
           const Icon(Icons.error_outline, size: 64, color: AppColors.error),
           const SizedBox(height: 16),
-          Text(
-            'Error',
-            style: Theme.of(context).textTheme.titleLarge,
-          ),
+          Text('Error', style: Theme.of(context).textTheme.titleLarge),
           const SizedBox(height: 8),
           Text(message, textAlign: TextAlign.center),
           const SizedBox(height: 24),
-          CustomButton(
-            text: 'Retry',
-            onPressed: _loadPrayerRequests,
-          ),
+          CustomButton(text: 'Retry', onPressed: _loadPrayerRequests),
         ],
       ),
     );
@@ -583,10 +579,12 @@ class _PrayerRequestScreenState extends State<PrayerRequestScreen>
               ),
               items: [
                 const DropdownMenuItem(value: null, child: Text('All')),
-                ...PrayerRequestStatus.all.map((s) => DropdownMenuItem(
-                  value: s,
-                  child: Text(PrayerRequestStatus.getDisplayName(s)),
-                )),
+                ...PrayerRequestStatus.all.map(
+                  (s) => DropdownMenuItem(
+                    value: s,
+                    child: Text(PrayerRequestStatus.getDisplayName(s)),
+                  ),
+                ),
               ],
               onChanged: (value) {
                 setState(() => _selectedStatus = value);
@@ -602,10 +600,12 @@ class _PrayerRequestScreenState extends State<PrayerRequestScreen>
               ),
               items: [
                 const DropdownMenuItem(value: null, child: Text('All')),
-                ...PrayerCategory.all.map((c) => DropdownMenuItem(
-                  value: c,
-                  child: Text(PrayerCategory.getDisplayName(c)),
-                )),
+                ...PrayerCategory.all.map(
+                  (c) => DropdownMenuItem(
+                    value: c,
+                    child: Text(PrayerCategory.getDisplayName(c)),
+                  ),
+                ),
               ],
               onChanged: (value) {
                 setState(() => _selectedCategory = value);
@@ -674,9 +674,9 @@ class _PrayerRequestScreenState extends State<PrayerRequestScreen>
               const SizedBox(height: 16),
               Text(
                 request.requesterName,
-                style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                  fontWeight: FontWeight.bold,
-                ),
+                style: Theme.of(
+                  context,
+                ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 8),
               if (request.requesterPhone != null)
@@ -685,31 +685,36 @@ class _PrayerRequestScreenState extends State<PrayerRequestScreen>
                 _buildDetailRow(Icons.email_outlined, request.requesterEmail!),
               if (request.requesterAddress != null)
                 _buildDetailRow(
-                    Icons.location_on_outlined, request.requesterAddress!),
+                  Icons.location_on_outlined,
+                  request.requesterAddress!,
+                ),
               const SizedBox(height: 16),
               const Divider(),
               const SizedBox(height: 16),
               Text(
                 'Prayer Subject',
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.w600,
-                ),
+                style: Theme.of(
+                  context,
+                ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
               ),
               const SizedBox(height: 8),
               Text(request.prayerSubject),
               const SizedBox(height: 16),
               Text(
                 'Prayer Details',
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.w600,
-                ),
+                style: Theme.of(
+                  context,
+                ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
               ),
               const SizedBox(height: 8),
               Text(request.prayerDetails),
               const SizedBox(height: 16),
               Row(
                 children: [
-                  _buildInfoChip(Icons.category_outlined, request.categoryDisplay),
+                  _buildInfoChip(
+                    Icons.category_outlined,
+                    request.categoryDisplay,
+                  ),
                   const SizedBox(width: 8),
                   _buildInfoChip(Icons.flag_outlined, request.urgencyDisplay),
                 ],
@@ -775,22 +780,16 @@ class _PrayerRequestScreenState extends State<PrayerRequestScreen>
         children: [
           Icon(icon, size: 16, color: Colors.grey[600]),
           const SizedBox(width: 4),
-          Text(
-            text,
-            style: TextStyle(
-              color: Colors.grey[600],
-              fontSize: 12,
-            ),
-          ),
+          Text(text, style: TextStyle(color: Colors.grey[600], fontSize: 12)),
         ],
       ),
     );
   }
 
   void _markAsCompleted(PrayerRequestModel request) {
-    context.read<PrayerRequestBloc>().add(PrayerRequestComplete(
-      id: request.id,
-    ));
+    context.read<PrayerRequestBloc>().add(
+      PrayerRequestComplete(id: request.id),
+    );
   }
 
   String _formatDate(DateTime date) {

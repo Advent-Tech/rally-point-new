@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'app_colors.dart';
 import 'app_theme_extensions.dart';
 import 'app_typography.dart';
@@ -14,6 +15,7 @@ class AppTheme {
       useMaterial3: true,
       brightness: Brightness.light,
       primaryColor: AppColors.buttonPrimaryLight,
+      fontFamily: AppTypography.fontFamily,
       scaffoldBackgroundColor: AppColors.backgroundLight,
       extensions: lightThemeExtensions,
       colorScheme: const ColorScheme.light(
@@ -35,7 +37,7 @@ class AppTheme {
         foregroundColor: AppColors.textPrimaryLight,
         systemOverlayStyle: SystemUiOverlayStyle.dark,
         titleTextStyle: TextStyle(
-          fontFamily: 'Inter',
+          fontFamily: AppTypography.fontFamily,
           fontSize: 18,
           fontWeight: FontWeight.w600,
           color: AppColors.textPrimaryLight,
@@ -49,12 +51,12 @@ class AppTheme {
         type: BottomNavigationBarType.fixed,
         elevation: 8,
         selectedLabelStyle: TextStyle(
-          fontFamily: 'Inter',
+          fontFamily: AppTypography.fontFamily,
           fontSize: 12,
           fontWeight: FontWeight.w500,
         ),
         unselectedLabelStyle: TextStyle(
-          fontFamily: 'Inter',
+          fontFamily: AppTypography.fontFamily,
           fontSize: 12,
           fontWeight: FontWeight.w400,
         ),
@@ -65,14 +67,14 @@ class AppTheme {
         labelTextStyle: WidgetStateProperty.resolveWith((states) {
           if (states.contains(WidgetState.selected)) {
             return const TextStyle(
-              fontFamily: 'Inter',
+              fontFamily: AppTypography.fontFamily,
               fontSize: 12,
               fontWeight: FontWeight.w600,
               color: AppColors.buttonPrimaryLight,
             );
           }
           return const TextStyle(
-            fontFamily: 'Inter',
+            fontFamily: AppTypography.fontFamily,
             fontSize: 12,
             fontWeight: FontWeight.w400,
             color: AppColors.textSecondaryLight,
@@ -95,7 +97,7 @@ class AppTheme {
             borderRadius: BorderRadius.circular(12),
           ),
           textStyle: const TextStyle(
-            fontFamily: 'Inter',
+            fontFamily: AppTypography.fontFamily,
             fontSize: 16,
             fontWeight: FontWeight.w600,
           ),
@@ -113,7 +115,7 @@ class AppTheme {
             width: 1.5,
           ),
           textStyle: const TextStyle(
-            fontFamily: 'Inter',
+            fontFamily: AppTypography.fontFamily,
             fontSize: 16,
             fontWeight: FontWeight.w600,
           ),
@@ -124,7 +126,7 @@ class AppTheme {
           foregroundColor: AppColors.buttonPrimaryLight,
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
           textStyle: const TextStyle(
-            fontFamily: 'Inter',
+            fontFamily: AppTypography.fontFamily,
             fontSize: 14,
             fontWeight: FontWeight.w600,
           ),
@@ -161,12 +163,12 @@ class AppTheme {
           borderSide: const BorderSide(color: AppColors.error, width: 2),
         ),
         labelStyle: const TextStyle(
-          fontFamily: 'Inter',
+          fontFamily: AppTypography.fontFamily,
           fontSize: 14,
           color: AppColors.textSecondaryLight,
         ),
         hintStyle: const TextStyle(
-          fontFamily: 'Inter',
+          fontFamily: AppTypography.fontFamily,
           fontSize: 14,
           color: AppColors.textTertiaryLight,
         ),
@@ -181,7 +183,7 @@ class AppTheme {
         backgroundColor: AppColors.backgroundLight,
         selectedColor: AppColors.buttonPrimaryLight.withValues(alpha: 0.1),
         labelStyle: const TextStyle(
-          fontFamily: 'Inter',
+          fontFamily: AppTypography.fontFamily,
           fontSize: 14,
           fontWeight: FontWeight.w500,
         ),
@@ -195,7 +197,7 @@ class AppTheme {
         color: AppColors.dividerLight,
         thickness: 1,
       ),
-      textTheme: AppTypography.textTheme,
+      textTheme: GoogleFonts.manropeTextTheme(AppTypography.textTheme),
     );
   }
 
@@ -205,6 +207,7 @@ class AppTheme {
       useMaterial3: true,
       brightness: Brightness.dark,
       primaryColor: AppColors.buttonPrimaryDark,
+      fontFamily: AppTypography.fontFamily,
       scaffoldBackgroundColor: AppColors.backgroundDark,
       extensions: darkThemeExtensions,
       colorScheme: const ColorScheme.dark(
@@ -226,7 +229,7 @@ class AppTheme {
         foregroundColor: AppColors.textPrimaryDark,
         systemOverlayStyle: SystemUiOverlayStyle.light,
         titleTextStyle: TextStyle(
-          fontFamily: 'Inter',
+          fontFamily: AppTypography.fontFamily,
           fontSize: 18,
           fontWeight: FontWeight.w600,
           color: AppColors.textPrimaryDark,
@@ -240,12 +243,12 @@ class AppTheme {
         type: BottomNavigationBarType.fixed,
         elevation: 8,
         selectedLabelStyle: TextStyle(
-          fontFamily: 'Inter',
+          fontFamily: AppTypography.fontFamily,
           fontSize: 12,
           fontWeight: FontWeight.w500,
         ),
         unselectedLabelStyle: TextStyle(
-          fontFamily: 'Inter',
+          fontFamily: AppTypography.fontFamily,
           fontSize: 12,
           fontWeight: FontWeight.w400,
         ),
@@ -256,14 +259,14 @@ class AppTheme {
         labelTextStyle: WidgetStateProperty.resolveWith((states) {
           if (states.contains(WidgetState.selected)) {
             return const TextStyle(
-              fontFamily: 'Inter',
+              fontFamily: AppTypography.fontFamily,
               fontSize: 12,
               fontWeight: FontWeight.w600,
               color: AppColors.buttonPrimaryDark,
             );
           }
           return const TextStyle(
-            fontFamily: 'Inter',
+            fontFamily: AppTypography.fontFamily,
             fontSize: 12,
             fontWeight: FontWeight.w400,
             color: AppColors.textSecondaryDark,
@@ -286,7 +289,7 @@ class AppTheme {
             borderRadius: BorderRadius.circular(12),
           ),
           textStyle: const TextStyle(
-            fontFamily: 'Inter',
+            fontFamily: AppTypography.fontFamily,
             fontSize: 16,
             fontWeight: FontWeight.w600,
           ),
@@ -304,7 +307,7 @@ class AppTheme {
             width: 1.5,
           ),
           textStyle: const TextStyle(
-            fontFamily: 'Inter',
+            fontFamily: AppTypography.fontFamily,
             fontSize: 16,
             fontWeight: FontWeight.w600,
           ),
@@ -315,7 +318,7 @@ class AppTheme {
           foregroundColor: AppColors.buttonPrimaryDark,
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
           textStyle: const TextStyle(
-            fontFamily: 'Inter',
+            fontFamily: AppTypography.fontFamily,
             fontSize: 14,
             fontWeight: FontWeight.w600,
           ),
@@ -344,12 +347,12 @@ class AppTheme {
           ),
         ),
         labelStyle: const TextStyle(
-          fontFamily: 'Inter',
+          fontFamily: AppTypography.fontFamily,
           fontSize: 14,
           color: AppColors.textSecondaryDark,
         ),
         hintStyle: const TextStyle(
-          fontFamily: 'Inter',
+          fontFamily: AppTypography.fontFamily,
           fontSize: 14,
           color: AppColors.textTertiaryDark,
         ),
@@ -364,7 +367,7 @@ class AppTheme {
         backgroundColor: AppColors.surfaceDark,
         selectedColor: AppColors.buttonPrimaryDark.withValues(alpha: 0.25),
         labelStyle: const TextStyle(
-          fontFamily: 'Inter',
+          fontFamily: AppTypography.fontFamily,
           fontSize: 14,
           fontWeight: FontWeight.w500,
           color: AppColors.textPrimaryDark,
@@ -379,7 +382,7 @@ class AppTheme {
         color: AppColors.dividerDark,
         thickness: 1,
       ),
-      textTheme: AppTypography.darkTextTheme,
+      textTheme: GoogleFonts.manropeTextTheme(AppTypography.darkTextTheme),
     );
   }
 }

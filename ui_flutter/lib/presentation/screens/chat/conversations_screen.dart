@@ -9,6 +9,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../data/models/chat_model.dart';
 import '../../blocs/auth/auth_bloc.dart';
 import '../../blocs/chat/chat_bloc.dart';
+import '../../widgets/navigation/app_back_button.dart';
 import '../../widgets/role_badge.dart';
 
 class ConversationsScreen extends StatefulWidget {
@@ -30,7 +31,10 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
     // Set current user info
     final authState = context.read<AuthBloc>().state;
     if (authState is AuthAuthenticated) {
-      _chatBloc.setCurrentUser(authState.user.id, authState.user.displayName ?? 'User');
+      _chatBloc.setCurrentUser(
+        authState.user.id,
+        authState.user.displayName ?? 'User',
+      );
     }
 
     _chatBloc.add(const ChatLoadConversations());
@@ -52,12 +56,15 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final authState = context.read<AuthBloc>().state;
-    final currentUserId = authState is AuthAuthenticated ? authState.user.id : '';
+    final currentUserId = authState is AuthAuthenticated
+        ? authState.user.id
+        : '';
 
     return BlocProvider.value(
       value: _chatBloc,
       child: Scaffold(
         appBar: AppBar(
+          leading: AppBackButton.leading(context),
           title: const Text('Messages'),
           actions: [
             const RoleBadge(),
@@ -82,7 +89,9 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
                     Icon(
                       Icons.error_outline,
                       size: 64,
-                      color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                      color: isDark
+                          ? AppColors.textSecondaryDark
+                          : AppColors.textSecondaryLight,
                     ),
                     const SizedBox(height: 16),
                     Text(
@@ -91,7 +100,8 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
                     ),
                     const SizedBox(height: 8),
                     TextButton(
-                      onPressed: () => _chatBloc.add(const ChatLoadConversations()),
+                      onPressed: () =>
+                          _chatBloc.add(const ChatLoadConversations()),
                       child: const Text('Retry'),
                     ),
                   ],
@@ -219,21 +229,27 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
           Icon(
             Icons.chat_bubble_outline,
             size: 80,
-            color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+            color: isDark
+                ? AppColors.textSecondaryDark
+                : AppColors.textSecondaryLight,
           ),
           const SizedBox(height: 16),
           Text(
             'No conversations yet',
             style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
-                ),
+              color: isDark
+                  ? AppColors.textSecondaryDark
+                  : AppColors.textSecondaryLight,
+            ),
           ),
           const SizedBox(height: 8),
           Text(
             'Start a new chat with a team member',
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
-                ),
+              color: isDark
+                  ? AppColors.textSecondaryDark
+                  : AppColors.textSecondaryLight,
+            ),
           ),
           const SizedBox(height: 24),
           ElevatedButton.icon(
@@ -286,7 +302,9 @@ class _ConversationTile extends StatelessWidget {
         backgroundImage: avatarUrl != null ? NetworkImage(avatarUrl) : null,
         child: avatarUrl == null
             ? Icon(
-                conversation.type == ConversationType.team ? Icons.groups : Icons.person,
+                conversation.type == ConversationType.team
+                    ? Icons.groups
+                    : Icons.person,
                 color: conversation.type == ConversationType.team
                     ? AppColors.primary
                     : AppColors.secondary,
@@ -312,7 +330,9 @@ class _ConversationTile extends StatelessWidget {
                 fontSize: 12,
                 color: hasUnread
                     ? AppColors.primary
-                    : (isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight),
+                    : (isDark
+                          ? AppColors.textSecondaryDark
+                          : AppColors.textSecondaryLight),
                 fontWeight: hasUnread ? FontWeight.bold : FontWeight.normal,
               ),
             ),
@@ -326,7 +346,9 @@ class _ConversationTile extends StatelessWidget {
               style: TextStyle(
                 color: hasUnread
                     ? (isDark ? Colors.white70 : Colors.black87)
-                    : (isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight),
+                    : (isDark
+                          ? AppColors.textSecondaryDark
+                          : AppColors.textSecondaryLight),
                 fontWeight: hasUnread ? FontWeight.w500 : FontWeight.normal,
               ),
               maxLines: 1,
@@ -341,7 +363,9 @@ class _ConversationTile extends StatelessWidget {
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Text(
-                conversation.unreadCount > 99 ? '99+' : conversation.unreadCount.toString(),
+                conversation.unreadCount > 99
+                    ? '99+'
+                    : conversation.unreadCount.toString(),
                 style: const TextStyle(
                   color: Colors.white,
                   fontSize: 12,
@@ -402,7 +426,9 @@ class _NewChatBottomSheetState extends State<_NewChatBottomSheet> {
         _filteredMembers = _teamMembers;
       } else {
         _filteredMembers = _teamMembers.where((member) {
-          final name = (member['display_name'] ?? member['name'] ?? '').toString().toLowerCase();
+          final name = (member['display_name'] ?? member['name'] ?? '')
+              .toString()
+              .toLowerCase();
           final email = (member['email'] ?? '').toString().toLowerCase();
           return name.contains(query) || email.contains(query);
         }).toList();
@@ -424,7 +450,9 @@ class _NewChatBottomSheetState extends State<_NewChatBottomSheet> {
 
     _currentUserId = authState.user.id;
     _teamId = authState.user.teamId;
-    debugPrint('NewChatBottomSheet: Loading members for team $_teamId, current user: $_currentUserId');
+    debugPrint(
+      'NewChatBottomSheet: Loading members for team $_teamId, current user: $_currentUserId',
+    );
 
     try {
       final apiClient = await ApiClient.getInstance();
@@ -436,7 +464,9 @@ class _NewChatBottomSheetState extends State<_NewChatBottomSheet> {
       if (response.statusCode == 200) {
         // Response is a direct array of users from user-service
         final List<dynamic> data = response.data is List ? response.data : [];
-        debugPrint('NewChatBottomSheet: Found ${data.length} members before filtering');
+        debugPrint(
+          'NewChatBottomSheet: Found ${data.length} members before filtering',
+        );
 
         // Filter out the current user - use user_id field from API
         final members = data
@@ -444,12 +474,16 @@ class _NewChatBottomSheetState extends State<_NewChatBottomSheet> {
             .where((m) {
               final odId = m['id']?.toString();
               final odUserId = m['user_id']?.toString();
-              debugPrint('NewChatBottomSheet: Member id=$odId, user_id=$odUserId, currentUserId=$_currentUserId');
+              debugPrint(
+                'NewChatBottomSheet: Member id=$odId, user_id=$odUserId, currentUserId=$_currentUserId',
+              );
               return odId != _currentUserId && odUserId != _currentUserId;
             })
             .toList();
 
-        debugPrint('NewChatBottomSheet: ${members.length} members after filtering');
+        debugPrint(
+          'NewChatBottomSheet: ${members.length} members after filtering',
+        );
 
         setState(() {
           _teamMembers = members;
@@ -457,7 +491,9 @@ class _NewChatBottomSheetState extends State<_NewChatBottomSheet> {
           _isLoading = false;
         });
       } else {
-        debugPrint('NewChatBottomSheet: Non-200 response: ${response.statusCode}');
+        debugPrint(
+          'NewChatBottomSheet: Non-200 response: ${response.statusCode}',
+        );
         setState(() {
           _isLoading = false;
           _teamMembers = [];
@@ -489,9 +525,9 @@ class _NewChatBottomSheetState extends State<_NewChatBottomSheet> {
             children: [
               Text(
                 'New Chat',
-                style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
+                style: Theme.of(
+                  context,
+                ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
               ),
               IconButton(
                 icon: const Icon(Icons.close),
@@ -528,10 +564,15 @@ class _NewChatBottomSheetState extends State<_NewChatBottomSheet> {
               final router = GoRouter.of(context);
               final authState = context.read<AuthBloc>().state;
               Navigator.pop(context);
-              if (authState is AuthAuthenticated && authState.user.teamId != null) {
+              if (authState is AuthAuthenticated &&
+                  authState.user.teamId != null) {
                 final teamName = authState.user.teamName ?? 'Team Chat';
-                debugPrint('Navigating to team chat: /chat/team/${authState.user.teamId}');
-                router.push('/chat/team/${authState.user.teamId}?name=${Uri.encodeComponent(teamName)}');
+                debugPrint(
+                  'Navigating to team chat: /chat/team/${authState.user.teamId}',
+                );
+                router.push(
+                  '/chat/team/${authState.user.teamId}?name=${Uri.encodeComponent(teamName)}',
+                );
               }
             },
           ),
@@ -540,92 +581,106 @@ class _NewChatBottomSheetState extends State<_NewChatBottomSheet> {
           Text(
             'Team Members',
             style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                  color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
-                ),
+              color: isDark
+                  ? AppColors.textSecondaryDark
+                  : AppColors.textSecondaryLight,
+            ),
           ),
           const SizedBox(height: 8),
           Expanded(
             child: _isLoading
                 ? const Center(child: CircularProgressIndicator())
                 : _filteredMembers.isEmpty
-                    ? Center(
-                        child: Text(
-                          _searchController.text.isEmpty
-                              ? 'No team members found'
-                              : 'No members match "${_searchController.text}"',
-                          style: TextStyle(
-                            color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
-                          ),
-                        ),
-                      )
-                    : ListView.builder(
-                        itemCount: _filteredMembers.length,
-                        itemBuilder: (context, index) {
-                          final member = _filteredMembers[index];
-                          final name = member['display_name'] ?? member['name'] ?? 'Unknown';
-                          final email = member['email'] ?? '';
-                          final avatarUrl = member['avatar_url'];
-                          final memberId = member['id'] ?? member['user_id'] ?? '';
-                          final isOnline = member['is_online'] == true;
+                ? Center(
+                    child: Text(
+                      _searchController.text.isEmpty
+                          ? 'No team members found'
+                          : 'No members match "${_searchController.text}"',
+                      style: TextStyle(
+                        color: isDark
+                            ? AppColors.textSecondaryDark
+                            : AppColors.textSecondaryLight,
+                      ),
+                    ),
+                  )
+                : ListView.builder(
+                    itemCount: _filteredMembers.length,
+                    itemBuilder: (context, index) {
+                      final member = _filteredMembers[index];
+                      final name =
+                          member['display_name'] ?? member['name'] ?? 'Unknown';
+                      final email = member['email'] ?? '';
+                      final avatarUrl = member['avatar_url'];
+                      final memberId = member['id'] ?? member['user_id'] ?? '';
+                      final isOnline = member['is_online'] == true;
 
-                          return ListTile(
-                            leading: Stack(
-                              children: [
-                                CircleAvatar(
-                                  backgroundImage: avatarUrl != null
-                                      ? NetworkImage(avatarUrl)
-                                      : null,
-                                  child: avatarUrl == null
-                                      ? Text(name[0].toUpperCase())
-                                      : null,
-                                ),
-                                if (isOnline)
-                                  Positioned(
-                                    right: 0,
-                                    bottom: 0,
-                                    child: Container(
-                                      width: 12,
-                                      height: 12,
-                                      decoration: BoxDecoration(
-                                        color: AppColors.success,
-                                        shape: BoxShape.circle,
-                                        border: Border.all(
-                                          color: isDark ? AppColors.surfaceDark : AppColors.surfaceLight,
-                                          width: 2,
-                                        ),
-                                      ),
+                      return ListTile(
+                        leading: Stack(
+                          children: [
+                            CircleAvatar(
+                              backgroundImage: avatarUrl != null
+                                  ? NetworkImage(avatarUrl)
+                                  : null,
+                              child: avatarUrl == null
+                                  ? Text(name[0].toUpperCase())
+                                  : null,
+                            ),
+                            if (isOnline)
+                              Positioned(
+                                right: 0,
+                                bottom: 0,
+                                child: Container(
+                                  width: 12,
+                                  height: 12,
+                                  decoration: BoxDecoration(
+                                    color: AppColors.success,
+                                    shape: BoxShape.circle,
+                                    border: Border.all(
+                                      color: isDark
+                                          ? AppColors.surfaceDark
+                                          : AppColors.surfaceLight,
+                                      width: 2,
                                     ),
                                   ),
-                              ],
-                            ),
-                            title: Text(name),
-                            subtitle: Text(email),
-                            onTap: () async {
-                              // Store the GoRouter before popping the bottom sheet
-                              final router = GoRouter.of(context);
-                              Navigator.pop(context);
-                              // Create or get the direct conversation and navigate
-                              try {
-                                final apiClient = await ApiClient.getInstance();
-                                final response = await apiClient.post(
-                                  '/api/chat/conversations/direct',
-                                  data: {'other_user_id': memberId},
+                                ),
+                              ),
+                          ],
+                        ),
+                        title: Text(name),
+                        subtitle: Text(email),
+                        onTap: () async {
+                          // Store the GoRouter before popping the bottom sheet
+                          final router = GoRouter.of(context);
+                          Navigator.pop(context);
+                          // Create or get the direct conversation and navigate
+                          try {
+                            final apiClient = await ApiClient.getInstance();
+                            final response = await apiClient.post(
+                              '/api/chat/conversations/direct',
+                              data: {'other_user_id': memberId},
+                            );
+                            debugPrint(
+                              'Create direct conversation response: ${response.statusCode} - ${response.data}',
+                            );
+                            if (response.statusCode == 200 ||
+                                response.statusCode == 201) {
+                              final conversationId = response.data['id'];
+                              if (conversationId != null) {
+                                debugPrint(
+                                  'Navigating to chat: /chat/$conversationId',
                                 );
-                                debugPrint('Create direct conversation response: ${response.statusCode} - ${response.data}');
-                                if (response.statusCode == 200 || response.statusCode == 201) {
-                                  final conversationId = response.data['id'];
-                                  if (conversationId != null) {
-                                    debugPrint('Navigating to chat: /chat/$conversationId');
-                                    router.push('/chat/$conversationId');
-                                  }
-                                }
-                              } catch (e) {
-                                debugPrint('Error creating direct conversation: $e');
+                                router.push('/chat/$conversationId');
                               }
-                            },
-                          );
+                            }
+                          } catch (e) {
+                            debugPrint(
+                              'Error creating direct conversation: $e',
+                            );
+                          }
                         },
-                      ),
+                      );
+                    },
+                  ),
           ),
         ],
       ),

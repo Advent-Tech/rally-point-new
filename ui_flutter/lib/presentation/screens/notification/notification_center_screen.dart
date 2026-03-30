@@ -6,13 +6,15 @@ import '../../blocs/notification/notification_bloc.dart';
 import '../../widgets/role_badge.dart';
 import '../../widgets/animations/staggered_fade_in.dart';
 import '../../widgets/notification/notification_tile.dart';
+import '../../widgets/navigation/app_back_button.dart';
 import '../../../data/models/notification_model.dart';
 
 class NotificationCenterScreen extends StatefulWidget {
   const NotificationCenterScreen({super.key});
 
   @override
-  State<NotificationCenterScreen> createState() => _NotificationCenterScreenState();
+  State<NotificationCenterScreen> createState() =>
+      _NotificationCenterScreenState();
 }
 
 class _NotificationCenterScreenState extends State<NotificationCenterScreen> {
@@ -45,6 +47,7 @@ class _NotificationCenterScreenState extends State<NotificationCenterScreen> {
       value: _bloc,
       child: Scaffold(
         appBar: AppBar(
+          leading: AppBackButton.leading(context),
           title: const Text('Notifications'),
           actions: [
             const RoleBadge(),
@@ -134,7 +137,9 @@ class _NotificationCenterScreenState extends State<NotificationCenterScreen> {
           Icon(
             Icons.notifications_none_rounded,
             size: 80,
-            color: Theme.of(context).colorScheme.onSurfaceVariant.withAlpha(100),
+            color: Theme.of(
+              context,
+            ).colorScheme.onSurfaceVariant.withAlpha(100),
           ),
           const SizedBox(height: 16),
           Text(
@@ -148,7 +153,9 @@ class _NotificationCenterScreenState extends State<NotificationCenterScreen> {
             'You\'ll see updates about your territory,\ndeliveries, and team here.',
             textAlign: TextAlign.center,
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-              color: Theme.of(context).colorScheme.onSurfaceVariant.withAlpha(150),
+              color: Theme.of(
+                context,
+              ).colorScheme.onSurfaceVariant.withAlpha(150),
             ),
           ),
         ],
@@ -180,12 +187,17 @@ class _NotificationCenterScreenState extends State<NotificationCenterScreen> {
     String? lastSection;
 
     for (final n in notifications) {
-      final date = DateTime(n.createdAt.year, n.createdAt.month, n.createdAt.day);
+      final date = DateTime(
+        n.createdAt.year,
+        n.createdAt.month,
+        n.createdAt.day,
+      );
       String section;
 
       if (date == today || date.isAfter(today)) {
         section = 'Today';
-      } else if (date == yesterday || (date.isAfter(yesterday) && date.isBefore(today))) {
+      } else if (date == yesterday ||
+          (date.isAfter(yesterday) && date.isBefore(today))) {
         section = 'Yesterday';
       } else if (date.isAfter(weekAgo)) {
         section = 'This Week';
@@ -222,7 +234,9 @@ class _NotificationCenterScreenState extends State<NotificationCenterScreen> {
       case 'chat':
         final conversationId = notification.data['conversation_id']?.toString();
         if (conversationId != null && conversationId.isNotEmpty) {
-          context.go(isLeader ? '/leader/chat/$conversationId' : '/chat/$conversationId');
+          context.go(
+            isLeader ? '/leader/chat/$conversationId' : '/chat/$conversationId',
+          );
         } else {
           context.go(isLeader ? '/leader/chat' : '/chat');
         }
@@ -244,10 +258,14 @@ class _NotificationCenterScreenState extends State<NotificationCenterScreen> {
         break;
       case 'geofence':
       case 'session':
-        context.go(isLeader ? '/leader/command-center?mode=workers' : '/territory');
+        context.go(
+          isLeader ? '/leader/command-center?mode=workers' : '/territory',
+        );
         break;
       case 'territory':
-        context.go(isLeader ? '/leader/command-center?mode=territories' : '/territory');
+        context.go(
+          isLeader ? '/leader/command-center?mode=territories' : '/territory',
+        );
         break;
       default:
         break;

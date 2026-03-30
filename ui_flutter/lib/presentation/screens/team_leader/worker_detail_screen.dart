@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import '../../../core/network/api_client.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../widgets/loading/skeleton_loader.dart';
+import '../../widgets/navigation/app_back_button.dart';
 
 class WorkerDetailScreen extends StatefulWidget {
   final String workerId;
@@ -57,8 +58,10 @@ class _WorkerDetailScreenState extends State<WorkerDetailScreen>
     try {
       final apiClient = await ApiClient.getInstance();
 
-      // Donations
+      // Donations + book sales (combined giving stream)
       try {
+        final combined = <DonationItem>[];
+
         final response = await apiClient.get(
           '/api/donations/worker/${widget.workerId}',
           queryParameters: {'limit': 100, 'offset': 0},
@@ -68,11 +71,41 @@ class _WorkerDetailScreenState extends State<WorkerDetailScreen>
           final List<dynamic> rows = body is Map
               ? (body['donations'] as List? ?? const [])
               : (body is List ? body : const []);
-          _donations = rows
-              .whereType<Map>()
-              .map((e) => DonationItem.fromJson(Map<String, dynamic>.from(e)))
-              .toList();
+          combined.addAll(
+            rows
+                .whereType<Map>()
+                .map((e) => DonationItem.fromJson(Map<String, dynamic>.from(e)))
+                .toList(),
+          );
         }
+
+        final bookSalesResponse = await apiClient.get(
+          '/api/book-sales/worker/${widget.workerId}',
+          queryParameters: {'limit': 100, 'offset': 0},
+        );
+        if (bookSalesResponse.statusCode == 200) {
+          final body = bookSalesResponse.data;
+          final List<dynamic> rows = body is Map
+              ? (body['book_sales'] as List? ??
+                    body['results'] as List? ??
+                    body['data'] as List? ??
+                    const [])
+              : (body is List ? body : const []);
+
+          combined.addAll(
+            rows
+                .whereType<Map>()
+                .map(
+                  (e) => DonationItem.fromBookSaleJson(
+                    Map<String, dynamic>.from(e),
+                  ),
+                )
+                .toList(),
+          );
+        }
+
+        combined.sort((a, b) => b.timestamp.compareTo(a.timestamp));
+        _donations = combined;
       } catch (e) {
         errors.add('donations');
         debugPrint('WorkerDetail donations error: $e');
@@ -202,9 +235,9 @@ class _WorkerDetailScreenState extends State<WorkerDetailScreen>
 
     return Scaffold(
       appBar: AppBar(
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => context.pop(),
+        leading: AppBackButton.leading(
+          context,
+          fallbackRoute: '/leader/reports',
         ),
         title: Text(workerName),
         centerTitle: true,
@@ -295,10 +328,12 @@ class _WorkerDetailScreenState extends State<WorkerDetailScreen>
   }
 
   Widget _buildOverviewTab(BuildContext context) {
-    final totalDonation = _donations.fold<double>(
+    final totalGiving = _donations.fold<double>(
       0,
       (sum, item) => sum + item.amount,
     );
+    final totalBookSales = _donations.where((d) => d.entryType == 'book_sale');
+    final totalDonations = _donations.where((d) => d.entryType != 'book_sale');
 
     final byDay = _weeklyActivityCounts();
 
@@ -312,9 +347,10 @@ class _WorkerDetailScreenState extends State<WorkerDetailScreen>
               Expanded(
                 child: _StatCard(
                   icon: Icons.volunteer_activism,
-                  value: '\$${totalDonation.toStringAsFixed(0)}',
-                  label: 'Donations',
-                  subLabel: '${_donations.length} collected',
+                  value: '\$${totalGiving.toStringAsFixed(0)}',
+                  label: 'Giving',
+                  subLabel:
+                      '${totalDonations.length} donations • ${totalBookSales.length} books',
                 ),
               ),
               const SizedBox(width: 12),
@@ -395,6 +431,12 @@ class _WorkerDetailScreenState extends State<WorkerDetailScreen>
       0,
       (sum, item) => sum + item.amount,
     );
+    final donationCount = _donations
+        .where((d) => d.entryType != 'book_sale')
+        .length;
+    final bookSaleCount = _donations
+        .where((d) => d.entryType == 'book_sale')
+        .length;
 
     return Column(
       children: [
@@ -417,14 +459,14 @@ class _WorkerDetailScreenState extends State<WorkerDetailScreen>
                     color: Color(0xFF11A67B),
                   ),
                 ),
-                Text('${_donations.length} donations'),
+                Text('$donationCount donations • $bookSaleCount book sales'),
               ],
             ),
           ),
         ),
         Expanded(
           child: _donations.isEmpty
-              ? const Center(child: Text('No donations found'))
+              ? const Center(child: Text('No giving activity found'))
               : ListView.separated(
                   padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
                   itemCount: _donations.length,
@@ -643,6 +685,7 @@ class _DonationTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isBookSale = donation.entryType == 'book_sale';
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
@@ -656,12 +699,16 @@ class _DonationTile extends StatelessWidget {
             width: 38,
             height: 38,
             decoration: BoxDecoration(
-              color: const Color(0xFFE5F6ED),
+              color: isBookSale
+                  ? const Color(0xFFE7F0FF)
+                  : const Color(0xFFE5F6ED),
               borderRadius: BorderRadius.circular(10),
             ),
-            child: const Icon(
-              Icons.volunteer_activism,
-              color: Color(0xFF28B978),
+            child: Icon(
+              isBookSale ? Icons.menu_book_rounded : Icons.volunteer_activism,
+              color: isBookSale
+                  ? const Color(0xFF3B82F6)
+                  : const Color(0xFF28B978),
               size: 20,
             ),
           ),
@@ -671,7 +718,7 @@ class _DonationTile extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  '\$${donation.amount.toStringAsFixed(2)} • ${donation.paymentMethod}',
+                  '\$${donation.amount.toStringAsFixed(2)} • ${donation.paymentMethod} ${isBookSale ? "• book sale" : ""}',
                   style: const TextStyle(
                     fontWeight: FontWeight.w700,
                     fontSize: 20 > 22 ? 22 : 22,
@@ -833,6 +880,7 @@ class _PrayerStatusChip extends StatelessWidget {
 class DonationItem {
   final String id;
   final double amount;
+  final String entryType;
   final String donorName;
   final String donorAddress;
   final String paymentMethod;
@@ -841,6 +889,7 @@ class DonationItem {
   const DonationItem({
     required this.id,
     required this.amount,
+    this.entryType = 'donation',
     required this.donorName,
     required this.donorAddress,
     required this.paymentMethod,
@@ -854,6 +903,7 @@ class DonationItem {
     return DonationItem(
       id: (json['id'] ?? '').toString(),
       amount: double.tryParse('${json['amount'] ?? 0}') ?? 0,
+      entryType: (json['donation_type'] ?? 'donation').toString().toLowerCase(),
       donorName: donorName.isEmpty ? 'Unknown donor' : donorName,
       donorAddress: address,
       paymentMethod: (json['payment_method'] ?? 'cash').toString(),
@@ -892,10 +942,34 @@ class DonationItem {
     return DonationItem(
       id: (delivery['id'] ?? '').toString(),
       amount: amount,
+      entryType: deliveryType == 'book_sale' ? 'book_sale' : 'donation',
       donorName: recipientName,
       donorAddress: address,
       paymentMethod: paymentMethod,
       timestamp: createdAt,
+    );
+  }
+
+  factory DonationItem.fromBookSaleJson(Map<String, dynamic> json) {
+    final buyerName = (json['buyer_name'] ?? 'Book buyer').toString();
+    final address = (json['buyer_address'] ?? '').toString();
+    final paymentMethod = (json['payment_method'] ?? 'cash').toString();
+    final timestamp =
+        DateTime.tryParse(
+          (json['sold_at'] ?? json['created_at'] ?? '').toString(),
+        ) ??
+        DateTime.now();
+
+    return DonationItem(
+      id: (json['id'] ?? '').toString(),
+      amount:
+          double.tryParse('${json['total_amount'] ?? json['amount'] ?? 0}') ??
+          0,
+      entryType: 'book_sale',
+      donorName: buyerName,
+      donorAddress: address,
+      paymentMethod: paymentMethod,
+      timestamp: timestamp,
     );
   }
 }

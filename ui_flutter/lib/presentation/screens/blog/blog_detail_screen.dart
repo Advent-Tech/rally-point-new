@@ -4,6 +4,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../data/models/blog_model.dart';
 import '../../blocs/blog/blog_bloc.dart';
+import '../../widgets/navigation/app_back_button.dart';
 
 class BlogDetailScreen extends StatefulWidget {
   final String blogId;
@@ -37,7 +38,9 @@ class _BlogDetailScreenState extends State<BlogDetailScreen> {
     return BlocProvider.value(
       value: _blogBloc,
       child: Scaffold(
-        backgroundColor: isDark ? AppColors.backgroundDark : AppColors.backgroundLight,
+        backgroundColor: isDark
+            ? AppColors.backgroundDark
+            : AppColors.backgroundLight,
         body: BlocBuilder<BlogBloc, BlogState>(
           builder: (context, state) {
             if (state is BlogLoading) {
@@ -66,6 +69,7 @@ class _BlogDetailScreenState extends State<BlogDetailScreen> {
           backgroundColor: isDark ? AppColors.surfaceDark : Colors.white,
           foregroundColor: isDark ? Colors.white : AppColors.textPrimaryLight,
           pinned: true,
+          leading: AppBackButton.leading(context),
         ),
         SliverFillRemaining(
           child: Center(
@@ -75,7 +79,9 @@ class _BlogDetailScreenState extends State<BlogDetailScreen> {
                 Icon(
                   Icons.error_outline,
                   size: 64,
-                  color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                  color: isDark
+                      ? AppColors.textSecondaryDark
+                      : AppColors.textSecondaryLight,
                 ),
                 const SizedBox(height: 16),
                 Text(
@@ -90,13 +96,16 @@ class _BlogDetailScreenState extends State<BlogDetailScreen> {
                 Text(
                   message,
                   style: TextStyle(
-                    color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                    color: isDark
+                        ? AppColors.textSecondaryDark
+                        : AppColors.textSecondaryLight,
                   ),
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 24),
                 ElevatedButton.icon(
-                  onPressed: () => _blogBloc.add(BlogLoadDetail(blogId: widget.blogId)),
+                  onPressed: () =>
+                      _blogBloc.add(BlogLoadDetail(blogId: widget.blogId)),
                   icon: const Icon(Icons.refresh),
                   label: const Text('Retry'),
                   style: ElevatedButton.styleFrom(
@@ -121,6 +130,7 @@ class _BlogDetailScreenState extends State<BlogDetailScreen> {
           pinned: true,
           backgroundColor: isDark ? AppColors.surfaceDark : Colors.white,
           foregroundColor: isDark ? Colors.white : AppColors.textPrimaryLight,
+          leading: AppBackButton.leading(context),
           flexibleSpace: blog.imageUrl != null
               ? FlexibleSpaceBar(
                   background: Stack(
@@ -131,9 +141,12 @@ class _BlogDetailScreenState extends State<BlogDetailScreen> {
                         fit: BoxFit.cover,
                         placeholder: (context, url) => Container(
                           color: AppColors.primary.withAlpha(30),
-                          child: const Center(child: CircularProgressIndicator()),
+                          child: const Center(
+                            child: CircularProgressIndicator(),
+                          ),
                         ),
-                        errorWidget: (context, url, error) => _buildPlaceholderImage(),
+                        errorWidget: (context, url, error) =>
+                            _buildPlaceholderImage(),
                       ),
                       // Gradient overlay for better text visibility
                       Container(
@@ -168,7 +181,9 @@ class _BlogDetailScreenState extends State<BlogDetailScreen> {
         // Content
         SliverToBoxAdapter(
           child: Container(
-            color: isDark ? AppColors.backgroundDark : AppColors.backgroundLight,
+            color: isDark
+                ? AppColors.backgroundDark
+                : AppColors.backgroundLight,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -244,7 +259,9 @@ class _BlogDetailScreenState extends State<BlogDetailScreen> {
                         style: TextStyle(
                           fontSize: 26,
                           fontWeight: FontWeight.bold,
-                          color: isDark ? Colors.white : AppColors.textPrimaryLight,
+                          color: isDark
+                              ? Colors.white
+                              : AppColors.textPrimaryLight,
                           height: 1.3,
                         ),
                       ),
@@ -276,7 +293,9 @@ class _BlogDetailScreenState extends State<BlogDetailScreen> {
                                 style: TextStyle(
                                   fontSize: 15,
                                   fontWeight: FontWeight.w600,
-                                  color: isDark ? Colors.white : AppColors.textPrimaryLight,
+                                  color: isDark
+                                      ? Colors.white
+                                      : AppColors.textPrimaryLight,
                                 ),
                               ),
                               Text(
@@ -318,7 +337,9 @@ class _BlogDetailScreenState extends State<BlogDetailScreen> {
                     style: TextStyle(
                       fontSize: 16,
                       height: 1.8,
-                      color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                      color: isDark
+                          ? AppColors.textSecondaryDark
+                          : AppColors.textSecondaryLight,
                     ),
                   ),
                 ),

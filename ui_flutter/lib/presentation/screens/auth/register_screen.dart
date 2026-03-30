@@ -13,6 +13,7 @@ import '../../../data/repositories/team_repository.dart';
 import '../../widgets/custom_text_field.dart';
 import '../../widgets/custom_button.dart';
 import '../../widgets/feedback/app_snackbar.dart';
+import '../../widgets/navigation/app_back_button.dart';
 
 // Global navigator key for showing dialogs from stream subscription
 final _registerNavigatorKey = GlobalKey<NavigatorState>();
@@ -605,10 +606,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => context.go('/login'),
-        ),
+        leading: AppBackButton.leading(context, fallbackRoute: '/login'),
       ),
       body: SafeArea(
         child: Builder(

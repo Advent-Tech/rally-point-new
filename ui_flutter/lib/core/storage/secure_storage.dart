@@ -64,7 +64,9 @@ class SecureStorage {
 
   Future<bool> isTokenExpired() async {
     final expiry = await getTokenExpiry();
-    if (expiry == null) return true;
+    // If expiry isn't stored, don't force-expire the session.
+    // Some backend responses may omit expires_in; in that case rely on 401 handling.
+    if (expiry == null) return false;
     // Add 2 minute buffer for refresh
     return DateTime.now().isAfter(expiry.subtract(const Duration(minutes: 2)));
   }

@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
+import 'package:showcaseview/showcaseview.dart';
 import '../../blocs/dashboard/dashboard_bloc.dart';
 import '../../blocs/auth/auth_bloc.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../services/coach_marks_service.dart';
 import '../../widgets/role_badge.dart';
 
 class ReportsScreen extends StatefulWidget {
@@ -17,6 +19,9 @@ class _ReportsScreenState extends State<ReportsScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
   late DashboardBloc _dashboardBloc;
+  final _showcaseTabs = GlobalKey();
+  final _showcaseBody = GlobalKey();
+  bool _coachMarksChecked = false;
 
   @override
   void initState() {
@@ -33,6 +38,20 @@ class _ReportsScreenState extends State<ReportsScreen>
     }
   }
 
+  void _maybeShowCoachMarks() {
+    if (_coachMarksChecked) return;
+    _coachMarksChecked = true;
+    CoachMarksService().hasBeenShown('leader_reports').then((shown) {
+      if (!shown && mounted) {
+        Future.delayed(const Duration(milliseconds: 800), () {
+          if (!mounted) return;
+          ShowcaseView.get().startShowCase([_showcaseTabs, _showcaseBody]);
+          CoachMarksService().markAsShown('leader_reports');
+        });
+      }
+    });
+  }
+
   @override
   void dispose() {
     _tabController.dispose();
@@ -44,39 +63,62 @@ class _ReportsScreenState extends State<ReportsScreen>
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    return BlocProvider.value(
-      value: _dashboardBloc,
-      child: Scaffold(
-        appBar: AppBar(
-          leading: GoRouter.of(context).canPop()
-              ? IconButton(
-                  icon: const Icon(Icons.arrow_back),
-                  onPressed: () => context.pop(),
-                )
-              : null,
-          title: const Text('Reports & Analytics'),
-          actions: [
-            const RoleBadge(),
-            IconButton(icon: const Icon(Icons.refresh), onPressed: _loadData),
-          ],
-          bottom: TabBar(
-            controller: _tabController,
-            tabs: const [
-              Tab(text: 'Overview'),
-              Tab(text: 'Team'),
-              Tab(text: 'Territories'),
-            ],
+    return ShowCaseWidget(
+      builder: (_) {
+        _maybeShowCoachMarks();
+        return BlocProvider.value(
+          value: _dashboardBloc,
+          child: Scaffold(
+            appBar: AppBar(
+              leading: GoRouter.of(context).canPop()
+                  ? IconButton(
+                      icon: const Icon(Icons.arrow_back),
+                      onPressed: () => context.pop(),
+                    )
+                  : null,
+              title: const Text('Reports & Analytics'),
+              actions: [
+                const RoleBadge(),
+                IconButton(
+                  icon: const Icon(Icons.refresh),
+                  onPressed: _loadData,
+                ),
+              ],
+              bottom: PreferredSize(
+                preferredSize: const Size.fromHeight(kTextTabBarHeight),
+                child: Showcase(
+                  key: _showcaseTabs,
+                  title: 'Analytics Views',
+                  description:
+                      'Switch between overview, team performance, and territory progress.',
+                  child: TabBar(
+                    controller: _tabController,
+                    tabs: const [
+                      Tab(text: 'Overview'),
+                      Tab(text: 'Team'),
+                      Tab(text: 'Territories'),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            body: Showcase(
+              key: _showcaseBody,
+              title: 'Report Data',
+              description:
+                  'Review donations, book sales, workers, and territory completion trends here.',
+              child: TabBarView(
+                controller: _tabController,
+                children: [
+                  _OverviewTab(isDark: isDark),
+                  _TeamTab(isDark: isDark),
+                  _TerritoriesTab(isDark: isDark),
+                ],
+              ),
+            ),
           ),
-        ),
-        body: TabBarView(
-          controller: _tabController,
-          children: [
-            _OverviewTab(isDark: isDark),
-            _TeamTab(isDark: isDark),
-            _TerritoriesTab(isDark: isDark),
-          ],
-        ),
-      ),
+        );
+      },
     );
   }
 }
@@ -188,9 +230,10 @@ class _OverviewTab extends StatelessWidget {
                     const SizedBox(width: 12),
                     Expanded(
                       child: _MetricCard(
-                        title: 'Donations',
-                        value: '${stats.totalDonations}',
-                        subtitle: 'Collected',
+                        title: 'Giving',
+                        value: '${stats.totalDonations + stats.totalBookSales}',
+                        subtitle:
+                            '${stats.totalDonations} donations • ${stats.totalBookSales} book sales',
                         icon: Icons.volunteer_activism,
                         color: AppColors.secondary,
                         isDark: isDark,
@@ -437,8 +480,8 @@ class _TeamTabState extends State<_TeamTab> {
                           ),
                           _TeamStatItem(
                             value:
-                                '\$${state.workerPerformance.fold<double>(0, (sum, w) => sum + w.donationsTotal).toStringAsFixed(0)}',
-                            label: 'Donations',
+                                '\$${state.workerPerformance.fold<double>(0, (sum, w) => sum + w.totalGiving).toStringAsFixed(0)}',
+                            label: 'Giving',
                             color: AppColors.accent,
                           ),
                         ],
@@ -534,6 +577,9 @@ class _TeamTabState extends State<_TeamTab> {
                             child: _WorkerPerformanceCard(
                               name: worker.name,
                               donationsTotal: worker.donationsTotal,
+                              bookSalesTotal: worker.bookSalesTotal,
+                              donationsCount: worker.donationsCount,
+                              bookSalesCount: worker.bookSalesCount,
                               coverage: worker.territoryCoverage / 100,
                               territoriesAssigned: worker.territoriesAssigned,
                               isActive: worker.isActive,
@@ -893,6 +939,9 @@ class _TeamStatItem extends StatelessWidget {
 class _WorkerPerformanceCard extends StatelessWidget {
   final String name;
   final double donationsTotal;
+  final double bookSalesTotal;
+  final int donationsCount;
+  final int bookSalesCount;
   final double coverage;
   final int territoriesAssigned;
   final bool isActive;
@@ -901,6 +950,9 @@ class _WorkerPerformanceCard extends StatelessWidget {
   const _WorkerPerformanceCard({
     required this.name,
     required this.donationsTotal,
+    required this.bookSalesTotal,
+    required this.donationsCount,
+    required this.bookSalesCount,
     required this.coverage,
     this.territoriesAssigned = 0,
     this.isActive = false,
@@ -997,7 +1049,7 @@ class _WorkerPerformanceCard extends StatelessWidget {
                 Row(
                   children: [
                     Text(
-                      '\$${donationsTotal.toStringAsFixed(0)} donations',
+                      '\$${(donationsTotal + bookSalesTotal).toStringAsFixed(0)} total',
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
                         color: isDark
                             ? AppColors.textSecondaryDark
@@ -1016,6 +1068,15 @@ class _WorkerPerformanceCard extends StatelessWidget {
                       ),
                     ],
                   ],
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  '$donationsCount donations • $bookSalesCount book sales',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: isDark
+                        ? AppColors.textSecondaryDark
+                        : AppColors.textSecondaryLight,
+                  ),
                 ),
                 const SizedBox(height: 6),
                 Row(
@@ -1299,43 +1360,96 @@ class _ActivityItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: isDark ? AppColors.surfaceDark : AppColors.surfaceLight,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(
-          color: isDark ? AppColors.borderDark : AppColors.borderLight,
-        ),
-      ),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: _getActivityColor(activity.type).withAlpha(30),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Icon(
-              _getActivityIcon(activity.type),
-              color: _getActivityColor(activity.type),
-              size: 20,
-            ),
+    return InkWell(
+      onTap: () => _showActivityDetail(context),
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 10),
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: isDark ? AppColors.surfaceDark : AppColors.surfaceLight,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: isDark ? AppColors.borderDark : AppColors.borderLight,
           ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+        ),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: _getActivityColor(activity.type).withAlpha(30),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Icon(
+                _getActivityIcon(activity.type),
+                color: _getActivityColor(activity.type),
+                size: 20,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    activity.workerName,
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    activity.description,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: isDark
+                          ? AppColors.textSecondaryDark
+                          : AppColors.textSecondaryLight,
+                    ),
+                  ),
+                  if ((activity.territoryName ?? '').isNotEmpty) ...[
+                    const SizedBox(height: 2),
+                    Text(
+                      activity.territoryName!,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: isDark
+                            ? AppColors.textSecondaryDark
+                            : AppColors.textSecondaryLight,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
               children: [
+                if (_activityAmountText(activity) != null)
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 4,
+                    ),
+                    decoration: BoxDecoration(
+                      color: _getActivityColor(activity.type).withAlpha(22),
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                    child: Text(
+                      _activityAmountText(activity)!,
+                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                        color: _getActivityColor(activity.type),
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                const SizedBox(height: 6),
                 Text(
-                  activity.workerName,
-                  style: Theme.of(
-                    context,
-                  ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
-                ),
-                Text(
-                  '${_getActivityLabel(activity.type)} - ${activity.territoryName ?? ""}',
+                  _formatTime(activity.timestamp),
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
                     color: isDark
                         ? AppColors.textSecondaryDark
@@ -1344,16 +1458,8 @@ class _ActivityItem extends StatelessWidget {
                 ),
               ],
             ),
-          ),
-          Text(
-            _formatTime(activity.timestamp),
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-              color: isDark
-                  ? AppColors.textSecondaryDark
-                  : AppColors.textSecondaryLight,
-            ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -1370,6 +1476,8 @@ class _ActivityItem extends StatelessWidget {
         return Icons.local_shipping;
       case 'donation':
         return Icons.volunteer_activism;
+      case 'book_sale':
+        return Icons.menu_book_rounded;
       default:
         return Icons.event;
     }
@@ -1387,6 +1495,8 @@ class _ActivityItem extends StatelessWidget {
         return AppColors.primary;
       case 'donation':
         return AppColors.accent;
+      case 'book_sale':
+        return AppColors.primary;
       default:
         return AppColors.secondary;
     }
@@ -1404,9 +1514,96 @@ class _ActivityItem extends StatelessWidget {
         return 'Delivery';
       case 'donation':
         return 'Donation';
+      case 'book_sale':
+        return 'Book Sale';
       default:
         return type;
     }
+  }
+
+  String? _activityAmountText(TeamActivity a) {
+    final amountRaw = a.metadata?['amount'];
+    final amount = amountRaw is num ? amountRaw.toDouble() : null;
+    if (amount == null || amount <= 0) {
+      return null;
+    }
+    return '\$${amount.toStringAsFixed(2)}';
+  }
+
+  void _showActivityDetail(BuildContext context) {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: false,
+      backgroundColor: isDark ? AppColors.surfaceDark : AppColors.surfaceLight,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(18)),
+      ),
+      builder: (ctx) {
+        final textTheme = Theme.of(ctx).textTheme;
+        return Padding(
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                _getActivityLabel(activity.type),
+                style: textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(height: 10),
+              _detailRow('Worker', activity.workerName),
+              _detailRow('Description', activity.description),
+              if ((activity.territoryName ?? '').isNotEmpty)
+                _detailRow('Location', activity.territoryName!),
+              _detailRow('Time', activity.timestamp.toLocal().toString()),
+              if (_activityAmountText(activity) != null)
+                _detailRow('Amount', _activityAmountText(activity)!),
+              if (activity.type == 'book_sale') ...[
+                if ((activity.metadata?['book_title'] ?? '')
+                    .toString()
+                    .isNotEmpty)
+                  _detailRow(
+                    'Book',
+                    activity.metadata!['book_title'].toString(),
+                  ),
+                if ((activity.metadata?['quantity'] ?? '')
+                    .toString()
+                    .isNotEmpty)
+                  _detailRow(
+                    'Quantity',
+                    activity.metadata!['quantity'].toString(),
+                  ),
+              ],
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _detailRow(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: RichText(
+        text: TextSpan(
+          style: TextStyle(
+            color: isDark
+                ? AppColors.textPrimaryDark
+                : AppColors.textPrimaryLight,
+            fontSize: 13,
+          ),
+          children: [
+            TextSpan(
+              text: '$label: ',
+              style: const TextStyle(fontWeight: FontWeight.w700),
+            ),
+            TextSpan(text: value),
+          ],
+        ),
+      ),
+    );
   }
 
   String _formatTime(DateTime time) {

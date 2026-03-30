@@ -34,7 +34,13 @@ class _TerritoryBottomSheetState extends State<TerritoryBottomSheet> {
   Widget build(BuildContext context) {
     return Stack(
       children: [
-        Positioned.fill(
+        // Outside-tap catcher for collapsing the sheet.
+        // Keep it below the top mode selector area so tab switches remain responsive.
+        Positioned(
+          top: MediaQuery.of(context).padding.top + 92,
+          left: 0,
+          right: 0,
+          bottom: 0,
           child: GestureDetector(
             behavior: HitTestBehavior.translucent,
             onTap: () {

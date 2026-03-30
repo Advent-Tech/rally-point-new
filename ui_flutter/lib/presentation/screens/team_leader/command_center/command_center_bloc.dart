@@ -70,7 +70,6 @@ class CommandCenterBloc extends Bloc<CommandCenterEvent, CommandCenterState> {
             showWorkers: true,
             showActivities: false,
             showTrails: false,
-            selectedTerritoryId: '',
             activePopup: null,
           ),
         );
@@ -421,7 +420,14 @@ class CommandCenterBloc extends Bloc<CommandCenterEvent, CommandCenterState> {
     FollowWorkerEvent event,
     Emitter<CommandCenterState> emit,
   ) {
-    emit(state.copyWith(followTarget: event.workerId, activePopup: null));
+    // Use empty string sentinel to clear follow target because copyWith treats
+    // null as "keep existing value".
+    emit(
+      state.copyWith(
+        followTarget: event.workerId ?? '',
+        activePopup: null,
+      ),
+    );
   }
 
   void _onShowMapPopup(
@@ -513,6 +519,18 @@ class CommandCenterBloc extends Bloc<CommandCenterEvent, CommandCenterState> {
   DonationModel _bookSaleToDonationModel(Map<String, dynamic> json) {
     final receipt = (json['receipt_number'] as String?) ?? '';
     final totalAmount = (json['total_amount'] as num?)?.toDouble() ?? 0.0;
+    final lat =
+        (json['latitude'] as num?)?.toDouble() ??
+        (json['lat'] as num?)?.toDouble() ??
+        (json['location_lat'] as num?)?.toDouble() ??
+        (json['buyer_latitude'] as num?)?.toDouble();
+    final lng =
+        (json['longitude'] as num?)?.toDouble() ??
+        (json['lng'] as num?)?.toDouble() ??
+        (json['location_lng'] as num?)?.toDouble() ??
+        (json['buyer_longitude'] as num?)?.toDouble();
+    final quantity = (json['quantity'] as num?)?.toInt() ?? 1;
+    final unitPrice = (json['price_per_unit'] as num?)?.toDouble();
 
     return DonationModel.fromJson({
       'id': json['id'],
@@ -524,9 +542,11 @@ class CommandCenterBloc extends Bloc<CommandCenterEvent, CommandCenterState> {
       'donor_phone': json['buyer_phone'],
       'donor_email': json['buyer_email'],
       'donor_address': json['buyer_address'] ?? '',
-      'latitude': json['latitude'],
-      'longitude': json['longitude'],
-      'amount': totalAmount,
+      'latitude': lat,
+      'longitude': lng,
+      'amount': totalAmount > 0
+          ? totalAmount
+          : (unitPrice != null ? unitPrice * quantity : 0.0),
       'currency': json['currency'] ?? 'USD',
       'donation_type': 'book_sale',
       'purpose': json['book_title'],

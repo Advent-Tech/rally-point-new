@@ -80,8 +80,19 @@ class PushNotificationService {
   }
 
   Future<void> _initLocalNotifications() async {
-    const androidSettings = AndroidInitializationSettings('@mipmap/ic_launcher');
-    const initSettings = InitializationSettings(android: androidSettings);
+    const androidSettings = AndroidInitializationSettings(
+      '@mipmap/ic_launcher',
+    );
+    const darwinSettings = DarwinInitializationSettings(
+      requestAlertPermission: false,
+      requestBadgePermission: false,
+      requestSoundPermission: false,
+    );
+    const initSettings = InitializationSettings(
+      android: androidSettings,
+      iOS: darwinSettings,
+      macOS: darwinSettings,
+    );
 
     await _localNotifications.initialize(
       initSettings,
@@ -100,7 +111,9 @@ class PushNotificationService {
         if (response.payload != null && response.payload!.isNotEmpty) {
           try {
             final data = json.decode(response.payload!) as Map<String, dynamic>;
-            _navigateToNotification(data.map((k, v) => MapEntry(k, v.toString())));
+            _navigateToNotification(
+              data.map((k, v) => MapEntry(k, v.toString())),
+            );
           } catch (e) {
             debugPrint('Failed to parse notification payload: $e');
           }
@@ -148,35 +161,61 @@ class PushNotificationService {
   }
 
   Future<void> _createNotificationChannels() async {
-    final android = _localNotifications.resolvePlatformSpecificImplementation<
-        AndroidFlutterLocalNotificationsPlugin>();
+    final android = _localNotifications
+        .resolvePlatformSpecificImplementation<
+          AndroidFlutterLocalNotificationsPlugin
+        >();
     if (android == null) return;
 
     const channels = [
-      AndroidNotificationChannel('geofence_channel', 'Territory',
-          description: 'Geofence entry/exit notifications',
-          importance: Importance.high),
-      AndroidNotificationChannel('prayer_channel', 'Prayer Requests',
-          description: 'Prayer request notifications',
-          importance: Importance.high),
-      AndroidNotificationChannel('delivery_channel', 'Deliveries',
-          description: 'Delivery assignment and status notifications',
-          importance: Importance.high),
-      AndroidNotificationChannel('team_channel', 'Team',
-          description: 'Team join requests and approvals',
-          importance: Importance.high),
-      AndroidNotificationChannel('walkie_channel', 'Walkie Talkie',
-          description: 'Voice message notifications',
-          importance: Importance.high),
-      AndroidNotificationChannel('chat_channel', 'Chat',
-          description: 'Chat message notifications',
-          importance: Importance.high),
-      AndroidNotificationChannel('session_channel', 'Work Sessions',
-          description: 'Check-in and check-out notifications',
-          importance: Importance.defaultImportance),
-      AndroidNotificationChannel('default_channel', 'General',
-          description: 'General notifications',
-          importance: Importance.defaultImportance),
+      AndroidNotificationChannel(
+        'geofence_channel',
+        'Territory',
+        description: 'Geofence entry/exit notifications',
+        importance: Importance.high,
+      ),
+      AndroidNotificationChannel(
+        'prayer_channel',
+        'Prayer Requests',
+        description: 'Prayer request notifications',
+        importance: Importance.high,
+      ),
+      AndroidNotificationChannel(
+        'delivery_channel',
+        'Deliveries',
+        description: 'Delivery assignment and status notifications',
+        importance: Importance.high,
+      ),
+      AndroidNotificationChannel(
+        'team_channel',
+        'Team',
+        description: 'Team join requests and approvals',
+        importance: Importance.high,
+      ),
+      AndroidNotificationChannel(
+        'walkie_channel',
+        'Walkie Talkie',
+        description: 'Voice message notifications',
+        importance: Importance.high,
+      ),
+      AndroidNotificationChannel(
+        'chat_channel',
+        'Chat',
+        description: 'Chat message notifications',
+        importance: Importance.high,
+      ),
+      AndroidNotificationChannel(
+        'session_channel',
+        'Work Sessions',
+        description: 'Check-in and check-out notifications',
+        importance: Importance.defaultImportance,
+      ),
+      AndroidNotificationChannel(
+        'default_channel',
+        'General',
+        description: 'General notifications',
+        importance: Importance.defaultImportance,
+      ),
     ];
 
     for (final channel in channels) {
@@ -186,9 +225,19 @@ class PushNotificationService {
 
   Future<void> _registerToken() async {
     try {
+      if (Platform.isIOS) {
+        final apnsToken = await _messaging.getAPNSToken();
+        debugPrint(
+          apnsToken == null
+              ? 'FCM/APNs: APNs token is null (not yet assigned)'
+              : 'FCM/APNs token acquired',
+        );
+      }
       final token = await _messaging.getToken();
       if (token != null) {
         await _registerTokenWithServer(token);
+      } else {
+        debugPrint('FCM token is null');
       }
     } catch (e) {
       debugPrint('FCM token error: $e');
@@ -219,7 +268,8 @@ class PushNotificationService {
           ? '${notificationType}_channel'
           : 'default_channel';
 
-      final isWalkie = notificationType == 'walkie' &&
+      final isWalkie =
+          notificationType == 'walkie' &&
           message.data['audio_url'] != null &&
           message.data['audio_url'].toString().isNotEmpty;
 
@@ -296,7 +346,9 @@ class PushNotificationService {
       case 'chat':
         final conversationId = data['conversation_id']?.toString();
         if (conversationId != null && conversationId.isNotEmpty) {
-          router.go(isLeader ? '/leader/chat/$conversationId' : '/chat/$conversationId');
+          router.go(
+            isLeader ? '/leader/chat/$conversationId' : '/chat/$conversationId',
+          );
         } else {
           router.go(isLeader ? '/leader/chat' : '/chat');
         }
@@ -318,10 +370,14 @@ class PushNotificationService {
         break;
       case 'geofence':
       case 'session':
-        router.go(isLeader ? '/leader/command-center?mode=workers' : '/territory');
+        router.go(
+          isLeader ? '/leader/command-center?mode=workers' : '/territory',
+        );
         break;
       case 'territory':
-        router.go(isLeader ? '/leader/command-center?mode=territories' : '/territory');
+        router.go(
+          isLeader ? '/leader/command-center?mode=territories' : '/territory',
+        );
         break;
       default:
         router.go('/notifications');

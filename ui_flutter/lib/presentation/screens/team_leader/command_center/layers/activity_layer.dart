@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart';
+import 'dart:math';
 import '../../../../../data/models/donation_model.dart';
 import '../../../../../data/models/prayer_request_model.dart';
 import '../services/annotation_registry.dart';
@@ -106,27 +107,48 @@ class ActivityLayer {
     final donationsToRegister = <MapEntry<DonationModel, int>>[];
     final prayersToRegister = <MapEntry<PrayerRequestModel, int>>[];
 
-    // Add donation markers
-    for (final id in [
+    final addedOrUpdatedIds = [
       ...(donationDiff['added'] as List? ?? []),
       ...(donationDiff['updated'] as List? ?? []),
-    ]) {
+    ].cast<String>();
+
+    // Render normal donations first and book sales after, so book markers stay visible on overlap.
+    final orderedDonationIds = [
+      ...addedOrUpdatedIds.where((id) {
+        final d = donations.where((e) => e.id == id).firstOrNull;
+        return d?.donationType != 'book_sale';
+      }),
+      ...addedOrUpdatedIds.where((id) {
+        final d = donations.where((e) => e.id == id).firstOrNull;
+        return d?.donationType == 'book_sale';
+      }),
+    ];
+
+    final occupiedCoordinateCount = <String, int>{};
+
+    // Add donation markers
+    for (final id in orderedDonationIds) {
       final donationModel = donations.where((d) => d.id == id).firstOrNull;
       if (donationModel != null &&
           donationModel.latitude != null &&
           donationModel.longitude != null) {
         donationsToRegister.add(MapEntry(donationModel, circlesToAdd.length));
         final isBookSale = donationModel.donationType == 'book_sale';
+        final adjusted = _adjustMarkerPosition(
+          donationModel.latitude!,
+          donationModel.longitude!,
+          occupiedCoordinateCount,
+        );
         circlesToAdd.add(
           CircleAnnotationOptions(
             geometry: Point(
               coordinates: Position(
-                donationModel.longitude!,
-                donationModel.latitude!,
+                adjusted.$2,
+                adjusted.$1,
               ),
             ),
             circleColor: (isBookSale
-                    ? const Color(0xFF3B82F6) // blue for books
+                    ? const Color(0xFFF59E0B) // amber for book sales
                     : const Color(0xFF10B981))
                 .toARGB32(),
             circleRadius: 12.0,
@@ -204,6 +226,30 @@ class ActivityLayer {
 
   void dispose() {
     _circleManager = null;
+  }
+
+  /// Slightly offsets overlapping markers so all activities remain visible.
+  /// Returns (lat, lng).
+  (double, double) _adjustMarkerPosition(
+    double latitude,
+    double longitude,
+    Map<String, int> occupied,
+  ) {
+    final key =
+        '${latitude.toStringAsFixed(5)},${longitude.toStringAsFixed(5)}';
+    final index = occupied[key] ?? 0;
+    occupied[key] = index + 1;
+
+    if (index == 0) return (latitude, longitude);
+
+    const step = 0.00045; // ~50m
+    final ring = ((index - 1) ~/ 8) + 1;
+    final angleDeg = (index - 1) % 8 * 45.0;
+    final angle = angleDeg * 3.141592653589793 / 180.0;
+    final latOffset = ring * step * sin(angle);
+    final lngOffset = ring * step * cos(angle);
+
+    return (latitude + latOffset, longitude + lngOffset);
   }
 }
 

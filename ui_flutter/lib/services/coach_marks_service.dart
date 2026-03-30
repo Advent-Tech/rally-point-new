@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../core/storage/local_storage.dart';
 
 class CoachMarksService {
   static final CoachMarksService _instance = CoachMarksService._internal();
@@ -7,9 +8,19 @@ class CoachMarksService {
 
   final Map<String, bool> _completedSteps = {};
   final List<CoachMarkStep> _steps = [];
+  LocalStorage? _localStorage;
+  Future<void>? _initFuture;
 
   List<CoachMarkStep> get steps => _steps;
   Map<String, bool> get completedSteps => _completedSteps;
+
+  Future<void> _ensureInitialized() async {
+    if (_localStorage != null) return;
+    _initFuture ??= () async {
+      _localStorage = await LocalStorage.getInstance();
+    }();
+    await _initFuture;
+  }
 
   void addStep(CoachMarkStep step) {
     _steps.add(step);
@@ -24,10 +35,18 @@ class CoachMarksService {
   }
 
   Future<bool> hasBeenShown(String stepId) async {
-    return isStepComplete(stepId);
+    await _ensureInitialized();
+    if (_completedSteps.containsKey(stepId)) {
+      return _completedSteps[stepId] ?? false;
+    }
+    final value = _localStorage?.getBool('coach_mark_$stepId') ?? false;
+    _completedSteps[stepId] = value;
+    return value;
   }
 
   Future<void> markAsShown(String stepId) async {
+    await _ensureInitialized();
+    await _localStorage?.setBool('coach_mark_$stepId', true);
     markComplete(stepId);
   }
 
@@ -38,6 +57,7 @@ class CoachMarksService {
 
   void resetStep(String stepId) {
     _completedSteps[stepId] = false;
+    _localStorage?.setBool('coach_mark_$stepId', false);
   }
 
   CoachMarkStep? getCurrentStep() {

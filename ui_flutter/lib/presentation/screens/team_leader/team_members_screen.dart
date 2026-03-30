@@ -8,6 +8,7 @@ import '../../blocs/team/team_bloc.dart';
 import '../../widgets/custom_button.dart';
 import '../../widgets/role_badge.dart';
 import '../../widgets/states/empty_state.dart';
+import '../../widgets/navigation/app_back_button.dart';
 
 class TeamMembersScreen extends StatefulWidget {
   const TeamMembersScreen({super.key});
@@ -45,12 +46,10 @@ class _TeamMembersScreenState extends State<TeamMembersScreen> {
       value: _teamBloc,
       child: Scaffold(
         appBar: AppBar(
-          leading: GoRouter.of(context).canPop()
-              ? IconButton(
-                  icon: const Icon(Icons.arrow_back),
-                  onPressed: () => context.pop(),
-                )
-              : null,
+          leading: AppBackButton.leading(
+            context,
+            fallbackRoute: '/leader/dashboard',
+          ),
           title: const Text('Team Members'),
           actions: [
             const RoleBadge(),

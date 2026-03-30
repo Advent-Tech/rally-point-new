@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import '../../widgets/navigation/app_back_button.dart';
 import '../../blocs/notification/notification_bloc.dart';
 import '../../../data/models/notification_model.dart';
 
@@ -7,20 +8,30 @@ class NotificationSettingsScreen extends StatefulWidget {
   const NotificationSettingsScreen({super.key});
 
   @override
-  State<NotificationSettingsScreen> createState() => _NotificationSettingsScreenState();
+  State<NotificationSettingsScreen> createState() =>
+      _NotificationSettingsScreenState();
 }
 
-class _NotificationSettingsScreenState extends State<NotificationSettingsScreen> {
+class _NotificationSettingsScreenState
+    extends State<NotificationSettingsScreen> {
   late final NotificationBloc _bloc;
 
   // All notification types with display info
   static const _notificationTypes = [
     _NotifTypeInfo('Territory', [
       _NotifItem('geofence', 'Geofence Events', 'Entry/exit territory alerts'),
-      _NotifItem('session', 'Work Sessions', 'Check-in/check-out notifications'),
+      _NotifItem(
+        'session',
+        'Work Sessions',
+        'Check-in/check-out notifications',
+      ),
     ]),
     _NotifTypeInfo('Ministry', [
-      _NotifItem('prayer', 'Prayer Requests', 'New requests and status changes'),
+      _NotifItem(
+        'prayer',
+        'Prayer Requests',
+        'New requests and status changes',
+      ),
       _NotifItem('survey', 'Surveys', 'Survey assignments'),
     ]),
     _NotifTypeInfo('Deliveries', [
@@ -53,6 +64,7 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
       value: _bloc,
       child: Scaffold(
         appBar: AppBar(
+          leading: AppBackButton.leading(context),
           title: const Text('Notification Settings'),
         ),
         body: BlocBuilder<NotificationBloc, NotificationState>(
@@ -85,7 +97,11 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
     );
   }
 
-  Widget _buildPreferenceRow(BuildContext context, NotificationState state, _NotifItem item) {
+  Widget _buildPreferenceRow(
+    BuildContext context,
+    NotificationState state,
+    _NotifItem item,
+  ) {
     final pref = state.preferences.firstWhere(
       (p) => p.notificationType == item.type,
       orElse: () => NotificationPreference(
@@ -123,10 +139,12 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
                         Switch(
                           value: pref.inAppEnabled,
                           onChanged: (value) {
-                            _bloc.add(NotificationUpdatePreference(
-                              notificationType: item.type,
-                              inAppEnabled: value,
-                            ));
+                            _bloc.add(
+                              NotificationUpdatePreference(
+                                notificationType: item.type,
+                                inAppEnabled: value,
+                              ),
+                            );
                           },
                         ),
                       ],
@@ -143,10 +161,12 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
                         Switch(
                           value: pref.pushEnabled,
                           onChanged: (value) {
-                            _bloc.add(NotificationUpdatePreference(
-                              notificationType: item.type,
-                              pushEnabled: value,
-                            ));
+                            _bloc.add(
+                              NotificationUpdatePreference(
+                                notificationType: item.type,
+                                pushEnabled: value,
+                              ),
+                            );
                           },
                         ),
                       ],

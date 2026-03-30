@@ -85,6 +85,7 @@ workflows:
           flutter build ipa --release -v \
             --build-number="$BUILD_NUMBER" \
             --dart-define=API_BASE_URL="$API_BASE_URL" \
+            --dart-define=EXPECTED_IOS_BUNDLE_ID="$BUNDLE_ID" \
             --export-options-plist=$HOME/export_options.plist
 
       - name: Debug - list IPA outputs
@@ -217,6 +218,7 @@ workflows:
           flutter build ipa --release \
             --build-number="$BUILD_NUMBER" \
             --dart-define=API_BASE_URL="$API_BASE_URL" \
+            --dart-define=EXPECTED_IOS_BUNDLE_ID="$BUNDLE_ID" \
             --export-method ad-hoc
       - name: Upload IPA to Firebase App Distribution
         script: |

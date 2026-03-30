@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/constants/map_constants.dart';
 import '../../../core/network/api_client.dart';
+import '../../widgets/navigation/app_back_button.dart';
 import '../../widgets/role_badge.dart';
 import '../../widgets/worker_context_banner.dart';
 
@@ -173,6 +174,10 @@ class _WorkerActivityScreenState extends State<WorkerActivityScreen>
 
     return Scaffold(
       appBar: AppBar(
+        leading: AppBackButton.leading(
+          context,
+          fallbackRoute: '/leader/reports',
+        ),
         title: const Text('Worker Activity'),
         actions: [
           const RoleBadge(),

@@ -112,22 +112,56 @@ class TeamMapBloc extends Bloc<TeamMapEvent, TeamMapState> {
   Future<List<MapDonationMarker>> _fetchDonations(String teamId) async {
     try {
       debugPrint('TeamMapBloc: Fetching donations for team $teamId');
-      // Use donations team endpoint
       final response = await _apiClient!.get(
         '${ApiConstants.donationsTeam}/$teamId',
       );
+      final bookSalesResponse = await _apiClient!.get(
+        '${ApiConstants.bookSalesTeam}/$teamId',
+      );
+
+      final donationItems = <MapDonationMarker>[];
+      final bookSaleItems = <MapDonationMarker>[];
 
       debugPrint('TeamMapBloc: Donations response: ${response.statusCode}');
       if (response.statusCode == 200) {
         final List<dynamic> data = response.data is List
             ? response.data
             : response.data['donations'] ?? [];
-        debugPrint('TeamMapBloc: Found ${data.length} donations');
-        return data
-            .map((json) => MapDonationMarker.fromJson(json))
-            .where((d) => d.latitude != 0 && d.longitude != 0)
-            .toList();
+        donationItems.addAll(
+          data
+              .whereType<Map>()
+              .map((json) => MapDonationMarker.fromJson(Map<String, dynamic>.from(json)))
+              .where((d) => d.latitude != 0 && d.longitude != 0),
+        );
       }
+
+      debugPrint('TeamMapBloc: Book sales response: ${bookSalesResponse.statusCode}');
+      if (bookSalesResponse.statusCode == 200) {
+        final List<dynamic> data = bookSalesResponse.data is List
+            ? bookSalesResponse.data
+            : (bookSalesResponse.data['book_sales'] ??
+                  bookSalesResponse.data['results'] ??
+                  bookSalesResponse.data['data'] ??
+                  []);
+        bookSaleItems.addAll(
+          data
+              .whereType<Map>()
+              .map(
+                (json) => MapDonationMarker.fromBookSaleJson(
+                  Map<String, dynamic>.from(json),
+                ),
+              )
+              .where((d) => d.latitude != 0 && d.longitude != 0),
+        );
+      }
+
+      debugPrint(
+        'TeamMapBloc: Found ${donationItems.length} donations and ${bookSaleItems.length} book sales',
+      );
+
+      final merged = [...donationItems, ...bookSaleItems];
+      merged.sort((a, b) => b.id.compareTo(a.id));
+      return merged;
     } catch (e) {
       debugPrint('TeamMapBloc: Error fetching donations: $e');
     }

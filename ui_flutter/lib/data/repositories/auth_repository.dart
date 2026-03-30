@@ -185,7 +185,7 @@ class AuthRepository {
 
       final response = await client.dio.post(
         ApiConstants.refreshToken,
-        data: {'refreshToken': refreshTokenValue},
+        data: {'refresh_token': refreshTokenValue},
       );
 
       final authResponse = AuthResponse.fromJson(response.data);
@@ -194,6 +194,11 @@ class AuthRepository {
       await storage.saveAccessToken(authResponse.accessToken);
       if (authResponse.refreshToken != null) {
         await storage.saveRefreshToken(authResponse.refreshToken!);
+      }
+      if (authResponse.expiresIn != null) {
+        await storage.saveTokenExpiry(authResponse.expiresIn!);
+      } else {
+        await storage.saveTokenExpiry(60 * 60 * 24 * 30);
       }
 
       // Update API client with new token

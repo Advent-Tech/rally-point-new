@@ -25,8 +25,8 @@ class CommandCenterController {
 
   StreamSubscription? _stateSubscription;
   CommandCenterState? _previousState;
-
-  Future<void> _stateQueue = Future.value();
+  CommandCenterState? _pendingState;
+  bool _isProcessingState = false;
 
   CommandCenterController({required this.mapController, required this.bloc}) {
     _initialize();
@@ -58,7 +58,28 @@ class CommandCenterController {
   }
 
   void _enqueueStateChange(CommandCenterState state) {
-    _stateQueue = _stateQueue.then((_) => _handleStateChange(state));
+    // Coalesce bursts of updates (websocket/live location) to the latest state
+    // instead of queueing every intermediate state, which can stall UI on mode switch.
+    _pendingState = state;
+    if (_isProcessingState) return;
+    _drainStateQueue();
+  }
+
+  Future<void> _drainStateQueue() async {
+    _isProcessingState = true;
+    try {
+      while (_pendingState != null) {
+        final next = _pendingState!;
+        _pendingState = null;
+        await _handleStateChange(next);
+      }
+    } finally {
+      _isProcessingState = false;
+      // If a new state arrived between loop completion and flag reset.
+      if (_pendingState != null) {
+        _drainStateQueue();
+      }
+    }
   }
 
   Future<void> handleMapTap(dynamic context) async {
@@ -255,10 +276,20 @@ class CommandCenterController {
       }
     }
 
-    // Update territories if changed
-    if ((state.territories != previous?.territories ||
-            state.selectedTerritoryId != previous?.selectedTerritoryId ||
-            (previous?.showTerritories == false && state.showTerritories)) &&
+    final territoriesChanged = state.territories != previous?.territories;
+    final territoriesVisibilityTurnedOn =
+        previous?.showTerritories == false && state.showTerritories;
+    final territorySelectionChanged =
+        state.selectedTerritoryId != previous?.selectedTerritoryId;
+    final shouldRedrawForSelection =
+        territorySelectionChanged &&
+        state.mapMode == MapMode.territories &&
+        previous?.mapMode == MapMode.territories;
+
+    // Avoid full polygon re-render on every mode switch.
+    if ((territoriesChanged ||
+            territoriesVisibilityTurnedOn ||
+            shouldRedrawForSelection) &&
         state.showTerritories) {
       await _territoryLayer.updateTerritories(
         state.territories,
@@ -368,8 +399,15 @@ class CommandCenterController {
       _cameraController.fitToBounds(bounds);
     }
 
-    // Auto-fit on mode change
+    // Auto-fit on mode change (only during initial loading transition).
+    // Re-fitting on every tab switch causes heavy bounds computation and
+    // long map animations that feel like UI hangs.
     if (state.mapMode != previous?.mapMode) {
+      final shouldAutoFitOnModeSwitch = previous == null || previous.isLoading;
+      if (!shouldAutoFitOnModeSwitch) {
+        return;
+      }
+
       switch (state.mapMode) {
         case MapMode.overview:
           final bounds = BoundsCalculator.calculateOverviewBounds(state);

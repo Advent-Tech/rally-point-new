@@ -3,6 +3,7 @@ import '../../../core/network/api_result.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../data/models/survey_model.dart';
 import '../../../data/repositories/survey_repository.dart';
+import '../../widgets/navigation/app_back_button.dart';
 
 class SurveyDetailScreen extends StatefulWidget {
   final SurveyModel survey;
@@ -64,6 +65,7 @@ class _SurveyDetailScreenState extends State<SurveyDetailScreen>
 
     return Scaffold(
       appBar: AppBar(
+        leading: AppBackButton.leading(context, fallbackRoute: '/surveys'),
         title: Text(widget.survey.title),
         bottom: TabBar(
           controller: _tabController,
@@ -82,7 +84,11 @@ class _SurveyDetailScreenState extends State<SurveyDetailScreen>
       body: TabBarView(
         controller: _tabController,
         children: [
-          _OverviewTab(survey: widget.survey, responses: _responses, isDark: isDark),
+          _OverviewTab(
+            survey: widget.survey,
+            responses: _responses,
+            isDark: isDark,
+          ),
           _ResponsesTab(
             survey: widget.survey,
             responses: _responses,
@@ -127,15 +133,22 @@ class _OverviewTab extends StatelessWidget {
                   Row(
                     children: [
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 6,
+                        ),
                         decoration: BoxDecoration(
-                          color: survey.isActive ? AppColors.success.withAlpha(30) : AppColors.error.withAlpha(30),
+                          color: survey.isActive
+                              ? AppColors.success.withAlpha(30)
+                              : AppColors.error.withAlpha(30),
                           borderRadius: BorderRadius.circular(20),
                         ),
                         child: Text(
                           survey.isActive ? 'ACTIVE' : 'INACTIVE',
                           style: TextStyle(
-                            color: survey.isActive ? AppColors.success : AppColors.error,
+                            color: survey.isActive
+                                ? AppColors.success
+                                : AppColors.error,
                             fontWeight: FontWeight.bold,
                             fontSize: 12,
                           ),
@@ -144,7 +157,10 @@ class _OverviewTab extends StatelessWidget {
                       const Spacer(),
                       if (survey.requiresLocation)
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 6,
+                          ),
                           decoration: BoxDecoration(
                             color: AppColors.info.withAlpha(30),
                             borderRadius: BorderRadius.circular(20),
@@ -152,7 +168,11 @@ class _OverviewTab extends StatelessWidget {
                           child: const Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              Icon(Icons.location_on, size: 14, color: AppColors.info),
+                              Icon(
+                                Icons.location_on,
+                                size: 14,
+                                color: AppColors.info,
+                              ),
                               SizedBox(width: 4),
                               Text(
                                 'GPS Required',
@@ -172,7 +192,9 @@ class _OverviewTab extends StatelessWidget {
                     Text(
                       survey.description!,
                       style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                        color: isDark
+                            ? AppColors.textSecondaryDark
+                            : AppColors.textSecondaryLight,
                       ),
                     ),
                     const SizedBox(height: 16),
@@ -203,9 +225,9 @@ class _OverviewTab extends StatelessWidget {
           // Questions Analysis
           Text(
             'Questions Analysis',
-            style: Theme.of(context).textTheme.titleLarge?.copyWith(
-              fontWeight: FontWeight.bold,
-            ),
+            style: Theme.of(
+              context,
+            ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 16),
 
@@ -214,7 +236,9 @@ class _OverviewTab extends StatelessWidget {
               child: Text(
                 'No questions in this survey',
                 style: TextStyle(
-                  color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                  color: isDark
+                      ? AppColors.textSecondaryDark
+                      : AppColors.textSecondaryLight,
                 ),
               ),
             )
@@ -269,13 +293,7 @@ class _StatCard extends StatelessWidget {
                 color: color,
               ),
             ),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 12,
-                color: color,
-              ),
-            ),
+            Text(label, style: TextStyle(fontSize: 12, color: color)),
           ],
         ),
       ),
@@ -302,12 +320,15 @@ class _QuestionAnalysisCard extends StatelessWidget {
     final answers = <String>[];
     for (final response in responses) {
       final responseAnswers = response.answers ?? [];
-      final matchingAnswer = responseAnswers.where((a) => a.questionId == question.id).toList();
+      final matchingAnswer = responseAnswers
+          .where((a) => a.questionId == question.id)
+          .toList();
       if (matchingAnswer.isNotEmpty) {
         final answer = matchingAnswer.first;
         if (answer.value != null && answer.value!.isNotEmpty) {
           answers.add(answer.value!);
-        } else if (answer.selectedOptions != null && answer.selectedOptions!.isNotEmpty) {
+        } else if (answer.selectedOptions != null &&
+            answer.selectedOptions!.isNotEmpty) {
           answers.addAll(answer.selectedOptions!);
         }
       }
@@ -344,7 +365,10 @@ class _QuestionAnalysisCard extends StatelessWidget {
                   ),
                 ),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
                   decoration: BoxDecoration(
                     color: AppColors.info.withAlpha(30),
                     borderRadius: BorderRadius.circular(8),
@@ -364,11 +388,14 @@ class _QuestionAnalysisCard extends StatelessWidget {
             Text(
               '${answers.length} responses',
               style: TextStyle(
-                color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                color: isDark
+                    ? AppColors.textSecondaryDark
+                    : AppColors.textSecondaryLight,
                 fontSize: 12,
               ),
             ),
-            if (_isChoiceQuestion(question.questionType) && question.options != null)
+            if (_isChoiceQuestion(question.questionType) &&
+                question.options != null)
               _buildChoiceAnalysis(context, question.options!, answers)
             else if (answers.isNotEmpty)
               _buildTextAnswers(context, answers),
@@ -379,10 +406,19 @@ class _QuestionAnalysisCard extends StatelessWidget {
   }
 
   bool _isChoiceQuestion(String type) {
-    return ['radio', 'checkbox', 'select', 'boolean'].contains(type.toLowerCase());
+    return [
+      'radio',
+      'checkbox',
+      'select',
+      'boolean',
+    ].contains(type.toLowerCase());
   }
 
-  Widget _buildChoiceAnalysis(BuildContext context, List<String> options, List<String> answers) {
+  Widget _buildChoiceAnalysis(
+    BuildContext context,
+    List<String> options,
+    List<String> answers,
+  ) {
     final counts = <String, int>{};
     for (final option in options) {
       counts[option] = 0;
@@ -411,7 +447,10 @@ class _QuestionAnalysisCard extends StatelessWidget {
                   Text(option, style: const TextStyle(fontSize: 13)),
                   Text(
                     '$count (${percentage.toStringAsFixed(0)}%)',
-                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                 ],
               ),
@@ -419,7 +458,9 @@ class _QuestionAnalysisCard extends StatelessWidget {
               LinearProgressIndicator(
                 value: percentage / 100,
                 backgroundColor: AppColors.primary.withAlpha(30),
-                valueColor: const AlwaysStoppedAnimation<Color>(AppColors.primary),
+                valueColor: const AlwaysStoppedAnimation<Color>(
+                  AppColors.primary,
+                ),
               ),
             ],
           ),
@@ -436,20 +477,22 @@ class _QuestionAnalysisCard extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        ...preview.map((answer) => Container(
-          margin: const EdgeInsets.only(top: 8),
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: isDark ? Colors.grey[800] : Colors.grey[100],
-            borderRadius: BorderRadius.circular(8),
+        ...preview.map(
+          (answer) => Container(
+            margin: const EdgeInsets.only(top: 8),
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: isDark ? Colors.grey[800] : Colors.grey[100],
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Text(
+              answer,
+              style: const TextStyle(fontSize: 13),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
           ),
-          child: Text(
-            answer,
-            style: const TextStyle(fontSize: 13),
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-          ),
-        )),
+        ),
         if (remaining > 0)
           Padding(
             padding: const EdgeInsets.only(top: 8),
@@ -499,10 +542,7 @@ class _ResponsesTab extends StatelessWidget {
             const SizedBox(height: 16),
             Text(error!),
             const SizedBox(height: 16),
-            ElevatedButton(
-              onPressed: onRetry,
-              child: const Text('Retry'),
-            ),
+            ElevatedButton(onPressed: onRetry, child: const Text('Retry')),
           ],
         ),
       );
@@ -529,15 +569,17 @@ class _ResponsesTab extends StatelessWidget {
             const SizedBox(height: 24),
             Text(
               'No Responses Yet',
-              style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                fontWeight: FontWeight.bold,
-              ),
+              style: Theme.of(
+                context,
+              ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 8),
             Text(
               'Responses will appear here once workers submit',
               style: TextStyle(
-                color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                color: isDark
+                    ? AppColors.textSecondaryDark
+                    : AppColors.textSecondaryLight,
               ),
             ),
           ],
@@ -602,20 +644,23 @@ class _ResponseCard extends StatelessWidget {
                 'Submitted: ${_formatDateTime(response.completedAt!)}',
                 style: TextStyle(
                   fontSize: 12,
-                  color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                  color: isDark
+                      ? AppColors.textSecondaryDark
+                      : AppColors.textSecondaryLight,
                 ),
               ),
             if (response.latitude != null && response.longitude != null)
               Row(
                 children: [
-                  const Icon(Icons.location_on, size: 12, color: AppColors.info),
+                  const Icon(
+                    Icons.location_on,
+                    size: 12,
+                    color: AppColors.info,
+                  ),
                   const SizedBox(width: 4),
                   Text(
                     '${response.latitude!.toStringAsFixed(4)}, ${response.longitude!.toStringAsFixed(4)}',
-                    style: const TextStyle(
-                      fontSize: 11,
-                      color: AppColors.info,
-                    ),
+                    style: const TextStyle(fontSize: 11, color: AppColors.info),
                   ),
                 ],
               ),
@@ -627,11 +672,17 @@ class _ResponseCard extends StatelessWidget {
             child: Builder(
               builder: (context) {
                 debugPrint('ResponseCard: Response ID: ${response.id}');
-                debugPrint('ResponseCard: Answers count: ${response.answers?.length ?? 0}');
-                debugPrint('ResponseCard: Survey questions count: ${survey.questions?.length ?? 0}');
+                debugPrint(
+                  'ResponseCard: Answers count: ${response.answers?.length ?? 0}',
+                );
+                debugPrint(
+                  'ResponseCard: Survey questions count: ${survey.questions?.length ?? 0}',
+                );
                 if (response.answers != null) {
                   for (final a in response.answers!) {
-                    debugPrint('ResponseCard: Answer - questionId: ${a.questionId}, value: ${a.value}');
+                    debugPrint(
+                      'ResponseCard: Answer - questionId: ${a.questionId}, value: ${a.value}',
+                    );
                   }
                 }
 
@@ -671,7 +722,9 @@ class _ResponseCard extends StatelessWidget {
                               question?.text ?? 'Question',
                               style: TextStyle(
                                 fontWeight: FontWeight.bold,
-                                color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                                color: isDark
+                                    ? AppColors.textSecondaryDark
+                                    : AppColors.textSecondaryLight,
                                 fontSize: 12,
                               ),
                             ),
@@ -680,11 +733,15 @@ class _ResponseCard extends StatelessWidget {
                               width: double.infinity,
                               padding: const EdgeInsets.all(12),
                               decoration: BoxDecoration(
-                                color: isDark ? Colors.grey[800] : Colors.grey[100],
+                                color: isDark
+                                    ? Colors.grey[800]
+                                    : Colors.grey[100],
                                 borderRadius: BorderRadius.circular(8),
                               ),
                               child: Text(
-                                answer.value ?? answer.selectedOptions?.join(', ') ?? 'No answer',
+                                answer.value ??
+                                    answer.selectedOptions?.join(', ') ??
+                                    'No answer',
                                 style: const TextStyle(fontSize: 14),
                               ),
                             ),

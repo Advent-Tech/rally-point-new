@@ -547,140 +547,175 @@ class _LoginScreenState extends State<LoginScreen> {
             AppSnackbar.success(context, message: state.message);
           }
         },
-        child: SafeArea(
-          child: Builder(
-            builder: (context) => SingleChildScrollView(
-              padding: EdgeInsets.fromLTRB(
-                24,
-                24,
-                24,
-                24 + MediaQuery.of(context).viewInsets.bottom,
-              ),
-              child: Form(
-                key: _formKey,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    const SizedBox(height: 60),
-                    // Logo - theme aware (logo.png for dark, splash.jpeg for light)
-                    const Center(
-                      child: SizedBox(
-                        width: 120,
-                        height: 120,
-                        child: AppLogo(),
-                      ),
-                    ),
-                    const SizedBox(height: 32),
-                    // Title
-                    Text(
-                      'Welcome Back',
-                      style: Theme.of(context).textTheme.headlineMedium
-                          ?.copyWith(fontWeight: FontWeight.bold),
-                      textAlign: TextAlign.center,
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'Sign in to continue to Rally Point',
-                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: isDark
-                            ? AppColors.textSecondaryDark
-                            : AppColors.textSecondaryLight,
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-                    const SizedBox(height: 48),
-                    // Email Field
-                    CustomTextField(
-                      controller: _emailController,
-                      label: 'Email',
-                      hint: 'Enter your email',
-                      keyboardType: TextInputType.emailAddress,
-                      prefixIcon: Icons.email_outlined,
-                      realtimeValidation: true,
-                      validator: (value) {
-                        if (value == null || value.isEmpty) {
-                          return 'Please enter your email';
-                        }
-                        if (!RegExp(
-                          r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$',
-                        ).hasMatch(value)) {
-                          return 'Please enter a valid email';
-                        }
-                        return null;
-                      },
-                    ),
-                    const SizedBox(height: 16),
-                    // Password Field
-                    CustomTextField(
-                      controller: _passwordController,
-                      label: 'Password',
-                      hint: 'Enter your password',
-                      obscureText: _obscurePassword,
-                      prefixIcon: Icons.lock_outlined,
-                      realtimeValidation: true,
-                      suffixIcon: IconButton(
-                        icon: Icon(
-                          _obscurePassword
-                              ? Icons.visibility_outlined
-                              : Icons.visibility_off_outlined,
-                          color: isDark
-                              ? AppColors.textSecondaryDark
-                              : AppColors.textSecondaryLight,
-                        ),
-                        onPressed: () => setState(
-                          () => _obscurePassword = !_obscurePassword,
-                        ),
-                      ),
-                      validator: (value) {
-                        if (value == null || value.isEmpty) {
-                          return 'Please enter your password';
-                        }
-                        if (value.length < 6) {
-                          return 'Password must be at least 6 characters';
-                        }
-                        return null;
-                      },
-                    ),
-                    const SizedBox(height: 12),
-                    // Forgot Password
-                    Align(
-                      alignment: Alignment.centerRight,
-                      child: TextButton(
-                        onPressed: () => context.go('/forgot-password'),
-                        child: const Text('Forgot Password?'),
-                      ),
-                    ),
-                    const SizedBox(height: 24),
-                    // Login Button
-                    BlocBuilder<AuthBloc, AuthState>(
-                      builder: (context, state) {
-                        return CustomButton(
-                          text: 'Sign In',
-                          onPressed: _handleLogin,
-                          isLoading: state is AuthLoading,
-                        );
-                      },
-                    ),
-                    const SizedBox(height: 24),
-                    // Register Link
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
+        child: Stack(
+          children: [
+            SafeArea(
+              child: Builder(
+                builder: (context) => SingleChildScrollView(
+                  padding: EdgeInsets.fromLTRB(
+                    24,
+                    24,
+                    24,
+                    24 + MediaQuery.of(context).viewInsets.bottom,
+                  ),
+                  child: Form(
+                    key: _formKey,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        Text(
-                          "Don't have an account? ",
-                          style: Theme.of(context).textTheme.bodyMedium,
+                        const SizedBox(height: 60),
+                        // Logo - theme aware (logo.png for dark, splash.jpeg for light)
+                        const Center(
+                          child: SizedBox(
+                            width: 120,
+                            height: 120,
+                            child: AppLogo(),
+                          ),
                         ),
-                        TextButton(
-                          onPressed: () => context.go('/register'),
-                          child: const Text('Sign Up'),
+                        const SizedBox(height: 32),
+                        // Title
+                        Text(
+                          'Welcome Back',
+                          style: Theme.of(context).textTheme.headlineMedium
+                              ?.copyWith(fontWeight: FontWeight.bold),
+                          textAlign: TextAlign.center,
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'Sign in to continue to Rally Point',
+                          style: Theme.of(context).textTheme.bodyMedium
+                              ?.copyWith(
+                                color: isDark
+                                    ? AppColors.textSecondaryDark
+                                    : AppColors.textSecondaryLight,
+                              ),
+                          textAlign: TextAlign.center,
+                        ),
+                        const SizedBox(height: 48),
+                        // Email Field
+                        CustomTextField(
+                          controller: _emailController,
+                          label: 'Email',
+                          hint: 'Enter your email',
+                          keyboardType: TextInputType.emailAddress,
+                          prefixIcon: Icons.email_outlined,
+                          realtimeValidation: true,
+                          validator: (value) {
+                            if (value == null || value.isEmpty) {
+                              return 'Please enter your email';
+                            }
+                            if (!RegExp(
+                              r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$',
+                            ).hasMatch(value)) {
+                              return 'Please enter a valid email';
+                            }
+                            return null;
+                          },
+                        ),
+                        const SizedBox(height: 16),
+                        // Password Field
+                        CustomTextField(
+                          controller: _passwordController,
+                          label: 'Password',
+                          hint: 'Enter your password',
+                          obscureText: _obscurePassword,
+                          prefixIcon: Icons.lock_outlined,
+                          realtimeValidation: true,
+                          suffixIcon: IconButton(
+                            icon: Icon(
+                              _obscurePassword
+                                  ? Icons.visibility_outlined
+                                  : Icons.visibility_off_outlined,
+                              color: isDark
+                                  ? AppColors.textSecondaryDark
+                                  : AppColors.textSecondaryLight,
+                            ),
+                            onPressed: () => setState(
+                              () => _obscurePassword = !_obscurePassword,
+                            ),
+                          ),
+                          validator: (value) {
+                            if (value == null || value.isEmpty) {
+                              return 'Please enter your password';
+                            }
+                            if (value.length < 6) {
+                              return 'Password must be at least 6 characters';
+                            }
+                            return null;
+                          },
+                        ),
+                        const SizedBox(height: 12),
+                        // Forgot Password
+                        Align(
+                          alignment: Alignment.centerRight,
+                          child: TextButton(
+                            onPressed: () => context.go('/forgot-password'),
+                            child: const Text('Forgot Password?'),
+                          ),
+                        ),
+                        const SizedBox(height: 24),
+                        // Login Button
+                        BlocBuilder<AuthBloc, AuthState>(
+                          builder: (context, state) {
+                            return CustomButton(
+                              text: 'Sign In',
+                              onPressed: _handleLogin,
+                              isLoading: state is AuthLoading,
+                            );
+                          },
+                        ),
+                        const SizedBox(height: 24),
+                        // Register Link
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Text(
+                              "Don't have an account? ",
+                              style: Theme.of(context).textTheme.bodyMedium,
+                            ),
+                            TextButton(
+                              onPressed: () => context.go('/register'),
+                              child: const Text('Sign Up'),
+                            ),
+                          ],
                         ),
                       ],
                     ),
-                  ],
+                  ),
                 ),
               ),
             ),
-          ),
+            BlocBuilder<AuthBloc, AuthState>(
+              builder: (context, state) {
+                if (state is! AuthLoading) return const SizedBox.shrink();
+                return Positioned.fill(
+                  child: ColoredBox(
+                    color: (isDark ? AppColors.backgroundDark : Colors.white)
+                        .withValues(alpha: 0.95),
+                    child: Center(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const SizedBox(
+                            width: 96,
+                            height: 96,
+                            child: AppLogo(),
+                          ),
+                          const SizedBox(height: 20),
+                          const CircularProgressIndicator(),
+                          const SizedBox(height: 12),
+                          Text(
+                            'Signing in...',
+                            style: Theme.of(context).textTheme.bodyMedium,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                );
+              },
+            ),
+          ],
         ),
       ),
     );

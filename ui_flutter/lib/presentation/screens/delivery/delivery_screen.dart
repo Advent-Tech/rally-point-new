@@ -3,7 +3,6 @@ import 'dart:math';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:go_router/go_router.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:intl/intl.dart';
 import 'package:showcaseview/showcaseview.dart';
@@ -22,6 +21,7 @@ import '../../widgets/animations/staggered_fade_in.dart';
 import '../../widgets/animations/success_check.dart';
 import '../../widgets/stepper/step_progress_bar.dart';
 import '../../widgets/states/empty_state.dart';
+import '../../widgets/navigation/app_back_button.dart';
 
 /// Date filter options
 enum DateFilter { today, thisWeek, thisMonth, all }
@@ -52,7 +52,8 @@ const List<_BookOption> _bookCatalog = [
   ),
   _BookOption(
     code: 'GC_ES',
-    title: 'The Great Controversy Book, Thrive Magazine, & Doorknob Bag (Spanish)',
+    title:
+        'The Great Controversy Book, Thrive Magazine, & Doorknob Bag (Spanish)',
     language: 'spanish',
     unitPrice: 2.50,
     assetPath: 'assets/books/great_contoversy_spanish.png',
@@ -66,7 +67,8 @@ const List<_BookOption> _bookCatalog = [
   ),
   _BookOption(
     code: 'WLD_ES',
-    title: 'When Light and Darkness Collide, Thrive Magazine, & Doorknob Bag (Spanish)',
+    title:
+        'When Light and Darkness Collide, Thrive Magazine, & Doorknob Bag (Spanish)',
     language: 'spanish',
     unitPrice: 2.50,
     assetPath: 'assets/books/whenLDcollide_spanish.png',
@@ -88,6 +90,7 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
   // Coach mark keys
   final _showcaseSummary = GlobalKey();
   final _showcaseRecord = GlobalKey();
+  final _showcaseBookSale = GlobalKey();
   final _showcaseFilters = GlobalKey();
   bool _coachMarksChecked = false;
 
@@ -171,6 +174,7 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
             ShowcaseView.get().startShowCase([
               _showcaseSummary,
               _showcaseRecord,
+              _showcaseBookSale,
               _showcaseFilters,
             ]);
             CoachMarksService().markAsShown('delivery');
@@ -192,16 +196,7 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
         _maybeShowCoachMarks();
         return Scaffold(
           appBar: AppBar(
-            leading: IconButton(
-              icon: const Icon(Icons.arrow_back),
-              onPressed: () {
-                if (context.canPop()) {
-                  context.pop();
-                } else {
-                  context.go('/home');
-                }
-              },
-            ),
+            leading: AppBackButton.leading(context, fallbackRoute: '/home'),
             title: const Text('Field Activity'),
             actions: [
               const RoleBadge(),
@@ -257,8 +252,12 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
               }
 
               // Calculate today's totals for summary
-              final donations = todayDeliveries.where((d) => d.isDonation).toList();
-              final bookSales = todayDeliveries.where((d) => d.isBookSale).toList();
+              final donations = todayDeliveries
+                  .where((d) => d.isDonation)
+                  .toList();
+              final bookSales = todayDeliveries
+                  .where((d) => d.isBookSale)
+                  .toList();
               final totalDonationAmount = donations.fold<double>(
                 0,
                 (sum, d) => sum + (d.donationAmount ?? 0),
@@ -322,11 +321,22 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
                           ),
                           const SizedBox(width: 12),
                           Expanded(
-                            child: _ActionButton(
-                              icon: Icons.menu_book_rounded,
-                              label: 'Record Book Sale',
-                              color: AppColors.primary,
-                              onTap: () => _showBookSaleSheet(context),
+                            child: Showcase(
+                              key: _showcaseBookSale,
+                              title: 'Record Book Sale',
+                              description:
+                                  'Tap here to record a book sale with buyer details, quantity, and payment method.',
+                              titleTextStyle: _tooltipTitleStyle,
+                              descTextStyle: _tooltipDescStyle,
+                              tooltipBorderRadius: _tooltipRadius,
+                              tooltipPadding: _tooltipPadding,
+                              targetBorderRadius: BorderRadius.circular(16),
+                              child: _ActionButton(
+                                icon: Icons.menu_book_rounded,
+                                label: 'Record Book Sale',
+                                color: AppColors.primary,
+                                onTap: () => _showBookSaleSheet(context),
+                              ),
                             ),
                           ),
                         ],
@@ -537,10 +547,11 @@ class _DeliveryDetailSheet extends StatelessWidget {
                   width: 48,
                   height: 48,
                   decoration: BoxDecoration(
-                    color: (delivery.isBookSale
-                            ? AppColors.primary
-                            : AppColors.success)
-                        .withAlpha(30),
+                    color:
+                        (delivery.isBookSale
+                                ? AppColors.primary
+                                : AppColors.success)
+                            .withAlpha(30),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Icon(
@@ -835,7 +846,8 @@ class _ActivityCard extends StatelessWidget {
                         ],
                         Expanded(
                           child: Text(
-                            isBookSale && (delivery.bookTitle?.isNotEmpty ?? false)
+                            isBookSale &&
+                                    (delivery.bookTitle?.isNotEmpty ?? false)
                                 ? delivery.bookTitle!
                                 : delivery.address,
                             style: TextStyle(
@@ -2029,7 +2041,8 @@ class _RecordBookSaleSheetState extends State<_RecordBookSaleSheet> {
           itemType: 'book',
           name: _selectedBook.title,
           quantity: quantity,
-          description: 'book_code=${_selectedBook.code};language=$languageLabel',
+          description:
+              'book_code=${_selectedBook.code};language=$languageLabel',
         ),
       ],
     );
@@ -2097,7 +2110,8 @@ class _RecordBookSaleSheetState extends State<_RecordBookSaleSheet> {
                         final book = _bookCatalog[index];
                         final isSelected = _selectedBookIndex == index;
                         return GestureDetector(
-                          onTap: () => setState(() => _selectedBookIndex = index),
+                          onTap: () =>
+                              setState(() => _selectedBookIndex = index),
                           child: Container(
                             width: 180,
                             padding: const EdgeInsets.all(10),
@@ -2116,11 +2130,35 @@ class _RecordBookSaleSheetState extends State<_RecordBookSaleSheet> {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Expanded(
-                                  child: Image.asset(
-                                    book.assetPath,
-                                    fit: BoxFit.contain,
-                                    errorBuilder: (_, _, _) => Container(
-                                      color: Colors.grey.shade100,
+                                  child: Container(
+                                    width: double.infinity,
+                                    decoration: BoxDecoration(
+                                      color: isDark
+                                          ? AppColors.surfaceDark
+                                          : Colors.grey.shade100,
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    child: ClipRRect(
+                                      borderRadius: BorderRadius.circular(8),
+                                      child: Image.asset(
+                                        book.assetPath,
+                                        fit: BoxFit.cover,
+                                        alignment: Alignment.center,
+                                        errorBuilder: (_, error, __) {
+                                          debugPrint(
+                                            'Book image failed to load: ${book.assetPath} | $error',
+                                          );
+                                          return Center(
+                                            child: Icon(
+                                              Icons.menu_book_rounded,
+                                              color: isDark
+                                                  ? AppColors.textSecondaryDark
+                                                  : AppColors
+                                                        .textSecondaryLight,
+                                            ),
+                                          );
+                                        },
+                                      ),
                                     ),
                                   ),
                                 ),

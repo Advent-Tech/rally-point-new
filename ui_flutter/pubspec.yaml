@@ -84,6 +84,7 @@ dependencies:
   responsive_framework: ^1.1.1
   flutter_screenutil: ^5.9.0
   showcaseview: ^5.0.1
+  google_fonts: ^6.2.1
 
 dev_dependencies:
   flutter_test:
@@ -100,24 +101,25 @@ dev_dependencies:
 flutter_native_splash:
   color: "#ffffff"
   image: assets/vertcal-logo.png
-  color_dark: "#1a1a2e"
+  color_dark: "#ffffff"
   image_dark: assets/vertcal-logo.png
   fullscreen: false
   android_12:
     color: "#ffffff"
     icon_background_color: "#ffffff"
     image: assets/vertcal-logo.png
-    color_dark: "#1a1a2e"
-    icon_background_color_dark: "#1a1a2e"
+    color_dark: "#ffffff"
+    icon_background_color_dark: "#ffffff"
     image_dark: assets/vertcal-logo.png
 
 # Flutter Launcher Icons configuration
 flutter_launcher_icons:
   android: true
   ios: true
-  image_path: "assets/adaptive-icon.png"
+  image_path: "assets/logo.png"
+  remove_alpha_ios: true
   adaptive_icon_background: "#ffffff"
-  adaptive_icon_foreground: "assets/adaptive-icon.png"
+  adaptive_icon_foreground: "assets/logo.png"
 
 dependency_overrides:
   record_linux: ^1.0.0
@@ -128,9 +130,10 @@ flutter:
 
   assets:
     - assets/
-    - assets/books/
-    - assets/images/
-    - assets/icons/
+    - assets/books/great_contoversy.png
+    - assets/books/great_contoversy_spanish.png
+    - assets/books/whenLDcollide.png
+    - assets/books/whenLDcollide_spanish.png
 
   # Custom fonts - uncomment when font files are added
   # fonts:
