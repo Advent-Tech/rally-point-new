@@ -5,6 +5,7 @@ import (
 	"math"
 	"net/http"
 	"strconv"
+	"sync"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -18,6 +19,14 @@ type LocationHandler struct {
 	locationService domain.LocationService
 	jwtManager      *auth.JWTManager
 	upgrader        websocket.Upgrader
+	recentMu        sync.RWMutex
+	recentByUser    map[uuid.UUID]recentLocationSample
+}
+
+type recentLocationSample struct {
+	Latitude  float64
+	Longitude float64
+	At        time.Time
 }
 
 // NewLocationHandler creates a new location handler
@@ -25,6 +34,7 @@ func NewLocationHandler(locationService domain.LocationService, jwtManager *auth
 	return &LocationHandler{
 		locationService: locationService,
 		jwtManager:      jwtManager,
+		recentByUser:    make(map[uuid.UUID]recentLocationSample),
 		upgrader: websocket.Upgrader{
 			CheckOrigin: func(r *http.Request) bool {
 				return true // Allow all origins in development
@@ -56,8 +66,21 @@ func (h *LocationHandler) UpdateLocation(c *gin.Context) {
 	// Get filtering config
 	filterConfig := DefaultFilterConfig()
 
-	// Apply GPS filtering (accuracy check) before saving
-	valid, reason := validateLocationUpdate(&req, filterConfig)
+	trackedAt := time.Now().UTC()
+	prev, hasPrev := h.getRecentSample(id)
+
+	// Apply server-side GPS filtering before saving.
+	valid, reason := validateLocationUpdate(
+		&req,
+		filterConfig,
+		trackedAt,
+		func() *recentLocationSample {
+			if !hasPrev {
+				return nil
+			}
+			return &prev
+		}(),
+	)
 	if !valid {
 		// Log filtered location but don't fail - prevents retry spam
 		fmt.Printf("[GPS_FILTER] user_id=%s reason=%s lat=%.6f lng=%.6f\n",
@@ -79,7 +102,27 @@ func (h *LocationHandler) UpdateLocation(c *gin.Context) {
 		return
 	}
 
+	// Update in-memory recent sample only after an accepted location update.
+	h.setRecentSample(id, recentLocationSample{
+		Latitude:  req.Latitude,
+		Longitude: req.Longitude,
+		At:        trackedAt,
+	})
+
 	c.JSON(http.StatusOK, track)
+}
+
+func (h *LocationHandler) getRecentSample(userID uuid.UUID) (recentLocationSample, bool) {
+	h.recentMu.RLock()
+	defer h.recentMu.RUnlock()
+	s, ok := h.recentByUser[userID]
+	return s, ok
+}
+
+func (h *LocationHandler) setRecentSample(userID uuid.UUID, sample recentLocationSample) {
+	h.recentMu.Lock()
+	defer h.recentMu.Unlock()
+	h.recentByUser[userID] = sample
 }
 
 // GetUserLocations handles getting user location history
@@ -515,10 +558,44 @@ func filterOutlierPoints(tracks []*domain.LocationTrack) []*domain.LocationTrack
 }
 
 // validateLocationUpdate validates incoming GPS data before saving
-func validateLocationUpdate(newLoc *domain.LocationUpdate, config LocationFilterConfig) (bool, string) {
+func validateLocationUpdate(
+	newLoc *domain.LocationUpdate,
+	config LocationFilterConfig,
+	now time.Time,
+	prev *recentLocationSample,
+) (bool, string) {
+	// 0. Basic coordinate sanity
+	if newLoc.Latitude < -90 || newLoc.Latitude > 90 || newLoc.Longitude < -180 || newLoc.Longitude > 180 {
+		return false, "invalid_coordinates"
+	}
+
 	// 1. Accuracy check - reject inaccurate GPS readings
 	if newLoc.Accuracy != nil && *newLoc.Accuracy > config.MinAccuracyMeters {
 		return false, fmt.Sprintf("accuracy_too_low: %.1fm > %.1fm", *newLoc.Accuracy, config.MinAccuracyMeters)
+	}
+
+	if prev != nil {
+		timeDiff := now.Sub(prev.At).Seconds()
+		if timeDiff <= 0 {
+			return false, "non_monotonic_timestamp"
+		}
+		if timeDiff < float64(config.MinIntervalSeconds) {
+			return false, fmt.Sprintf("too_frequent: %.2fs < %ds", timeDiff, config.MinIntervalSeconds)
+		}
+
+		distanceMeters := haversineDistance(prev.Latitude, prev.Longitude, newLoc.Latitude, newLoc.Longitude)
+		if distanceMeters > config.MaxDistanceKm*1000.0 {
+			return false, fmt.Sprintf("outlier_jump: %.1fkm > %.1fkm", distanceMeters/1000.0, config.MaxDistanceKm)
+		}
+
+		// Prefer device speed if available (m/s from Geolocator), fallback to computed speed.
+		speedKmh := (distanceMeters / timeDiff) * 3.6
+		if newLoc.Speed != nil && *newLoc.Speed >= 0 {
+			speedKmh = *newLoc.Speed * 3.6
+		}
+		if speedKmh > config.MaxSpeedKmh {
+			return false, fmt.Sprintf("speed_too_high: %.1fkm/h > %.1fkm/h", speedKmh, config.MaxSpeedKmh)
+		}
 	}
 
 	return true, ""

@@ -18,43 +18,58 @@ class RealtimeBridge {
   }
 
   void _initialize() {
+    DateTime parseOccurredAt(dynamic payloadTimestamp, DateTime fallback) {
+      if (payloadTimestamp is String) {
+        return DateTime.tryParse(payloadTimestamp)?.toUtc() ?? fallback.toUtc();
+      }
+      return fallback.toUtc();
+    }
+
     // Listen for worker location updates
     _subscriptions.add(
       _ws.messagesOfType(WsMessageType.locationUpdate).listen((message) {
-        if (bloc.state.mapMode != MapMode.workers) return;
-
         final raw = message.data;
         final payload = (raw['data'] is Map) ? (raw['data'] as Map) : raw;
 
         final userId = (payload['userId'] ?? payload['user_id'])?.toString();
         if (userId == null || userId.isEmpty) return;
-        if (userId != bloc.state.followTarget) return;
 
         final latRaw = payload['latitude'];
         final lngRaw = payload['longitude'];
         if (latRaw is! num || lngRaw is! num) return;
+        final occurredAt = parseOccurredAt(
+          payload['timestamp'],
+          message.timestamp,
+        );
 
         bloc.add(
           UpdateLiveLocationEvent(
             workerId: userId,
             latitude: latRaw.toDouble(),
             longitude: lngRaw.toDouble(),
+            occurredAt: occurredAt,
           ),
         );
 
-        final currentPath = bloc.state.workerPaths[userId] ?? [];
-        bloc.add(
-          UpdateWorkerPathEvent(
-            workerId: userId,
-            path: [
-              ...currentPath,
-              Position(
-                latitude: latRaw.toDouble(),
-                longitude: lngRaw.toDouble(),
-              ),
-            ],
-          ),
-        );
+        if (bloc.state.followTarget == userId) {
+          final currentPath = bloc.state.workerPaths[userId] ?? [];
+          final nextPath = [
+            ...currentPath,
+            Position(
+              latitude: latRaw.toDouble(),
+              longitude: lngRaw.toDouble(),
+            ),
+          ];
+          final trimmedPath = nextPath.length > 500
+              ? nextPath.sublist(nextPath.length - 500)
+              : nextPath;
+          bloc.add(
+            UpdateWorkerPathEvent(
+              workerId: userId,
+              path: trimmedPath,
+            ),
+          );
+        }
       }),
     );
 
@@ -62,40 +77,48 @@ class RealtimeBridge {
       _ws.messagesOfType(WsMessageType.workerLocationBroadcast).listen((
         message,
       ) {
-        if (bloc.state.mapMode != MapMode.workers) return;
-
         final raw = message.data;
         final payload = (raw['data'] is Map) ? (raw['data'] as Map) : raw;
 
         final userId = (payload['userId'] ?? payload['user_id'])?.toString();
         if (userId == null || userId.isEmpty) return;
-        if (userId != bloc.state.followTarget) return;
 
         final latRaw = payload['latitude'];
         final lngRaw = payload['longitude'];
         if (latRaw is! num || lngRaw is! num) return;
+        final occurredAt = parseOccurredAt(
+          payload['timestamp'],
+          message.timestamp,
+        );
 
         bloc.add(
           UpdateLiveLocationEvent(
             workerId: userId,
             latitude: latRaw.toDouble(),
             longitude: lngRaw.toDouble(),
+            occurredAt: occurredAt,
           ),
         );
 
-        final currentPath = bloc.state.workerPaths[userId] ?? [];
-        bloc.add(
-          UpdateWorkerPathEvent(
-            workerId: userId,
-            path: [
-              ...currentPath,
-              Position(
-                latitude: latRaw.toDouble(),
-                longitude: lngRaw.toDouble(),
-              ),
-            ],
-          ),
-        );
+        if (bloc.state.followTarget == userId) {
+          final currentPath = bloc.state.workerPaths[userId] ?? [];
+          final nextPath = [
+            ...currentPath,
+            Position(
+              latitude: latRaw.toDouble(),
+              longitude: lngRaw.toDouble(),
+            ),
+          ];
+          final trimmedPath = nextPath.length > 500
+              ? nextPath.sublist(nextPath.length - 500)
+              : nextPath;
+          bloc.add(
+            UpdateWorkerPathEvent(
+              workerId: userId,
+              path: trimmedPath,
+            ),
+          );
+        }
       }),
     );
 

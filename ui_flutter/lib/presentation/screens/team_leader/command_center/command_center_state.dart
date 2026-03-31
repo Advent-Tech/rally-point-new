@@ -63,6 +63,7 @@ class CommandCenterState extends Equatable {
 
   // Real-time data
   final Map<String, Position> liveLocations; // workerId -> Position
+  final Map<String, DateTime> liveLocationUpdatedAt; // workerId -> last event ts
   final Set<String> gpsLiveWorkerIds; // workerIds with websocket GPS updates
   final Set<String> breachedWorkerIds;
 
@@ -86,6 +87,7 @@ class CommandCenterState extends Equatable {
     this.donations = const [],
     this.prayerRequests = const [],
     this.liveLocations = const {},
+    this.liveLocationUpdatedAt = const {},
     this.gpsLiveWorkerIds = const {},
     this.breachedWorkerIds = const {},
     this.followTarget,
@@ -108,6 +110,7 @@ class CommandCenterState extends Equatable {
     donations,
     prayerRequests,
     liveLocations,
+    liveLocationUpdatedAt,
     gpsLiveWorkerIds,
     breachedWorkerIds,
     followTarget,
@@ -129,6 +132,7 @@ class CommandCenterState extends Equatable {
     List<DonationModel>? donations,
     List<PrayerRequestModel>? prayerRequests,
     Map<String, Position>? liveLocations,
+    Map<String, DateTime>? liveLocationUpdatedAt,
     Set<String>? gpsLiveWorkerIds,
     Set<String>? breachedWorkerIds,
     String? followTarget,
@@ -149,6 +153,8 @@ class CommandCenterState extends Equatable {
       donations: donations ?? this.donations,
       prayerRequests: prayerRequests ?? this.prayerRequests,
       liveLocations: liveLocations ?? this.liveLocations,
+      liveLocationUpdatedAt:
+          liveLocationUpdatedAt ?? this.liveLocationUpdatedAt,
       gpsLiveWorkerIds: gpsLiveWorkerIds ?? this.gpsLiveWorkerIds,
       breachedWorkerIds: breachedWorkerIds ?? this.breachedWorkerIds,
       followTarget: followTarget == ''

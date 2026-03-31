@@ -15,7 +15,8 @@ class CommandCenterCameraController {
 
   CameraPriority _currentPriority = CameraPriority.idle;
   Timer? _followTimer;
-  // String? _followingWorkerId;
+  double? _followLatitude;
+  double? _followLongitude;
 
   CommandCenterCameraController({required this.mapController});
 
@@ -69,7 +70,8 @@ class CommandCenterCameraController {
   /// Start following a worker
   void follow(double latitude, double longitude, {String? workerId}) {
     _currentPriority = CameraPriority.follow;
-    // _followingWorkerId = workerId;
+    _followLatitude = latitude;
+    _followLongitude = longitude;
 
     // Cancel existing follow timer
     _followTimer?.cancel();
@@ -84,19 +86,33 @@ class CommandCenterCameraController {
 
     // Set up periodic updates
     _followTimer = Timer.periodic(const Duration(seconds: 2), (_) {
+      if (_followLatitude == null || _followLongitude == null) return;
+      easeTo(
+        latitude: _followLatitude!,
+        longitude: _followLongitude!,
+        priority: CameraPriority.follow,
+      );
+    });
+  }
+
+  void updateFollowPosition(double latitude, double longitude) {
+    _followLatitude = latitude;
+    _followLongitude = longitude;
+    if (_currentPriority == CameraPriority.follow) {
       easeTo(
         latitude: latitude,
         longitude: longitude,
         priority: CameraPriority.follow,
       );
-    });
+    }
   }
 
   /// Stop following
   void stopFollow() {
     _followTimer?.cancel();
     _followTimer = null;
-    // _followingWorkerId = null;
+    _followLatitude = null;
+    _followLongitude = null;
     _currentPriority = CameraPriority.idle;
   }
 

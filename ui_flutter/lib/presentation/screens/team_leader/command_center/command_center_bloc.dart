@@ -1,14 +1,17 @@
+import 'dart:math' as math;
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'command_center_event.dart';
-import 'command_center_state.dart';
+
 import '../../../../core/constants/api_constants.dart';
+import '../../../../core/network/api_client.dart';
 import '../../../../core/storage/secure_storage.dart';
-import '../../../../data/models/territory_model.dart';
-import '../../../../data/models/team_model.dart';
 import '../../../../data/models/donation_model.dart';
 import '../../../../data/models/prayer_request_model.dart';
-import '../../../../core/network/api_client.dart';
+import '../../../../data/models/team_model.dart';
+import '../../../../data/models/territory_model.dart';
+import 'command_center_event.dart';
+import 'command_center_state.dart';
 
 class CommandCenterBloc extends Bloc<CommandCenterEvent, CommandCenterState> {
   final ApiClient _apiClient;
@@ -40,7 +43,6 @@ class CommandCenterBloc extends Bloc<CommandCenterEvent, CommandCenterState> {
     Emitter<CommandCenterState> emit,
   ) async {
     emit(state.copyWith(mapMode: event.initialMode, isLoading: true));
-
     await _loadAllData(emit);
   }
 
@@ -106,7 +108,6 @@ class CommandCenterBloc extends Bloc<CommandCenterEvent, CommandCenterState> {
         return;
       }
 
-      // Parallel data loading with individual error handling
       final results = await Future.wait([
         _loadTerritories(),
         _loadDonations(teamId),
@@ -123,8 +124,15 @@ class CommandCenterBloc extends Bloc<CommandCenterEvent, CommandCenterState> {
 
       final mergedLiveLocations = Map<String, Position>.from(
         state.liveLocations,
+      )..addAll(fetchedLiveLocations);
+
+      final mergedLiveUpdatedAt = Map<String, DateTime>.from(
+        state.liveLocationUpdatedAt,
       );
-      mergedLiveLocations.addAll(fetchedLiveLocations);
+      final fetchTime = DateTime.now().toUtc();
+      for (final workerId in fetchedLiveLocations.keys) {
+        mergedLiveUpdatedAt.putIfAbsent(workerId, () => fetchTime);
+      }
 
       emit(
         state.copyWith(
@@ -133,6 +141,7 @@ class CommandCenterBloc extends Bloc<CommandCenterEvent, CommandCenterState> {
           prayerRequests: prayerRequests,
           workers: workers,
           liveLocations: mergedLiveLocations,
+          liveLocationUpdatedAt: mergedLiveUpdatedAt,
           isLoading: false,
           error: null,
         ),
@@ -147,29 +156,22 @@ class CommandCenterBloc extends Bloc<CommandCenterEvent, CommandCenterState> {
       final response = await _apiClient.get(
         '${ApiConstants.workSessions}/teams/$teamId/workers/active',
       );
-
       if (response.statusCode != 200) return null;
-      final data = response.data;
 
+      final data = response.data;
       if (kDebugMode) {
         debugPrint(
           'LiveLocations: /workers/active response type=${data.runtimeType}',
         );
-        if (data is Map) {
-          debugPrint(
-            'LiveLocations: top-level keys=${data.keys.toList().take(25).toList()}',
-          );
-        }
       }
 
       List<dynamic> workers;
       if (data is List) {
         workers = data;
       } else if (data is Map) {
-        final dynamic activeSessions =
-            data['active_sessions'] ?? data['activeSessions'];
-        final dynamic topWorkers = data['workers'] ?? data['members'];
-        final dynamic nestedData = data['data'];
+        final activeSessions = data['active_sessions'] ?? data['activeSessions'];
+        final topWorkers = data['workers'] ?? data['members'];
+        final nestedData = data['data'];
 
         if (activeSessions is List) {
           workers = activeSessions;
@@ -178,7 +180,7 @@ class CommandCenterBloc extends Bloc<CommandCenterEvent, CommandCenterState> {
         } else if (nestedData is List) {
           workers = nestedData;
         } else if (nestedData is Map) {
-          final dynamic nestedWorkers =
+          final nestedWorkers =
               nestedData['workers'] ?? nestedData['active_sessions'];
           workers = nestedWorkers is List ? nestedWorkers : const [];
         } else {
@@ -188,22 +190,10 @@ class CommandCenterBloc extends Bloc<CommandCenterEvent, CommandCenterState> {
         workers = const [];
       }
 
-      if (kDebugMode) {
-        debugPrint('LiveLocations: items=${workers.length}');
-        if (workers.isNotEmpty) {
-          final first = workers.first;
-          debugPrint('LiveLocations: first item type=${first.runtimeType}');
-          if (first is Map) {
-            debugPrint(
-              'LiveLocations: first keys=${first.keys.toList().take(25).toList()}',
-            );
-          }
-        }
-      }
-
-      final Map<String, Position> locations = {};
+      final locations = <String, Position>{};
       for (final item in workers) {
         if (item is! Map) continue;
+
         final workerId =
             item['worker_id']?.toString() ??
             item['workerId']?.toString() ??
@@ -216,24 +206,25 @@ class CommandCenterBloc extends Bloc<CommandCenterEvent, CommandCenterState> {
             item['entryLat'] ??
             item['latitude'] ??
             item['lat'] ??
-            item['latitud'] ??
             (item['location'] is Map
                 ? (item['location']['latitude'] ?? item['location']['lat'])
                 : null);
+
         final lngRaw =
             item['entry_lng'] ??
             item['entryLng'] ??
             item['longitude'] ??
             item['lng'] ??
             item['lon'] ??
-            item['long'] ??
             (item['location'] is Map
                 ? (item['location']['longitude'] ??
                       item['location']['lng'] ??
                       item['location']['lon'])
                 : null);
+
         if (workerId == null || workerId.isEmpty) continue;
         if (latRaw is! num || lngRaw is! num) continue;
+
         locations[workerId] = Position(
           latitude: latRaw.toDouble(),
           longitude: lngRaw.toDouble(),
@@ -243,7 +234,6 @@ class CommandCenterBloc extends Bloc<CommandCenterEvent, CommandCenterState> {
       if (kDebugMode) {
         debugPrint('LiveLocations: parsed locations=${locations.length}');
       }
-
       return locations;
     } catch (e) {
       debugPrint('Error loading live worker locations: $e');
@@ -286,31 +276,21 @@ class CommandCenterBloc extends Bloc<CommandCenterEvent, CommandCenterState> {
 
   Future<List<DonationModel>?> _loadDonations(String teamId) async {
     try {
-      final response = await _apiClient.get(
-        '${ApiConstants.donations}/team/$teamId',
-      );
+      final response = await _apiClient.get('${ApiConstants.donations}/team/$teamId');
       final bookSalesResponse = await _apiClient.get(
         '${ApiConstants.bookSales}/team/$teamId',
       );
 
       if (response.statusCode == 200 || bookSalesResponse.statusCode == 200) {
-        final results = _extractList(
+        final donationItems = _extractList(
           response.data,
           keys: const ['results', 'data', 'donations'],
-        );
-        final donationItems = results
-            .whereType<Map<String, dynamic>>()
-            .map(DonationModel.fromJson)
-            .toList();
+        ).whereType<Map<String, dynamic>>().map(DonationModel.fromJson).toList();
 
-        final bookResults = _extractList(
+        final bookAsDonations = _extractList(
           bookSalesResponse.data,
           keys: const ['results', 'data', 'book_sales'],
-        );
-        final bookAsDonations = bookResults
-            .whereType<Map<String, dynamic>>()
-            .map(_bookSaleToDonationModel)
-            .toList();
+        ).whereType<Map<String, dynamic>>().map(_bookSaleToDonationModel).toList();
 
         return [...donationItems, ...bookAsDonations];
       }
@@ -328,15 +308,10 @@ class CommandCenterBloc extends Bloc<CommandCenterEvent, CommandCenterState> {
       );
 
       if (response.statusCode == 200) {
-        final results = _extractList(
+        return _extractList(
           response.data,
           keys: const ['results', 'data', 'prayer_requests', 'prayers'],
-        );
-
-        return results
-            .whereType<Map<String, dynamic>>()
-            .map(PrayerRequestModel.fromJson)
-            .toList();
+        ).whereType<Map<String, dynamic>>().map(PrayerRequestModel.fromJson).toList();
       }
       return null;
     } catch (e) {
@@ -347,20 +322,13 @@ class CommandCenterBloc extends Bloc<CommandCenterEvent, CommandCenterState> {
 
   Future<List<TeamMember>?> _loadWorkers(String teamId) async {
     try {
-      final response = await _apiClient.get(
-        '${ApiConstants.teams}/$teamId/workers',
-      );
+      final response = await _apiClient.get('${ApiConstants.teams}/$teamId/workers');
 
       if (response.statusCode == 200) {
-        final results = _extractList(
+        return _extractList(
           response.data,
           keys: const ['results', 'data', 'workers', 'members', 'users'],
-        );
-
-        return results
-            .whereType<Map<String, dynamic>>()
-            .map(TeamMember.fromUserJson)
-            .toList();
+        ).whereType<Map<String, dynamic>>().map(TeamMember.fromUserJson).toList();
       }
       return null;
     } catch (e) {
@@ -373,27 +341,48 @@ class CommandCenterBloc extends Bloc<CommandCenterEvent, CommandCenterState> {
     UpdateLiveLocationEvent event,
     Emitter<CommandCenterState> emit,
   ) {
+    final existingTs = state.liveLocationUpdatedAt[event.workerId];
+    if (existingTs != null && event.occurredAt.isBefore(existingTs)) {
+      return;
+    }
+
     final updatedLocations = Map<String, Position>.from(state.liveLocations);
+    final previous = updatedLocations[event.workerId];
+    if (previous != null) {
+      final movementMeters = _haversineMeters(
+        previous.latitude,
+        previous.longitude,
+        event.latitude,
+        event.longitude,
+      );
+      if (movementMeters < 1.5) {
+        return;
+      }
+    }
+
     updatedLocations[event.workerId] = Position(
       latitude: event.latitude,
       longitude: event.longitude,
     );
 
-    final updatedGpsLive = Set<String>.from(state.gpsLiveWorkerIds);
-    updatedGpsLive.add(event.workerId);
+    final updatedTimestamps = Map<String, DateTime>.from(
+      state.liveLocationUpdatedAt,
+    );
+    updatedTimestamps[event.workerId] = event.occurredAt;
+
+    final updatedGpsLive = Set<String>.from(state.gpsLiveWorkerIds)
+      ..add(event.workerId);
 
     emit(
       state.copyWith(
         liveLocations: updatedLocations,
+        liveLocationUpdatedAt: updatedTimestamps,
         gpsLiveWorkerIds: updatedGpsLive,
       ),
     );
   }
 
-  void _onAddDonation(
-    AddDonationEvent event,
-    Emitter<CommandCenterState> emit,
-  ) {
+  void _onAddDonation(AddDonationEvent event, Emitter<CommandCenterState> emit) {
     emit(state.copyWith(donations: [...state.donations, event.donation]));
   }
 
@@ -413,7 +402,10 @@ class CommandCenterBloc extends Bloc<CommandCenterEvent, CommandCenterState> {
     Emitter<CommandCenterState> emit,
   ) {
     emit(
-      state.copyWith(selectedTerritoryId: event.territoryId, activePopup: null),
+      state.copyWith(
+        selectedTerritoryId: event.territoryId,
+        activePopup: null,
+      ),
     );
   }
 
@@ -421,7 +413,12 @@ class CommandCenterBloc extends Bloc<CommandCenterEvent, CommandCenterState> {
     FollowWorkerEvent event,
     Emitter<CommandCenterState> emit,
   ) {
-    emit(state.copyWith(followTarget: event.workerId, activePopup: null));
+    emit(
+      state.copyWith(
+        followTarget: event.workerId ?? '',
+        activePopup: null,
+      ),
+    );
   }
 
   void _onShowMapPopup(
@@ -444,11 +441,7 @@ class CommandCenterBloc extends Bloc<CommandCenterEvent, CommandCenterState> {
   ) {
     final current = state.activePopup;
     if (current == null) return;
-    emit(
-      state.copyWith(
-        activePopup: current.copyWith(expanded: !current.expanded),
-      ),
-    );
+    emit(state.copyWith(activePopup: current.copyWith(expanded: !current.expanded)));
   }
 
   void _onToggleLayer(
@@ -475,9 +468,8 @@ class CommandCenterBloc extends Bloc<CommandCenterEvent, CommandCenterState> {
     UpdateWorkerPathEvent event,
     Emitter<CommandCenterState> emit,
   ) {
-    final updatedPaths = Map<String, List<Position>>.from(state.workerPaths);
-    updatedPaths[event.workerId] = event.path;
-
+    final updatedPaths = Map<String, List<Position>>.from(state.workerPaths)
+      ..[event.workerId] = event.path;
     emit(state.copyWith(workerPaths: updatedPaths));
   }
 
@@ -495,7 +487,6 @@ class CommandCenterBloc extends Bloc<CommandCenterEvent, CommandCenterState> {
   Map<String, dynamic> _sanitizeGeoTerritoryJson(Map<String, dynamic> json) {
     final id = json['id']?.toString() ?? '';
     final solid = json['solid']?.toString() ?? 'false';
-
     final entityName =
         json['entity_name']?.toString() ?? json['entityName']?.toString() ?? '';
     final entityId =
@@ -513,6 +504,18 @@ class CommandCenterBloc extends Bloc<CommandCenterEvent, CommandCenterState> {
   DonationModel _bookSaleToDonationModel(Map<String, dynamic> json) {
     final receipt = (json['receipt_number'] as String?) ?? '';
     final totalAmount = (json['total_amount'] as num?)?.toDouble() ?? 0.0;
+    final lat =
+        (json['latitude'] as num?)?.toDouble() ??
+        (json['lat'] as num?)?.toDouble() ??
+        (json['location_lat'] as num?)?.toDouble() ??
+        (json['buyer_latitude'] as num?)?.toDouble();
+    final lng =
+        (json['longitude'] as num?)?.toDouble() ??
+        (json['lng'] as num?)?.toDouble() ??
+        (json['location_lng'] as num?)?.toDouble() ??
+        (json['buyer_longitude'] as num?)?.toDouble();
+    final quantity = (json['quantity'] as num?)?.toInt() ?? 1;
+    final unitPrice = (json['price_per_unit'] as num?)?.toDouble();
 
     return DonationModel.fromJson({
       'id': json['id'],
@@ -524,9 +527,11 @@ class CommandCenterBloc extends Bloc<CommandCenterEvent, CommandCenterState> {
       'donor_phone': json['buyer_phone'],
       'donor_email': json['buyer_email'],
       'donor_address': json['buyer_address'] ?? '',
-      'latitude': json['latitude'],
-      'longitude': json['longitude'],
-      'amount': totalAmount,
+      'latitude': lat,
+      'longitude': lng,
+      'amount': totalAmount > 0
+          ? totalAmount
+          : (unitPrice != null ? unitPrice * quantity : 0.0),
       'currency': json['currency'] ?? 'USD',
       'donation_type': 'book_sale',
       'purpose': json['book_title'],
@@ -535,11 +540,27 @@ class CommandCenterBloc extends Bloc<CommandCenterEvent, CommandCenterState> {
       'receipt_number': receipt.isEmpty ? 'BOOK-SALE' : receipt,
       'is_anonymous': false,
       'notes': json['notes'],
-      'status': (json['status'] == 'completed') ? 'received' : (json['status'] ?? 'received'),
+      'status': (json['status'] == 'completed')
+          ? 'received'
+          : (json['status'] ?? 'received'),
       'collected_at': json['sold_at'] ?? json['created_at'],
       'deposited_at': null,
       'created_at': json['created_at'],
       'updated_at': json['updated_at'],
     });
+  }
+
+  double _haversineMeters(double lat1, double lon1, double lat2, double lon2) {
+    const earthRadiusMeters = 6371000.0;
+    final dLat = (lat2 - lat1) * math.pi / 180.0;
+    final dLon = (lon2 - lon1) * math.pi / 180.0;
+    final a =
+        math.sin(dLat / 2) * math.sin(dLat / 2) +
+        math.cos(lat1 * math.pi / 180.0) *
+            math.cos(lat2 * math.pi / 180.0) *
+            math.sin(dLon / 2) *
+            math.sin(dLon / 2);
+    final c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a));
+    return earthRadiusMeters * c;
   }
 }
