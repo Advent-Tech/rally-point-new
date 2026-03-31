@@ -12,16 +12,20 @@ import '../../../../data/models/team_model.dart';
 import '../../../../data/models/territory_model.dart';
 import 'command_center_event.dart';
 import 'command_center_state.dart';
+import 'services/road_snap_service.dart';
 
 class CommandCenterBloc extends Bloc<CommandCenterEvent, CommandCenterState> {
   final ApiClient _apiClient;
   final SecureStorage _storage;
+  final RoadSnapService _roadSnapService;
 
   CommandCenterBloc({
     required ApiClient apiClient,
     required SecureStorage storage,
+    RoadSnapService? roadSnapService,
   }) : _apiClient = apiClient,
        _storage = storage,
+       _roadSnapService = roadSnapService ?? RoadSnapService(),
        super(const CommandCenterState()) {
     on<InitializeEvent>(_onInitialize);
     on<ChangeMapModeEvent>(_onChangeMapMode);
@@ -463,9 +467,14 @@ class CommandCenterBloc extends Bloc<CommandCenterEvent, CommandCenterState> {
 
     final workerId = event.workerId!;
     final historyPath = await _fetchWorkerPathHistory(workerId);
+    final snappedPath = historyPath == null
+        ? null
+        : await _roadSnapService.snapPath(historyPath);
 
     final updatedPaths = Map<String, List<Position>>.from(state.workerPaths);
-    if (historyPath != null && historyPath.isNotEmpty) {
+    if (snappedPath != null && snappedPath.isNotEmpty) {
+      updatedPaths[workerId] = snappedPath;
+    } else if (historyPath != null && historyPath.isNotEmpty) {
       updatedPaths[workerId] = historyPath;
     }
 
