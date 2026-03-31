@@ -15,10 +15,13 @@ class FollowModeBanner extends StatelessWidget {
           return const SizedBox.shrink();
         }
 
-        final worker = state.workers.firstWhere(
-          (w) => w.id == state.followTarget,
-          orElse: () => state.workers.first,
-        );
+        String displayName = 'Worker';
+        for (final w in state.workers) {
+          if (w.id == state.followTarget) {
+            displayName = w.displayName ?? 'Worker';
+            break;
+          }
+        }
 
         return Container(
           margin: const EdgeInsets.symmetric(horizontal: 16),
@@ -37,7 +40,7 @@ class FollowModeBanner extends StatelessWidget {
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
-                  'Following ${worker.displayName ?? 'Worker'}',
+                  'Following $displayName',
                   style: TextStyle(
                     color: Theme.of(context).colorScheme.onPrimaryContainer,
                     fontWeight: FontWeight.w500,

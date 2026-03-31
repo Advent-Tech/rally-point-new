@@ -334,21 +334,16 @@ class CommandCenterController {
       // Start follow when target changes and we have any location (GPS live or last-known entry)
       if (followId != previous?.followTarget) {
         if (pos != null) {
-          _cameraController.easeTo(
-            latitude: pos.latitude,
-            longitude: pos.longitude,
-            zoom: 16.0,
-            priority: CameraPriority.follow,
+          _cameraController.follow(
+            pos.latitude,
+            pos.longitude,
+            workerId: followId,
           );
         }
       } else {
         // While following, keep camera updated when position changes (e.g. websocket updates)
         if (pos != null && pos != prevPos) {
-          _cameraController.easeTo(
-            latitude: pos.latitude,
-            longitude: pos.longitude,
-            priority: CameraPriority.follow,
-          );
+          _cameraController.updateFollowPosition(pos.latitude, pos.longitude);
         }
       }
     } else {

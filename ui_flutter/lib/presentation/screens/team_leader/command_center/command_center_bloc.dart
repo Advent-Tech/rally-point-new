@@ -56,7 +56,7 @@ class CommandCenterBloc extends Bloc<CommandCenterEvent, CommandCenterState> {
           state.copyWith(
             mapMode: event.mode,
             showTerritories: true,
-            showWorkers: false,
+            showWorkers: true,
             showActivities: true,
             showTrails: false,
             followTarget: '',
