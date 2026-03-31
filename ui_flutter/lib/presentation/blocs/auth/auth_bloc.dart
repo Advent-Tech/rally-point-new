@@ -124,18 +124,36 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     emit(AuthLoading());
 
     try {
-      await _initialize();
+      await _initialize().timeout(const Duration(seconds: 8));
 
-      final token = await _secure.getAccessToken();
+      final token = await _secure
+          .getAccessToken()
+          .timeout(const Duration(seconds: 4));
       if (token == null) {
         emit(AuthUnauthenticated());
         return;
       }
 
+      // Fast boot path:
+      // If we have cached user data, let user in immediately and validate token in background.
+      final cachedUser = _local.getUserData();
+      if (cachedUser != null) {
+        final cached = UserModel.fromJson(cachedUser);
+        if (cached.teamId != null && cached.teamId!.isNotEmpty) {
+          await _secure.write('team_id', cached.teamId!);
+        }
+        emit(AuthAuthenticated(user: cached, isOffline: true));
+      }
+
       // Check if token is expired and try to refresh
-      final isExpired = await _secure.isTokenExpired();
+      final isExpired = await _secure
+          .isTokenExpired()
+          .timeout(const Duration(seconds: 4));
       if (isExpired) {
-        final refreshed = await _tryRefreshToken();
+        final refreshed = await _tryRefreshToken().timeout(
+          const Duration(seconds: 12),
+          onTimeout: () => false,
+        );
         if (!refreshed) {
           await _secure.clearTokens();
           emit(AuthUnauthenticated());
@@ -160,6 +178,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
         emit(AuthUnauthenticated());
       }
     } catch (e) {
+      debugPrint('Auth check failed, falling back safely: $e');
       // Check for cached user data
       final cachedUser = _local.getUserData();
       if (cachedUser != null) {

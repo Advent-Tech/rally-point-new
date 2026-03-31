@@ -124,7 +124,12 @@ class ApiClient {
       final refreshToken = await _storage?.getRefreshToken();
       if (refreshToken == null) return false;
 
-      final response = await Dio().post(
+      final response = await Dio(
+        BaseOptions(
+          connectTimeout: const Duration(milliseconds: ApiConstants.connectionTimeout),
+          receiveTimeout: const Duration(milliseconds: ApiConstants.receiveTimeout),
+        ),
+      ).post(
         '${_getBaseUrl()}${ApiConstants.refreshToken}',
         data: {'refresh_token': refreshToken},
       );
