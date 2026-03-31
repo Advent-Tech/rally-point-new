@@ -204,6 +204,11 @@ class _PopupCard extends StatelessWidget {
         final hasAnyLocation = state.liveLocations.containsKey(popup.id);
         final isGpsLive = state.gpsLiveWorkerIds.contains(popup.id);
         final isApiOnline = w?.isOnline == true;
+        final updatedAt = state.liveLocationUpdatedAt[popup.id];
+        final accuracy = state.liveLocationAccuracy[popup.id];
+        final speedMps = state.liveLocationSpeedMps[popup.id];
+        final speedKmh = speedMps == null ? null : speedMps * 3.6;
+        final isFollowing = state.followTarget == popup.id;
         body = w == null
             ? const Text('Details unavailable')
             : Column(
@@ -219,6 +224,31 @@ class _PopupCard extends StatelessWidget {
                               ? 'Last known (entry)'
                               : (isApiOnline ? 'Online (no GPS)' : 'Offline')),
                   ),
+                  if (updatedAt != null) ...[
+                    const SizedBox(height: 6),
+                    Text('Updated ${_formatFreshness(updatedAt)}'),
+                  ],
+                  if (accuracy != null || speedKmh != null) ...[
+                    const SizedBox(height: 2),
+                    Text(
+                      [
+                        if (accuracy != null)
+                          'Accuracy ±${accuracy.toStringAsFixed(0)}m',
+                        if (speedKmh != null)
+                          'Speed ${speedKmh.toStringAsFixed(1)} km/h',
+                      ].join('  •  '),
+                    ),
+                  ],
+                  if (isFollowing) ...[
+                    const SizedBox(height: 8),
+                    Text(
+                      'Following now',
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: Theme.of(context).colorScheme.primary,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
                 ],
               );
         break;
@@ -276,13 +306,15 @@ class _PopupCard extends StatelessWidget {
                   cc.MapPopupKind.worker => FilledButton(
                     onPressed: () {
                       context.read<CommandCenterBloc>().add(
-                        FollowWorkerEvent(workerId: popup.id),
+                        FollowWorkerEvent(
+                          workerId: state.followTarget == popup.id ? null : popup.id,
+                        ),
                       );
                       context.read<CommandCenterBloc>().add(
                         HideMapPopupEvent(),
                       );
                     },
-                    child: const Text('Follow'),
+                    child: Text(state.followTarget == popup.id ? 'Stop' : 'Follow'),
                   ),
                   _ => TextButton(
                     onPressed: () {
@@ -299,5 +331,12 @@ class _PopupCard extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  String _formatFreshness(DateTime updatedAt) {
+    final age = DateTime.now().toUtc().difference(updatedAt.toUtc());
+    if (age.inSeconds < 60) return '${age.inSeconds}s ago';
+    if (age.inMinutes < 60) return '${age.inMinutes}m ago';
+    return '${age.inHours}h ago';
   }
 }

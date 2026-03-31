@@ -37,15 +37,13 @@ class TrailLayer {
         .toList();
 
     final Map<dynamic, dynamic> removedMapRaw = diff['removed'] as Map? ?? {};
-    final Map<String, List<String>> removed = removedMapRaw.map(
-      (k, v) => MapEntry(k as String, List<String>.from(v as Iterable)),
+    final Map<String, List<dynamic>> removed = removedMapRaw.map(
+      (k, v) => MapEntry(k as String, List<dynamic>.from(v as Iterable)),
     );
 
     // Remove old trails
     if (removed.isNotEmpty) {
-      final toRemove = removed.values
-          .expand((r) => r as Iterable<dynamic>)
-          .toList();
+      final toRemove = removed.values.expand((r) => r).toList();
       for (final annotation in toRemove) {
         if (annotation is PolylineAnnotation) {
           await _polylineManager?.delete(annotation);
@@ -92,6 +90,11 @@ class TrailLayer {
         }
       }
     }
+  }
+
+  Future<void> clear() async {
+    await _polylineManager?.deleteAll();
+    _registry.clear();
   }
 
   void dispose() {

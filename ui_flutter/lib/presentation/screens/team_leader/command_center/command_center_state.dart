@@ -64,6 +64,8 @@ class CommandCenterState extends Equatable {
   // Real-time data
   final Map<String, Position> liveLocations; // workerId -> Position
   final Map<String, DateTime> liveLocationUpdatedAt; // workerId -> last event ts
+  final Map<String, double> liveLocationAccuracy; // workerId -> meters
+  final Map<String, double> liveLocationSpeedMps; // workerId -> m/s
   final Set<String> gpsLiveWorkerIds; // workerIds with websocket GPS updates
   final Set<String> breachedWorkerIds;
 
@@ -88,6 +90,8 @@ class CommandCenterState extends Equatable {
     this.prayerRequests = const [],
     this.liveLocations = const {},
     this.liveLocationUpdatedAt = const {},
+    this.liveLocationAccuracy = const {},
+    this.liveLocationSpeedMps = const {},
     this.gpsLiveWorkerIds = const {},
     this.breachedWorkerIds = const {},
     this.followTarget,
@@ -111,6 +115,8 @@ class CommandCenterState extends Equatable {
     prayerRequests,
     liveLocations,
     liveLocationUpdatedAt,
+    liveLocationAccuracy,
+    liveLocationSpeedMps,
     gpsLiveWorkerIds,
     breachedWorkerIds,
     followTarget,
@@ -133,6 +139,8 @@ class CommandCenterState extends Equatable {
     List<PrayerRequestModel>? prayerRequests,
     Map<String, Position>? liveLocations,
     Map<String, DateTime>? liveLocationUpdatedAt,
+    Map<String, double>? liveLocationAccuracy,
+    Map<String, double>? liveLocationSpeedMps,
     Set<String>? gpsLiveWorkerIds,
     Set<String>? breachedWorkerIds,
     String? followTarget,
@@ -155,6 +163,10 @@ class CommandCenterState extends Equatable {
       liveLocations: liveLocations ?? this.liveLocations,
       liveLocationUpdatedAt:
           liveLocationUpdatedAt ?? this.liveLocationUpdatedAt,
+      liveLocationAccuracy:
+          liveLocationAccuracy ?? this.liveLocationAccuracy,
+      liveLocationSpeedMps:
+          liveLocationSpeedMps ?? this.liveLocationSpeedMps,
       gpsLiveWorkerIds: gpsLiveWorkerIds ?? this.gpsLiveWorkerIds,
       breachedWorkerIds: breachedWorkerIds ?? this.breachedWorkerIds,
       followTarget: followTarget == ''

@@ -35,16 +35,27 @@ class UpdateLiveLocationEvent extends CommandCenterEvent {
   final double latitude;
   final double longitude;
   final DateTime occurredAt;
+  final double? accuracy;
+  final double? speedMps;
 
   const UpdateLiveLocationEvent({
     required this.workerId,
     required this.latitude,
     required this.longitude,
     required this.occurredAt,
+    this.accuracy,
+    this.speedMps,
   });
 
   @override
-  List<Object> get props => [workerId, latitude, longitude, occurredAt];
+  List<Object?> get props => [
+    workerId,
+    latitude,
+    longitude,
+    occurredAt,
+    accuracy,
+    speedMps,
+  ];
 }
 
 class AddDonationEvent extends CommandCenterEvent {

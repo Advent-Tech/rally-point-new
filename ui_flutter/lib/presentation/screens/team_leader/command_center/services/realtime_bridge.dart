@@ -4,7 +4,6 @@ import '../../../../../data/models/donation_model.dart';
 import '../../../../../services/websocket_service.dart';
 import '../command_center_bloc.dart';
 import '../command_center_event.dart';
-import '../command_center_state.dart';
 
 /// Bridge between WebSocket service and CommandCenterBloc
 class RealtimeBridge {
@@ -37,6 +36,8 @@ class RealtimeBridge {
         final latRaw = payload['latitude'];
         final lngRaw = payload['longitude'];
         if (latRaw is! num || lngRaw is! num) return;
+        final accuracyRaw = payload['accuracy'];
+        final speedRaw = payload['speed'] ?? payload['speed_mps'];
         final occurredAt = parseOccurredAt(
           payload['timestamp'],
           message.timestamp,
@@ -48,28 +49,10 @@ class RealtimeBridge {
             latitude: latRaw.toDouble(),
             longitude: lngRaw.toDouble(),
             occurredAt: occurredAt,
+            accuracy: accuracyRaw is num ? accuracyRaw.toDouble() : null,
+            speedMps: speedRaw is num ? speedRaw.toDouble() : null,
           ),
         );
-
-        if (bloc.state.followTarget == userId) {
-          final currentPath = bloc.state.workerPaths[userId] ?? [];
-          final nextPath = [
-            ...currentPath,
-            Position(
-              latitude: latRaw.toDouble(),
-              longitude: lngRaw.toDouble(),
-            ),
-          ];
-          final trimmedPath = nextPath.length > 500
-              ? nextPath.sublist(nextPath.length - 500)
-              : nextPath;
-          bloc.add(
-            UpdateWorkerPathEvent(
-              workerId: userId,
-              path: trimmedPath,
-            ),
-          );
-        }
       }),
     );
 
@@ -86,6 +69,8 @@ class RealtimeBridge {
         final latRaw = payload['latitude'];
         final lngRaw = payload['longitude'];
         if (latRaw is! num || lngRaw is! num) return;
+        final accuracyRaw = payload['accuracy'];
+        final speedRaw = payload['speed'] ?? payload['speed_mps'];
         final occurredAt = parseOccurredAt(
           payload['timestamp'],
           message.timestamp,
@@ -97,28 +82,10 @@ class RealtimeBridge {
             latitude: latRaw.toDouble(),
             longitude: lngRaw.toDouble(),
             occurredAt: occurredAt,
+            accuracy: accuracyRaw is num ? accuracyRaw.toDouble() : null,
+            speedMps: speedRaw is num ? speedRaw.toDouble() : null,
           ),
         );
-
-        if (bloc.state.followTarget == userId) {
-          final currentPath = bloc.state.workerPaths[userId] ?? [];
-          final nextPath = [
-            ...currentPath,
-            Position(
-              latitude: latRaw.toDouble(),
-              longitude: lngRaw.toDouble(),
-            ),
-          ];
-          final trimmedPath = nextPath.length > 500
-              ? nextPath.sublist(nextPath.length - 500)
-              : nextPath;
-          bloc.add(
-            UpdateWorkerPathEvent(
-              workerId: userId,
-              path: trimmedPath,
-            ),
-          );
-        }
       }),
     );
 

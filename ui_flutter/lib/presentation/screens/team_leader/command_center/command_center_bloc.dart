@@ -373,11 +373,49 @@ class CommandCenterBloc extends Bloc<CommandCenterEvent, CommandCenterState> {
     final updatedGpsLive = Set<String>.from(state.gpsLiveWorkerIds)
       ..add(event.workerId);
 
+    final updatedAccuracy = Map<String, double>.from(state.liveLocationAccuracy);
+    if (event.accuracy != null && event.accuracy! >= 0) {
+      updatedAccuracy[event.workerId] = event.accuracy!;
+    }
+
+    final updatedSpeed = Map<String, double>.from(state.liveLocationSpeedMps);
+    if (event.speedMps != null && event.speedMps! >= 0) {
+      updatedSpeed[event.workerId] = event.speedMps!;
+    }
+
+    final shouldExtendPath =
+        state.followTarget == event.workerId ||
+        (state.workerPaths[event.workerId]?.isNotEmpty ?? false);
+    final updatedPaths = Map<String, List<Position>>.from(state.workerPaths);
+    if (shouldExtendPath) {
+      final currentPath = List<Position>.from(updatedPaths[event.workerId] ?? const []);
+      final bool shouldAppendPoint =
+          currentPath.isEmpty ||
+          _haversineMeters(
+                currentPath.last.latitude,
+                currentPath.last.longitude,
+                event.latitude,
+                event.longitude,
+              ) >=
+              1.5;
+      if (shouldAppendPoint) {
+        currentPath.add(
+          Position(latitude: event.latitude, longitude: event.longitude),
+        );
+      }
+      updatedPaths[event.workerId] = currentPath.length > 1200
+          ? currentPath.sublist(currentPath.length - 1200)
+          : currentPath;
+    }
+
     emit(
       state.copyWith(
         liveLocations: updatedLocations,
         liveLocationUpdatedAt: updatedTimestamps,
+        liveLocationAccuracy: updatedAccuracy,
+        liveLocationSpeedMps: updatedSpeed,
         gpsLiveWorkerIds: updatedGpsLive,
+        workerPaths: updatedPaths,
       ),
     );
   }
@@ -409,13 +447,51 @@ class CommandCenterBloc extends Bloc<CommandCenterEvent, CommandCenterState> {
     );
   }
 
-  void _onFollowWorker(
+  Future<void> _onFollowWorker(
     FollowWorkerEvent event,
     Emitter<CommandCenterState> emit,
-  ) {
+  ) async {
+    if (event.workerId == null || event.workerId!.isEmpty) {
+      emit(
+        state.copyWith(
+          followTarget: '',
+          activePopup: null,
+        ),
+      );
+      return;
+    }
+
+    final workerId = event.workerId!;
+    final historyPath = await _fetchWorkerPathHistory(workerId);
+
+    final updatedPaths = Map<String, List<Position>>.from(state.workerPaths);
+    if (historyPath != null && historyPath.isNotEmpty) {
+      updatedPaths[workerId] = historyPath;
+    }
+
+    final livePoint = state.liveLocations[workerId];
+    if (livePoint != null) {
+      final current = List<Position>.from(updatedPaths[workerId] ?? const []);
+      if (current.isEmpty ||
+          _haversineMeters(
+                current.last.latitude,
+                current.last.longitude,
+                livePoint.latitude,
+                livePoint.longitude,
+              ) >=
+              1.5) {
+        current.add(livePoint);
+      }
+      updatedPaths[workerId] = current.length > 1200
+          ? current.sublist(current.length - 1200)
+          : current;
+    }
+
     emit(
       state.copyWith(
-        followTarget: event.workerId ?? '',
+        followTarget: workerId,
+        showTrails: true,
+        workerPaths: updatedPaths,
         activePopup: null,
       ),
     );
@@ -471,6 +547,66 @@ class CommandCenterBloc extends Bloc<CommandCenterEvent, CommandCenterState> {
     final updatedPaths = Map<String, List<Position>>.from(state.workerPaths)
       ..[event.workerId] = event.path;
     emit(state.copyWith(workerPaths: updatedPaths));
+  }
+
+  Future<List<Position>?> _fetchWorkerPathHistory(String workerId) async {
+    try {
+      final end = DateTime.now().toUtc();
+      final start = end.subtract(const Duration(minutes: 45));
+      final response = await _apiClient.get(
+        '/api/workers/$workerId/path-history',
+        queryParameters: <String, dynamic>{
+          'start_time': start.toIso8601String(),
+          'end_time': end.toIso8601String(),
+          'limit': 1200,
+        },
+      );
+      if (response.statusCode != 200) return null;
+
+      final payload = response.data;
+      final pointsRaw = payload is Map ? payload['path_points'] : null;
+      if (pointsRaw is! List) return null;
+
+      final pointsWithTs = <({Position p, DateTime ts})>[];
+      for (final item in pointsRaw) {
+        if (item is! Map) continue;
+        final lat = item['latitude'];
+        final lng = item['longitude'];
+        if (lat is! num || lng is! num) continue;
+        final trackedAt = item['tracked_at'];
+        final timestamp = trackedAt is String
+            ? DateTime.tryParse(trackedAt)?.toUtc()
+            : null;
+        pointsWithTs.add((
+          p: Position(latitude: lat.toDouble(), longitude: lng.toDouble()),
+          ts: timestamp ?? DateTime.fromMillisecondsSinceEpoch(0, isUtc: true),
+        ));
+      }
+
+      if (pointsWithTs.isEmpty) return null;
+      pointsWithTs.sort((a, b) => a.ts.compareTo(b.ts));
+
+      final deduped = <Position>[];
+      for (final entry in pointsWithTs) {
+        if (deduped.isEmpty) {
+          deduped.add(entry.p);
+          continue;
+        }
+        final last = deduped.last;
+        final distance = _haversineMeters(
+          last.latitude,
+          last.longitude,
+          entry.p.latitude,
+          entry.p.longitude,
+        );
+        if (distance >= 1.5) deduped.add(entry.p);
+      }
+
+      return deduped;
+    } catch (e) {
+      debugPrint('Error loading worker path history for $workerId: $e');
+      return null;
+    }
   }
 
   List<dynamic> _extractList(dynamic data, {required List<String> keys}) {

@@ -253,6 +253,9 @@ class CommandCenterController {
       if (previous.showActivities && !state.showActivities) {
         await _activityLayer.clear();
       }
+      if (previous.showTrails && !state.showTrails) {
+        await _trailLayer.clear();
+      }
     }
 
     // Update territories if changed

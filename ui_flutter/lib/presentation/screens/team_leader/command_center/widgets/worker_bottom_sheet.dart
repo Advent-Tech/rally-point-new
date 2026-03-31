@@ -106,8 +106,20 @@ class _WorkerBottomSheetState extends State<WorkerBottomSheet> {
                         final isBreached = state.breachedWorkerIds.contains(
                           worker.id,
                         );
+                        final updatedAt = state.liveLocationUpdatedAt[worker.id];
+                        final accuracy = state.liveLocationAccuracy[worker.id];
+                        final speedMps = state.liveLocationSpeedMps[worker.id];
+                        final freshness = _formatFreshness(updatedAt);
+                        final speedKmh = speedMps == null ? null : speedMps * 3.6;
 
                         final pos = state.liveLocations[worker.id];
+                        final statusLabel = isGpsLive
+                            ? 'GPS Live'
+                            : (hasAnyLocation
+                                  ? 'Last known (entry)'
+                                  : (isApiOnline
+                                        ? 'Online (no GPS)'
+                                        : 'Offline'));
 
                         return ListTile(
                           onTap: () {
@@ -136,14 +148,22 @@ class _WorkerBottomSheetState extends State<WorkerBottomSheet> {
                             ),
                           ),
                           title: Text(worker.displayName ?? 'Team Member'),
-                          subtitle: Text(
-                            isGpsLive
-                                ? 'GPS Live'
-                                : (hasAnyLocation
-                                      ? 'Last known (entry)'
-                                      : (isApiOnline
-                                            ? 'Online (no GPS)'
-                                            : 'Offline')),
+                          subtitle: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(statusLabel),
+                              if (freshness != null || accuracy != null || speedKmh != null)
+                                Text(
+                                  [
+                                    if (freshness != null) freshness,
+                                    if (accuracy != null) '±${accuracy.toStringAsFixed(0)}m',
+                                    if (speedKmh != null) '${speedKmh.toStringAsFixed(1)} km/h',
+                                  ].join('  •  '),
+                                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                                  ),
+                                ),
+                            ],
                           ),
                           trailing: Row(
                             mainAxisSize: MainAxisSize.min,
@@ -154,7 +174,7 @@ class _WorkerBottomSheetState extends State<WorkerBottomSheet> {
                                   color: Colors.red.shade700,
                                   size: 20,
                                 ),
-                              if (isGpsLive)
+                              if (hasAnyLocation)
                                 IconButton(
                                   icon: Icon(
                                     isFollowing
@@ -187,5 +207,13 @@ class _WorkerBottomSheetState extends State<WorkerBottomSheet> {
         );
       },
     );
+  }
+
+  String? _formatFreshness(DateTime? updatedAt) {
+    if (updatedAt == null) return null;
+    final age = DateTime.now().toUtc().difference(updatedAt.toUtc());
+    if (age.inSeconds < 60) return '${age.inSeconds}s ago';
+    if (age.inMinutes < 60) return '${age.inMinutes}m ago';
+    return '${age.inHours}h ago';
   }
 }
