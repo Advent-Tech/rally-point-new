@@ -612,7 +612,8 @@ class CommandCenterBloc extends Bloc<CommandCenterEvent, CommandCenterState> {
         queryParameters: <String, dynamic>{
           'start_time': start.toIso8601String(),
           'end_time': end.toIso8601String(),
-          'limit': 1200,
+          'limit': 600,
+          'sample_meters': 5,
         },
       );
       if (response.statusCode != 200) return null;

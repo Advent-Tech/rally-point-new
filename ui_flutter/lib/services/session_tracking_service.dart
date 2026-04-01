@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 import 'package:flutter/foundation.dart';
 import 'package:geolocator/geolocator.dart';
 import '../core/network/api_client.dart';
@@ -35,12 +36,16 @@ class SessionTrackingService {
   TerritoryAssignment? _currentTerritory;
   String? _currentSessionId;
   Position? _lastPosition;
+  Position? _lastSentPosition;
+  DateTime? _lastSentAt;
   List<TerritoryAssignment> _assignedTerritories = [];
 
   // Settings
   Duration _geofenceCheckInterval = const Duration(seconds: 60);
   bool _autoCheckIn = true;
   bool _autoCheckOut = true;
+  Duration _minSendInterval = const Duration(seconds: 3);
+  double _minSendDistanceMeters = 8;
 
   // Callbacks
   OnTerritoryEntered? onTerritoryEntered;
@@ -125,11 +130,24 @@ class SessionTrackingService {
     Duration? geofenceCheckInterval,
     bool? autoCheckIn,
     bool? autoCheckOut,
+    Duration? minSendInterval,
+    double? minSendDistanceMeters,
   }) {
-    if (geofenceCheckInterval != null)
+    if (geofenceCheckInterval != null) {
       _geofenceCheckInterval = geofenceCheckInterval;
-    if (autoCheckIn != null) _autoCheckIn = autoCheckIn;
-    if (autoCheckOut != null) _autoCheckOut = autoCheckOut;
+    }
+    if (autoCheckIn != null) {
+      _autoCheckIn = autoCheckIn;
+    }
+    if (autoCheckOut != null) {
+      _autoCheckOut = autoCheckOut;
+    }
+    if (minSendInterval != null) {
+      _minSendInterval = minSendInterval;
+    }
+    if (minSendDistanceMeters != null && minSendDistanceMeters >= 0) {
+      _minSendDistanceMeters = minSendDistanceMeters;
+    }
   }
 
   /// Start automatic tracking
@@ -153,6 +171,8 @@ class SessionTrackingService {
       // Start location updates
       await _startLocationUpdates();
       debugPrint('[SessionTracking] Location updates started');
+      _lastSentAt = null;
+      _lastSentPosition = null;
 
       // Start geofence check timer
       _geofenceCheckTimer = Timer.periodic(_geofenceCheckInterval, (_) {
@@ -228,6 +248,21 @@ class SessionTrackingService {
 
   /// Send location update to server
   Future<void> _sendLocationUpdate(Position position) async {
+    final now = DateTime.now().toUtc();
+    if (_lastSentAt != null &&
+        now.difference(_lastSentAt!) < _minSendInterval &&
+        _lastSentPosition != null) {
+      final moved = _distanceMeters(
+        _lastSentPosition!.latitude,
+        _lastSentPosition!.longitude,
+        position.latitude,
+        position.longitude,
+      );
+      if (moved < _minSendDistanceMeters) {
+        return;
+      }
+    }
+
     try {
       debugPrint(
         '[SessionTracking] Sending location: lat=${position.latitude}, lng=${position.longitude}, teamId=$_teamId, userId=$_userId',
@@ -266,9 +301,25 @@ class SessionTrackingService {
           '[SessionTracking] Geofence update response: ${geofenceResponse.statusCode}',
         );
       }
+      _lastSentAt = now;
+      _lastSentPosition = position;
     } catch (e) {
       debugPrint('[SessionTracking] Error sending location: $e');
     }
+  }
+
+  double _distanceMeters(double lat1, double lon1, double lat2, double lon2) {
+    const r = 6371000.0;
+    final dLat = (lat2 - lat1) * math.pi / 180.0;
+    final dLon = (lon2 - lon1) * math.pi / 180.0;
+    final a =
+        math.sin(dLat / 2) * math.sin(dLat / 2) +
+        math.cos(lat1 * math.pi / 180.0) *
+            math.cos(lat2 * math.pi / 180.0) *
+            math.sin(dLon / 2) *
+            math.sin(dLon / 2);
+    final c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a));
+    return r * c;
   }
 
   /// Check geofence for territory entry/exit

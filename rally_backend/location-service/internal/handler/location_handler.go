@@ -435,26 +435,43 @@ func (h *LocationHandler) WebSocketHandler(c *gin.Context) {
 
 // handleWebSocketConnection handles individual WebSocket connections
 func (h *LocationHandler) handleWebSocketConnection(conn *websocket.Conn, userID uuid.UUID, locationCh <-chan *domain.WorkerLocation) {
-	ticker := time.NewTicker(30 * time.Second)
-	defer ticker.Stop()
+	pingTicker := time.NewTicker(30 * time.Second)
+	defer pingTicker.Stop()
+	flushTicker := time.NewTicker(250 * time.Millisecond)
+	defer flushTicker.Stop()
+
+	pending := make(map[uuid.UUID]*domain.WorkerLocation)
 
 	for {
 		select {
-		case location := <-locationCh:
-			// Send location update to client
-			message := domain.WebSocketMessage{
-				Type:      domain.WSMessageTypeWorkerLocationBroadcast,
-				UserID:    location.UserID,
-				Data:      location,
-				Timestamp: time.Now(),
-			}
-
-			err := conn.WriteJSON(message)
-			if err != nil {
+		case location, ok := <-locationCh:
+			if !ok {
 				return
 			}
+			if location == nil {
+				continue
+			}
+			// Coalesce by worker: only latest update per worker is sent each flush.
+			pending[location.UserID] = location
 
-		case <-ticker.C:
+		case <-flushTicker.C:
+			if len(pending) == 0 {
+				continue
+			}
+			for _, location := range pending {
+				message := domain.WebSocketMessage{
+					Type:      domain.WSMessageTypeWorkerLocationBroadcast,
+					UserID:    location.UserID,
+					Data:      location,
+					Timestamp: time.Now(),
+				}
+				if err := conn.WriteJSON(message); err != nil {
+					return
+				}
+			}
+			clear(pending)
+
+		case <-pingTicker.C:
 			// Send ping to keep connection alive
 			err := conn.WriteMessage(websocket.PingMessage, nil)
 			if err != nil {
@@ -639,6 +656,7 @@ func (h *LocationHandler) GetWorkerPathHistory(c *gin.Context) {
 	startTimeStr := c.Query("start_time")
 	endTimeStr := c.Query("end_time")
 	limitStr := c.DefaultQuery("limit", "500")
+	sampleMetersStr := c.DefaultQuery("sample_meters", "5")
 
 	limit, err := strconv.Atoi(limitStr)
 	if err != nil || limit <= 0 {
@@ -646,6 +664,13 @@ func (h *LocationHandler) GetWorkerPathHistory(c *gin.Context) {
 	}
 	if limit > domain.MaxLocationLimit {
 		limit = domain.MaxLocationLimit
+	}
+	sampleMeters, err := strconv.ParseFloat(sampleMetersStr, 64)
+	if err != nil || sampleMeters < 0 {
+		sampleMeters = 5
+	}
+	if sampleMeters > 100 {
+		sampleMeters = 100
 	}
 
 	var tracks []*domain.LocationTrack
@@ -691,6 +716,8 @@ func (h *LocationHandler) GetWorkerPathHistory(c *gin.Context) {
 
 	// Filter out GPS glitches (>100km jumps)
 	tracks = filterOutlierPoints(tracks)
+	rawCount := len(tracks)
+	tracks = downsampleTracks(tracks, limit, sampleMeters)
 
 	// Format response with path points - use smoothed coordinates if available
 	pathPoints := make([]gin.H, 0, len(tracks))
@@ -727,7 +754,45 @@ func (h *LocationHandler) GetWorkerPathHistory(c *gin.Context) {
 		"worker_id":   workerID.String(),
 		"path_points": pathPoints,
 		"count":       len(pathPoints),
+		"raw_count":   rawCount,
 	})
+}
+
+func downsampleTracks(tracks []*domain.LocationTrack, maxPoints int, minStepMeters float64) []*domain.LocationTrack {
+	if len(tracks) <= 1 {
+		return tracks
+	}
+
+	// 1) Distance-based thinning to remove dense GPS noise.
+	filtered := make([]*domain.LocationTrack, 0, len(tracks))
+	filtered = append(filtered, tracks[0])
+	last := tracks[0]
+	for i := 1; i < len(tracks); i++ {
+		d := haversineDistance(last.Latitude, last.Longitude, tracks[i].Latitude, tracks[i].Longitude)
+		if d >= minStepMeters {
+			filtered = append(filtered, tracks[i])
+			last = tracks[i]
+		}
+	}
+	if len(filtered) > 0 && filtered[len(filtered)-1].ID != tracks[len(tracks)-1].ID {
+		filtered = append(filtered, tracks[len(tracks)-1])
+	}
+
+	if len(filtered) <= maxPoints {
+		return filtered
+	}
+
+	// 2) Uniform stride sampling to bound payload size deterministically.
+	step := float64(len(filtered)-1) / float64(maxPoints-1)
+	out := make([]*domain.LocationTrack, 0, maxPoints)
+	for i := 0; i < maxPoints; i++ {
+		idx := int(math.Round(float64(i) * step))
+		if idx >= len(filtered) {
+			idx = len(filtered) - 1
+		}
+		out = append(out, filtered[idx])
+	}
+	return out
 }
 
 // GetWorkerLocationStats handles getting location statistics for a specific worker

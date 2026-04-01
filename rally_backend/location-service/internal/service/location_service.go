@@ -366,7 +366,9 @@ func (s *locationService) SetWorkerOffline(userID uuid.UUID) error {
 
 // SubscribeToLocationUpdates subscribes to real-time location updates
 func (s *locationService) SubscribeToLocationUpdates(userID uuid.UUID, teamID string) (<-chan *domain.WorkerLocation, error) {
-	ch := make(chan *domain.WorkerLocation, 100)
+	// Small buffered channel to keep only near-latest updates per subscriber
+	// and avoid unbounded backlog during burst traffic.
+	ch := make(chan *domain.WorkerLocation, 1)
 	err := s.realtimeManager.AddSubscriber(userID, ch, teamID)
 	if err != nil {
 		close(ch)

@@ -8,7 +8,7 @@ import (
 )
 
 type subscriber struct {
-	ch     chan<- *domain.WorkerLocation
+	ch     chan *domain.WorkerLocation
 	teamID string
 }
 
@@ -25,7 +25,7 @@ func NewRealtimeManager() domain.RealtimeManager {
 }
 
 // AddSubscriber adds a subscriber for location updates
-func (rm *realtimeManager) AddSubscriber(userID uuid.UUID, ch chan<- *domain.WorkerLocation, teamID string) error {
+func (rm *realtimeManager) AddSubscriber(userID uuid.UUID, ch chan *domain.WorkerLocation, teamID string) error {
 	rm.mu.Lock()
 	defer rm.mu.Unlock()
 
@@ -61,7 +61,17 @@ func (rm *realtimeManager) Broadcast(location *domain.WorkerLocation, teamID str
 			case sub.ch <- location:
 				// Successfully sent
 			default:
-				// Channel is full, skip this subscriber
+				// Subscriber is slow: drop one stale buffered item (if any)
+				// and try enqueuing the latest update once.
+				select {
+				case <-sub.ch:
+				default:
+				}
+				select {
+				case sub.ch <- location:
+				default:
+					// Still blocked, skip this subscriber for this tick.
+				}
 			}
 		}
 	}

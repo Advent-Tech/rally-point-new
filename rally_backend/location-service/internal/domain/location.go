@@ -152,7 +152,7 @@ type LocationService interface {
 
 // RealtimeManager defines the interface for real-time location management
 type RealtimeManager interface {
-	AddSubscriber(userID uuid.UUID, ch chan<- *WorkerLocation, teamID string) error
+	AddSubscriber(userID uuid.UUID, ch chan *WorkerLocation, teamID string) error
 	RemoveSubscriber(userID uuid.UUID) error
 	Broadcast(location *WorkerLocation, teamID string) error
 	GetActiveSubscribers() []uuid.UUID
