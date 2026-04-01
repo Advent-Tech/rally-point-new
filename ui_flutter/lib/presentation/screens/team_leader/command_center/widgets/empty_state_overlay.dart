@@ -91,33 +91,33 @@ class EmptyStateOverlay extends StatelessWidget {
   String _getTitle() {
     switch (mode) {
       case cc.MapMode.overview:
-        return 'Welcome to Command Center';
+        return 'No Map Activity Yet';
       case cc.MapMode.workers:
         return 'No Workers Active';
       case cc.MapMode.territories:
-        return 'No Territories Loaded';
+        return 'No Territories Assigned';
     }
   }
 
   String _getMessage() {
     switch (mode) {
       case cc.MapMode.overview:
-        return 'Start by viewing your team activity or managing territories.';
+        return 'No territory or worker location data is available yet. Ask admin to assign territories, then refresh.';
       case cc.MapMode.workers:
-        return 'There are currently no team members active in the field.';
+        return 'No workers are currently sharing live location. They may be offline or not checked in yet.';
       case cc.MapMode.territories:
-        return 'No territories have been loaded for your team yet.';
+        return 'Your team has no territory allocations yet. Contact admin to assign territories to this leader/team.';
     }
   }
 
   String _getActionLabel() {
     switch (mode) {
       case cc.MapMode.overview:
-        return 'REFRESH DATA';
+        return 'REFRESH';
       case cc.MapMode.workers:
-        return 'INVITE MEMBERS';
+        return 'REFRESH';
       case cc.MapMode.territories:
-        return 'ASSIGN TERRITORIES';
+        return 'REFRESH';
     }
   }
 }

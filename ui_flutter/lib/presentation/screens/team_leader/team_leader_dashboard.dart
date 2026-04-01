@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
+import 'package:showcaseview/showcaseview.dart';
 import '../../../core/network/api_client.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../services/coach_marks_service.dart';
 import '../../blocs/auth/auth_bloc.dart';
 import '../../blocs/dashboard/dashboard_bloc.dart';
 import '../../widgets/app_logo.dart';
@@ -18,6 +20,11 @@ class TeamLeaderDashboard extends StatefulWidget {
 class _TeamLeaderDashboardState extends State<TeamLeaderDashboard> {
   late DashboardBloc _dashboardBloc;
   bool _showAllManagement = false;
+  final ScrollController _scrollController = ScrollController();
+  final _showcaseCommandCenter = GlobalKey();
+  final _showcaseVerifyWorkers = GlobalKey();
+  final _showcaseReports = GlobalKey();
+  bool _coachMarksChecked = false;
 
   @override
   void initState() {
@@ -62,20 +69,48 @@ class _TeamLeaderDashboardState extends State<TeamLeaderDashboard> {
 
   @override
   void dispose() {
+    _scrollController.dispose();
     _dashboardBloc.close();
     super.dispose();
   }
 
+  void _maybeShowCoachMarks() {
+    if (_coachMarksChecked) return;
+    _coachMarksChecked = true;
+    CoachMarksService().hasBeenShown('leader_dashboard').then((shown) {
+      if (!shown && mounted) {
+        Future.delayed(const Duration(milliseconds: 900), () {
+          if (!mounted) return;
+          setState(() => _showAllManagement = true);
+          Future.delayed(const Duration(milliseconds: 250), () {
+            if (!mounted) return;
+            ShowcaseView.get().startShowCase([
+              _showcaseCommandCenter,
+              _showcaseVerifyWorkers,
+              _showcaseReports,
+            ]);
+            CoachMarksService().markAsShown('leader_dashboard');
+          });
+        });
+      }
+    });
+  }
+
   List<Widget> _buildManagementTiles(bool isDark, BuildContext context) {
     final tiles = <Widget>[
-      _ManagementTile(
-        icon: Icons.map,
+      Showcase(
+        key: _showcaseCommandCenter,
         title: 'Command Center',
-        subtitle: 'Map, worker tracking & territories',
-        color: AppColors.primary,
-        isDark: isDark,
-
-        onTap: () => context.push('/leader/command-center?mode=overview'),
+        description:
+            'Track workers live, view territories, and manage field activity on map.',
+        child: _ManagementTile(
+          icon: Icons.map,
+          title: 'Command Center',
+          subtitle: 'Map, worker tracking & territories',
+          color: AppColors.primary,
+          isDark: isDark,
+          onTap: () => context.push('/leader/command-center?mode=overview'),
+        ),
       ),
       _ManagementTile(
         icon: Icons.people_outline,
@@ -85,21 +120,33 @@ class _TeamLeaderDashboardState extends State<TeamLeaderDashboard> {
         isDark: isDark,
         onTap: () => context.push('/leader/team-members'),
       ),
-      _ManagementTile(
-        icon: Icons.verified_user,
+      Showcase(
+        key: _showcaseVerifyWorkers,
         title: 'Verify Workers',
-        subtitle: 'Approve or reject join requests',
-        color: AppColors.info,
-        isDark: isDark,
-        onTap: () => context.push('/leader/worker-verification'),
+        description:
+            'Approve pending worker requests so they can join the team tools.',
+        child: _ManagementTile(
+          icon: Icons.verified_user,
+          title: 'Verify Workers',
+          subtitle: 'Approve or reject join requests',
+          color: AppColors.info,
+          isDark: isDark,
+          onTap: () => context.push('/leader/worker-verification'),
+        ),
       ),
-      _ManagementTile(
-        icon: Icons.analytics_outlined,
+      Showcase(
+        key: _showcaseReports,
         title: 'Reports & Analytics',
-        subtitle: 'View team performance',
-        color: AppColors.accent,
-        isDark: isDark,
-        onTap: () => context.push('/leader/reports'),
+        description:
+            'Review donations, activity and worker performance in one place.',
+        child: _ManagementTile(
+          icon: Icons.analytics_outlined,
+          title: 'Reports & Analytics',
+          subtitle: 'View team performance',
+          color: AppColors.accent,
+          isDark: isDark,
+          onTap: () => context.push('/leader/reports'),
+        ),
       ),
       _ManagementTile(
         icon: Icons.schedule_outlined,
@@ -156,350 +203,371 @@ class _TeamLeaderDashboardState extends State<TeamLeaderDashboard> {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    return BlocProvider.value(
-      value: _dashboardBloc,
-      child: Scaffold(
-        body: SafeArea(
-          child: RefreshIndicator(
-            onRefresh: () async {
-              _dashboardBloc.add(const DashboardRefresh());
-            },
-            child: CustomScrollView(
-              slivers: [
-                // App Bar
-                SliverAppBar(
-                  floating: true,
-                  centerTitle: false,
-                  title: const SizedBox(height: 36, child: AppHorizontalLogo()),
-                  actions: [
-                    IconButton(
-                      icon: const Icon(Icons.notifications_outlined),
-                      onPressed: () {
-                        // TODO: Notifications
-                      },
-                    ),
-                    BlocBuilder<AuthBloc, AuthState>(
-                      builder: (context, state) {
-                        return IconButton(
-                          icon: CircleAvatar(
-                            radius: 16,
-                            backgroundColor: AppColors.secondary.withAlpha(50),
-                            child: Text(
-                              state is AuthAuthenticated
-                                  ? (state.user.displayName?.isNotEmpty == true
-                                        ? state.user.displayName![0]
-                                              .toUpperCase()
-                                        : 'T')
-                                  : 'T',
-                              style: const TextStyle(
-                                color: AppColors.secondary,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ),
-                          onPressed: () => context.go('/leader/profile'),
-                        );
-                      },
-                    ),
-                    const SizedBox(width: 8),
-                  ],
-                ),
-
-                // Welcome Section
-                SliverToBoxAdapter(
-                  child: BlocBuilder<AuthBloc, AuthState>(
-                    builder: (context, state) {
-                      final userName = state is AuthAuthenticated
-                          ? state.user.displayName ?? 'Team Leader'
-                          : 'Team Leader';
-                      final teamName = state is AuthAuthenticated
-                          ? state.user.teamName ?? 'Your Team'
-                          : 'Your Team';
-                      return Padding(
-                        padding: const EdgeInsets.all(20),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Welcome back,',
-                              style: Theme.of(context).textTheme.bodyLarge
-                                  ?.copyWith(
-                                    color: isDark
-                                        ? AppColors.textSecondaryDark
-                                        : AppColors.textSecondaryLight,
-                                  ),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              userName,
-                              style: Theme.of(context).textTheme.headlineMedium
-                                  ?.copyWith(fontWeight: FontWeight.bold),
-                            ),
-                            const SizedBox(height: 4),
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 12,
-                                vertical: 6,
-                              ),
-                              decoration: BoxDecoration(
-                                color: AppColors.secondary.withAlpha(30),
-                                borderRadius: BorderRadius.circular(20),
-                              ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  const Icon(
-                                    Icons.groups,
-                                    size: 16,
+    return ShowCaseWidget(
+      enableAutoScroll: true,
+      builder: (_) {
+        _maybeShowCoachMarks();
+        return BlocProvider.value(
+          value: _dashboardBloc,
+          child: Scaffold(
+            body: SafeArea(
+              child: RefreshIndicator(
+                onRefresh: () async {
+                  _dashboardBloc.add(const DashboardRefresh());
+                },
+                child: CustomScrollView(
+                  controller: _scrollController,
+                  slivers: [
+                    // App Bar
+                    SliverAppBar(
+                      floating: true,
+                      centerTitle: false,
+                      title: const SizedBox(
+                        height: 36,
+                        child: AppHorizontalLogo(),
+                      ),
+                      actions: [
+                        IconButton(
+                          icon: const Icon(Icons.notifications_outlined),
+                          onPressed: () {
+                            // TODO: Notifications
+                          },
+                        ),
+                        BlocBuilder<AuthBloc, AuthState>(
+                          builder: (context, state) {
+                            return IconButton(
+                              icon: CircleAvatar(
+                                radius: 16,
+                                backgroundColor: AppColors.secondary.withAlpha(
+                                  50,
+                                ),
+                                child: Text(
+                                  state is AuthAuthenticated
+                                      ? (state.user.displayName?.isNotEmpty ==
+                                                true
+                                            ? state.user.displayName![0]
+                                                  .toUpperCase()
+                                            : 'T')
+                                      : 'T',
+                                  style: const TextStyle(
                                     color: AppColors.secondary,
+                                    fontWeight: FontWeight.bold,
                                   ),
-                                  const SizedBox(width: 6),
-                                  Text(
-                                    teamName,
-                                    style: const TextStyle(
-                                      color: AppColors.secondary,
-                                      fontWeight: FontWeight.w500,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
-                      );
-                    },
-                  ),
-                ),
-
-                // Quick Stats Overview
-                SliverToBoxAdapter(
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 20),
-                    child: BlocBuilder<DashboardBloc, DashboardState>(
-                      builder: (context, state) {
-                        final stats = state is DashboardLoaded
-                            ? state.stats
-                            : const TeamDashboardStats();
-                        final isLoading = state is DashboardLoading;
-
-                        return Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Team Overview',
-                              style: Theme.of(context).textTheme.titleMedium
-                                  ?.copyWith(fontWeight: FontWeight.bold),
-                            ),
-                            const SizedBox(height: 16),
-                            if (isLoading)
-                              const SkeletonOverviewGrid()
-                            else ...[
-                              Row(
-                                children: [
-                                  Expanded(
-                                    child: _OverviewCard(
-                                      icon: Icons.people,
-                                      value: '${stats.totalMembers}',
-                                      label: 'Team Members',
-                                      color: AppColors.primary,
-                                      isDark: isDark,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 12),
-                                  Expanded(
-                                    child: _OverviewCard(
-                                      icon: Icons.online_prediction,
-                                      value: '${stats.activeWorkers}',
-                                      label: 'Currently Active',
-                                      color: AppColors.success,
-                                      isDark: isDark,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 12),
-                              Row(
-                                children: [
-                                  Expanded(
-                                    child: _OverviewCard(
-                                      icon: Icons.map,
-                                      value: '${stats.totalTerritories}',
-                                      label: 'Territories',
-                                      color: AppColors.accent,
-                                      isDark: isDark,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 12),
-                                  Expanded(
-                                    child: _OverviewCard(
-                                      icon: Icons.check_circle,
-                                      value:
-                                          stats.completionPercentage < 1 &&
-                                              stats.completionPercentage > 0
-                                          ? '<1%'
-                                          : '${stats.completionPercentage.toStringAsFixed(0)}%',
-                                      label: 'Completion',
-                                      color: AppColors.secondary,
-                                      isDark: isDark,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ],
-                          ],
-                        );
-                      },
-                    ),
-                  ),
-                ),
-
-                const SliverToBoxAdapter(child: SizedBox(height: 24)),
-
-                // Management Actions
-                SliverToBoxAdapter(
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 20),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Management',
-                          style: Theme.of(context).textTheme.titleMedium
-                              ?.copyWith(fontWeight: FontWeight.bold),
-                        ),
-                        const SizedBox(height: 16),
-                        ..._buildManagementTiles(isDark, context),
-                        const SizedBox(height: 8),
-                        GestureDetector(
-                          onTap: () => setState(
-                            () => _showAllManagement = !_showAllManagement,
-                          ),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Text(
-                                _showAllManagement
-                                    ? 'Show Less'
-                                    : 'See All Actions',
-                                style: const TextStyle(
-                                  color: AppColors.primary,
-                                  fontWeight: FontWeight.w600,
-                                  fontSize: 13,
                                 ),
                               ),
-                              const SizedBox(width: 4),
-                              AnimatedRotation(
-                                turns: _showAllManagement ? 0.5 : 0,
-                                duration: const Duration(milliseconds: 200),
-                                child: const Icon(
-                                  Icons.expand_more,
-                                  color: AppColors.primary,
-                                  size: 20,
-                                ),
-                              ),
-                            ],
-                          ),
+                              onPressed: () => context.go('/leader/profile'),
+                            );
+                          },
                         ),
+                        const SizedBox(width: 8),
                       ],
                     ),
-                  ),
-                ),
 
-                const SliverToBoxAdapter(child: SizedBox(height: 24)),
-
-                // Recent Activity
-                SliverToBoxAdapter(
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 20),
-                    child: BlocBuilder<DashboardBloc, DashboardState>(
-                      builder: (context, state) {
-                        final activities = state is DashboardLoaded
-                            ? state.recentActivity
-                            : <TeamActivity>[];
-
-                        return Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    // Welcome Section
+                    SliverToBoxAdapter(
+                      child: BlocBuilder<AuthBloc, AuthState>(
+                        builder: (context, state) {
+                          final userName = state is AuthAuthenticated
+                              ? state.user.displayName ?? 'Team Leader'
+                              : 'Team Leader';
+                          final teamName = state is AuthAuthenticated
+                              ? state.user.teamName ?? 'Your Team'
+                              : 'Your Team';
+                          return Padding(
+                            padding: const EdgeInsets.all(20),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
-                                  'Team Activity',
-                                  style: Theme.of(context).textTheme.titleMedium
-                                      ?.copyWith(fontWeight: FontWeight.bold),
-                                ),
-                                TextButton(
-                                  onPressed: () {
-                                    // TODO: View all activity
-                                  },
-                                  child: const Text('View All'),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 12),
-                            if (activities.isEmpty)
-                              Container(
-                                padding: const EdgeInsets.all(24),
-                                decoration: BoxDecoration(
-                                  color: isDark
-                                      ? AppColors.surfaceDark
-                                      : AppColors.surfaceLight,
-                                  borderRadius: BorderRadius.circular(16),
-                                  border: Border.all(
-                                    color: isDark
-                                        ? AppColors.borderDark
-                                        : AppColors.borderLight,
-                                  ),
-                                ),
-                                child: Center(
-                                  child: Column(
-                                    children: [
-                                      Icon(
-                                        Icons.history,
-                                        size: 48,
+                                  'Welcome back,',
+                                  style: Theme.of(context).textTheme.bodyLarge
+                                      ?.copyWith(
                                         color: isDark
                                             ? AppColors.textSecondaryDark
                                             : AppColors.textSecondaryLight,
                                       ),
-                                      const SizedBox(height: 8),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  userName,
+                                  style: Theme.of(context)
+                                      .textTheme
+                                      .headlineMedium
+                                      ?.copyWith(fontWeight: FontWeight.bold),
+                                ),
+                                const SizedBox(height: 4),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 12,
+                                    vertical: 6,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: AppColors.secondary.withAlpha(30),
+                                    borderRadius: BorderRadius.circular(20),
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      const Icon(
+                                        Icons.groups,
+                                        size: 16,
+                                        color: AppColors.secondary,
+                                      ),
+                                      const SizedBox(width: 6),
                                       Text(
-                                        'No recent team activity',
-                                        style: Theme.of(context)
-                                            .textTheme
-                                            .bodyMedium
-                                            ?.copyWith(
-                                              color: isDark
-                                                  ? AppColors.textSecondaryDark
-                                                  : AppColors
-                                                        .textSecondaryLight,
-                                            ),
+                                        teamName,
+                                        style: const TextStyle(
+                                          color: AppColors.secondary,
+                                          fontWeight: FontWeight.w500,
+                                        ),
                                       ),
                                     ],
                                   ),
                                 ),
-                              )
-                            else
-                              ...activities
-                                  .take(5)
-                                  .map(
-                                    (activity) => _ActivityCard(
-                                      activity: activity,
-                                      isDark: isDark,
+                              ],
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+
+                    // Quick Stats Overview
+                    SliverToBoxAdapter(
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 20),
+                        child: BlocBuilder<DashboardBloc, DashboardState>(
+                          builder: (context, state) {
+                            final stats = state is DashboardLoaded
+                                ? state.stats
+                                : const TeamDashboardStats();
+                            final isLoading = state is DashboardLoading;
+
+                            return Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Team Overview',
+                                  style: Theme.of(context).textTheme.titleMedium
+                                      ?.copyWith(fontWeight: FontWeight.bold),
+                                ),
+                                const SizedBox(height: 16),
+                                if (isLoading)
+                                  const SkeletonOverviewGrid()
+                                else ...[
+                                  Row(
+                                    children: [
+                                      Expanded(
+                                        child: _OverviewCard(
+                                          icon: Icons.people,
+                                          value: '${stats.totalMembers}',
+                                          label: 'Team Members',
+                                          color: AppColors.primary,
+                                          isDark: isDark,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 12),
+                                      Expanded(
+                                        child: _OverviewCard(
+                                          icon: Icons.online_prediction,
+                                          value: '${stats.activeWorkers}',
+                                          label: 'Currently Active',
+                                          color: AppColors.success,
+                                          isDark: isDark,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 12),
+                                  Row(
+                                    children: [
+                                      Expanded(
+                                        child: _OverviewCard(
+                                          icon: Icons.map,
+                                          value: '${stats.totalTerritories}',
+                                          label: 'Territories',
+                                          color: AppColors.accent,
+                                          isDark: isDark,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 12),
+                                      Expanded(
+                                        child: _OverviewCard(
+                                          icon: Icons.check_circle,
+                                          value:
+                                              stats.completionPercentage < 1 &&
+                                                  stats.completionPercentage > 0
+                                              ? '<1%'
+                                              : '${stats.completionPercentage.toStringAsFixed(0)}%',
+                                          label: 'Completion',
+                                          color: AppColors.secondary,
+                                          isDark: isDark,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ],
+                            );
+                          },
+                        ),
+                      ),
+                    ),
+
+                    const SliverToBoxAdapter(child: SizedBox(height: 24)),
+
+                    // Management Actions
+                    SliverToBoxAdapter(
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 20),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Management',
+                              style: Theme.of(context).textTheme.titleMedium
+                                  ?.copyWith(fontWeight: FontWeight.bold),
+                            ),
+                            const SizedBox(height: 16),
+                            ..._buildManagementTiles(isDark, context),
+                            const SizedBox(height: 8),
+                            GestureDetector(
+                              onTap: () => setState(
+                                () => _showAllManagement = !_showAllManagement,
+                              ),
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Text(
+                                    _showAllManagement
+                                        ? 'Show Less'
+                                        : 'See All Actions',
+                                    style: const TextStyle(
+                                      color: AppColors.primary,
+                                      fontWeight: FontWeight.w600,
+                                      fontSize: 13,
                                     ),
                                   ),
+                                  const SizedBox(width: 4),
+                                  AnimatedRotation(
+                                    turns: _showAllManagement ? 0.5 : 0,
+                                    duration: const Duration(milliseconds: 200),
+                                    child: const Icon(
+                                      Icons.expand_more,
+                                      color: AppColors.primary,
+                                      size: 20,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
                           ],
-                        );
-                      },
+                        ),
+                      ),
                     ),
-                  ),
-                ),
 
-                const SliverToBoxAdapter(child: SizedBox(height: 100)),
-              ],
+                    const SliverToBoxAdapter(child: SizedBox(height: 24)),
+
+                    // Recent Activity
+                    SliverToBoxAdapter(
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 20),
+                        child: BlocBuilder<DashboardBloc, DashboardState>(
+                          builder: (context, state) {
+                            final activities = state is DashboardLoaded
+                                ? state.recentActivity
+                                : <TeamActivity>[];
+
+                            return Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  mainAxisAlignment:
+                                      MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Text(
+                                      'Team Activity',
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .titleMedium
+                                          ?.copyWith(
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                    ),
+                                    TextButton(
+                                      onPressed: () {
+                                        // TODO: View all activity
+                                      },
+                                      child: const Text('View All'),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 12),
+                                if (activities.isEmpty)
+                                  Container(
+                                    padding: const EdgeInsets.all(24),
+                                    decoration: BoxDecoration(
+                                      color: isDark
+                                          ? AppColors.surfaceDark
+                                          : AppColors.surfaceLight,
+                                      borderRadius: BorderRadius.circular(16),
+                                      border: Border.all(
+                                        color: isDark
+                                            ? AppColors.borderDark
+                                            : AppColors.borderLight,
+                                      ),
+                                    ),
+                                    child: Center(
+                                      child: Column(
+                                        children: [
+                                          Icon(
+                                            Icons.history,
+                                            size: 48,
+                                            color: isDark
+                                                ? AppColors.textSecondaryDark
+                                                : AppColors.textSecondaryLight,
+                                          ),
+                                          const SizedBox(height: 8),
+                                          Text(
+                                            'No recent team activity',
+                                            style: Theme.of(context)
+                                                .textTheme
+                                                .bodyMedium
+                                                ?.copyWith(
+                                                  color: isDark
+                                                      ? AppColors
+                                                            .textSecondaryDark
+                                                      : AppColors
+                                                            .textSecondaryLight,
+                                                ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  )
+                                else
+                                  ...activities
+                                      .take(5)
+                                      .map(
+                                        (activity) => _ActivityCard(
+                                          activity: activity,
+                                          isDark: isDark,
+                                        ),
+                                      ),
+                              ],
+                            );
+                          },
+                        ),
+                      ),
+                    ),
+
+                    const SliverToBoxAdapter(child: SizedBox(height: 100)),
+                  ],
+                ),
+              ),
             ),
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 }
