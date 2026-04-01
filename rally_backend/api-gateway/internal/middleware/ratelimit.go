@@ -3,6 +3,7 @@ package middleware
 import (
 	"context"
 	"fmt"
+	"log"
 	"net/http"
 	"strconv"
 	"time"
@@ -153,8 +154,10 @@ func RateLimitMiddleware(rateLimiter RateLimiter) gin.HandlerFunc {
 		
 		allowed, err := rateLimiter.Allow(key)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "rate limit check failed"})
-			c.Abort()
+			// Fail-open: auth/login and other critical APIs should not break
+			// due to transient rate limiter backend issues (e.g. Redis hiccups).
+			log.Printf("rate limiter unavailable for key=%s path=%s: %v", key, c.FullPath(), err)
+			c.Next()
 			return
 		}
 		
