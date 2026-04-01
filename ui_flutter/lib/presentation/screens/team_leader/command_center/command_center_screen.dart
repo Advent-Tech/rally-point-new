@@ -111,12 +111,20 @@ class _CommandCenterScreenState extends State<CommandCenterScreen> {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final topInset = MediaQuery.of(context).padding.top;
+    final backButtonTop = topInset + 8;
+    final modeTabsTop = topInset + 52;
+    final followBannerTop = topInset + 150;
     return ShowCaseWidget(
       enableAutoScroll: true,
       builder: (_) => Scaffold(
-        body: BlocBuilder<CommandCenterBloc, cc.CommandCenterState>(
-          builder: (context, state) {
+        body: BlocConsumer<CommandCenterBloc, cc.CommandCenterState>(
+          listenWhen: (previous, current) =>
+              previous.mapMode != current.mapMode && !current.isLoading,
+          listener: (context, state) {
             _maybeShowModeCoachMarks(state.mapMode);
+          },
+          builder: (context, state) {
             return Stack(
               children: [
                 // Map Layer
@@ -138,43 +146,39 @@ class _CommandCenterScreenState extends State<CommandCenterScreen> {
 
                 // Mode Selector (top)
                 Positioned(
-                  top: 0,
+                  top: modeTabsTop,
                   left: 0,
                   right: 0,
-                  child: SafeArea(
-                    child: Showcase(
-                      key: _showcaseModeTabs,
-                      title: 'Map Tabs',
-                      description:
-                          'Switch between Overview, Workers and Territories to manage operations.',
-                      child: const ModeSelector(),
-                    ),
+                  child: Showcase(
+                    key: _showcaseModeTabs,
+                    title: 'Map Tabs',
+                    description:
+                        'Switch between Overview, Workers and Territories to manage operations.',
+                    child: const ModeSelector(),
                   ),
                 ),
 
                 Positioned(
-                  top: 6,
+                  top: backButtonTop,
                   left: 10,
-                  child: SafeArea(
-                    child: Material(
-                      color: Theme.of(
-                        context,
-                      ).colorScheme.surface.withValues(alpha: 0.92),
-                      elevation: 3,
+                  child: Material(
+                    color: Theme.of(
+                      context,
+                    ).colorScheme.surface.withValues(alpha: 0.92),
+                    elevation: 3,
+                    borderRadius: BorderRadius.circular(12),
+                    child: InkWell(
                       borderRadius: BorderRadius.circular(12),
-                      child: InkWell(
-                        borderRadius: BorderRadius.circular(12),
-                        onTap: () {
-                          if (context.canPop()) {
-                            context.pop();
-                          } else {
-                            context.go('/leader/dashboard');
-                          }
-                        },
-                        child: const Padding(
-                          padding: EdgeInsets.all(8),
-                          child: Icon(Icons.arrow_back, size: 22),
-                        ),
+                      onTap: () {
+                        if (context.canPop()) {
+                          context.pop();
+                        } else {
+                          context.go('/leader/dashboard');
+                        }
+                      },
+                      child: const Padding(
+                        padding: EdgeInsets.all(8),
+                        child: Icon(Icons.arrow_back, size: 22),
                       ),
                     ),
                   ),
@@ -213,16 +217,18 @@ class _CommandCenterScreenState extends State<CommandCenterScreen> {
 
                     // Follow mode banner
                     if (state.followTarget != null)
-                      const Positioned(
-                        top: 100,
+                      Positioned(
+                        top: followBannerTop,
                         left: 0,
                         right: 0,
-                        child: FollowModeBanner(),
+                        child: const FollowModeBanner(),
                       ),
 
                     if (state.breachedWorkerIds.isNotEmpty)
                       Positioned(
-                        top: state.followTarget != null ? 150 : 100,
+                        top: state.followTarget != null
+                            ? followBannerTop + 50
+                            : followBannerTop,
                         left: 0,
                         right: 0,
                         child: const BreachAlertBanner(),

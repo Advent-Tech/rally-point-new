@@ -9,16 +9,19 @@ part 'theme_state.dart';
 class ThemeBloc extends Bloc<ThemeEvent, ThemeState> {
   late LocalStorage _localStorage;
 
-  ThemeBloc() : super(ThemeState(themeMode: ThemeMode.system)) {
+  ThemeBloc() : super(ThemeState(themeMode: ThemeMode.light)) {
     on<ThemeInitialize>(_onInitialize);
     on<ThemeChanged>(_onThemeChanged);
   }
 
-  Future<void> _onInitialize(ThemeInitialize event, Emitter<ThemeState> emit) async {
+  Future<void> _onInitialize(
+    ThemeInitialize event,
+    Emitter<ThemeState> emit,
+  ) async {
     _localStorage = await LocalStorage.getInstance();
 
     final savedTheme = _localStorage.getThemeMode();
-    ThemeMode mode = ThemeMode.system;
+    ThemeMode mode = ThemeMode.light;
 
     if (savedTheme != null) {
       switch (savedTheme) {
@@ -29,14 +32,17 @@ class ThemeBloc extends Bloc<ThemeEvent, ThemeState> {
           mode = ThemeMode.dark;
           break;
         default:
-          mode = ThemeMode.system;
+          mode = ThemeMode.light;
       }
     }
 
     emit(ThemeState(themeMode: mode));
   }
 
-  Future<void> _onThemeChanged(ThemeChanged event, Emitter<ThemeState> emit) async {
+  Future<void> _onThemeChanged(
+    ThemeChanged event,
+    Emitter<ThemeState> emit,
+  ) async {
     String themeString;
     switch (event.themeMode) {
       case ThemeMode.light:
@@ -46,7 +52,7 @@ class ThemeBloc extends Bloc<ThemeEvent, ThemeState> {
         themeString = 'dark';
         break;
       default:
-        themeString = 'system';
+        themeString = 'light';
     }
 
     await _localStorage.saveThemeMode(themeString);

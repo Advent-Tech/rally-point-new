@@ -93,6 +93,8 @@ class MapControls extends StatelessWidget {
     required IconData icon,
     required VoidCallback onPressed,
   }) {
+    final Color bg = Colors.white.withValues(alpha: 0.96);
+    const Color iconColor = Color(0xFF1F2937);
     return Material(
       elevation: 2,
       borderRadius: BorderRadius.circular(8),
@@ -103,10 +105,10 @@ class MapControls extends StatelessWidget {
           width: 40,
           height: 40,
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: bg,
             borderRadius: BorderRadius.circular(8),
           ),
-          child: Icon(icon, size: 20),
+          child: Icon(icon, size: 20, color: iconColor),
         ),
       ),
     );
