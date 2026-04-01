@@ -17,6 +17,7 @@ class _TerritoryBottomSheetState extends State<TerritoryBottomSheet> {
   static const double _collapsedSize = 0.12;
   static const double _midSize = 0.32;
   static const double _maxSize = 0.60;
+  static const double _topInteractiveSafeArea = 108;
   double _currentSize = _midSize;
 
   @override
@@ -35,18 +36,22 @@ class _TerritoryBottomSheetState extends State<TerritoryBottomSheet> {
     return Stack(
       children: [
         Positioned.fill(
-          child: GestureDetector(
-            behavior: HitTestBehavior.translucent,
-            onTap: () {
-              if (_currentSize > _collapsedSize + 0.01) {
-                _controller.animateTo(
-                  _collapsedSize,
-                  duration: const Duration(milliseconds: 220),
-                  curve: Curves.easeOut,
-                );
-              }
-            },
-            child: const SizedBox.expand(),
+          top: _topInteractiveSafeArea,
+          child: IgnorePointer(
+            ignoring: _currentSize <= _collapsedSize + 0.01,
+            child: GestureDetector(
+              behavior: HitTestBehavior.translucent,
+              onTap: () {
+                if (_currentSize > _collapsedSize + 0.01) {
+                  _controller.animateTo(
+                    _collapsedSize,
+                    duration: const Duration(milliseconds: 220),
+                    curve: Curves.easeOut,
+                  );
+                }
+              },
+              child: const SizedBox.expand(),
+            ),
           ),
         ),
         NotificationListener<DraggableScrollableNotification>(
