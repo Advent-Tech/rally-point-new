@@ -27,6 +27,7 @@ class CommandCenterController {
   CommandCenterState? _previousState;
   bool _isProcessingState = false;
   CommandCenterState? _pendingState;
+  static const int _maxVisibleWorkerMarkers = 150;
 
   CommandCenterController({required this.mapController, required this.bloc}) {
     _initialize();
@@ -288,7 +289,8 @@ class CommandCenterController {
     if ((state.liveLocations != previous?.liveLocations ||
             state.showWorkers != previous?.showWorkers) &&
         state.showWorkers) {
-      await _workerLayer.updateWorkers(state.workers, state.liveLocations);
+      final visibleLocations = _selectVisibleWorkerLocations(state);
+      await _workerLayer.updateWorkers(state.workers, visibleLocations);
     }
 
     // Update activities if changed
@@ -337,6 +339,39 @@ class CommandCenterController {
     }
 
     _previousState = state;
+  }
+
+  Map<String, Position> _selectVisibleWorkerLocations(
+    CommandCenterState state,
+  ) {
+    final total = state.liveLocations.length;
+    if (total <= _maxVisibleWorkerMarkers) {
+      return state.liveLocations;
+    }
+
+    final entries = state.liveLocations.entries.toList(growable: false);
+    entries.sort((a, b) {
+      final aTs = state.liveLocationUpdatedAt[a.key];
+      final bTs = state.liveLocationUpdatedAt[b.key];
+      if (aTs == null && bTs == null) return 0;
+      if (aTs == null) return 1;
+      if (bTs == null) return -1;
+      return bTs.compareTo(aTs);
+    });
+
+    final selected = <String, Position>{};
+    for (final entry in entries.take(_maxVisibleWorkerMarkers)) {
+      selected[entry.key] = entry.value;
+    }
+
+    final followId = state.followTarget;
+    if (followId != null) {
+      final followPos = state.liveLocations[followId];
+      if (followPos != null) {
+        selected[followId] = followPos;
+      }
+    }
+    return selected;
   }
 
   void _handleCameraChanges(
