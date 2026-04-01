@@ -58,10 +58,12 @@ func main() {
 
 	// Initialize rate limiter
 	var rateLimiter middleware.RateLimiter
+	fallbackRateLimiter := middleware.NewInMemoryRateLimiter(cfg.RateLimit.RequestsPerMinute, cfg.RateLimit.BurstSize)
 	if redisClient != nil {
-		rateLimiter = middleware.NewRedisRateLimiter(redisClient, cfg.RateLimit.RequestsPerMinute)
+		redisRateLimiter := middleware.NewRedisRateLimiter(redisClient, cfg.RateLimit.RequestsPerMinute)
+		rateLimiter = middleware.NewResilientRateLimiter(redisRateLimiter, fallbackRateLimiter)
 	} else {
-		rateLimiter = middleware.NewInMemoryRateLimiter(cfg.RateLimit.RequestsPerMinute, cfg.RateLimit.BurstSize)
+		rateLimiter = fallbackRateLimiter
 	}
 
 	// Initialize service proxy
