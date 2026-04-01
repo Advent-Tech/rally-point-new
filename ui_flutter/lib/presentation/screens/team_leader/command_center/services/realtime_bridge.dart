@@ -10,6 +10,9 @@ class RealtimeBridge {
   final CommandCenterBloc bloc;
   final List<StreamSubscription> _subscriptions = [];
   final WebSocketService _ws;
+  final Map<String, _QueuedLocationUpdate> _pendingLocationUpdates = {};
+  Timer? _locationFlushTimer;
+  static const Duration _locationFlushInterval = Duration(milliseconds: 300);
 
   RealtimeBridge({required this.bloc, WebSocketService? ws})
     : _ws = ws ?? WebSocketService() {
@@ -43,15 +46,13 @@ class RealtimeBridge {
           message.timestamp,
         );
 
-        bloc.add(
-          UpdateLiveLocationEvent(
-            workerId: userId,
-            latitude: latRaw.toDouble(),
-            longitude: lngRaw.toDouble(),
-            occurredAt: occurredAt,
-            accuracy: accuracyRaw is num ? accuracyRaw.toDouble() : null,
-            speedMps: speedRaw is num ? speedRaw.toDouble() : null,
-          ),
+        _queueLocationUpdate(
+          workerId: userId,
+          latitude: latRaw.toDouble(),
+          longitude: lngRaw.toDouble(),
+          occurredAt: occurredAt,
+          accuracy: accuracyRaw is num ? accuracyRaw.toDouble() : null,
+          speedMps: speedRaw is num ? speedRaw.toDouble() : null,
         );
       }),
     );
@@ -76,15 +77,13 @@ class RealtimeBridge {
           message.timestamp,
         );
 
-        bloc.add(
-          UpdateLiveLocationEvent(
-            workerId: userId,
-            latitude: latRaw.toDouble(),
-            longitude: lngRaw.toDouble(),
-            occurredAt: occurredAt,
-            accuracy: accuracyRaw is num ? accuracyRaw.toDouble() : null,
-            speedMps: speedRaw is num ? speedRaw.toDouble() : null,
-          ),
+        _queueLocationUpdate(
+          workerId: userId,
+          latitude: latRaw.toDouble(),
+          longitude: lngRaw.toDouble(),
+          occurredAt: occurredAt,
+          accuracy: accuracyRaw is num ? accuracyRaw.toDouble() : null,
+          speedMps: speedRaw is num ? speedRaw.toDouble() : null,
         );
       }),
     );
@@ -112,9 +111,78 @@ class RealtimeBridge {
     );
   }
 
+  void _queueLocationUpdate({
+    required String workerId,
+    required double latitude,
+    required double longitude,
+    required DateTime occurredAt,
+    double? accuracy,
+    double? speedMps,
+  }) {
+    final current = _pendingLocationUpdates[workerId];
+    if (current == null || !occurredAt.isBefore(current.occurredAt)) {
+      _pendingLocationUpdates[workerId] = _QueuedLocationUpdate(
+        workerId: workerId,
+        latitude: latitude,
+        longitude: longitude,
+        occurredAt: occurredAt,
+        accuracy: accuracy,
+        speedMps: speedMps,
+      );
+    }
+    _locationFlushTimer ??= Timer.periodic(_locationFlushInterval, (_) {
+      _flushLocationUpdates();
+    });
+  }
+
+  void _flushLocationUpdates() {
+    if (_pendingLocationUpdates.isEmpty) {
+      _locationFlushTimer?.cancel();
+      _locationFlushTimer = null;
+      return;
+    }
+
+    final updates = _pendingLocationUpdates.values.toList(growable: false);
+    _pendingLocationUpdates.clear();
+
+    for (final update in updates) {
+      bloc.add(
+        UpdateLiveLocationEvent(
+          workerId: update.workerId,
+          latitude: update.latitude,
+          longitude: update.longitude,
+          occurredAt: update.occurredAt,
+          accuracy: update.accuracy,
+          speedMps: update.speedMps,
+        ),
+      );
+    }
+  }
+
   void dispose() {
+    _locationFlushTimer?.cancel();
+    _locationFlushTimer = null;
+    _pendingLocationUpdates.clear();
     for (final sub in _subscriptions) {
       sub.cancel();
     }
   }
+}
+
+class _QueuedLocationUpdate {
+  final String workerId;
+  final double latitude;
+  final double longitude;
+  final DateTime occurredAt;
+  final double? accuracy;
+  final double? speedMps;
+
+  const _QueuedLocationUpdate({
+    required this.workerId,
+    required this.latitude,
+    required this.longitude,
+    required this.occurredAt,
+    this.accuracy,
+    this.speedMps,
+  });
 }

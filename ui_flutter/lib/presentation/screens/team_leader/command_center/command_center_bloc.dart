@@ -78,7 +78,6 @@ class CommandCenterBloc extends Bloc<CommandCenterEvent, CommandCenterState> {
             showWorkers: true,
             showActivities: false,
             showTrails: false,
-            selectedTerritoryId: '',
             activePopup: null,
           ),
         );
@@ -175,7 +174,8 @@ class CommandCenterBloc extends Bloc<CommandCenterEvent, CommandCenterState> {
       if (data is List) {
         workers = data;
       } else if (data is Map) {
-        final activeSessions = data['active_sessions'] ?? data['activeSessions'];
+        final activeSessions =
+            data['active_sessions'] ?? data['activeSessions'];
         final topWorkers = data['workers'] ?? data['members'];
         final nestedData = data['data'];
 
@@ -282,21 +282,31 @@ class CommandCenterBloc extends Bloc<CommandCenterEvent, CommandCenterState> {
 
   Future<List<DonationModel>?> _loadDonations(String teamId) async {
     try {
-      final response = await _apiClient.get('${ApiConstants.donations}/team/$teamId');
+      final response = await _apiClient.get(
+        '${ApiConstants.donations}/team/$teamId',
+      );
       final bookSalesResponse = await _apiClient.get(
         '${ApiConstants.bookSales}/team/$teamId',
       );
 
       if (response.statusCode == 200 || bookSalesResponse.statusCode == 200) {
-        final donationItems = _extractList(
-          response.data,
-          keys: const ['results', 'data', 'donations'],
-        ).whereType<Map<String, dynamic>>().map(DonationModel.fromJson).toList();
+        final donationItems =
+            _extractList(
+                  response.data,
+                  keys: const ['results', 'data', 'donations'],
+                )
+                .whereType<Map<String, dynamic>>()
+                .map(DonationModel.fromJson)
+                .toList();
 
-        final bookAsDonations = _extractList(
-          bookSalesResponse.data,
-          keys: const ['results', 'data', 'book_sales'],
-        ).whereType<Map<String, dynamic>>().map(_bookSaleToDonationModel).toList();
+        final bookAsDonations =
+            _extractList(
+                  bookSalesResponse.data,
+                  keys: const ['results', 'data', 'book_sales'],
+                )
+                .whereType<Map<String, dynamic>>()
+                .map(_bookSaleToDonationModel)
+                .toList();
 
         return [...donationItems, ...bookAsDonations];
       }
@@ -315,9 +325,12 @@ class CommandCenterBloc extends Bloc<CommandCenterEvent, CommandCenterState> {
 
       if (response.statusCode == 200) {
         return _extractList(
-          response.data,
-          keys: const ['results', 'data', 'prayer_requests', 'prayers'],
-        ).whereType<Map<String, dynamic>>().map(PrayerRequestModel.fromJson).toList();
+              response.data,
+              keys: const ['results', 'data', 'prayer_requests', 'prayers'],
+            )
+            .whereType<Map<String, dynamic>>()
+            .map(PrayerRequestModel.fromJson)
+            .toList();
       }
       return null;
     } catch (e) {
@@ -328,13 +341,18 @@ class CommandCenterBloc extends Bloc<CommandCenterEvent, CommandCenterState> {
 
   Future<List<TeamMember>?> _loadWorkers(String teamId) async {
     try {
-      final response = await _apiClient.get('${ApiConstants.teams}/$teamId/workers');
+      final response = await _apiClient.get(
+        '${ApiConstants.teams}/$teamId/workers',
+      );
 
       if (response.statusCode == 200) {
         return _extractList(
-          response.data,
-          keys: const ['results', 'data', 'workers', 'members', 'users'],
-        ).whereType<Map<String, dynamic>>().map(TeamMember.fromUserJson).toList();
+              response.data,
+              keys: const ['results', 'data', 'workers', 'members', 'users'],
+            )
+            .whereType<Map<String, dynamic>>()
+            .map(TeamMember.fromUserJson)
+            .toList();
       }
       return null;
     } catch (e) {
@@ -379,7 +397,9 @@ class CommandCenterBloc extends Bloc<CommandCenterEvent, CommandCenterState> {
     final updatedGpsLive = Set<String>.from(state.gpsLiveWorkerIds)
       ..add(event.workerId);
 
-    final updatedAccuracy = Map<String, double>.from(state.liveLocationAccuracy);
+    final updatedAccuracy = Map<String, double>.from(
+      state.liveLocationAccuracy,
+    );
     if (event.accuracy != null && event.accuracy! >= 0) {
       updatedAccuracy[event.workerId] = event.accuracy!;
     }
@@ -394,7 +414,9 @@ class CommandCenterBloc extends Bloc<CommandCenterEvent, CommandCenterState> {
         (state.workerPaths[event.workerId]?.isNotEmpty ?? false);
     final updatedPaths = Map<String, List<Position>>.from(state.workerPaths);
     if (shouldExtendPath) {
-      final currentPath = List<Position>.from(updatedPaths[event.workerId] ?? const []);
+      final currentPath = List<Position>.from(
+        updatedPaths[event.workerId] ?? const [],
+      );
       final bool shouldAppendPoint =
           currentPath.isEmpty ||
           _haversineMeters(
@@ -426,7 +448,10 @@ class CommandCenterBloc extends Bloc<CommandCenterEvent, CommandCenterState> {
     );
   }
 
-  void _onAddDonation(AddDonationEvent event, Emitter<CommandCenterState> emit) {
+  void _onAddDonation(
+    AddDonationEvent event,
+    Emitter<CommandCenterState> emit,
+  ) {
     emit(state.copyWith(donations: [...state.donations, event.donation]));
   }
 
@@ -446,10 +471,7 @@ class CommandCenterBloc extends Bloc<CommandCenterEvent, CommandCenterState> {
     Emitter<CommandCenterState> emit,
   ) {
     emit(
-      state.copyWith(
-        selectedTerritoryId: event.territoryId,
-        activePopup: null,
-      ),
+      state.copyWith(selectedTerritoryId: event.territoryId, activePopup: null),
     );
   }
 
@@ -458,17 +480,16 @@ class CommandCenterBloc extends Bloc<CommandCenterEvent, CommandCenterState> {
     Emitter<CommandCenterState> emit,
   ) async {
     if (event.workerId == null || event.workerId!.isEmpty) {
-      emit(
-        state.copyWith(
-          followTarget: '',
-          activePopup: null,
-        ),
-      );
+      emit(state.copyWith(followTarget: '', activePopup: null));
       return;
     }
 
     final workerId = event.workerId!;
-    final updatedPaths = Map<String, List<Position>>.from(state.workerPaths);
+    final updatedPaths = <String, List<Position>>{};
+    final existingPathForTarget = state.workerPaths[workerId];
+    if (existingPathForTarget != null && existingPathForTarget.isNotEmpty) {
+      updatedPaths[workerId] = List<Position>.from(existingPathForTarget);
+    }
     emit(
       state.copyWith(
         followTarget: workerId,
@@ -491,7 +512,9 @@ class CommandCenterBloc extends Bloc<CommandCenterEvent, CommandCenterState> {
 
     final livePoint = state.liveLocations[event.workerId];
     if (livePoint != null) {
-      final current = List<Position>.from(updatedPaths[event.workerId] ?? const []);
+      final current = List<Position>.from(
+        updatedPaths[event.workerId] ?? const [],
+      );
       if (current.isEmpty ||
           _haversineMeters(
                 current.last.latitude,
@@ -544,7 +567,11 @@ class CommandCenterBloc extends Bloc<CommandCenterEvent, CommandCenterState> {
   ) {
     final current = state.activePopup;
     if (current == null) return;
-    emit(state.copyWith(activePopup: current.copyWith(expanded: !current.expanded)));
+    emit(
+      state.copyWith(
+        activePopup: current.copyWith(expanded: !current.expanded),
+      ),
+    );
   }
 
   void _onToggleLayer(

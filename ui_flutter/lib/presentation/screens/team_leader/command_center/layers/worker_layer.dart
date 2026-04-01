@@ -48,6 +48,19 @@ class WorkerLayer {
       }
     }
 
+    // Updated workers already have existing annotations on map; remove them
+    // before creating new ones, otherwise circles accumulate over time.
+    if (updated.isNotEmpty) {
+      for (final workerId in updated) {
+        final existing = _registry.getAnnotations(workerId);
+        for (final annotation in existing) {
+          if (annotation is CircleAnnotation) {
+            await _circleManager?.delete(annotation);
+          }
+        }
+      }
+    }
+
     final circlesToAdd = <CircleAnnotationOptions>[];
     final idsToAdd = <String>[];
 
@@ -93,4 +106,3 @@ class WorkerLayer {
     _circleManager = null;
   }
 }
-

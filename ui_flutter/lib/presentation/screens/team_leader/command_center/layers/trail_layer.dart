@@ -51,6 +51,19 @@ class TrailLayer {
       }
     }
 
+    // Updated paths must replace prior polyline annotations; otherwise trails
+    // pile up on each websocket tick and can eventually freeze the map UI.
+    if (updated.isNotEmpty) {
+      for (final workerId in updated) {
+        final existing = _registry.getAnnotations(workerId);
+        for (final annotation in existing) {
+          if (annotation is PolylineAnnotation) {
+            await _polylineManager?.delete(annotation);
+          }
+        }
+      }
+    }
+
     // Add/update trails
     final List<PolylineAnnotationOptions> polylinesToAdd = [];
     final List<String> idsToAdd = [];
