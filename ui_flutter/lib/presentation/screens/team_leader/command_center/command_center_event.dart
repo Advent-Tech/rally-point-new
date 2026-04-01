@@ -94,6 +94,16 @@ class FollowWorkerEvent extends CommandCenterEvent {
   List<Object?> get props => [workerId];
 }
 
+class SeedFollowPathEvent extends CommandCenterEvent {
+  final String workerId;
+  final List<Position> path;
+
+  const SeedFollowPathEvent({required this.workerId, required this.path});
+
+  @override
+  List<Object> get props => [workerId, path];
+}
+
 class ToggleLayerEvent extends CommandCenterEvent {
   final String layer;
 

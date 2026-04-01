@@ -25,8 +25,8 @@ class CommandCenterController {
 
   StreamSubscription? _stateSubscription;
   CommandCenterState? _previousState;
-
-  Future<void> _stateQueue = Future.value();
+  bool _isProcessingState = false;
+  CommandCenterState? _pendingState;
 
   CommandCenterController({required this.mapController, required this.bloc}) {
     _initialize();
@@ -58,7 +58,22 @@ class CommandCenterController {
   }
 
   void _enqueueStateChange(CommandCenterState state) {
-    _stateQueue = _stateQueue.then((_) => _handleStateChange(state));
+    _pendingState = state;
+    if (_isProcessingState) return;
+    _processStateQueue();
+  }
+
+  Future<void> _processStateQueue() async {
+    _isProcessingState = true;
+    try {
+      while (_pendingState != null) {
+        final next = _pendingState!;
+        _pendingState = null;
+        await _handleStateChange(next);
+      }
+    } finally {
+      _isProcessingState = false;
+    }
   }
 
   Future<void> handleMapTap(dynamic context) async {

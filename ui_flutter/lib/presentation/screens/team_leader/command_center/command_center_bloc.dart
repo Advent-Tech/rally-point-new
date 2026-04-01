@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart';
@@ -35,6 +36,7 @@ class CommandCenterBloc extends Bloc<CommandCenterEvent, CommandCenterState> {
     on<AddPrayerRequestEvent>(_onAddPrayerRequest);
     on<SelectTerritoryEvent>(_onSelectTerritory);
     on<FollowWorkerEvent>(_onFollowWorker);
+    on<SeedFollowPathEvent>(_onSeedFollowPath);
     on<ToggleLayerEvent>(_onToggleLayer);
     on<UpdateWorkerPathEvent>(_onUpdateWorkerPath);
     on<ShowMapPopupEvent>(_onShowMapPopup);
@@ -466,21 +468,30 @@ class CommandCenterBloc extends Bloc<CommandCenterEvent, CommandCenterState> {
     }
 
     final workerId = event.workerId!;
-    final historyPath = await _fetchWorkerPathHistory(workerId);
-    final snappedPath = historyPath == null
-        ? null
-        : await _roadSnapService.snapPath(historyPath);
-
     final updatedPaths = Map<String, List<Position>>.from(state.workerPaths);
-    if (snappedPath != null && snappedPath.isNotEmpty) {
-      updatedPaths[workerId] = snappedPath;
-    } else if (historyPath != null && historyPath.isNotEmpty) {
-      updatedPaths[workerId] = historyPath;
-    }
+    emit(
+      state.copyWith(
+        followTarget: workerId,
+        showTrails: true,
+        workerPaths: updatedPaths,
+        activePopup: null,
+      ),
+    );
 
-    final livePoint = state.liveLocations[workerId];
+    unawaited(_loadFollowPathInBackground(workerId));
+  }
+
+  void _onSeedFollowPath(
+    SeedFollowPathEvent event,
+    Emitter<CommandCenterState> emit,
+  ) {
+    if (state.followTarget != event.workerId) return;
+    final updatedPaths = Map<String, List<Position>>.from(state.workerPaths)
+      ..[event.workerId] = event.path;
+
+    final livePoint = state.liveLocations[event.workerId];
     if (livePoint != null) {
-      final current = List<Position>.from(updatedPaths[workerId] ?? const []);
+      final current = List<Position>.from(updatedPaths[event.workerId] ?? const []);
       if (current.isEmpty ||
           _haversineMeters(
                 current.last.latitude,
@@ -491,19 +502,26 @@ class CommandCenterBloc extends Bloc<CommandCenterEvent, CommandCenterState> {
               1.5) {
         current.add(livePoint);
       }
-      updatedPaths[workerId] = current.length > 1200
+      updatedPaths[event.workerId] = current.length > 1200
           ? current.sublist(current.length - 1200)
           : current;
     }
 
-    emit(
-      state.copyWith(
-        followTarget: workerId,
-        showTrails: true,
-        workerPaths: updatedPaths,
-        activePopup: null,
-      ),
-    );
+    emit(state.copyWith(workerPaths: updatedPaths));
+  }
+
+  Future<void> _loadFollowPathInBackground(String workerId) async {
+    final historyPath = await _fetchWorkerPathHistory(workerId);
+    if (historyPath == null || historyPath.isEmpty) return;
+
+    final snappedPath = await _roadSnapService.snapPath(historyPath);
+    final path = (snappedPath != null && snappedPath.isNotEmpty)
+        ? snappedPath
+        : historyPath;
+
+    if (!isClosed) {
+      add(SeedFollowPathEvent(workerId: workerId, path: path));
+    }
   }
 
   void _onShowMapPopup(

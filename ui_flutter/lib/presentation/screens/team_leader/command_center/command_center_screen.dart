@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:go_router/go_router.dart';
 import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart' as mapbox;
 import 'command_center_bloc.dart';
 import 'command_center_event.dart';
@@ -89,6 +90,32 @@ class _CommandCenterScreenState extends State<CommandCenterScreen> {
             left: 0,
             right: 0,
             child: SafeArea(child: ModeSelector()),
+          ),
+
+          Positioned(
+            top: 6,
+            left: 10,
+            child: SafeArea(
+              child: Material(
+                color: Theme.of(context).colorScheme.surface.withValues(alpha: 0.92),
+                elevation: 3,
+                borderRadius: BorderRadius.circular(12),
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(12),
+                  onTap: () {
+                    if (context.canPop()) {
+                      context.pop();
+                    } else {
+                      context.go('/leader/dashboard');
+                    }
+                  },
+                  child: const Padding(
+                    padding: EdgeInsets.all(8),
+                    child: Icon(Icons.arrow_back, size: 22),
+                  ),
+                ),
+              ),
+            ),
           ),
 
           // Map Controls (right side)
