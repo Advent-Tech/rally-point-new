@@ -1,12 +1,22 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class CoachMarksService {
   static final CoachMarksService _instance = CoachMarksService._internal();
   factory CoachMarksService() => _instance;
   CoachMarksService._internal();
+  static const String _keyPrefix = 'coach_mark_shown_';
 
   final Map<String, bool> _completedSteps = {};
   final List<CoachMarkStep> _steps = [];
+  SharedPreferences? _prefs;
+
+  Future<SharedPreferences> _getPrefs() async {
+    _prefs ??= await SharedPreferences.getInstance();
+    return _prefs!;
+  }
+
+  String _storageKey(String stepId) => '$_keyPrefix$stepId';
 
   List<CoachMarkStep> get steps => _steps;
   Map<String, bool> get completedSteps => _completedSteps;
@@ -24,20 +34,38 @@ class CoachMarksService {
   }
 
   Future<bool> hasBeenShown(String stepId) async {
-    return isStepComplete(stepId);
+    if (isStepComplete(stepId)) return true;
+    final prefs = await _getPrefs();
+    final shown = prefs.getBool(_storageKey(stepId)) ?? false;
+    if (shown) {
+      _completedSteps[stepId] = true;
+    }
+    return shown;
   }
 
   Future<void> markAsShown(String stepId) async {
     markComplete(stepId);
+    final prefs = await _getPrefs();
+    await prefs.setBool(_storageKey(stepId), true);
   }
 
-  void reset() {
+  Future<void> reset() async {
     _completedSteps.clear();
     _steps.clear();
+    final prefs = await _getPrefs();
+    final keys = prefs
+        .getKeys()
+        .where((k) => k.startsWith(_keyPrefix))
+        .toList(growable: false);
+    for (final key in keys) {
+      await prefs.remove(key);
+    }
   }
 
-  void resetStep(String stepId) {
+  Future<void> resetStep(String stepId) async {
     _completedSteps[stepId] = false;
+    final prefs = await _getPrefs();
+    await prefs.remove(_storageKey(stepId));
   }
 
   CoachMarkStep? getCurrentStep() {

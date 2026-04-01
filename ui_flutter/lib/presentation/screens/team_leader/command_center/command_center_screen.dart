@@ -40,7 +40,7 @@ class _CommandCenterScreenState extends State<CommandCenterScreen> {
   final _showcaseWorkerSheet = GlobalKey();
   final _showcaseTerritorySheet = GlobalKey();
   bool _coachMarksBusy = false;
-  final Set<cc.MapMode> _coachMarksCompletedModes = <cc.MapMode>{};
+  final Set<String> _coachMarksShownThisSession = <String>{};
 
   @override
   void initState() {
@@ -71,20 +71,31 @@ class _CommandCenterScreenState extends State<CommandCenterScreen> {
   }
 
   void _maybeShowModeCoachMarks(cc.MapMode mode) {
-    if (_coachMarksBusy || _coachMarksCompletedModes.contains(mode)) return;
-    final stepId = switch (mode) {
+    if (_coachMarksBusy) return;
+    final modeStepId = switch (mode) {
       cc.MapMode.overview => 'command_center_overview',
       cc.MapMode.workers => 'command_center_workers',
       cc.MapMode.territories => 'command_center_territories',
     };
+    final commonStepId = 'command_center_common';
+    if (_coachMarksShownThisSession.contains(modeStepId) &&
+        _coachMarksShownThisSession.contains(commonStepId)) {
+      return;
+    }
     _coachMarksBusy = true;
-    CoachMarksService().hasBeenShown(stepId).then((shown) {
+    Future.wait<bool>([
+      CoachMarksService().hasBeenShown(commonStepId),
+      CoachMarksService().hasBeenShown(modeStepId),
+    ]).then((shownFlags) {
       if (!mounted) {
         _coachMarksBusy = false;
         return;
       }
-      if (shown) {
-        _coachMarksCompletedModes.add(mode);
+      final commonShown = shownFlags[0];
+      final modeShown = shownFlags[1];
+      if (commonShown && modeShown) {
+        _coachMarksShownThisSession.add(commonStepId);
+        _coachMarksShownThisSession.add(modeStepId);
         _coachMarksBusy = false;
         return;
       }
@@ -93,17 +104,30 @@ class _CommandCenterScreenState extends State<CommandCenterScreen> {
           _coachMarksBusy = false;
           return;
         }
-        final keys = <GlobalKey>[
-          _showcaseModeTabs,
-          _showcaseMapControls,
-          if (mode == cc.MapMode.overview) _showcaseOverviewStats,
-          if (mode == cc.MapMode.workers) _showcaseWorkerSheet,
-          if (mode == cc.MapMode.territories) _showcaseTerritorySheet,
-        ];
+        final keys = <GlobalKey>[];
+        // Common command center guidance should only be shown once globally.
+        if (!commonShown) {
+          keys.addAll([_showcaseModeTabs, _showcaseMapControls]);
+        }
+        // Per-tab guidance is distinct and should only show once per tab.
+        if (!modeShown) {
+          if (mode == cc.MapMode.overview) keys.add(_showcaseOverviewStats);
+          if (mode == cc.MapMode.workers) keys.add(_showcaseWorkerSheet);
+          if (mode == cc.MapMode.territories) keys.add(_showcaseTerritorySheet);
+        }
+        if (keys.isEmpty) {
+          _coachMarksBusy = false;
+          return;
+        }
         ShowcaseView.get().startShowCase(keys);
-        CoachMarksService().markAsShown(stepId);
-        _coachMarksCompletedModes.add(mode);
-        _coachMarksBusy = false;
+        Future.wait<void>([
+          if (!commonShown) CoachMarksService().markAsShown(commonStepId),
+          if (!modeShown) CoachMarksService().markAsShown(modeStepId),
+        ]).whenComplete(() {
+          _coachMarksShownThisSession.add(commonStepId);
+          _coachMarksShownThisSession.add(modeStepId);
+          _coachMarksBusy = false;
+        });
       });
     });
   }
