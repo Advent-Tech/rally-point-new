@@ -95,9 +95,10 @@ class _WorkerBottomSheetState extends State<WorkerBottomSheet> {
                       itemCount: state.workers.length,
                       itemBuilder: (context, index) {
                         final worker = state.workers[index];
-                        final hasAnyLocation = state.liveLocations.containsKey(
-                          worker.id,
-                        );
+                        final pos = state.liveLocations[worker.id];
+                        final hasAnyLocation =
+                            pos != null &&
+                            _isValidLocation(pos.latitude, pos.longitude);
                         final isGpsLive = state.gpsLiveWorkerIds.contains(
                           worker.id,
                         );
@@ -112,13 +113,12 @@ class _WorkerBottomSheetState extends State<WorkerBottomSheet> {
                         final freshness = _formatFreshness(updatedAt);
                         final speedKmh = speedMps == null ? null : speedMps * 3.6;
 
-                        final pos = state.liveLocations[worker.id];
                         final statusLabel = isGpsLive
                             ? 'GPS Live'
                             : (hasAnyLocation
                                   ? 'Last known (entry)'
                                   : (isApiOnline
-                                        ? 'Online (no GPS)'
+                                        ? 'Online (no valid location yet)'
                                         : 'Offline'));
 
                         return ListTile(
@@ -163,6 +163,17 @@ class _WorkerBottomSheetState extends State<WorkerBottomSheet> {
                                     color: Theme.of(context).colorScheme.onSurfaceVariant,
                                   ),
                                 ),
+                              if (!hasAnyLocation)
+                                Text(
+                                  'No valid location yet',
+                                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                    color: Theme.of(context)
+                                        .colorScheme
+                                        .onSurfaceVariant
+                                        .withValues(alpha: 0.85),
+                                    fontStyle: FontStyle.italic,
+                                  ),
+                                ),
                             ],
                           ),
                           trailing: Row(
@@ -174,26 +185,42 @@ class _WorkerBottomSheetState extends State<WorkerBottomSheet> {
                                   color: Colors.red.shade700,
                                   size: 20,
                                 ),
-                              if (hasAnyLocation)
-                                IconButton(
-                                  icon: Icon(
-                                    isFollowing
-                                        ? Icons.gps_fixed
-                                        : Icons.gps_not_fixed,
-                                    color: isFollowing
-                                        ? Theme.of(context).colorScheme.primary
-                                        : null,
-                                  ),
-                                  onPressed: () {
-                                    context.read<CommandCenterBloc>().add(
-                                      FollowWorkerEvent(
-                                        workerId: isFollowing
+                              IconButton(
+                                icon: Icon(
+                                  isFollowing
+                                      ? Icons.gps_fixed
+                                      : Icons.gps_not_fixed,
+                                  color: isFollowing
+                                      ? Theme.of(context).colorScheme.primary
+                                      : (hasAnyLocation
                                             ? null
-                                            : worker.id,
+                                            : Theme.of(context)
+                                                  .colorScheme
+                                                  .onSurfaceVariant),
+                                ),
+                                tooltip: hasAnyLocation
+                                    ? (isFollowing
+                                          ? 'Stop following'
+                                          : 'Follow worker')
+                                    : 'No GPS location available',
+                                onPressed: () {
+                                  if (!hasAnyLocation) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(
+                                        content: Text(
+                                          'This worker has no GPS location yet.',
+                                        ),
                                       ),
                                     );
-                                  },
-                                ),
+                                    return;
+                                  }
+                                  context.read<CommandCenterBloc>().add(
+                                    FollowWorkerEvent(
+                                      workerId: isFollowing ? null : worker.id,
+                                    ),
+                                  );
+                                },
+                              ),
                             ],
                           ),
                         );
@@ -215,5 +242,12 @@ class _WorkerBottomSheetState extends State<WorkerBottomSheet> {
     if (age.inSeconds < 60) return '${age.inSeconds}s ago';
     if (age.inMinutes < 60) return '${age.inMinutes}m ago';
     return '${age.inHours}h ago';
+  }
+
+  bool _isValidLocation(double lat, double lng) {
+    if (lat == 0.0 && lng == 0.0) return false;
+    if (lat < -90 || lat > 90) return false;
+    if (lng < -180 || lng > 180) return false;
+    return true;
   }
 }

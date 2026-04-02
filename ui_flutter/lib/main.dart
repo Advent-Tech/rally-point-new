@@ -17,6 +17,7 @@ import 'presentation/blocs/theme/theme_bloc.dart';
 import 'presentation/blocs/territory/territory_bloc.dart';
 import 'presentation/blocs/location/location_bloc.dart';
 import 'presentation/blocs/delivery/delivery_bloc.dart';
+import 'presentation/blocs/work_session/work_session_bloc.dart';
 
 import 'presentation/blocs/team_map/team_map_bloc.dart';
 import 'presentation/blocs/schedule/schedule_bloc.dart';
@@ -146,6 +147,10 @@ class RallyPointApp extends StatelessWidget {
             BlocProvider<TerritoryBloc>(create: (context) => TerritoryBloc()),
             BlocProvider<LocationBloc>(create: (context) => LocationBloc()),
             BlocProvider<DeliveryBloc>(create: (context) => DeliveryBloc()),
+            BlocProvider<WorkSessionBloc>(
+              create: (context) =>
+                  WorkSessionBloc()..add(const WorkSessionLoadCurrent()),
+            ),
             BlocProvider<TeamMapBloc>(create: (context) => TeamMapBloc()),
             BlocProvider<ScheduleBloc>(create: (context) => ScheduleBloc()),
             BlocProvider<SurveyBloc>(create: (context) => SurveyBloc()),

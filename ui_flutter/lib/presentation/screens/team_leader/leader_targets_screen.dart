@@ -256,7 +256,7 @@ class _LeaderTargetsScreenState extends State<LeaderTargetsScreen>
     );
 
     String targetType = existing?.targetType.isNotEmpty == true
-        ? existing!.targetType
+        ? _normalizeTargetType(existing!.targetType)
         : 'territory';
     String targetUnit = existing?.targetUnit.isNotEmpty == true
         ? existing!.targetUnit
@@ -284,12 +284,13 @@ class _LeaderTargetsScreenState extends State<LeaderTargetsScreen>
 
               final value = double.tryParse(valueCtrl.text.trim()) ?? 0;
               final description = descCtrl.text.trim();
+              final effectiveTargetType = _apiTargetType(targetType);
 
               final res = existing == null
                   ? await _targetsRepository.createTargetTemplate(
                       name: nameCtrl.text.trim(),
                       description: description,
-                      targetType: targetType,
+                      targetType: effectiveTargetType,
                       targetUnit: targetUnit,
                       targetValue: value,
                       periodType: periodType,
@@ -298,7 +299,7 @@ class _LeaderTargetsScreenState extends State<LeaderTargetsScreen>
                       targetId: existing.id,
                       name: nameCtrl.text.trim(),
                       description: description,
-                      targetType: targetType,
+                      targetType: effectiveTargetType,
                       targetUnit: targetUnit,
                       targetValue: value,
                       periodType: periodType,
@@ -357,6 +358,10 @@ class _LeaderTargetsScreenState extends State<LeaderTargetsScreen>
                             child: Text('Donation'),
                           ),
                           DropdownMenuItem(
+                            value: 'book_sale',
+                            child: Text('Book Sale'),
+                          ),
+                          DropdownMenuItem(
                             value: 'prayer',
                             child: Text('Prayer'),
                           ),
@@ -374,6 +379,20 @@ class _LeaderTargetsScreenState extends State<LeaderTargetsScreen>
                             : (v) =>
                                   setState(() => targetType = v ?? targetType),
                       ),
+                      if (targetType == 'book_sale')
+                        const Padding(
+                          padding: EdgeInsets.only(top: 6),
+                          child: Align(
+                            alignment: Alignment.centerLeft,
+                            child: Text(
+                              'Book Sale targets are saved under donations on the backend.',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.orange,
+                              ),
+                            ),
+                          ),
+                        ),
                       const SizedBox(height: 8),
                       DropdownButtonFormField<String>(
                         value: targetUnit,
@@ -692,6 +711,18 @@ class _LeaderTargetsScreenState extends State<LeaderTargetsScreen>
       context,
     ).showSnackBar(SnackBar(content: Text(message)));
   }
+
+  String _normalizeTargetType(String rawType) {
+    final normalized = rawType.trim().toLowerCase();
+    if (normalized == 'book' || normalized == 'booksale') return 'book_sale';
+    return normalized.isEmpty ? 'other' : normalized;
+  }
+
+  String _apiTargetType(String uiType) {
+    // Backend DB constraint currently allows donation, not book_sale.
+    if (uiType == 'book_sale') return 'donation';
+    return uiType;
+  }
 }
 
 class _AssignedTargetCard extends StatelessWidget {
@@ -710,7 +741,7 @@ class _AssignedTargetCard extends StatelessWidget {
     final target = item.assignment.target;
     final name = target?.name.isNotEmpty == true ? target!.name : 'Target';
     final type = target?.targetType.isNotEmpty == true
-        ? target!.targetType
+        ? _normalizeType(target!.targetType)
         : 'other';
     final targetValue = target?.targetValue ?? 0;
     final currentValue = item.progress.currentValue;
@@ -852,6 +883,8 @@ class _AssignedTargetCard extends StatelessWidget {
         return Icons.map_outlined;
       case 'donation':
         return Icons.volunteer_activism_outlined;
+      case 'book_sale':
+        return Icons.menu_book_rounded;
       case 'prayer':
         return Icons.church;
       case 'visit':
@@ -867,6 +900,8 @@ class _AssignedTargetCard extends StatelessWidget {
         return AppColors.secondary;
       case 'donation':
         return AppColors.accent;
+      case 'book_sale':
+        return AppColors.warning;
       case 'prayer':
         return AppColors.warning;
       case 'visit':
@@ -882,13 +917,26 @@ class _AssignedTargetCard extends StatelessWidget {
         return 'Territories';
       case 'donation':
         return 'Donations';
+      case 'book_sale':
+        return 'Book Sales';
       case 'prayer':
         return 'Prayer Requests';
       case 'visit':
         return 'Visits';
       default:
-        return type[0].toUpperCase() + type.substring(1);
+        return _toTitle(type);
     }
+  }
+
+  String _normalizeType(String rawType) {
+    final normalized = rawType.trim().toLowerCase();
+    if (normalized == 'book' || normalized == 'booksale') return 'book_sale';
+    return normalized.isEmpty ? 'other' : normalized;
+  }
+
+  String _toTitle(String value) {
+    if (value.isEmpty) return 'Other';
+    return value[0].toUpperCase() + value.substring(1);
   }
 }
 
@@ -909,7 +957,7 @@ class _TemplateTargetCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final type = target.targetType;
+    final type = _normalizeType(target.targetType);
     final unit = target.targetUnit;
     final value = target.targetValue;
     final period = target.periodType;
@@ -936,7 +984,7 @@ class _TemplateTargetCard extends StatelessWidget {
           ),
         ),
         subtitle: Text(
-          '${type.toUpperCase()} • ${value.toStringAsFixed(0)} ${unit.toUpperCase()} • ${period.toUpperCase()}',
+          '${_typeLabel(type)} • ${value.toStringAsFixed(0)} ${unit.toUpperCase()} • ${period.toUpperCase()}',
           style: TextStyle(
             color: isDark
                 ? AppColors.textSecondaryDark
@@ -965,5 +1013,20 @@ class _TemplateTargetCard extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  String _normalizeType(String rawType) {
+    final normalized = rawType.trim().toLowerCase();
+    if (normalized == 'book' || normalized == 'booksale') return 'book_sale';
+    return normalized.isEmpty ? 'other' : normalized;
+  }
+
+  String _typeLabel(String type) {
+    switch (type) {
+      case 'book_sale':
+        return 'BOOK SALE';
+      default:
+        return type.toUpperCase();
+    }
   }
 }

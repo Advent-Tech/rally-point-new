@@ -201,22 +201,22 @@ func (r *AchievementRepository) HasAchievement(ctx context.Context, workerID, ac
 }
 
 func (r *AchievementRepository) GetOrCreateWorkerLevel(ctx context.Context, workerID uuid.UUID) (*domain.WorkerLevel, error) {
-	query := `SELECT worker_id, total_points, current_level, level_progress, territory_badges, donation_badges, prayer_badges, visit_badges, streak_badges, session_badges, team_badges, updated_at FROM worker_levels WHERE worker_id = $1`
+	query := `SELECT worker_id, total_points, current_level, level_progress, territory_badges, donation_badges, book_sale_badges, prayer_badges, visit_badges, streak_badges, session_badges, team_badges, updated_at FROM worker_levels WHERE worker_id = $1`
 	wl := &domain.WorkerLevel{WorkerID: workerID}
 	err := r.db.QueryRowContext(ctx, query, workerID).Scan(
 		&wl.WorkerID, &wl.TotalPoints, &wl.CurrentLevel, &wl.LevelProgress,
-		&wl.TerritoryBadges, &wl.DonationBadges, &wl.PrayerBadges, &wl.VisitBadges,
+		&wl.TerritoryBadges, &wl.DonationBadges, &wl.BookSaleBadges, &wl.PrayerBadges, &wl.VisitBadges,
 		&wl.StreakBadges, &wl.SessionBadges, &wl.TeamBadges, &wl.UpdatedAt,
 	)
 	if err == sql.ErrNoRows {
 		insertQuery := `
-			INSERT INTO worker_levels (worker_id, total_points, current_level, level_progress, territory_badges, donation_badges, prayer_badges, visit_badges, streak_badges, session_badges, team_badges, updated_at)
-			VALUES ($1, 0, 'bronze', 0, 0, 0, 0, 0, 0, 0, 0, NOW())
-			RETURNING worker_id, total_points, current_level, level_progress, territory_badges, donation_badges, prayer_badges, visit_badges, streak_badges, session_badges, team_badges, updated_at
+			INSERT INTO worker_levels (worker_id, total_points, current_level, level_progress, territory_badges, donation_badges, book_sale_badges, prayer_badges, visit_badges, streak_badges, session_badges, team_badges, updated_at)
+			VALUES ($1, 0, 'bronze', 0, 0, 0, 0, 0, 0, 0, 0, 0, NOW())
+			RETURNING worker_id, total_points, current_level, level_progress, territory_badges, donation_badges, book_sale_badges, prayer_badges, visit_badges, streak_badges, session_badges, team_badges, updated_at
 		`
 		err = r.db.QueryRowContext(ctx, insertQuery, workerID).Scan(
 			&wl.WorkerID, &wl.TotalPoints, &wl.CurrentLevel, &wl.LevelProgress,
-			&wl.TerritoryBadges, &wl.DonationBadges, &wl.PrayerBadges, &wl.VisitBadges,
+			&wl.TerritoryBadges, &wl.DonationBadges, &wl.BookSaleBadges, &wl.PrayerBadges, &wl.VisitBadges,
 			&wl.StreakBadges, &wl.SessionBadges, &wl.TeamBadges, &wl.UpdatedAt,
 		)
 		return wl, err
@@ -254,6 +254,8 @@ func (r *AchievementRepository) IncrementBadgeCount(ctx context.Context, workerI
 		column = "territory_badges"
 	case "donation":
 		column = "donation_badges"
+	case "book_sale":
+		column = "book_sale_badges"
 	case "prayer":
 		column = "prayer_badges"
 	case "visit":

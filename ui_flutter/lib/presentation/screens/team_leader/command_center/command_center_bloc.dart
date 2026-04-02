@@ -36,6 +36,7 @@ class CommandCenterBloc extends Bloc<CommandCenterEvent, CommandCenterState> {
     on<AddPrayerRequestEvent>(_onAddPrayerRequest);
     on<SelectTerritoryEvent>(_onSelectTerritory);
     on<FollowWorkerEvent>(_onFollowWorker);
+    on<RecenterFollowEvent>(_onRecenterFollow);
     on<SeedFollowPathEvent>(_onSeedFollowPath);
     on<ToggleLayerEvent>(_onToggleLayer);
     on<UpdateWorkerPathEvent>(_onUpdateWorkerPath);
@@ -230,10 +231,13 @@ class CommandCenterBloc extends Bloc<CommandCenterEvent, CommandCenterState> {
 
         if (workerId == null || workerId.isEmpty) continue;
         if (latRaw is! num || lngRaw is! num) continue;
+        final lat = latRaw.toDouble();
+        final lng = lngRaw.toDouble();
+        if (!_isValidLocation(lat, lng)) continue;
 
         locations[workerId] = Position(
-          latitude: latRaw.toDouble(),
-          longitude: lngRaw.toDouble(),
+          latitude: lat,
+          longitude: lng,
         );
       }
 
@@ -365,6 +369,7 @@ class CommandCenterBloc extends Bloc<CommandCenterEvent, CommandCenterState> {
     UpdateLiveLocationEvent event,
     Emitter<CommandCenterState> emit,
   ) {
+    if (!_isValidLocation(event.latitude, event.longitude)) return;
     final existingTs = state.liveLocationUpdatedAt[event.workerId];
     if (existingTs != null && event.occurredAt.isBefore(existingTs)) {
       return;
@@ -485,6 +490,8 @@ class CommandCenterBloc extends Bloc<CommandCenterEvent, CommandCenterState> {
     }
 
     final workerId = event.workerId!;
+    final pos = state.liveLocations[workerId];
+    if (pos == null || !_isValidLocation(pos.latitude, pos.longitude)) return;
     final updatedPaths = <String, List<Position>>{};
     final existingPathForTarget = state.workerPaths[workerId];
     if (existingPathForTarget != null && existingPathForTarget.isNotEmpty) {
@@ -500,6 +507,39 @@ class CommandCenterBloc extends Bloc<CommandCenterEvent, CommandCenterState> {
     );
 
     unawaited(_loadFollowPathInBackground(workerId));
+  }
+
+  Future<void> _onRecenterFollow(
+    RecenterFollowEvent event,
+    Emitter<CommandCenterState> emit,
+  ) async {
+    final workerId = state.followTarget;
+    if (workerId == null || workerId.isEmpty) return;
+    final pos = state.liveLocations[workerId];
+    if (pos == null || !_isValidLocation(pos.latitude, pos.longitude)) return;
+
+    // Force camera-follow re-initialization even when no fresh GPS packet arrives.
+    final updatedPaths = <String, List<Position>>{};
+    final existingPathForTarget = state.workerPaths[workerId];
+    if (existingPathForTarget != null && existingPathForTarget.isNotEmpty) {
+      updatedPaths[workerId] = List<Position>.from(existingPathForTarget);
+    }
+
+    emit(
+      state.copyWith(
+        followTarget: '',
+        activePopup: null,
+      ),
+    );
+
+    emit(
+      state.copyWith(
+        followTarget: workerId,
+        showTrails: true,
+        workerPaths: updatedPaths,
+        activePopup: null,
+      ),
+    );
   }
 
   void _onSeedFollowPath(
@@ -753,5 +793,12 @@ class CommandCenterBloc extends Bloc<CommandCenterEvent, CommandCenterState> {
             math.sin(dLon / 2);
     final c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a));
     return earthRadiusMeters * c;
+  }
+
+  bool _isValidLocation(double lat, double lng) {
+    if (lat == 0.0 && lng == 0.0) return false;
+    if (lat < -90 || lat > 90) return false;
+    if (lng < -180 || lng > 180) return false;
+    return true;
   }
 }

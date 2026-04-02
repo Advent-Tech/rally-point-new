@@ -37,7 +37,7 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
-    _workSessionBloc = WorkSessionBloc();
+    _workSessionBloc = context.read<WorkSessionBloc>();
     _workSessionBloc.add(const WorkSessionLoadCurrent());
 
     _scheduleBloc = WorkerScheduleBloc();
@@ -200,7 +200,6 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   void dispose() {
-    _workSessionBloc.close();
     _scheduleBloc.close();
     _prayerRequestBloc.close();
     _locationBloc.close();
@@ -928,8 +927,8 @@ class _HomeScreenState extends State<HomeScreen> {
                       ),
                       QuickActionTileData(
                         icon: Icons.volunteer_activism,
-                        label: 'Donation',
-                        subtitle: 'Record gifts',
+                        label: 'Donations & Books',
+                        subtitle: 'Record sales & gifts',
                         backgroundColor: QuickActionColors.delivery,
                         backgroundColorEnd: QuickActionColors.deliveryEnd,
                         onTap: () => context.go('/delivery'),
@@ -1465,9 +1464,17 @@ class _HomeScreenState extends State<HomeScreen> {
                               ) {
                                 final index = entry.key;
                                 final delivery = entry.value;
-                                const color = AppColors.success;
+                                final isBookSale = delivery.isBookSale;
+                                final color = isBookSale
+                                    ? AppColors.warning
+                                    : AppColors.success;
                                 final time =
                                     delivery.createdAt ?? delivery.completedAt;
+                                final subtitle = time != null
+                                    ? DateFormat('MMM d, h:mm a').format(time)
+                                    : (isBookSale
+                                          ? 'Book sale'
+                                          : 'Donation');
 
                                 return Column(
                                   children: [
@@ -1481,8 +1488,10 @@ class _HomeScreenState extends State<HomeScreen> {
                                             10,
                                           ),
                                         ),
-                                        child: const Icon(
-                                          Icons.volunteer_activism,
+                                        child: Icon(
+                                          isBookSale
+                                              ? Icons.menu_book_rounded
+                                              : Icons.volunteer_activism,
                                           color: color,
                                           size: 20,
                                         ),
@@ -1496,11 +1505,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                         overflow: TextOverflow.ellipsis,
                                       ),
                                       subtitle: Text(
-                                        time != null
-                                            ? DateFormat(
-                                                'MMM d, h:mm a',
-                                              ).format(time)
-                                            : 'Donation',
+                                        subtitle,
                                         style: TextStyle(
                                           fontSize: 12,
                                           color: isDark
@@ -1510,7 +1515,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                       ),
                                       trailing: Text(
                                         '\$${(delivery.donationAmount ?? 0).toStringAsFixed(2)}',
-                                        style: const TextStyle(
+                                        style: TextStyle(
                                           fontWeight: FontWeight.bold,
                                           color: color,
                                         ),

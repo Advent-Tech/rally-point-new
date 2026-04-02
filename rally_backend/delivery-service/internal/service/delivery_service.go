@@ -223,6 +223,19 @@ func (s *deliveryService) CreateDelivery(creatorID uuid.UUID, req *domain.Create
 		Items:    items,
 	}
 
+	// Award collection achievements for on-spot donation/book-sale records.
+	if s.achievementService != nil && req.DonationAmount > 0 {
+		if isDonation {
+			go func(workerID uuid.UUID) {
+				s.checkCollectionAchievements(context.Background(), workerID, domain.DeliveryTypeDonation, "donation")
+			}(workerID)
+		} else if isBookSale {
+			go func(workerID uuid.UUID) {
+				s.checkCollectionAchievements(context.Background(), workerID, domain.DeliveryTypeBookSale, "book_sale")
+			}(workerID)
+		}
+	}
+
 	// Publish notification — notify team leader about new donation/delivery recorded by worker
 	if delivery.TeamID != uuid.Nil {
 		notifTitle := fmt.Sprintf("New donation from %s", delivery.RecipientName)
@@ -250,6 +263,20 @@ func (s *deliveryService) CreateDelivery(creatorID uuid.UUID, req *domain.Create
 	}
 
 	return result, nil
+}
+
+func (s *deliveryService) checkCollectionAchievements(ctx context.Context, workerID uuid.UUID, deliveryType string, achievementCategory string) {
+	if s.achievementService == nil {
+		return
+	}
+
+	totalCount, totalAmount, err := s.deliveryRepo.GetWorkerCollectionStatsByType(workerID, deliveryType)
+	if err != nil {
+		return
+	}
+
+	s.achievementService.CheckAndAwardAchievements(ctx, workerID, achievementCategory, float64(totalCount))
+	s.achievementService.CheckAndAwardAchievements(ctx, workerID, achievementCategory, totalAmount)
 }
 
 // GetDelivery retrieves a delivery with its items

@@ -283,7 +283,7 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
                         key: _showcaseSummary,
                         title: "Today's Summary",
                         description:
-                            'See your daily donation totals at a glance. This updates as you record donations.',
+                            'See today\'s totals for both donations and book sales. This updates as you record each activity.',
                         titleTextStyle: _tooltipTitleStyle,
                         descTextStyle: _tooltipDescStyle,
                         tooltipBorderRadius: _tooltipRadius,
@@ -304,9 +304,9 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
                           Expanded(
                             child: Showcase(
                               key: _showcaseRecord,
-                              title: 'Record Donation',
+                              title: 'Record Activity',
                               description:
-                                  'Tap here to record a new donation. Your GPS location is automatically captured.',
+                                  'Use these buttons to record a donation or a book sale. Your GPS location is captured automatically.',
                               titleTextStyle: _tooltipTitleStyle,
                               descTextStyle: _tooltipDescStyle,
                               tooltipBorderRadius: _tooltipRadius,

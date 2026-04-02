@@ -1083,7 +1083,7 @@ void _showTerritoryDetailSheet(
   GeoTerritory territory, {
   VoidCallback? onDismiss,
 }) {
-  final workSessionBloc = WorkSessionBloc();
+  final workSessionBloc = context.read<WorkSessionBloc>();
 
   showModalBottomSheet(
     context: context,
@@ -1294,7 +1294,6 @@ void _showTerritoryDetailSheet(
       ),
     ),
   ).whenComplete(() {
-    workSessionBloc.close();
     onDismiss?.call();
   });
 }

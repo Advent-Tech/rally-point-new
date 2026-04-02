@@ -22,25 +22,36 @@ class FollowModeBanner extends StatelessWidget {
             break;
           }
         }
+        final isGpsLive = state.gpsLiveWorkerIds.contains(state.followTarget);
 
-        return Container(
-          margin: const EdgeInsets.symmetric(horizontal: 16),
+        return ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 460),
+          child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
           decoration: BoxDecoration(
             color: Theme.of(context).colorScheme.primaryContainer,
-            borderRadius: BorderRadius.circular(8),
+            borderRadius: BorderRadius.circular(10),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.12),
+                blurRadius: 10,
+                offset: const Offset(0, 2),
+              ),
+            ],
           ),
           child: Row(
             children: [
               Icon(
-                Icons.gps_fixed,
+                isGpsLive ? Icons.gps_fixed : Icons.location_searching,
                 size: 20,
                 color: Theme.of(context).colorScheme.onPrimaryContainer,
               ),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
-                  'Following $displayName',
+                  isGpsLive
+                      ? 'Following $displayName'
+                      : 'Following $displayName (last known)',
                   style: TextStyle(
                     color: Theme.of(context).colorScheme.onPrimaryContainer,
                     fontWeight: FontWeight.w500,
@@ -53,9 +64,10 @@ class FollowModeBanner extends StatelessWidget {
                     const FollowWorkerEvent(workerId: null),
                   );
                 },
-                child: const Text('EXIT'),
+                child: const Text('STOP'),
               ),
             ],
+          ),
           ),
         );
       },

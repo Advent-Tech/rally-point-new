@@ -158,6 +158,12 @@ class TeamActivity extends Equatable {
         return '🏠';
       case 'assignment':
         return '📋';
+      case 'delivery':
+        return '📦';
+      case 'donation':
+        return '💚';
+      case 'book_sale':
+        return '📚';
       default:
         return '📌';
     }

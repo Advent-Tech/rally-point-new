@@ -365,6 +365,7 @@ type DeliveryRepository interface {
 	// Visit counting for achievements
 	GetCompletedVisitCount(workerID uuid.UUID) (int, error)
 	GetCompletedTerritoryCount(workerID uuid.UUID) (int, error)
+	GetWorkerCollectionStatsByType(workerID uuid.UUID, deliveryType string) (count int, amount float64, err error)
 }
 
 // DeliveryService defines the interface for delivery business logic

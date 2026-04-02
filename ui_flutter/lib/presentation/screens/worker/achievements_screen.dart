@@ -44,20 +44,13 @@ class _AchievementsScreenState extends State<AchievementsScreen>
         setState(() {
           if (achievementsResponse.statusCode == 200 &&
               achievementsResponse.data != null) {
-            if (achievementsResponse.data is List) {
-              _achievements = achievementsResponse.data as List;
-            } else if (achievementsResponse.data is Map) {
-              final mapData = achievementsResponse.data as Map;
-              if (mapData['data'] is List) {
-                _achievements = mapData['data'] as List;
-              }
-            }
+            _achievements = _normalizeAchievementsResponse(
+              achievementsResponse.data,
+            );
           }
 
           if (levelResponse.statusCode == 200 && levelResponse.data != null) {
-            if (levelResponse.data is Map) {
-              _workerLevel = levelResponse.data as Map<String, dynamic>;
-            }
+            _workerLevel = _normalizeLevelResponse(levelResponse.data);
           }
 
           _isLoading = false;
@@ -122,7 +115,7 @@ class _AchievementsScreenState extends State<AchievementsScreen>
 
     final grouped = <String, List<dynamic>>{};
     for (final ach in _achievements) {
-      final category = ach['category']?.toString() ?? 'other';
+      final category = _normalizeCategory(ach['category']?.toString());
       grouped.putIfAbsent(category, () => []).add(ach);
     }
 
@@ -150,16 +143,24 @@ class _AchievementsScreenState extends State<AchievementsScreen>
 
   Widget _buildBadgesSummary(bool isDark) {
     final total = _achievements.length;
-    int territory = 0, donation = 0, prayer = 0, visit = 0, streak = 0;
+    int territory = 0,
+        donation = 0,
+        bookSales = 0,
+        prayer = 0,
+        visit = 0,
+        streak = 0;
 
     for (final ach in _achievements) {
-      final cat = ach['category']?.toString() ?? '';
+      final cat = _normalizeCategory(ach['category']?.toString());
       switch (cat) {
         case 'territory':
           territory++;
           break;
         case 'donation':
           donation++;
+          break;
+        case 'book_sale':
+          bookSales++;
           break;
         case 'prayer':
           prayer++;
@@ -228,6 +229,11 @@ class _AchievementsScreenState extends State<AchievementsScreen>
                 icon: Icons.volunteer_activism,
                 count: donation,
                 label: 'Donation',
+              ),
+              _BadgeCount(
+                icon: Icons.menu_book_rounded,
+                count: bookSales,
+                label: 'Books',
               ),
               _BadgeCount(icon: Icons.church, count: prayer, label: 'Prayer'),
               _BadgeCount(
@@ -373,6 +379,13 @@ class _AchievementsScreenState extends State<AchievementsScreen>
             isDark: isDark,
           ),
           _LevelStatRow(
+            icon: Icons.menu_book_rounded,
+            label: 'Book Sale Badges',
+            value: level['book_sale_badges'] ?? level['book_badges'] ?? 0,
+            color: AppColors.warning,
+            isDark: isDark,
+          ),
+          _LevelStatRow(
             icon: Icons.church,
             label: 'Prayer Badges',
             value: level['prayer_badges'] ?? 0,
@@ -452,6 +465,63 @@ class _AchievementsScreenState extends State<AchievementsScreen>
       default:
         return Icons.military_tech;
     }
+  }
+
+  String _normalizeCategory(String? rawCategory) {
+    final normalized = (rawCategory ?? '').trim().toLowerCase();
+    if (normalized.isEmpty) return 'other';
+    if (normalized == 'book' || normalized == 'booksale') return 'book_sale';
+    return normalized;
+  }
+
+  List<dynamic> _normalizeAchievementsResponse(dynamic raw) {
+    final List<dynamic> rows;
+    if (raw is List) {
+      rows = raw;
+    } else if (raw is Map) {
+      final map = Map<String, dynamic>.from(raw);
+      final listCandidate =
+          map['data'] ?? map['achievements'] ?? map['items'] ?? [];
+      if (listCandidate is List) {
+        rows = listCandidate;
+      } else {
+        rows = const [];
+      }
+    } else {
+      rows = const [];
+    }
+
+    return rows.whereType<Map>().map<Map<String, dynamic>>((entryRaw) {
+      final entry = Map<String, dynamic>.from(entryRaw);
+      final nestedRaw = entry['achievement'];
+      final nested = nestedRaw is Map<String, dynamic>
+          ? nestedRaw
+          : (nestedRaw is Map ? Map<String, dynamic>.from(nestedRaw) : null);
+      if (nested == null) return entry;
+
+      // Flatten nested achievement payload so existing UI fields work.
+      return {
+        ...nested,
+        ...entry,
+        'category': entry['category'] ?? nested['category'],
+        'name': entry['name'] ?? nested['name'],
+        'description': entry['description'] ?? nested['description'],
+        'icon': entry['icon'] ?? nested['icon'],
+        'level': entry['level'] ?? nested['level'],
+        'points': entry['points'] ?? nested['points'],
+      };
+    }).toList();
+  }
+
+  Map<String, dynamic>? _normalizeLevelResponse(dynamic raw) {
+    if (raw is Map<String, dynamic>) {
+      final nested = raw['data'];
+      if (nested is Map<String, dynamic>) return nested;
+      if (nested is Map) return Map<String, dynamic>.from(nested);
+      return raw;
+    }
+    if (raw is Map) return Map<String, dynamic>.from(raw);
+    return null;
   }
 }
 
@@ -574,6 +644,8 @@ class _AchievementCategoryCard extends StatelessWidget {
         return 'Territories';
       case 'donation':
         return 'Donations';
+      case 'book_sale':
+        return 'Book Sales';
       case 'prayer':
         return 'Prayer';
       case 'visit':
@@ -585,7 +657,7 @@ class _AchievementCategoryCard extends StatelessWidget {
       case 'team':
         return 'Team';
       default:
-        return cat[0].toUpperCase() + cat.substring(1);
+        return _toTitle(cat);
     }
   }
 
@@ -595,6 +667,8 @@ class _AchievementCategoryCard extends StatelessWidget {
         return Icons.map_outlined;
       case 'donation':
         return Icons.volunteer_activism_outlined;
+      case 'book_sale':
+        return Icons.menu_book_rounded;
       case 'prayer':
         return Icons.church;
       case 'visit':
@@ -616,6 +690,8 @@ class _AchievementCategoryCard extends StatelessWidget {
         return AppColors.secondary;
       case 'donation':
         return AppColors.accent;
+      case 'book_sale':
+        return AppColors.warning;
       case 'prayer':
         return AppColors.warning;
       case 'visit':
@@ -630,6 +706,11 @@ class _AchievementCategoryCard extends StatelessWidget {
         return AppColors.primary;
     }
   }
+
+  String _toTitle(String value) {
+    if (value.isEmpty) return 'Other';
+    return value[0].toUpperCase() + value.substring(1);
+  }
 }
 
 class _AchievementBadge extends StatelessWidget {
@@ -643,8 +724,6 @@ class _AchievementBadge extends StatelessWidget {
     final name = achievement['name']?.toString() ?? 'Achievement';
     final level = achievement['level']?.toString() ?? 'bronze';
     final points = achievement['points'] ?? 0;
-    final description = achievement['description']?.toString() ?? '';
-    final earnedAt = achievement['earned_at']?.toString();
 
     return Container(
       width: 100,

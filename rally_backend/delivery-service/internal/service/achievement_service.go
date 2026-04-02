@@ -134,6 +134,7 @@ func (s *AchievementService) GetWorkerStats(ctx context.Context, workerID uuid.U
 		"by_level":         levelCount,
 		"territory_badges": level.TerritoryBadges,
 		"donation_badges":  level.DonationBadges,
+		"book_sale_badges": level.BookSaleBadges,
 		"prayer_badges":    level.PrayerBadges,
 		"visit_badges":     level.VisitBadges,
 		"streak_badges":    level.StreakBadges,

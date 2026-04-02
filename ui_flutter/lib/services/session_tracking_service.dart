@@ -29,6 +29,7 @@ class SessionTrackingService {
 
   StreamSubscription<Position>? _positionSubscription;
   Timer? _geofenceCheckTimer;
+  Timer? _positionWatchdogTimer;
 
   // Current state
   String? _userId;
@@ -38,6 +39,7 @@ class SessionTrackingService {
   Position? _lastPosition;
   Position? _lastSentPosition;
   DateTime? _lastSentAt;
+  DateTime? _lastPositionAt;
   List<TerritoryAssignment> _assignedTerritories = [];
 
   // Settings
@@ -46,6 +48,8 @@ class SessionTrackingService {
   bool _autoCheckOut = true;
   Duration _minSendInterval = const Duration(seconds: 3);
   double _minSendDistanceMeters = 8;
+  Duration _watchdogInterval = const Duration(seconds: 20);
+  Duration _maxPositionSilence = const Duration(seconds: 75);
 
   // Callbacks
   OnTerritoryEntered? onTerritoryEntered;
@@ -171,12 +175,16 @@ class SessionTrackingService {
       // Start location updates
       await _startLocationUpdates();
       debugPrint('[SessionTracking] Location updates started');
+      _lastPositionAt = DateTime.now().toUtc();
       _lastSentAt = null;
       _lastSentPosition = null;
 
       // Start geofence check timer
       _geofenceCheckTimer = Timer.periodic(_geofenceCheckInterval, (_) {
         _checkGeofence();
+      });
+      _positionWatchdogTimer = Timer.periodic(_watchdogInterval, (_) {
+        _ensurePositionStreamHealthy();
       });
 
       _isTracking = true;
@@ -198,6 +206,8 @@ class SessionTrackingService {
 
     _geofenceCheckTimer?.cancel();
     _geofenceCheckTimer = null;
+    _positionWatchdogTimer?.cancel();
+    _positionWatchdogTimer = null;
 
     _isTracking = false;
     debugPrint('SessionTracking: Stopped tracking');
@@ -236,14 +246,59 @@ class SessionTrackingService {
         Geolocator.getPositionStream(locationSettings: locationSettings).listen(
           (Position position) {
             _lastPosition = position;
+            _lastPositionAt = DateTime.now().toUtc();
             onLocationUpdated?.call(position);
             _sendLocationUpdate(position);
           },
           onError: (error) {
             debugPrint('SessionTracking: Location error: $error');
             onTrackingError?.call(error.toString());
+            unawaited(_restartLocationStream());
+          },
+          onDone: () {
+            debugPrint('SessionTracking: Position stream closed; restarting');
+            unawaited(_restartLocationStream());
           },
         );
+  }
+
+  Future<void> _restartLocationStream() async {
+    if (!_isTracking) return;
+    try {
+      await _positionSubscription?.cancel();
+      _positionSubscription = null;
+      await _startLocationUpdates();
+    } catch (e) {
+      debugPrint('SessionTracking: Failed restarting stream: $e');
+    }
+  }
+
+  Future<void> _ensurePositionStreamHealthy() async {
+    if (!_isTracking) return;
+    final now = DateTime.now().toUtc();
+    final lastTick = _lastPositionAt;
+    if (lastTick != null && now.difference(lastTick) <= _maxPositionSilence) {
+      return;
+    }
+
+    debugPrint(
+      'SessionTracking: No GPS updates for ${lastTick == null ? 'unknown' : now.difference(lastTick).inSeconds}s; repairing stream',
+    );
+    await _restartLocationStream();
+
+    // Kick one immediate fix if stream is quiet due to platform throttling.
+    try {
+      final pos = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.high,
+        timeLimit: const Duration(seconds: 8),
+      );
+      _lastPosition = pos;
+      _lastPositionAt = DateTime.now().toUtc();
+      onLocationUpdated?.call(pos);
+      await _sendLocationUpdate(pos);
+    } catch (e) {
+      debugPrint('SessionTracking: Watchdog currentPosition failed: $e');
+    }
   }
 
   /// Send location update to server

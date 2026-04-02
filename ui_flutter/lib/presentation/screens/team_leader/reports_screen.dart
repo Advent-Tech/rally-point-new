@@ -141,6 +141,9 @@ class _OverviewTab extends StatelessWidget {
 
         if (state is DashboardLoaded) {
           final stats = state.stats;
+          final recentBookSales = state.recentActivity
+              .where((a) => a.type == 'book_sale')
+              .length;
           return SingleChildScrollView(
             padding: const EdgeInsets.all(16),
             child: Column(
@@ -190,7 +193,9 @@ class _OverviewTab extends StatelessWidget {
                       child: _MetricCard(
                         title: 'Donations',
                         value: '${stats.totalDonations}',
-                        subtitle: 'Collected',
+                        subtitle: recentBookSales > 0
+                            ? '$recentBookSales recent books'
+                            : 'Collected',
                         icon: Icons.volunteer_activism,
                         color: AppColors.secondary,
                         isDark: isDark,
@@ -1370,6 +1375,8 @@ class _ActivityItem extends StatelessWidget {
         return Icons.local_shipping;
       case 'donation':
         return Icons.volunteer_activism;
+      case 'book_sale':
+        return Icons.menu_book_rounded;
       default:
         return Icons.event;
     }
@@ -1387,6 +1394,8 @@ class _ActivityItem extends StatelessWidget {
         return AppColors.primary;
       case 'donation':
         return AppColors.accent;
+      case 'book_sale':
+        return AppColors.warning;
       default:
         return AppColors.secondary;
     }
@@ -1404,6 +1413,8 @@ class _ActivityItem extends StatelessWidget {
         return 'Delivery';
       case 'donation':
         return 'Donation';
+      case 'book_sale':
+        return 'Book sale';
       default:
         return type;
     }

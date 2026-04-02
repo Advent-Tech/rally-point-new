@@ -94,6 +94,10 @@ class FollowWorkerEvent extends CommandCenterEvent {
   List<Object?> get props => [workerId];
 }
 
+class RecenterFollowEvent extends CommandCenterEvent {
+  const RecenterFollowEvent();
+}
+
 class SeedFollowPathEvent extends CommandCenterEvent {
   final String workerId;
   final List<Position> path;

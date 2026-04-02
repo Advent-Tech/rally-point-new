@@ -1,3 +1,6 @@
+import 'dart:async';
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
@@ -40,6 +43,9 @@ class _CommandCenterScreenState extends State<CommandCenterScreen> {
   final _showcaseWorkerSheet = GlobalKey();
   final _showcaseTerritorySheet = GlobalKey();
   bool _coachMarksBusy = false;
+  bool _coachMarksActive = false;
+  bool _showRecenterButton = false;
+  Timer? _followMonitorTimer;
   final Set<String> _coachMarksShownThisSession = <String>{};
 
   @override
@@ -53,10 +59,12 @@ class _CommandCenterScreenState extends State<CommandCenterScreen> {
     // Initialize realtime bridge
     _realtimeBridge = RealtimeBridge(bloc: bloc);
     context.read<WebSocketService>().connect();
+    _startFollowMonitor();
   }
 
   @override
   void dispose() {
+    _followMonitorTimer?.cancel();
     _commandController?.dispose();
     _realtimeBridge.dispose();
     super.dispose();
@@ -68,6 +76,63 @@ class _CommandCenterScreenState extends State<CommandCenterScreen> {
       mapController: controller,
       bloc: context.read<CommandCenterBloc>(),
     );
+  }
+
+  void _startFollowMonitor() {
+    _followMonitorTimer?.cancel();
+    _followMonitorTimer = Timer.periodic(const Duration(milliseconds: 1200), (
+      _,
+    ) async {
+      if (!mounted || _mapController == null) return;
+      final state = context.read<CommandCenterBloc>().state;
+      final followId = state.followTarget;
+      if (followId == null || followId.isEmpty) {
+        if (_showRecenterButton) {
+          setState(() => _showRecenterButton = false);
+        }
+        return;
+      }
+      final pos = state.liveLocations[followId];
+      if (pos == null) {
+        if (_showRecenterButton) {
+          setState(() => _showRecenterButton = false);
+        }
+        return;
+      }
+      try {
+        final camera = await _mapController!.getCameraState();
+        final center = camera.center.coordinates;
+        final distanceMeters = _distanceMeters(
+          center.lat.toDouble(),
+          center.lng.toDouble(),
+          pos.latitude,
+          pos.longitude,
+        );
+        final shouldShow = distanceMeters > 120;
+        if (shouldShow != _showRecenterButton && mounted) {
+          setState(() => _showRecenterButton = shouldShow);
+        }
+      } catch (_) {}
+    });
+  }
+
+  double _distanceMeters(
+    double lat1,
+    double lon1,
+    double lat2,
+    double lon2,
+  ) {
+    const radius = 6371000.0;
+    final dLat = (lat2 - lat1) * math.pi / 180.0;
+    final dLon = (lon2 - lon1) * math.pi / 180.0;
+    final a =
+        math.sin(dLat / 2) * math.sin(dLat / 2) +
+        math.cos(lat1 * math.pi / 180.0) *
+            math.cos(lat2 * math.pi / 180.0) *
+            math.sin(dLon / 2) *
+            math.sin(dLon / 2);
+    final c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a));
+    return radius * c;
   }
 
   void _maybeShowModeCoachMarks(cc.MapMode mode) {
@@ -119,11 +184,22 @@ class _CommandCenterScreenState extends State<CommandCenterScreen> {
           _coachMarksBusy = false;
           return;
         }
+        _coachMarksActive = true;
         ShowcaseView.get().startShowCase(keys);
+        // Safety fallback: never allow coach marks to block interaction forever.
+        Future.delayed(const Duration(seconds: 8), () {
+          if (!mounted) return;
+          if (_coachMarksActive) {
+            ShowcaseView.get().dismiss();
+            _coachMarksActive = false;
+            _coachMarksBusy = false;
+          }
+        });
         Future.wait<void>([
           if (!commonShown) CoachMarksService().markAsShown(commonStepId),
           if (!modeShown) CoachMarksService().markAsShown(modeStepId),
         ]).whenComplete(() {
+          _coachMarksActive = false;
           _coachMarksShownThisSession.add(commonStepId);
           _coachMarksShownThisSession.add(modeStepId);
           _coachMarksBusy = false;
@@ -135,10 +211,21 @@ class _CommandCenterScreenState extends State<CommandCenterScreen> {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final tooltipBg = isDark ? const Color(0xFF1F2937) : Colors.white;
+    final tooltipTitleStyle = TextStyle(
+      color: isDark ? Colors.white : const Color(0xFF111827),
+      fontWeight: FontWeight.w700,
+      fontSize: 15,
+    );
+    final tooltipDescStyle = TextStyle(
+      color: isDark ? const Color(0xFFE5E7EB) : const Color(0xFF374151),
+      fontSize: 13,
+      height: 1.3,
+    );
     final topInset = MediaQuery.of(context).padding.top;
     final backButtonTop = topInset + 8;
     final modeTabsTop = topInset + 52;
-    final followBannerTop = topInset + 150;
+    final followBannerTop = topInset + 128;
     return ShowCaseWidget(
       enableAutoScroll: true,
       builder: (_) => Scaffold(
@@ -178,6 +265,9 @@ class _CommandCenterScreenState extends State<CommandCenterScreen> {
                     title: 'Map Tabs',
                     description:
                         'Switch between Overview, Workers and Territories to manage operations.',
+                    tooltipBackgroundColor: tooltipBg,
+                    titleTextStyle: tooltipTitleStyle,
+                    descTextStyle: tooltipDescStyle,
                     child: const ModeSelector(),
                   ),
                 ),
@@ -217,6 +307,9 @@ class _CommandCenterScreenState extends State<CommandCenterScreen> {
                     title: 'Map Controls',
                     description:
                         'Use zoom, layer and style controls to inspect field activity clearly.',
+                    tooltipBackgroundColor: tooltipBg,
+                    titleTextStyle: tooltipTitleStyle,
+                    descTextStyle: tooltipDescStyle,
                     child: MapControls(mapController: _mapController),
                   ),
                 ),
@@ -235,6 +328,9 @@ class _CommandCenterScreenState extends State<CommandCenterScreen> {
                           title: 'Overview Summary',
                           description:
                               'This bar summarizes active workers, donations and prayer records.',
+                          tooltipBackgroundColor: tooltipBg,
+                          titleTextStyle: tooltipTitleStyle,
+                          descTextStyle: tooltipDescStyle,
                           child: const OverviewStatsBar(),
                         ),
                       ),
@@ -243,9 +339,12 @@ class _CommandCenterScreenState extends State<CommandCenterScreen> {
                     if (state.followTarget != null)
                       Positioned(
                         top: followBannerTop,
-                        left: 0,
-                        right: 0,
-                        child: const FollowModeBanner(),
+                        left: 16,
+                        right: 16,
+                        child: const Align(
+                          alignment: Alignment.topCenter,
+                          child: FollowModeBanner(),
+                        ),
                       ),
 
                     if (state.breachedWorkerIds.isNotEmpty)
@@ -258,6 +357,22 @@ class _CommandCenterScreenState extends State<CommandCenterScreen> {
                         child: const BreachAlertBanner(),
                       ),
 
+                    if (state.followTarget != null && _showRecenterButton)
+                      Positioned(
+                        right: 16,
+                        bottom: 248,
+                        child: FloatingActionButton.small(
+                          heroTag: 'recenter_follow',
+                          onPressed: () {
+                            context.read<CommandCenterBloc>().add(
+                              const RecenterFollowEvent(),
+                            );
+                            setState(() => _showRecenterButton = false);
+                          },
+                          child: const Icon(Icons.my_location),
+                        ),
+                      ),
+
                     // Worker bottom sheet
                     if (state.mapMode == cc.MapMode.workers)
                       Showcase(
@@ -265,6 +380,9 @@ class _CommandCenterScreenState extends State<CommandCenterScreen> {
                         title: 'Workers Panel',
                         description:
                             'Tap a worker to view details, and follow to track live movement.',
+                        tooltipBackgroundColor: tooltipBg,
+                        titleTextStyle: tooltipTitleStyle,
+                        descTextStyle: tooltipDescStyle,
                         child: const WorkerBottomSheet(),
                       ),
 
@@ -275,6 +393,9 @@ class _CommandCenterScreenState extends State<CommandCenterScreen> {
                         title: 'Territories Panel',
                         description:
                             'Review assigned territories and progress. If empty, ask admin to assign.',
+                        tooltipBackgroundColor: tooltipBg,
+                        titleTextStyle: tooltipTitleStyle,
+                        descTextStyle: tooltipDescStyle,
                         child: const TerritoryBottomSheet(),
                       ),
 

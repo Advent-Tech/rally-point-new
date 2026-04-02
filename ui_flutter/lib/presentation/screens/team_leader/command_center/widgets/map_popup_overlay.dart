@@ -82,7 +82,10 @@ class _MapPopupOverlayState extends State<MapPopupOverlay> {
               else if (_anchor != null)
                 Positioned(
                   left: (_anchor!.dx - 170).clamp(12.0, 100000.0),
-                  top: (_anchor!.dy - 160).clamp(80.0, 100000.0),
+                  top: (_anchor!.dy - 160).clamp(
+                    MediaQuery.of(context).padding.top + 138.0,
+                    100000.0,
+                  ),
                   child: card,
                 )
               else
@@ -201,7 +204,10 @@ class _PopupCard extends StatelessWidget {
         break;
       case cc.MapPopupKind.worker:
         final w = _findWorker(state);
-        final hasAnyLocation = state.liveLocations.containsKey(popup.id);
+        final workerPos = state.liveLocations[popup.id];
+        final hasAnyLocation =
+            workerPos != null &&
+            _isValidLocation(workerPos.latitude, workerPos.longitude);
         final isGpsLive = state.gpsLiveWorkerIds.contains(popup.id);
         final isApiOnline = w?.isOnline == true;
         final updatedAt = state.liveLocationUpdatedAt[popup.id];
@@ -222,8 +228,19 @@ class _PopupCard extends StatelessWidget {
                         ? 'GPS Live'
                         : (hasAnyLocation
                               ? 'Last known (entry)'
-                              : (isApiOnline ? 'Online (no GPS)' : 'Offline')),
+                              : (isApiOnline
+                                    ? 'Online (no valid location yet)'
+                                    : 'Offline')),
                   ),
+                  if (!hasAnyLocation) ...[
+                    const SizedBox(height: 6),
+                    Text(
+                      'Follow is unavailable until valid GPS coordinates arrive.',
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
                   if (updatedAt != null) ...[
                     const SizedBox(height: 6),
                     Text('Updated ${_formatFreshness(updatedAt)}'),
@@ -304,16 +321,24 @@ class _PopupCard extends StatelessWidget {
                     child: const Text('View'),
                   ),
                   cc.MapPopupKind.worker => FilledButton(
-                    onPressed: () {
-                      context.read<CommandCenterBloc>().add(
-                        FollowWorkerEvent(
-                          workerId: state.followTarget == popup.id ? null : popup.id,
-                        ),
-                      );
-                      context.read<CommandCenterBloc>().add(
-                        HideMapPopupEvent(),
-                      );
-                    },
+                    onPressed: (() {
+                          final pos = state.liveLocations[popup.id];
+                          return pos != null &&
+                              _isValidLocation(pos.latitude, pos.longitude);
+                        })()
+                        ? () {
+                            context.read<CommandCenterBloc>().add(
+                              FollowWorkerEvent(
+                                workerId: state.followTarget == popup.id
+                                    ? null
+                                    : popup.id,
+                              ),
+                            );
+                            context.read<CommandCenterBloc>().add(
+                              HideMapPopupEvent(),
+                            );
+                          }
+                        : null,
                     child: Text(state.followTarget == popup.id ? 'Stop' : 'Follow'),
                   ),
                   _ => TextButton(
@@ -338,5 +363,12 @@ class _PopupCard extends StatelessWidget {
     if (age.inSeconds < 60) return '${age.inSeconds}s ago';
     if (age.inMinutes < 60) return '${age.inMinutes}m ago';
     return '${age.inHours}h ago';
+  }
+
+  bool _isValidLocation(double lat, double lng) {
+    if (lat == 0.0 && lng == 0.0) return false;
+    if (lat < -90 || lat > 90) return false;
+    if (lng < -180 || lng > 180) return false;
+    return true;
   }
 }

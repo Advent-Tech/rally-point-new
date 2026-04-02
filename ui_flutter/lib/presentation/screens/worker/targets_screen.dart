@@ -118,7 +118,9 @@ class _TargetsScreenState extends State<TargetsScreen> {
     for (final target in _targets) {
       final assignment = target['assignment'] as Map<String, dynamic>? ?? {};
       final targetInfo = assignment['target'] as Map<String, dynamic>? ?? {};
-      final targetType = targetInfo['target_type']?.toString() ?? 'other';
+      final targetType = _normalizeTargetType(
+        targetInfo['target_type']?.toString(),
+      );
 
       groupedTargets.putIfAbsent(targetType, () => []).add(target);
     }
@@ -246,6 +248,9 @@ class _TargetsScreenState extends State<TargetsScreen> {
         return 'Territories';
       case 'donation':
         return 'Donations';
+      case 'book_sale':
+      case 'book':
+        return 'Book Sales';
       case 'prayer':
         return 'Prayer Requests';
       case 'visit':
@@ -253,7 +258,7 @@ class _TargetsScreenState extends State<TargetsScreen> {
       case 'session':
         return 'Sessions';
       default:
-        return type[0].toUpperCase() + type.substring(1);
+        return _toTitle(type);
     }
   }
 
@@ -263,6 +268,9 @@ class _TargetsScreenState extends State<TargetsScreen> {
         return Icons.map_outlined;
       case 'donation':
         return Icons.volunteer_activism_outlined;
+      case 'book_sale':
+      case 'book':
+        return Icons.menu_book_rounded;
       case 'prayer':
         return Icons.church;
       case 'visit':
@@ -280,6 +288,9 @@ class _TargetsScreenState extends State<TargetsScreen> {
         return AppColors.secondary;
       case 'donation':
         return AppColors.accent;
+      case 'book_sale':
+      case 'book':
+        return AppColors.warning;
       case 'prayer':
         return AppColors.warning;
       case 'visit':
@@ -289,6 +300,18 @@ class _TargetsScreenState extends State<TargetsScreen> {
       default:
         return AppColors.primary;
     }
+  }
+
+  String _normalizeTargetType(String? rawType) {
+    final normalized = (rawType ?? '').trim().toLowerCase();
+    if (normalized.isEmpty) return 'other';
+    if (normalized == 'book' || normalized == 'booksale') return 'book_sale';
+    return normalized;
+  }
+
+  String _toTitle(String value) {
+    if (value.isEmpty) return 'Other';
+    return value[0].toUpperCase() + value.substring(1);
   }
 }
 

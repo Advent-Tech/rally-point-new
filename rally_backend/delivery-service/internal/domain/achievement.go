@@ -12,6 +12,7 @@ type AchievementLevel string
 const (
 	AchievementCategoryTerritory AchievementCategory = "territory"
 	AchievementCategoryDonation  AchievementCategory = "donation"
+	AchievementCategoryBookSale  AchievementCategory = "book_sale"
 	AchievementCategoryPrayer    AchievementCategory = "prayer"
 	AchievementCategoryVisit     AchievementCategory = "visit"
 	AchievementCategoryStreak    AchievementCategory = "streak"
@@ -60,6 +61,7 @@ type WorkerLevel struct {
 	LevelProgress   float64   `json:"level_progress"`
 	TerritoryBadges int       `json:"territory_badges"`
 	DonationBadges  int       `json:"donation_badges"`
+	BookSaleBadges  int       `json:"book_sale_badges"`
 	PrayerBadges    int       `json:"prayer_badges"`
 	VisitBadges     int       `json:"visit_badges"`
 	StreakBadges    int       `json:"streak_badges"`

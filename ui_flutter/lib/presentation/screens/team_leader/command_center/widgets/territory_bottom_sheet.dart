@@ -17,7 +17,7 @@ class _TerritoryBottomSheetState extends State<TerritoryBottomSheet> {
   static const double _collapsedSize = 0.12;
   static const double _midSize = 0.32;
   static const double _maxSize = 0.60;
-  static const double _topInteractiveSafeArea = 108;
+  static const double _topInteractiveSafeAreaBase = 170;
   double _currentSize = _midSize;
 
   @override
@@ -33,10 +33,12 @@ class _TerritoryBottomSheetState extends State<TerritoryBottomSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final topInteractiveSafeArea =
+        MediaQuery.of(context).padding.top + _topInteractiveSafeAreaBase;
     return Stack(
       children: [
         Positioned.fill(
-          top: _topInteractiveSafeArea,
+          top: topInteractiveSafeArea,
           child: IgnorePointer(
             ignoring: _currentSize <= _collapsedSize + 0.01,
             child: GestureDetector(
@@ -56,7 +58,12 @@ class _TerritoryBottomSheetState extends State<TerritoryBottomSheet> {
         ),
         NotificationListener<DraggableScrollableNotification>(
           onNotification: (notification) {
-            _currentSize = notification.extent;
+            final newSize = notification.extent;
+            if ((newSize - _currentSize).abs() > 0.002 && mounted) {
+              setState(() => _currentSize = newSize);
+            } else {
+              _currentSize = newSize;
+            }
             return false;
           },
           child: DraggableScrollableSheet(

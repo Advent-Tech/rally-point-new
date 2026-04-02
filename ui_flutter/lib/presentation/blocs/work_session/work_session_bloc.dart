@@ -72,6 +72,9 @@ class WorkSessionBloc extends Bloc<WorkSessionEvent, WorkSessionState> {
           await _localStorage?.saveCurrentWorkSession(sessionData);
 
           if (_currentSession!.isActive) {
+            _autoTrackingEnabled = true;
+            _trackingService ??= await SessionTrackingService.getInstance();
+            await _startTrackingService();
             final visits = await _fetchTodayVisits();
             emit(
               WorkSessionActive(session: _currentSession!, todayVisits: visits),
@@ -93,6 +96,9 @@ class WorkSessionBloc extends Bloc<WorkSessionEvent, WorkSessionState> {
       if (cachedSession != null) {
         _currentSession = WorkSession.fromJson(cachedSession);
         if (_currentSession!.isActive) {
+          _autoTrackingEnabled = true;
+          _trackingService ??= await SessionTrackingService.getInstance();
+          await _startTrackingService();
           final visits = await _fetchTodayVisits();
           emit(
             WorkSessionActive(session: _currentSession!, todayVisits: visits),
@@ -212,6 +218,8 @@ class WorkSessionBloc extends Bloc<WorkSessionEvent, WorkSessionState> {
         // Backend wraps session in {"session": {...}, "message": "..."}
         final sessionData = response.data['session'] ?? response.data;
         final lastSession = WorkSession.fromJson(sessionData);
+        await _trackingService?.stopTracking();
+        _autoTrackingEnabled = false;
         _currentSession = null;
         await _localStorage?.clearCurrentWorkSession();
 
@@ -330,6 +338,7 @@ class WorkSessionBloc extends Bloc<WorkSessionEvent, WorkSessionState> {
   /// Start the tracking service with all callbacks
   Future<void> _startTrackingService() async {
     if (_trackingService == null) return;
+    if (_trackingService!.isTracking) return;
 
     debugPrint('[WorkSessionBloc] Starting tracking...');
     // Set up callbacks

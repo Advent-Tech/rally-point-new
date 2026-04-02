@@ -121,9 +121,15 @@ class CommandCenterCameraController {
     // User gesture always wins
     if (newPriority == CameraPriority.userGesture) return true;
 
-    // Follow mode can only be overridden by user gesture
+    // While following, allow follow updates (same priority) and user gesture.
     if (_currentPriority == CameraPriority.follow) {
-      return newPriority == CameraPriority.userGesture;
+      return newPriority == CameraPriority.follow ||
+          newPriority == CameraPriority.userGesture;
+    }
+
+    // If user is interacting, still allow explicit follow from UI action.
+    if (_currentPriority == CameraPriority.userGesture) {
+      return newPriority == CameraPriority.follow;
     }
 
     // Otherwise, higher priority wins

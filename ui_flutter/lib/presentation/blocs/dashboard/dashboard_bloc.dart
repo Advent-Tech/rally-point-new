@@ -238,21 +238,37 @@ class DashboardBloc extends Bloc<DashboardEvent, DashboardState> {
 
     // Add delivery activities
     for (var delivery in deliveries) {
+      final deliveryType = (delivery['delivery_type'] ?? '')
+          .toString()
+          .toLowerCase();
+      final isBookSale = deliveryType == 'book_sale';
+      final amount = (delivery['donation_amount'] as num?)?.toDouble() ?? 0.0;
+      final bookTitle =
+          delivery['book_title']?.toString().trim().isNotEmpty == true
+          ? delivery['book_title'].toString().trim()
+          : 'Book';
+
       activities.add(
         TeamActivity(
           id: delivery['id']?.toString() ?? '',
-          type: 'delivery',
+          type: isBookSale ? 'book_sale' : 'delivery',
           workerId: delivery['worker_id']?.toString() ?? '',
           workerName: delivery['worker_name']?.toString() ?? 'Worker',
-          description:
-              'Delivered to ${delivery['recipient_name'] ?? 'recipient'}',
+          description: isBookSale
+              ? 'Sold $bookTitle: \$${amount.toStringAsFixed(2)}'
+              : 'Delivered to ${delivery['recipient_name'] ?? 'recipient'}',
           territoryName: delivery['address']?.toString(),
           address: delivery['address']?.toString(),
           timestamp: delivery['created_at'] != null
               ? DateTime.tryParse(delivery['created_at'].toString()) ??
                     DateTime.now()
               : DateTime.now(),
-          metadata: {'status': delivery['status'], 'type': 'delivery'},
+          metadata: {
+            'status': delivery['status'],
+            'type': isBookSale ? 'book_sale' : 'delivery',
+            if (isBookSale) 'book_title': delivery['book_title'],
+            if (isBookSale) 'amount': amount,
+          },
         ),
       );
     }

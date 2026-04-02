@@ -138,7 +138,7 @@ class _TeamLeaderDashboardState extends State<TeamLeaderDashboard> {
         key: _showcaseReports,
         title: 'Reports & Analytics',
         description:
-            'Review donations, activity and worker performance in one place.',
+            'Review donations, book sales, activity, and worker performance in one place.',
         child: _ManagementTile(
           icon: Icons.analytics_outlined,
           title: 'Reports & Analytics',
@@ -831,6 +831,12 @@ class _ActivityCard extends StatelessWidget {
         return AppColors.warning;
       case 'visit':
         return AppColors.primary;
+      case 'delivery':
+        return AppColors.info;
+      case 'donation':
+        return AppColors.accent;
+      case 'book_sale':
+        return AppColors.warning;
       case 'assignment':
         return AppColors.secondary;
       default:
@@ -846,6 +852,12 @@ class _ActivityCard extends StatelessWidget {
         return 'CHECK OUT';
       case 'visit':
         return 'VISIT';
+      case 'delivery':
+        return 'DELIVERY';
+      case 'donation':
+        return 'DONATION';
+      case 'book_sale':
+        return 'BOOK SALE';
       case 'assignment':
         return 'ASSIGNED';
       default:
@@ -861,6 +873,12 @@ class _ActivityCard extends StatelessWidget {
         return 'Finished working on territory';
       case 'visit':
         return activity.address ?? 'Visited a household';
+      case 'delivery':
+        return 'Completed a delivery';
+      case 'donation':
+        return 'Collected donation';
+      case 'book_sale':
+        return 'Recorded a book sale';
       case 'assignment':
         return 'New territory assigned';
       default:

@@ -651,3 +651,20 @@ func (r *deliveryRepository) GetCompletedTerritoryCount(workerID uuid.UUID) (int
 	).Scan(&count)
 	return count, err
 }
+
+// GetWorkerCollectionStatsByType returns total completed collections and amount for a specific delivery_type.
+func (r *deliveryRepository) GetWorkerCollectionStatsByType(workerID uuid.UUID, deliveryType string) (count int, amount float64, err error) {
+	err = r.db.QueryRow(
+		`SELECT 
+			COUNT(*)::int,
+			COALESCE(SUM(COALESCE(donation_amount, 0)), 0)::float8
+		FROM deliveries
+		WHERE worker_id = $1
+		  AND status = 'completed'
+		  AND delivery_type = $2
+		  AND COALESCE(donation_amount, 0) > 0`,
+		workerID,
+		deliveryType,
+	).Scan(&count, &amount)
+	return count, amount, err
+}
