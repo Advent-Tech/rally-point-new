@@ -51,6 +51,12 @@ class DashboardBloc extends Bloc<DashboardEvent, DashboardState> {
       final deliveries = results[3] as List<dynamic>;
       final donations = results[4] as List<dynamic>;
       final prayers = results[5] as List<dynamic>;
+      final totalBookSales = deliveries.where((delivery) {
+        final deliveryType = (delivery['delivery_type'] ?? '')
+            .toString()
+            .toLowerCase();
+        return deliveryType == 'book_sale';
+      }).length;
 
       // Calculate completion percentage based on deliveries vs total housing units
       // This is more accurate than using completeness_percentage from API which may not update with deliveries
@@ -120,6 +126,8 @@ class DashboardBloc extends Bloc<DashboardEvent, DashboardState> {
         visitsThisWeek: _countVisitsThisWeek(deliveries, donations),
         totalDeliveries: deliveries.length,
         totalDonations: donations.length,
+        totalBookSales: totalBookSales,
+        totalPrayers: prayers.length,
       );
 
       // Build territory stats from assignments with delivery counts

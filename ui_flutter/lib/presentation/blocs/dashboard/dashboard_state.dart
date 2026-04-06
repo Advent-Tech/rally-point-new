@@ -52,6 +52,8 @@ class TeamDashboardStats extends Equatable {
   final int visitsThisWeek;
   final int totalDeliveries;
   final int totalDonations;
+  final int totalBookSales;
+  final int totalPrayers;
 
   const TeamDashboardStats({
     this.totalMembers = 0,
@@ -62,6 +64,8 @@ class TeamDashboardStats extends Equatable {
     this.visitsThisWeek = 0,
     this.totalDeliveries = 0,
     this.totalDonations = 0,
+    this.totalBookSales = 0,
+    this.totalPrayers = 0,
   });
 
   factory TeamDashboardStats.fromJson(Map<String, dynamic> json) {
@@ -77,6 +81,8 @@ class TeamDashboardStats extends Equatable {
       visitsThisWeek: json['visits_this_week'] ?? json['visitsThisWeek'] ?? 0,
       totalDeliveries: json['total_deliveries'] ?? json['totalDeliveries'] ?? 0,
       totalDonations: json['total_donations'] ?? json['totalDonations'] ?? 0,
+      totalBookSales: json['total_book_sales'] ?? json['totalBookSales'] ?? 0,
+      totalPrayers: json['total_prayers'] ?? json['totalPrayers'] ?? 0,
     );
   }
 
@@ -90,6 +96,8 @@ class TeamDashboardStats extends Equatable {
     visitsThisWeek,
     totalDeliveries,
     totalDonations,
+    totalBookSales,
+    totalPrayers,
   ];
 }
 

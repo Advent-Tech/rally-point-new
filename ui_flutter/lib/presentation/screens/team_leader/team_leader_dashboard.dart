@@ -413,6 +413,44 @@ class _TeamLeaderDashboardState extends State<TeamLeaderDashboard> {
                       ),
                     ),
 
+                    // Impact Snapshot (Donations / Book Sales / Prayers)
+                    SliverToBoxAdapter(
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 20),
+                        child: BlocBuilder<DashboardBloc, DashboardState>(
+                          builder: (context, state) {
+                            final stats = state is DashboardLoaded
+                                ? state.stats
+                                : const TeamDashboardStats();
+                            final isLoading = state is DashboardLoading;
+                            return Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const SizedBox(height: 24),
+                                Text(
+                                  'Impact Snapshot',
+                                  style: Theme.of(context).textTheme.titleMedium
+                                      ?.copyWith(fontWeight: FontWeight.bold),
+                                ),
+                                const SizedBox(height: 12),
+                                if (isLoading)
+                                  const SkeletonOverviewGrid()
+                                else
+                                  _ImpactMetroBoard(
+                                    isDark: isDark,
+                                    donations: stats.totalDonations,
+                                    bookSales: stats.totalBookSales,
+                                    prayers: stats.totalPrayers,
+                                    onTapReports: () =>
+                                        context.push('/leader/reports'),
+                                  ),
+                              ],
+                            );
+                          },
+                        ),
+                      ),
+                    ),
+
                     const SliverToBoxAdapter(child: SizedBox(height: 24)),
 
                     // Management Actions
@@ -621,6 +659,156 @@ class _OverviewCard extends StatelessWidget {
           Text(
             label,
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              color: isDark
+                  ? AppColors.textSecondaryDark
+                  : AppColors.textSecondaryLight,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ImpactMetroBoard extends StatelessWidget {
+  final bool isDark;
+  final int donations;
+  final int bookSales;
+  final int prayers;
+  final VoidCallback onTapReports;
+
+  const _ImpactMetroBoard({
+    required this.isDark,
+    required this.donations,
+    required this.bookSales,
+    required this.prayers,
+    required this.onTapReports,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: isDark ? AppColors.surfaceDark : AppColors.surfaceLight,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: isDark ? AppColors.borderDark : AppColors.borderLight,
+        ),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            flex: 6,
+            child: _ImpactTile(
+              icon: Icons.favorite,
+              label: 'Donations',
+              value: '$donations',
+              color: AppColors.success,
+              isDark: isDark,
+              compact: false,
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            flex: 4,
+            child: Column(
+              children: [
+                _ImpactTile(
+                  icon: Icons.menu_book_rounded,
+                  label: 'Books',
+                  value: '$bookSales',
+                  color: const Color(0xFFF59E0B),
+                  isDark: isDark,
+                  compact: true,
+                ),
+                const SizedBox(height: 10),
+                _ImpactTile(
+                  icon: Icons.volunteer_activism,
+                  label: 'Prayers',
+                  value: '$prayers',
+                  color: AppColors.accent,
+                  isDark: isDark,
+                  compact: true,
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 10),
+          InkWell(
+            onTap: onTapReports,
+            borderRadius: BorderRadius.circular(14),
+            child: Container(
+              width: 42,
+              height: 42,
+              decoration: BoxDecoration(
+                color: AppColors.primary.withAlpha(24),
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: const Icon(
+                Icons.analytics_outlined,
+                color: AppColors.primary,
+                size: 20,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ImpactTile extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String value;
+  final Color color;
+  final bool isDark;
+  final bool compact;
+
+  const _ImpactTile({
+    required this.icon,
+    required this.label,
+    required this.value,
+    required this.color,
+    required this.isDark,
+    required this.compact,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: compact ? 74 : 158,
+      padding: EdgeInsets.all(compact ? 10 : 14),
+      decoration: BoxDecoration(
+        color: color.withAlpha(isDark ? 32 : 20),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: color.withAlpha(55)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Container(
+            width: compact ? 28 : 34,
+            height: compact ? 28 : 34,
+            decoration: BoxDecoration(
+              color: Colors.white.withAlpha(isDark ? 18 : 180),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Icon(icon, color: color, size: compact ? 15 : 18),
+          ),
+          Text(
+            value,
+            style: Theme.of(context).textTheme.titleLarge?.copyWith(
+              fontWeight: FontWeight.w800,
+              height: 1.0,
+            ),
+          ),
+          Text(
+            label,
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              fontWeight: FontWeight.w600,
               color: isDark
                   ? AppColors.textSecondaryDark
                   : AppColors.textSecondaryLight,

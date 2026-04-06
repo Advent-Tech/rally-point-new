@@ -141,9 +141,6 @@ class _OverviewTab extends StatelessWidget {
 
         if (state is DashboardLoaded) {
           final stats = state.stats;
-          final recentBookSales = state.recentActivity
-              .where((a) => a.type == 'book_sale')
-              .length;
           return SingleChildScrollView(
             padding: const EdgeInsets.all(16),
             child: Column(
@@ -154,11 +151,11 @@ class _OverviewTab extends StatelessWidget {
                   children: [
                     Expanded(
                       child: _MetricCard(
-                        title: 'Deliveries',
-                        value: '${stats.totalDeliveries}',
-                        subtitle: 'Total',
-                        icon: Icons.local_shipping,
-                        color: AppColors.primary,
+                        title: 'Book Sales',
+                        value: '${stats.totalBookSales}',
+                        subtitle: 'Sold',
+                        icon: Icons.menu_book_rounded,
+                        color: const Color(0xFFF59E0B),
                         isDark: isDark,
                       ),
                     ),
@@ -193,9 +190,7 @@ class _OverviewTab extends StatelessWidget {
                       child: _MetricCard(
                         title: 'Donations',
                         value: '${stats.totalDonations}',
-                        subtitle: recentBookSales > 0
-                            ? '$recentBookSales recent books'
-                            : 'Collected',
+                        subtitle: 'Collected',
                         icon: Icons.volunteer_activism,
                         color: AppColors.secondary,
                         isDark: isDark,
@@ -757,10 +752,17 @@ class _MetricCard extends StatelessWidget {
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: isDark ? AppColors.surfaceDark : AppColors.surfaceLight,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: isDark ? AppColors.borderDark : AppColors.borderLight,
+          color: color.withAlpha(isDark ? 90 : 65),
         ),
+        boxShadow: [
+          BoxShadow(
+            color: color.withAlpha(isDark ? 16 : 12),
+            blurRadius: 14,
+            offset: const Offset(0, 6),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -768,12 +770,19 @@ class _MetricCard extends StatelessWidget {
           Row(
             children: [
               Container(
-                padding: const EdgeInsets.all(8),
+                padding: const EdgeInsets.all(9),
                 decoration: BoxDecoration(
-                  color: color.withAlpha(30),
-                  borderRadius: BorderRadius.circular(8),
+                  gradient: LinearGradient(
+                    colors: [
+                      color.withAlpha(isDark ? 80 : 55),
+                      color.withAlpha(isDark ? 44 : 28),
+                    ],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  borderRadius: BorderRadius.circular(10),
                 ),
-                child: Icon(icon, color: color, size: 20),
+                child: Icon(icon, color: color, size: 19),
               ),
               const Spacer(),
             ],
@@ -783,12 +792,16 @@ class _MetricCard extends StatelessWidget {
             value,
             style: Theme.of(
               context,
-            ).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
+            ).textTheme.headlineSmall?.copyWith(
+              fontWeight: FontWeight.w800,
+              letterSpacing: -0.3,
+            ),
           ),
           const SizedBox(height: 4),
           Text(
             title,
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+              fontWeight: FontWeight.w600,
               color: isDark
                   ? AppColors.textSecondaryDark
                   : AppColors.textSecondaryLight,
