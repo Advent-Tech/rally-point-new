@@ -15,8 +15,9 @@ class ApiClient {
 
   ApiClient._() {
     _dio = Dio(_baseOptions);
-    // Trust self-signed certificates (EC2 uses self-signed SSL)
-    if (!kIsWeb) {
+    // DEV ONLY: trust self-signed certificates.
+    // Never allow this in release builds.
+    if (!kIsWeb && !kReleaseMode) {
       (_dio.httpClientAdapter as IOHttpClientAdapter).createHttpClient = () {
         final client = HttpClient();
         client.badCertificateCallback = (cert, host, port) => true;

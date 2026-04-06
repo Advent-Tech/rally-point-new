@@ -166,6 +166,7 @@ class RealtimeProvider extends ChangeNotifier {
         return NotificationType.sessionUpdate;
       case 'prayer':
       case 'delivery':
+      case 'book_sale':
       case 'survey':
         return NotificationType.deliveryUpdate;
       case 'team':

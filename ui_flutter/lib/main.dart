@@ -181,7 +181,9 @@ class _AppContentState extends State<_AppContent> {
         if (state is AuthAuthenticated && !_pushInitialized) {
           _pushInitialized = true;
           PushNotificationService.instance.initialize();
-        } else if (state is AuthInitial || state is AuthError) {
+        } else if (state is AuthInitial ||
+            state is AuthError ||
+            state is AuthUnauthenticated) {
           if (_pushInitialized) {
             _pushInitialized = false;
             PushNotificationService.instance.removeToken();

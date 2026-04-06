@@ -79,6 +79,16 @@ func (f *FCMSender) SendToUser(ctx context.Context, tokens []DeviceToken, title,
 				Sound:     "default",
 			},
 		},
+		APNS: &messaging.APNSConfig{
+			Headers: map[string]string{
+				"apns-priority": "10",
+			},
+			Payload: &messaging.APNSPayload{
+				Aps: &messaging.Aps{
+					Sound: "default",
+				},
+			},
+		},
 	}
 
 	response, err := f.client.SendEachForMulticast(ctx, msg)
@@ -112,6 +122,8 @@ func channelForType(notifType string) string {
 		return "prayer_channel"
 	case "delivery":
 		return "delivery_channel"
+	case "book_sale":
+		return "book_sale_channel"
 	case "team":
 		return "team_channel"
 	case "walkie":

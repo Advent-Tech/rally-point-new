@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:async';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -26,6 +27,9 @@ class PushNotificationService {
   NotificationApiService? _apiService;
   String? _currentToken;
   FlutterSoundPlayer? _audioPlayer;
+  bool _initialized = false;
+  Timer? _tokenRetryTimer;
+  String? _pendingToken;
 
   PushNotificationService._();
 
@@ -36,6 +40,7 @@ class PushNotificationService {
 
   /// Initialize FCM and local notifications
   Future<void> initialize() async {
+    if (_initialized) return;
     _apiService = await NotificationApiService.getInstance();
 
     // Request permissions
@@ -50,6 +55,12 @@ class PushNotificationService {
     if (settings.authorizationStatus == AuthorizationStatus.denied) {
       return;
     }
+
+    await _messaging.setForegroundNotificationPresentationOptions(
+      alert: true,
+      badge: true,
+      sound: true,
+    );
 
     // Initialize local notifications (for foreground display)
     await _initLocalNotifications();
@@ -77,11 +88,21 @@ class PushNotificationService {
     if (initialMessage != null) {
       _handleMessageTap(initialMessage);
     }
+
+    _initialized = true;
   }
 
   Future<void> _initLocalNotifications() async {
     const androidSettings = AndroidInitializationSettings('@mipmap/ic_launcher');
-    const initSettings = InitializationSettings(android: androidSettings);
+    const darwinSettings = DarwinInitializationSettings(
+      requestAlertPermission: false,
+      requestBadgePermission: false,
+      requestSoundPermission: false,
+    );
+    const initSettings = InitializationSettings(
+      android: androidSettings,
+      iOS: darwinSettings,
+    );
 
     await _localNotifications.initialize(
       initSettings,
@@ -162,6 +183,9 @@ class PushNotificationService {
       AndroidNotificationChannel('delivery_channel', 'Deliveries',
           description: 'Delivery assignment and status notifications',
           importance: Importance.high),
+      AndroidNotificationChannel('book_sale_channel', 'Book Sales',
+          description: 'Book sales and targets notifications',
+          importance: Importance.high),
       AndroidNotificationChannel('team_channel', 'Team',
           description: 'Team join requests and approvals',
           importance: Importance.high),
@@ -202,10 +226,39 @@ class PushNotificationService {
         token: token,
         platform: Platform.isAndroid ? 'android' : 'ios',
       );
+      _pendingToken = null;
+      _tokenRetryTimer?.cancel();
       debugPrint('FCM token registered with server');
     } catch (e) {
+      _pendingToken = token;
+      _scheduleTokenRetry();
       debugPrint('Failed to register FCM token: $e');
     }
+  }
+
+  void _scheduleTokenRetry() {
+    _tokenRetryTimer ??= Timer.periodic(const Duration(seconds: 30), (
+      timer,
+    ) async {
+      final token = _pendingToken;
+      if (token == null) {
+        timer.cancel();
+        _tokenRetryTimer = null;
+        return;
+      }
+      try {
+        await _apiService?.registerToken(
+          token: token,
+          platform: Platform.isAndroid ? 'android' : 'ios',
+        );
+        _pendingToken = null;
+        timer.cancel();
+        _tokenRetryTimer = null;
+        debugPrint('FCM token registered on retry');
+      } catch (_) {
+        // Keep retrying until success/logout.
+      }
+    });
   }
 
   void _handleForegroundMessage(RemoteMessage message) {
@@ -216,7 +269,7 @@ class PushNotificationService {
     if (notification != null) {
       final notificationType = message.data['notification_type']?.toString();
       final channelId = notificationType != null
-          ? '${notificationType}_channel'
+          ? _channelIdForType(notificationType)
           : 'default_channel';
 
       final isWalkie = notificationType == 'walkie' &&
@@ -240,11 +293,17 @@ class PushNotificationService {
             : null,
       );
 
+      const iosDetails = DarwinNotificationDetails(
+        presentAlert: true,
+        presentBadge: true,
+        presentSound: true,
+      );
+
       _localNotifications.show(
         notification.hashCode,
         notification.title,
         notification.body,
-        NotificationDetails(android: androidDetails),
+        NotificationDetails(android: androidDetails, iOS: iosDetails),
         // Pass full data as JSON so the tap/action handler can use it
         payload: json.encode(message.data),
       );
@@ -286,10 +345,16 @@ class PushNotificationService {
       debugPrint('No navigator context for deep-link');
       return;
     }
+    final router = GoRouter.of(context);
+
+    final deepLink = data['deep_link']?.toString();
+    if (deepLink != null && deepLink.isNotEmpty) {
+      router.go(deepLink);
+      return;
+    }
 
     final type = data['notification_type']?.toString();
     final isLeader = _isUserLeader(context);
-    final router = GoRouter.of(context);
     debugPrint('Deep-linking for type: $type, isLeader: $isLeader');
 
     switch (type) {
@@ -305,6 +370,9 @@ class PushNotificationService {
         router.go(isLeader ? '/leader/walkie' : '/walkie');
         break;
       case 'delivery':
+        router.go(isLeader ? '/leader/reports' : '/delivery');
+        break;
+      case 'book_sale':
         router.go(isLeader ? '/leader/reports' : '/delivery');
         break;
       case 'prayer':
@@ -331,6 +399,10 @@ class PushNotificationService {
 
   /// Remove token on logout
   Future<void> removeToken() async {
+    _tokenRetryTimer?.cancel();
+    _tokenRetryTimer = null;
+    _pendingToken = null;
+
     if (_currentToken != null) {
       try {
         await _apiService?.removeToken(_currentToken!);
@@ -340,5 +412,14 @@ class PushNotificationService {
     }
     await _messaging.deleteToken();
     _currentToken = null;
+  }
+
+  String _channelIdForType(String type) {
+    switch (type) {
+      case 'book_sale':
+        return 'book_sale_channel';
+      default:
+        return '${type}_channel';
+    }
   }
 }
