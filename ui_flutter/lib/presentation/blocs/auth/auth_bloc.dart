@@ -46,6 +46,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
   LocalStorage? _localStorage;
   Timer? _refreshTimer;
   bool _isInitialized = false;
+  int _refreshFailureCount = 0;
 
   AuthBloc() : super(AuthInitial()) {
     on<AuthCheckStatus>(_onCheckStatus);
@@ -156,9 +157,11 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
           onTimeout: () => false,
         );
         if (!refreshed) {
-          await _secure.clearTokens();
-          emit(AuthUnauthenticated());
-          return;
+          // Do not force logout on a single refresh failure.
+          // Network hiccups or temporary backend issues should not drop session.
+          debugPrint(
+            'Auth: token refresh failed during check, proceeding to /me validation.',
+          );
         }
       }
 
@@ -173,6 +176,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
           await _secure.write('team_id', user.teamId!);
         }
         _startRefreshTimer();
+        _refreshFailureCount = 0;
         emit(AuthAuthenticated(user: user));
       } else {
         await _secure.clearTokens();
@@ -233,6 +237,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
           await _secure.write('team_id', user.teamId!);
         }
         _startRefreshTimer();
+        _refreshFailureCount = 0;
         emit(AuthAuthenticated(user: user));
       } else {
         emit(
@@ -406,6 +411,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
           await _secure.write('team_id', user.teamId!);
         }
         _startRefreshTimer();
+        _refreshFailureCount = 0;
         emit(AuthAuthenticated(user: user));
       } else {
         emit(AuthError(message: 'Registration failed. Please try again.'));
@@ -461,7 +467,19 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     if (currentState is! AuthAuthenticated) return;
 
     final refreshed = await _tryRefreshToken();
-    if (!refreshed) {
+    if (refreshed) {
+      _refreshFailureCount = 0;
+      return;
+    }
+
+    _refreshFailureCount += 1;
+    debugPrint(
+      'Auth: background refresh failed ($_refreshFailureCount). Keeping session for now.',
+    );
+
+    // Only force logout after repeated failures to avoid random inactivity logouts.
+    if (_refreshFailureCount >= 3) {
+      _refreshFailureCount = 0;
       add(const AuthTokenExpired());
     }
   }
@@ -470,6 +488,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     AuthTokenExpired event,
     Emitter<AuthState> emit,
   ) async {
+    _refreshFailureCount = 0;
     _stopRefreshTimer();
     await _secure.clearTokens();
     await _local.clearUserData();

@@ -11,6 +11,7 @@ class ApiClient {
   late final Dio _dio;
   SecureStorage? _storage;
   String? _authToken;
+  Future<bool>? _refreshFuture;
 
   ApiClient._() {
     _dio = Dio(_baseOptions);
@@ -120,6 +121,19 @@ class ApiClient {
   }
 
   Future<bool> _refreshToken() async {
+    if (_refreshFuture != null) {
+      return _refreshFuture!;
+    }
+
+    _refreshFuture = _performRefresh();
+    try {
+      return await _refreshFuture!;
+    } finally {
+      _refreshFuture = null;
+    }
+  }
+
+  Future<bool> _performRefresh() async {
     try {
       final refreshToken = await _storage?.getRefreshToken();
       if (refreshToken == null) return false;
@@ -139,6 +153,15 @@ class ApiClient {
         await _storage?.saveAccessToken(data['access_token']);
         if (data['refresh_token'] != null) {
           await _storage?.saveRefreshToken(data['refresh_token']);
+        }
+        final expiresInRaw = data['expires_in'];
+        if (expiresInRaw != null) {
+          final expiresIn = expiresInRaw is int
+              ? expiresInRaw
+              : int.tryParse(expiresInRaw.toString());
+          if (expiresIn != null) {
+            await _storage?.saveTokenExpiry(expiresIn);
+          }
         }
         return true;
       }
