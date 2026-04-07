@@ -193,6 +193,9 @@ workflows:
           pod install --repo-update
       - name: Set up keychain
         script: keychain initialize
+      - name: Clean local provisioning profiles cache
+        script: |
+          rm -f "$HOME/Library/MobileDevice/Provisioning Profiles/"*.mobileprovision || true
       - name: Fetch Ad Hoc signing files
         script: |
           app-store-connect fetch-signing-files "$BUNDLE_ID" --type IOS_APP_ADHOC --create
@@ -200,6 +203,48 @@ workflows:
         script: keychain add-certificates
       - name: Configure Xcode code signing
         script: xcode-project use-profiles
+      - name: Debug Ad Hoc profile entitlements
+        script: |
+          set -euo pipefail
+          PROFILE_DIR="$HOME/Library/MobileDevice/Provisioning Profiles"
+          echo "Provisioning profiles in $PROFILE_DIR:"
+          ls -la "$PROFILE_DIR" || true
+
+          MATCHED=0
+          APS_FOUND=0
+          for p in "$PROFILE_DIR"/*.mobileprovision; do
+            [ -e "$p" ] || continue
+            TMP_PLIST="$(mktemp)"
+            security cms -D -i "$p" > "$TMP_PLIST"
+            APP_ID_ENTITLEMENT="$(/usr/libexec/PlistBuddy -c "Print :Entitlements:application-identifier" "$TMP_PLIST" 2>/dev/null || true)"
+            if [[ "$APP_ID_ENTITLEMENT" == *"$BUNDLE_ID" ]]; then
+              MATCHED=1
+              NAME="$(/usr/libexec/PlistBuddy -c "Print :Name" "$TMP_PLIST" 2>/dev/null || true)"
+              UUID="$(/usr/libexec/PlistBuddy -c "Print :UUID" "$TMP_PLIST" 2>/dev/null || true)"
+              APS_ENV="$(/usr/libexec/PlistBuddy -c "Print :Entitlements:aps-environment" "$TMP_PLIST" 2>/dev/null || true)"
+              EXPIRY="$(/usr/libexec/PlistBuddy -c "Print :ExpirationDate" "$TMP_PLIST" 2>/dev/null || true)"
+              echo "Matched profile: $p"
+              echo "  Name: $NAME"
+              echo "  UUID: $UUID"
+              echo "  application-identifier: $APP_ID_ENTITLEMENT"
+              echo "  aps-environment: ${APS_ENV:-<missing>}"
+              echo "  ExpirationDate: $EXPIRY"
+              if [ -n "${APS_ENV:-}" ]; then
+                APS_FOUND=1
+              fi
+            fi
+            rm -f "$TMP_PLIST"
+          done
+
+          if [ "$MATCHED" -eq 0 ]; then
+            echo "No provisioning profile found for bundle id: $BUNDLE_ID" >&2
+            exit 1
+          fi
+          if [ "$APS_FOUND" -eq 0 ]; then
+            echo "Matched Ad Hoc profile(s) do not include aps-environment entitlement." >&2
+            echo "Enable Push Notifications on App ID and regenerate Ad Hoc profile in Apple Developer." >&2
+            exit 1
+          fi
       - name: Build Ad Hoc IPA
         script: |
           cd $PROJECT_DIR
