@@ -1,0 +1,284 @@
+-- Add additional constraints and triggers for Rally Point application
+-- Migration: 003_add_constraints.sql
+
+-- Add check constraints for data validation
+
+-- Users table constraints
+ALTER TABLE users ADD CONSTRAINT chk_users_email_format 
+    CHECK (email ~* '^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$');
+
+ALTER TABLE users ADD CONSTRAINT chk_users_role_valid 
+    CHECK (role IN ('admin', 'team_leader', 'worker', 'viewer'));
+
+-- Teams table constraints
+ALTER TABLE teams ADD CONSTRAINT chk_teams_invitation_code_format 
+    CHECK (invitation_code ~* '^[A-Z0-9]{6,8}$');
+
+-- Locations table constraints
+ALTER TABLE locations ADD CONSTRAINT chk_locations_latitude_range 
+    CHECK (latitude >= -90.0 AND latitude <= 90.0);
+
+ALTER TABLE locations ADD CONSTRAINT chk_locations_longitude_range 
+    CHECK (longitude >= -180.0 AND longitude <= 180.0);
+
+ALTER TABLE locations ADD CONSTRAINT chk_locations_accuracy_positive 
+    CHECK (accuracy >= 0);
+
+-- Territories table constraints
+ALTER TABLE territories ADD CONSTRAINT chk_territories_status_valid 
+    CHECK (status IN ('available', 'assigned', 'in_progress', 'completed', 'on_hold'));
+
+ALTER TABLE territories ADD CONSTRAINT chk_territories_coordinates_valid 
+    CHECK (
+        (latitude IS NULL AND longitude IS NULL) OR 
+        (latitude IS NOT NULL AND longitude IS NOT NULL AND 
+         latitude >= -90.0 AND latitude <= 90.0 AND 
+         longitude >= -180.0 AND longitude <= 180.0)
+    );
+
+-- Surveys table constraints
+ALTER TABLE surveys ADD CONSTRAINT chk_surveys_status_valid 
+    CHECK (status IN ('draft', 'active', 'completed', 'archived'));
+
+-- Survey questions table constraints
+ALTER TABLE survey_questions ADD CONSTRAINT chk_survey_questions_type_valid 
+    CHECK (question_type IN ('text', 'multiple_choice', 'single_choice', 'rating', 'boolean', 'date'));
+
+ALTER TABLE survey_questions ADD CONSTRAINT chk_survey_questions_order_positive 
+    CHECK (question_order > 0);
+
+-- Deliveries table constraints
+ALTER TABLE deliveries ADD CONSTRAINT chk_deliveries_status_valid 
+    CHECK (status IN ('pending', 'assigned', 'in_progress', 'delivered', 'failed', 'cancelled'));
+
+ALTER TABLE deliveries ADD CONSTRAINT chk_deliveries_priority_valid 
+    CHECK (priority IN ('low', 'medium', 'high', 'urgent'));
+
+ALTER TABLE deliveries ADD CONSTRAINT chk_deliveries_coordinates_valid 
+    CHECK (latitude >= -90.0 AND latitude <= 90.0 AND longitude >= -180.0 AND longitude <= 180.0);
+
+ALTER TABLE deliveries ADD CONSTRAINT chk_deliveries_estimated_time_positive 
+    CHECK (estimated_time IS NULL OR estimated_time > 0);
+
+ALTER TABLE deliveries ADD CONSTRAINT chk_deliveries_actual_time_positive 
+    CHECK (actual_time IS NULL OR actual_time > 0);
+
+-- Delivery items table constraints
+ALTER TABLE delivery_items ADD CONSTRAINT chk_delivery_items_quantity_positive 
+    CHECK (quantity > 0);
+
+-- Delivery routes table constraints
+ALTER TABLE delivery_routes ADD CONSTRAINT chk_delivery_routes_status_valid 
+    CHECK (status IN ('planned', 'active', 'completed', 'cancelled'));
+
+ALTER TABLE delivery_routes ADD CONSTRAINT chk_delivery_routes_stops_positive 
+    CHECK (total_stops > 0 AND completed_stops >= 0 AND completed_stops <= total_stops);
+
+ALTER TABLE delivery_routes ADD CONSTRAINT chk_delivery_routes_time_positive 
+    CHECK (
+        (estimated_time IS NULL OR estimated_time > 0) AND 
+        (actual_time IS NULL OR actual_time > 0)
+    );
+
+-- Route stops table constraints
+ALTER TABLE route_stops ADD CONSTRAINT chk_route_stops_order_positive 
+    CHECK (stop_order > 0);
+
+ALTER TABLE route_stops ADD CONSTRAINT chk_route_stops_status_valid 
+    CHECK (status IN ('pending', 'arrived', 'completed', 'skipped'));
+
+-- Walkie talkie sessions table constraints
+ALTER TABLE walkie_talkie_sessions ADD CONSTRAINT chk_walkie_sessions_duration_positive 
+    CHECK (duration_seconds IS NULL OR duration_seconds >= 0);
+
+-- Add triggers for automatic timestamp updates
+
+-- Function to update updated_at timestamp
+CREATE OR REPLACE FUNCTION update_updated_at_column()
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW.updated_at = CURRENT_TIMESTAMP;
+    RETURN NEW;
+END;
+$$ language 'plpgsql';
+
+-- Add updated_at triggers for tables that have updated_at column
+CREATE TRIGGER update_users_updated_at BEFORE UPDATE ON users 
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER update_teams_updated_at BEFORE UPDATE ON teams 
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER update_territories_updated_at BEFORE UPDATE ON territories 
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER update_surveys_updated_at BEFORE UPDATE ON surveys 
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER update_deliveries_updated_at BEFORE UPDATE ON deliveries 
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER update_delivery_routes_updated_at BEFORE UPDATE ON delivery_routes 
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+-- Function to validate delivery status transitions
+CREATE OR REPLACE FUNCTION validate_delivery_status_transition()
+RETURNS TRIGGER AS $$
+BEGIN
+    -- Allow any transition if OLD.status is NULL (new record)
+    IF OLD.status IS NULL THEN
+        RETURN NEW;
+    END IF;
+    
+    -- Define valid status transitions
+    IF (OLD.status = 'pending' AND NEW.status NOT IN ('assigned', 'cancelled')) OR
+       (OLD.status = 'assigned' AND NEW.status NOT IN ('in_progress', 'cancelled')) OR
+       (OLD.status = 'in_progress' AND NEW.status NOT IN ('delivered', 'failed', 'cancelled')) OR
+       (OLD.status IN ('delivered', 'failed', 'cancelled') AND NEW.status != OLD.status) THEN
+        RAISE EXCEPTION 'Invalid status transition from % to %', OLD.status, NEW.status;
+    END IF;
+    
+    RETURN NEW;
+END;
+$$ language 'plpgsql';
+
+-- Add delivery status validation trigger
+CREATE TRIGGER validate_delivery_status_transition_trigger 
+    BEFORE UPDATE ON deliveries 
+    FOR EACH ROW EXECUTE FUNCTION validate_delivery_status_transition();
+
+-- Function to update delivery timestamps based on status
+CREATE OR REPLACE FUNCTION update_delivery_timestamps()
+RETURNS TRIGGER AS $$
+BEGIN
+    -- Set assigned_at when status changes to assigned
+    IF OLD.status != 'assigned' AND NEW.status = 'assigned' THEN
+        NEW.assigned_at = CURRENT_TIMESTAMP;
+    END IF;
+    
+    -- Set started_at when status changes to in_progress
+    IF OLD.status != 'in_progress' AND NEW.status = 'in_progress' THEN
+        NEW.started_at = CURRENT_TIMESTAMP;
+    END IF;
+    
+    -- Set completed_at when status changes to delivered or failed
+    IF OLD.status NOT IN ('delivered', 'failed') AND NEW.status IN ('delivered', 'failed') THEN
+        NEW.completed_at = CURRENT_TIMESTAMP;
+        
+        -- Calculate actual_time if started_at is set
+        IF NEW.started_at IS NOT NULL THEN
+            NEW.actual_time = EXTRACT(EPOCH FROM (CURRENT_TIMESTAMP - NEW.started_at)) / 60; -- in minutes
+        END IF;
+    END IF;
+    
+    RETURN NEW;
+END;
+$$ language 'plpgsql';
+
+-- Add delivery timestamp trigger
+CREATE TRIGGER update_delivery_timestamps_trigger 
+    BEFORE UPDATE ON deliveries 
+    FOR EACH ROW EXECUTE FUNCTION update_delivery_timestamps();
+
+-- Function to update route completed_stops count
+CREATE OR REPLACE FUNCTION update_route_completed_stops()
+RETURNS TRIGGER AS $$
+BEGIN
+    -- Update completed_stops count when route stop status changes to completed
+    IF TG_OP = 'UPDATE' AND OLD.status != 'completed' AND NEW.status = 'completed' THEN
+        UPDATE delivery_routes 
+        SET completed_stops = (
+            SELECT COUNT(*) 
+            FROM route_stops 
+            WHERE route_id = NEW.route_id AND status = 'completed'
+        )
+        WHERE id = NEW.route_id;
+    ELSIF TG_OP = 'UPDATE' AND OLD.status = 'completed' AND NEW.status != 'completed' THEN
+        UPDATE delivery_routes 
+        SET completed_stops = (
+            SELECT COUNT(*) 
+            FROM route_stops 
+            WHERE route_id = NEW.route_id AND status = 'completed'
+        )
+        WHERE id = NEW.route_id;
+    END IF;
+    
+    RETURN COALESCE(NEW, OLD);
+END;
+$$ language 'plpgsql';
+
+-- Add route stops trigger
+CREATE TRIGGER update_route_completed_stops_trigger 
+    AFTER UPDATE ON route_stops 
+    FOR EACH ROW EXECUTE FUNCTION update_route_completed_stops();
+
+-- Function to end active walkie talkie sessions when a new one starts
+CREATE OR REPLACE FUNCTION manage_walkie_sessions()
+RETURNS TRIGGER AS $$
+BEGIN
+    -- End all other active sessions for the same team when a new session starts
+    IF NEW.is_active = true THEN
+        UPDATE walkie_talkie_sessions 
+        SET is_active = false, 
+            ended_at = CURRENT_TIMESTAMP,
+            duration_seconds = EXTRACT(EPOCH FROM (CURRENT_TIMESTAMP - started_at))
+        WHERE team_id = NEW.team_id 
+          AND id != NEW.id 
+          AND is_active = true;
+    END IF;
+    
+    RETURN NEW;
+END;
+$$ language 'plpgsql';
+
+-- Add walkie session management trigger
+CREATE TRIGGER manage_walkie_sessions_trigger 
+    AFTER INSERT OR UPDATE ON walkie_talkie_sessions 
+    FOR EACH ROW EXECUTE FUNCTION manage_walkie_sessions();
+
+-- Add foreign key constraints with proper cascade options
+ALTER TABLE users DROP CONSTRAINT IF EXISTS fk_users_team_id;
+ALTER TABLE users ADD CONSTRAINT fk_users_team_id 
+    FOREIGN KEY (team_id) REFERENCES teams(id) ON DELETE SET NULL;
+
+ALTER TABLE locations DROP CONSTRAINT IF EXISTS fk_locations_user_id;
+ALTER TABLE locations ADD CONSTRAINT fk_locations_user_id 
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE;
+
+ALTER TABLE locations DROP CONSTRAINT IF EXISTS fk_locations_team_id;
+ALTER TABLE locations ADD CONSTRAINT fk_locations_team_id 
+    FOREIGN KEY (team_id) REFERENCES teams(id) ON DELETE CASCADE;
+
+-- Add unique constraints where needed
+ALTER TABLE teams ADD CONSTRAINT uk_teams_invitation_code UNIQUE (invitation_code);
+ALTER TABLE users ADD CONSTRAINT uk_users_email UNIQUE (email);
+
+-- Add comments for documentation
+COMMENT ON TABLE users IS 'User accounts and authentication information';
+COMMENT ON TABLE teams IS 'Team/organization information';
+COMMENT ON TABLE locations IS 'GPS location tracking data';
+COMMENT ON TABLE territories IS 'Territory assignments and management';
+COMMENT ON TABLE surveys IS 'Survey definitions and metadata';
+COMMENT ON TABLE deliveries IS 'Delivery orders and tracking';
+COMMENT ON TABLE walkie_talkie_sessions IS 'Walkie-talkie communication sessions';
+
+-- Create views for common queries
+CREATE OR REPLACE VIEW active_users AS
+SELECT u.*, t.name as team_name
+FROM users u
+LEFT JOIN teams t ON u.team_id = t.id
+WHERE u.is_active = true;
+
+CREATE OR REPLACE VIEW pending_deliveries AS
+SELECT d.*, u.name as worker_name
+FROM deliveries d
+LEFT JOIN users u ON d.worker_id = u.id
+WHERE d.status = 'pending'
+ORDER BY d.priority DESC, d.created_at ASC;
+
+CREATE OR REPLACE VIEW active_territories AS
+SELECT t.*, u.name as assigned_worker_name
+FROM territories t
+LEFT JOIN users u ON t.assigned_to = u.id
+WHERE t.status IN ('assigned', 'in_progress')
+ORDER BY t.updated_at DESC;
