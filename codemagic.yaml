@@ -206,34 +206,39 @@ workflows:
       - name: Debug Ad Hoc profile entitlements
         script: |
           set -euo pipefail
-          PROFILE_DIR="$HOME/Library/MobileDevice/Provisioning Profiles"
-          echo "Provisioning profiles in $PROFILE_DIR:"
-          ls -la "$PROFILE_DIR" || true
-
           MATCHED=0
           APS_FOUND=0
-          for p in "$PROFILE_DIR"/*.mobileprovision; do
-            [ -e "$p" ] || continue
-            TMP_PLIST="$(mktemp)"
-            security cms -D -i "$p" > "$TMP_PLIST"
-            APP_ID_ENTITLEMENT="$(/usr/libexec/PlistBuddy -c "Print :Entitlements:application-identifier" "$TMP_PLIST" 2>/dev/null || true)"
-            if [[ "$APP_ID_ENTITLEMENT" == *"$BUNDLE_ID" ]]; then
-              MATCHED=1
-              NAME="$(/usr/libexec/PlistBuddy -c "Print :Name" "$TMP_PLIST" 2>/dev/null || true)"
-              UUID="$(/usr/libexec/PlistBuddy -c "Print :UUID" "$TMP_PLIST" 2>/dev/null || true)"
-              APS_ENV="$(/usr/libexec/PlistBuddy -c "Print :Entitlements:aps-environment" "$TMP_PLIST" 2>/dev/null || true)"
-              EXPIRY="$(/usr/libexec/PlistBuddy -c "Print :ExpirationDate" "$TMP_PLIST" 2>/dev/null || true)"
-              echo "Matched profile: $p"
-              echo "  Name: $NAME"
-              echo "  UUID: $UUID"
-              echo "  application-identifier: $APP_ID_ENTITLEMENT"
-              echo "  aps-environment: ${APS_ENV:-<missing>}"
-              echo "  ExpirationDate: $EXPIRY"
-              if [ -n "${APS_ENV:-}" ]; then
-                APS_FOUND=1
+          PROFILE_DIRS=(
+            "$HOME/Library/Developer/Xcode/UserData/Provisioning Profiles"
+            "$HOME/Library/MobileDevice/Provisioning Profiles"
+          )
+
+          for PROFILE_DIR in "${PROFILE_DIRS[@]}"; do
+            echo "Provisioning profiles in $PROFILE_DIR:"
+            ls -la "$PROFILE_DIR" || true
+            for p in "$PROFILE_DIR"/*.mobileprovision "$PROFILE_DIR"/*.provisionprofile; do
+              [ -e "$p" ] || continue
+              TMP_PLIST="$(mktemp)"
+              security cms -D -i "$p" > "$TMP_PLIST"
+              APP_ID_ENTITLEMENT="$(/usr/libexec/PlistBuddy -c "Print :Entitlements:application-identifier" "$TMP_PLIST" 2>/dev/null || true)"
+              if [[ "$APP_ID_ENTITLEMENT" == *"$BUNDLE_ID" ]]; then
+                MATCHED=1
+                NAME="$(/usr/libexec/PlistBuddy -c "Print :Name" "$TMP_PLIST" 2>/dev/null || true)"
+                UUID="$(/usr/libexec/PlistBuddy -c "Print :UUID" "$TMP_PLIST" 2>/dev/null || true)"
+                APS_ENV="$(/usr/libexec/PlistBuddy -c "Print :Entitlements:aps-environment" "$TMP_PLIST" 2>/dev/null || true)"
+                EXPIRY="$(/usr/libexec/PlistBuddy -c "Print :ExpirationDate" "$TMP_PLIST" 2>/dev/null || true)"
+                echo "Matched profile: $p"
+                echo "  Name: $NAME"
+                echo "  UUID: $UUID"
+                echo "  application-identifier: $APP_ID_ENTITLEMENT"
+                echo "  aps-environment: ${APS_ENV:-<missing>}"
+                echo "  ExpirationDate: $EXPIRY"
+                if [ -n "${APS_ENV:-}" ]; then
+                  APS_FOUND=1
+                fi
               fi
-            fi
-            rm -f "$TMP_PLIST"
+              rm -f "$TMP_PLIST"
+            done
           done
 
           if [ "$MATCHED" -eq 0 ]; then
