@@ -697,6 +697,7 @@ class _ImpactMetroBoard extends StatelessWidget {
         ),
       ),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Expanded(
             flex: 6,
@@ -712,43 +713,53 @@ class _ImpactMetroBoard extends StatelessWidget {
           const SizedBox(width: 10),
           Expanded(
             flex: 4,
-            child: Column(
-              children: [
-                _ImpactTile(
-                  icon: Icons.menu_book_rounded,
-                  label: 'Books',
-                  value: '$bookSales',
-                  color: const Color(0xFFF59E0B),
-                  isDark: isDark,
-                  compact: true,
-                ),
-                const SizedBox(height: 10),
-                _ImpactTile(
-                  icon: Icons.volunteer_activism,
-                  label: 'Prayers',
-                  value: '$prayers',
-                  color: AppColors.accent,
-                  isDark: isDark,
-                  compact: true,
-                ),
-              ],
+            child: SizedBox(
+              height: 158,
+              child: Column(
+                children: [
+                  Expanded(
+                    child: _ImpactTile(
+                      icon: Icons.menu_book_rounded,
+                      label: 'Books',
+                      value: '$bookSales',
+                      color: const Color(0xFFF59E0B),
+                      isDark: isDark,
+                      compact: true,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  Expanded(
+                    child: _ImpactTile(
+                      icon: Icons.volunteer_activism,
+                      label: 'Prayers',
+                      value: '$prayers',
+                      color: AppColors.accent,
+                      isDark: isDark,
+                      compact: true,
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
           const SizedBox(width: 10),
-          InkWell(
-            onTap: onTapReports,
-            borderRadius: BorderRadius.circular(14),
-            child: Container(
-              width: 42,
-              height: 42,
-              decoration: BoxDecoration(
-                color: AppColors.primary.withAlpha(24),
-                borderRadius: BorderRadius.circular(14),
-              ),
-              child: const Icon(
-                Icons.analytics_outlined,
-                color: AppColors.primary,
-                size: 20,
+          Align(
+            alignment: Alignment.topRight,
+            child: InkWell(
+              onTap: onTapReports,
+              borderRadius: BorderRadius.circular(14),
+              child: Container(
+                width: 42,
+                height: 42,
+                decoration: BoxDecoration(
+                  color: AppColors.primary.withAlpha(24),
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: const Icon(
+                  Icons.analytics_outlined,
+                  color: AppColors.primary,
+                  size: 20,
+                ),
               ),
             ),
           ),
@@ -778,7 +789,7 @@ class _ImpactTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      height: compact ? 74 : 158,
+      height: compact ? double.infinity : 158,
       padding: EdgeInsets.all(compact ? 10 : 14),
       decoration: BoxDecoration(
         color: color.withAlpha(isDark ? 32 : 20),
@@ -804,6 +815,8 @@ class _ImpactTile extends StatelessWidget {
               fontWeight: FontWeight.w800,
               height: 1.0,
             ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
           ),
           Text(
             label,
@@ -813,6 +826,8 @@ class _ImpactTile extends StatelessWidget {
                   ? AppColors.textSecondaryDark
                   : AppColors.textSecondaryLight,
             ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
           ),
         ],
       ),
