@@ -290,12 +290,88 @@ class _RegisterScreenState extends State<RegisterScreen> {
       // rallypoint://team/{teamId}
       // https://rallypoint.app/team/{teamId}
       String? teamId;
+      String? invitationToken;
 
       if (text.startsWith('rallypoint://team/')) {
         teamId = text.replaceFirst('rallypoint://team/', '');
       } else if (text.contains('rallypoint.app/team/')) {
         final match = RegExp(r'rallypoint\.app/team/([^/?]+)').firstMatch(text);
         teamId = match?.group(1);
+      } else {
+        // Parse invitation token formats:
+        // https://backend.lightsquads.com/api/invitations/join/{token}
+        // https://.../join-team?token={token}
+        // rallypoint://join-team?token={token}
+        final joinPathMatch = RegExp(
+          r'/api/invitations/join/([A-Za-z0-9]+)',
+        ).firstMatch(text);
+        if (joinPathMatch != null) {
+          invitationToken = joinPathMatch.group(1);
+        } else {
+          final tokenQueryMatch = RegExp(
+            r'[?&]token=([A-Za-z0-9]+)',
+          ).firstMatch(text);
+          invitationToken = tokenQueryMatch?.group(1);
+        }
+
+        // Accept plain token pasted directly
+        invitationToken ??= RegExp(r'^[A-Za-z0-9]{32,}$').hasMatch(text.trim())
+            ? text.trim()
+            : null;
+      }
+
+      if (invitationToken != null && invitationToken.isNotEmpty) {
+        final apiClient = await ApiClient.getInstance();
+        final infoResponse = await apiClient.get(
+          '/api/invitations/info',
+          queryParameters: {'token': invitationToken},
+        );
+        final data = (infoResponse.data as Map<String, dynamic>? ?? {});
+        final isValid = data['valid'] == true;
+        if (!isValid) {
+          if (mounted) {
+            AppSnackbar.error(
+              context,
+              message:
+                  data['message']?.toString() ?? 'Invalid invitation link.',
+            );
+          }
+          return;
+        }
+
+        final invitedTeamId = data['team_id']?.toString() ?? '';
+        if (invitedTeamId.isEmpty) {
+          if (mounted) {
+            AppSnackbar.error(
+              context,
+              message: 'Invitation is missing team information.',
+            );
+          }
+          return;
+        }
+
+        final invitedEmail = data['email']?.toString();
+        if ((invitedEmail ?? '').isNotEmpty &&
+            _emailController.text.trim().isEmpty) {
+          _emailController.text = invitedEmail!;
+        }
+
+        final result = await _teamRepository.getTeamById(invitedTeamId);
+        switch (result) {
+          case ApiSuccess<TeamModel>(:final data):
+            _selectTeam(data);
+            if (mounted) {
+              AppSnackbar.success(
+                context,
+                message: 'Invitation accepted for team: ${data.name}',
+              );
+            }
+          case ApiFailure<TeamModel>(:final message):
+            if (mounted) {
+              AppSnackbar.error(context, message: 'Team not found: $message');
+            }
+        }
+        return;
       }
 
       if (teamId != null && teamId.isNotEmpty) {

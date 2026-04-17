@@ -265,7 +265,6 @@ h1{margin:0 0 12px;font-size:28px}.title{font-size:22px;font-weight:700;color:#D
 </div></div></body></html>`, errorMessage)
 	}
 
-	deepLink := fmt.Sprintf("rallypoint://join-team?token=%s", token)
 	return fmt.Sprintf(`<!doctype html>
 <html><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
 <title>light point - Team Invitation</title>
@@ -275,16 +274,26 @@ body{margin:0;background:#F8FAFC;color:#0F172A;font-family:-apple-system,BlinkMa
 .card{width:100%%;max-width:560px;background:#fff;border:1px solid #E2E8F0;border-radius:16px;padding:26px;box-shadow:0 8px 30px rgba(15,23,42,.08)}
 h1{margin:0 0 10px;font-size:28px}.title{font-size:22px;font-weight:700;margin:0 0 10px}
 .meta{font-size:15px;color:#334155;line-height:1.5;margin-bottom:14px}
-.btn{display:inline-block;background:#7C3AED;color:#fff !important;text-decoration:none;padding:13px 24px;border-radius:10px;font-weight:700}
+.btn{display:inline-block;background:#7C3AED;color:#fff !important;text-decoration:none;padding:13px 24px;border-radius:10px;font-weight:700;border:0;cursor:pointer}
 .note{margin-top:14px;padding:12px;border:1px solid #E2E8F0;background:#F8FAFC;border-radius:10px;font-size:14px;color:#475569}
 .token{font-family:ui-monospace,Menlo,monospace;word-break:break-all;font-size:12px;color:#334155}
 </style></head><body><div class="wrap"><div class="card">
 <h1>light point</h1><div class="title">You are invited to join a team</div>
 <div class="meta"><strong>Team:</strong> %s<br/><strong>Invited by:</strong> %s<br/><strong>Email:</strong> %s</div>
-<a class="btn" href="%s">Open in light point app</a>
+<button class="btn" onclick="copyToken()">Copy invitation token</button>
 <div class="note">
-If the app does not open, install/open the worker app and use the same invited email.<br/>
+Open the light point worker app, go to Sign Up, and paste the invitation link/token there.<br/>
 Invitation token:<div class="token">%s</div>
 </div>
-</div></div></body></html>`, teamName, inviterName, email, deepLink, token)
+<script>
+function copyToken(){
+  const t = "%s";
+  if (navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(t).then(function(){ alert("Invitation token copied"); });
+  } else {
+    alert("Copy this token manually: " + t);
+  }
+}
+</script>
+</div></div></body></html>`, teamName, inviterName, email, token, token)
 }

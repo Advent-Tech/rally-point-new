@@ -214,11 +214,11 @@ services:
       # Email configuration
       - SMTP_HOST=smtp.gmail.com
       - SMTP_PORT=587
-      - SMTP_USERNAME=brichhaliya@gmail.com
-      - SMTP_PASSWORD=ehehkcforlbrjcld
-      - SMTP_FROM=brichhaliya@gmail.com
-      - SMTP_FROM_NAME=Rally Point
-      - FRONTEND_URL=https://admin.lightsquad.com
+      - SMTP_USERNAME=adventtech80@gmail.com
+      - SMTP_PASSWORD=vdkzxwwaylqczcvz
+      - SMTP_FROM=adventtech80@gmail.com
+      - SMTP_FROM_NAME=light point
+      - FRONTEND_URL=https://admin.lightsquads.com
       - GO_ENV=production
     volumes:
       - blog_uploads:/app/uploads
