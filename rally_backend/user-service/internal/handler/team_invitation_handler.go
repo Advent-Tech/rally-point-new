@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"fmt"
 	"net/http"
 	"rally-point/user-service/internal/domain"
 	"rally-point/user-service/internal/service"
@@ -106,6 +107,28 @@ func (h *TeamInvitationHandler) GetInvitationInfo(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, info)
+}
+
+// JoinInvitationLanding renders a browser page for worker invitation links
+// GET /api/invitations/join/:token
+func (h *TeamInvitationHandler) JoinInvitationLanding(c *gin.Context) {
+	token := c.Param("token")
+	if token == "" {
+		c.Data(http.StatusBadRequest, "text/html; charset=utf-8", []byte(renderInvitationLanding(false, "", "", "", token, "Invitation token is required")))
+		return
+	}
+
+	info, err := h.invitationService.GetInvitationInfo(token)
+	if err != nil || info == nil || !info.Valid {
+		msg := "Invalid or expired invitation link"
+		if info != nil && info.Message != "" {
+			msg = info.Message
+		}
+		c.Data(http.StatusBadRequest, "text/html; charset=utf-8", []byte(renderInvitationLanding(false, "", "", "", token, msg)))
+		return
+	}
+
+	c.Data(http.StatusOK, "text/html; charset=utf-8", []byte(renderInvitationLanding(true, info.TeamName, info.InviterName, info.Email, token, "")))
 }
 
 // AcceptInvitation accepts a team invitation for an authenticated user
@@ -224,4 +247,44 @@ func (h *TeamInvitationHandler) ResendInvitation(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"message": "Invitation resent successfully",
 	})
+}
+
+func renderInvitationLanding(valid bool, teamName, inviterName, email, token, errorMessage string) string {
+	if !valid {
+		return fmt.Sprintf(`<!doctype html>
+<html><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>light point - Team Invitation</title>
+<style>
+body{margin:0;background:#F8FAFC;color:#0F172A;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif}
+.wrap{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}
+.card{width:100%%;max-width:520px;background:#fff;border:1px solid #E2E8F0;border-radius:16px;padding:26px;box-shadow:0 8px 30px rgba(15,23,42,.08)}
+h1{margin:0 0 12px;font-size:28px}.title{font-size:22px;font-weight:700;color:#DC2626;margin:0 0 10px}
+.msg{font-size:16px;line-height:1.45}
+</style></head><body><div class="wrap"><div class="card">
+<h1>light point</h1><div class="title">Invitation Invalid</div><div class="msg">%s</div>
+</div></div></body></html>`, errorMessage)
+	}
+
+	deepLink := fmt.Sprintf("rallypoint://join-team?token=%s", token)
+	return fmt.Sprintf(`<!doctype html>
+<html><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>light point - Team Invitation</title>
+<style>
+body{margin:0;background:#F8FAFC;color:#0F172A;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif}
+.wrap{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}
+.card{width:100%%;max-width:560px;background:#fff;border:1px solid #E2E8F0;border-radius:16px;padding:26px;box-shadow:0 8px 30px rgba(15,23,42,.08)}
+h1{margin:0 0 10px;font-size:28px}.title{font-size:22px;font-weight:700;margin:0 0 10px}
+.meta{font-size:15px;color:#334155;line-height:1.5;margin-bottom:14px}
+.btn{display:inline-block;background:#7C3AED;color:#fff !important;text-decoration:none;padding:13px 24px;border-radius:10px;font-weight:700}
+.note{margin-top:14px;padding:12px;border:1px solid #E2E8F0;background:#F8FAFC;border-radius:10px;font-size:14px;color:#475569}
+.token{font-family:ui-monospace,Menlo,monospace;word-break:break-all;font-size:12px;color:#334155}
+</style></head><body><div class="wrap"><div class="card">
+<h1>light point</h1><div class="title">You are invited to join a team</div>
+<div class="meta"><strong>Team:</strong> %s<br/><strong>Invited by:</strong> %s<br/><strong>Email:</strong> %s</div>
+<a class="btn" href="%s">Open in light point app</a>
+<div class="note">
+If the app does not open, install/open the worker app and use the same invited email.<br/>
+Invitation token:<div class="token">%s</div>
+</div>
+</div></div></body></html>`, teamName, inviterName, email, deepLink, token)
 }

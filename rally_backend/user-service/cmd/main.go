@@ -195,6 +195,7 @@ func setupRouter(
 			// Email verification and password reset routes
 			auth.POST("/resend-verification", verificationHandler.ResendVerificationEmail)
 			auth.POST("/verify-email", verificationHandler.VerifyEmail)
+			auth.GET("/verify-email/:token", verificationHandler.VerifyEmailFromLink)
 			auth.POST("/forgot-password", verificationHandler.ForgotPassword)
 			auth.POST("/reset-password", verificationHandler.ResetPassword)
 		}
@@ -210,6 +211,7 @@ func setupRouter(
 		invitations := api.Group("/invitations")
 		{
 			invitations.GET("/info", teamInvitationHandler.GetInvitationInfo)
+			invitations.GET("/join/:token", teamInvitationHandler.JoinInvitationLanding)
 			invitations.POST("/decline", teamInvitationHandler.DeclineInvitation)
 		}
 	}

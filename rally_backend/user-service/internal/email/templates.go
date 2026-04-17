@@ -9,6 +9,7 @@ import (
 // EmailTemplates holds all email template generators
 type EmailTemplates struct {
 	frontendURL string
+	backendURL  string
 }
 
 // NewEmailTemplates creates a new template generator
@@ -17,8 +18,13 @@ func NewEmailTemplates() *EmailTemplates {
 	if frontendURL == "" {
 		frontendURL = "http://localhost:3000"
 	}
+	backendURL := os.Getenv("BASE_URL")
+	if backendURL == "" {
+		backendURL = "http://localhost:8081"
+	}
 	return &EmailTemplates{
 		frontendURL: frontendURL,
+		backendURL:  backendURL,
 	}
 }
 
@@ -130,43 +136,45 @@ func (t *EmailTemplates) GenerateVerificationEmail(data VerificationEmailData) (
 <body>
     <div class="container">
         <div class="header">
-            <h1>Rally Point</h1>
+            <h1>light point</h1>
         </div>
         <div class="content">
             <h2>Verify Your Email Address</h2>
             <p>Hello {{.UserName}},</p>
-            <p>Thank you for registering with Rally Point. To complete your registration, please verify your email address by clicking the button below:</p>
-            <p style="text-align: center;">
-                <a href="{{.VerificationURL}}" class="button">Verify Email Address</a>
-            </p>
-            <p>Or copy and paste this link into your browser:</p>
-            <p class="link-text">{{.VerificationURL}}</p>
+            <p>Thank you for registering with light point. To complete your registration, please activate your account by clicking the button below:</p>
+            <table role="presentation" cellspacing="0" cellpadding="0" border="0" style="margin:20px auto;">
+                <tr>
+                    <td align="center" bgcolor="#4A90D9" style="border-radius:6px;">
+                        <a href="{{.VerificationURL}}" style="display:inline-block;padding:14px 28px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;font-size:16px;font-weight:600;color:#ffffff;text-decoration:none;border-radius:6px;">Activate Account</a>
+                    </td>
+                </tr>
+            </table>
             <div class="warning">
-                <strong>Note:</strong> This link will expire in {{.ExpiryHours}} hours. If you did not create an account with Rally Point, please ignore this email.
+                <strong>Note:</strong> This link will expire in {{.ExpiryHours}} hours. If you did not create an account with light point, please ignore this email.
             </div>
         </div>
         <div class="footer">
-            <p>&copy; Rally Point. All rights reserved.</p>
+            <p>&copy; light point. All rights reserved.</p>
             <p>This is an automated message, please do not reply.</p>
         </div>
     </div>
 </body>
 </html>`
 
-	textTmpl := `Rally Point - Verify Your Email Address
+	textTmpl := `light point - Verify Your Email Address
 
 Hello {{.UserName}},
 
-Thank you for registering with Rally Point. To complete your registration, please verify your email address by clicking the link below:
+Thank you for registering with light point. To complete your registration, please activate your account by clicking the link below:
 
 {{.VerificationURL}}
 
 This link will expire in {{.ExpiryHours}} hours.
 
-If you did not create an account with Rally Point, please ignore this email.
+If you did not create an account with light point, please ignore this email.
 
 ---
-Rally Point
+light point
 This is an automated message, please do not reply.`
 
 	var htmlBuf, textBuf bytes.Buffer
@@ -283,7 +291,7 @@ func (t *EmailTemplates) GeneratePasswordResetEmail(data PasswordResetEmailData)
 <body>
     <div class="container">
         <div class="header">
-            <h1>Rally Point</h1>
+            <h1>light point</h1>
         </div>
         <div class="content">
             <h2>Reset Your Password</h2>
@@ -302,14 +310,14 @@ func (t *EmailTemplates) GeneratePasswordResetEmail(data PasswordResetEmailData)
             </div>
         </div>
         <div class="footer">
-            <p>&copy; Rally Point. All rights reserved.</p>
+            <p>&copy; light point. All rights reserved.</p>
             <p>This is an automated message, please do not reply.</p>
         </div>
     </div>
 </body>
 </html>`
 
-	textTmpl := `Rally Point - Reset Your Password
+	textTmpl := `light point - Reset Your Password
 
 Hello {{.UserName}},
 
@@ -322,7 +330,7 @@ SECURITY NOTICE: This link will expire in {{.ExpiryMinutes}} minutes for your se
 Didn't request this? If you did not request a password reset, please ignore this email. Your password will remain unchanged and your account is secure.
 
 ---
-Rally Point
+light point
 This is an automated message, please do not reply.`
 
 	var htmlBuf, textBuf bytes.Buffer
@@ -348,7 +356,7 @@ This is an automated message, please do not reply.`
 
 // GetVerificationURL constructs the full verification URL
 func (t *EmailTemplates) GetVerificationURL(token string) string {
-	return t.frontendURL + "/verify-email/" + token
+	return t.backendURL + "/api/auth/verify-email/" + token
 }
 
 // GetPasswordResetURL constructs the full password reset URL
@@ -363,7 +371,7 @@ func (t *EmailTemplates) SetFrontendURL(url string) {
 
 // GetTeamInvitationURL constructs the full team invitation URL
 func (t *EmailTemplates) GetTeamInvitationURL(token string) string {
-	return t.frontendURL + "/join-team?token=" + token
+	return t.backendURL + "/api/invitations/join/" + token
 }
 
 // GenerateTeamInvitationEmail generates HTML and text versions of team invitation email
@@ -478,12 +486,12 @@ func (t *EmailTemplates) GenerateTeamInvitationEmail(data TeamInvitationEmailDat
 <body>
     <div class="container">
         <div class="header">
-            <h1>Rally Point</h1>
+            <h1>light point</h1>
         </div>
         <div class="content">
             <h2>You've Been Invited!</h2>
             <p>Hello,</p>
-            <p><strong>{{.InviterName}}</strong> has invited you to join their team on Rally Point:</p>
+            <p><strong>{{.InviterName}}</strong> has invited you to join their team on light point:</p>
 
             <div class="team-card">
                 <p class="team-name">{{.TeamName}}</p>
@@ -509,7 +517,7 @@ func (t *EmailTemplates) GenerateTeamInvitationEmail(data TeamInvitationEmailDat
             </div>
         </div>
         <div class="footer">
-            <p>&copy; Rally Point. All rights reserved.</p>
+            <p>&copy; light point. All rights reserved.</p>
             <p>This is an automated message, please do not reply.</p>
             <p style="color: #999; font-size: 11px;">If you did not expect this invitation, you can safely ignore this email.</p>
         </div>
@@ -517,11 +525,11 @@ func (t *EmailTemplates) GenerateTeamInvitationEmail(data TeamInvitationEmailDat
 </body>
 </html>`
 
-	textTmpl := `Rally Point - Team Invitation
+	textTmpl := `light point - Team Invitation
 
 Hello,
 
-{{.InviterName}} has invited you to join their team "{{.TeamName}}" on Rally Point!
+{{.InviterName}} has invited you to join their team "{{.TeamName}}" on light point!
 
 To accept this invitation, click the link below:
 
@@ -535,7 +543,7 @@ What happens next?
 This invitation expires in {{.ExpiryDays}} days.
 
 ---
-Rally Point
+light point
 This is an automated message, please do not reply.
 
 If you did not expect this invitation, you can safely ignore this email.`
