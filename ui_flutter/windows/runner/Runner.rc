@@ -89,13 +89,13 @@ BEGIN
     BEGIN
         BLOCK "040904e4"
         BEGIN
-            VALUE "CompanyName", "Rally Point" "\0"
-            VALUE "FileDescription", "Rally Point" "\0"
+            VALUE "CompanyName", "Light Point" "\0"
+            VALUE "FileDescription", "Light Point" "\0"
             VALUE "FileVersion", VERSION_AS_STRING "\0"
-            VALUE "InternalName", "rally_point" "\0"
-            VALUE "LegalCopyright", "Copyright (C) 2025 Rally Point. All rights reserved." "\0"
-            VALUE "OriginalFilename", "rally_point.exe" "\0"
-            VALUE "ProductName", "Rally Point" "\0"
+            VALUE "InternalName", "light_point" "\0"
+            VALUE "LegalCopyright", "Copyright (C) 2025 Light Point. All rights reserved." "\0"
+            VALUE "OriginalFilename", "light_point.exe" "\0"
+            VALUE "ProductName", "Light Point" "\0"
             VALUE "ProductVersion", VERSION_AS_STRING "\0"
         END
     END

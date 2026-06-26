@@ -132,7 +132,7 @@ class _SplashScreenState extends State<SplashScreen>
                   ),
                   const SizedBox(height: 26),
                   Text(
-                    'Rally Point',
+                    'Light Point',
                     style: Theme.of(context).textTheme.headlineMedium?.copyWith(
                       color: titleColor,
                       fontWeight: FontWeight.w800,

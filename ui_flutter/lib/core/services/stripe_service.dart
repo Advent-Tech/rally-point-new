@@ -73,7 +73,7 @@ class StripeService {
       await Stripe.instance.initPaymentSheet(
         paymentSheetParameters: SetupPaymentSheetParameters(
           paymentIntentClientSecret: clientSecret,
-          merchantDisplayName: 'Rally Point',
+          merchantDisplayName: 'Light Point',
           style: ThemeMode.system,
           billingDetails: BillingDetails(
             name: recipientName,

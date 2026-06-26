@@ -88,7 +88,7 @@ class ProfileScreen extends StatelessWidget {
 
                 // App Info
                 Text(
-                  'Rally Point v1.0.0',
+                  'Light Point v1.0.0',
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
                     color: isDark
                         ? AppColors.textSecondaryDark

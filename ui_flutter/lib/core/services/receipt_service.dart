@@ -37,7 +37,7 @@ class ReceiptService {
         amount: formatter.format(amount),
         paymentMethod: _formatPaymentMethod(paymentMethod),
         date: dateFormatter.format(date),
-        organizationName: organizationName ?? 'Rally Point Ministry',
+        organizationName: organizationName ?? 'Light Point Ministry',
         organizationAddress: organizationAddress,
         workerName: workerName,
         notes: notes,
@@ -145,7 +145,7 @@ Donor: $donorName
 Amount: ${formatter.format(amount)}
 Payment: ${_formatPaymentMethod(paymentMethod)}
 
-Thank you for your donation to ${organizationName ?? 'Rally Point Ministry'}!
+Thank you for your donation to ${organizationName ?? 'Light Point Ministry'}!
 ''';
   }
 }

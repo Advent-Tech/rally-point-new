@@ -105,7 +105,7 @@ void main() async {
   final helpEnabled = await loadHelpMode();
 
   runApp(
-    RallyPointApp(
+    LightPointApp(
       helpModeEnabled: helpEnabled,
       apiClient: apiClient,
       secureStorage: secureStorage,
@@ -114,13 +114,13 @@ void main() async {
   );
 }
 
-class RallyPointApp extends StatelessWidget {
+class LightPointApp extends StatelessWidget {
   final bool helpModeEnabled;
   final ApiClient apiClient;
   final SecureStorage secureStorage;
   final WebSocketService webSocketService;
 
-  const RallyPointApp({
+  const LightPointApp({
     super.key,
     this.helpModeEnabled = false,
     required this.apiClient,
@@ -193,7 +193,7 @@ class _AppContentState extends State<_AppContent> {
       child: BlocBuilder<ThemeBloc, ThemeState>(
         builder: (context, themeState) {
           return MaterialApp.router(
-            title: 'Rally Point',
+            title: 'Light Point',
             debugShowCheckedModeBanner: false,
             theme: AppTheme.lightTheme,
             darkTheme: AppTheme.darkTheme,

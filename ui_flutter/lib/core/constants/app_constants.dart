@@ -3,7 +3,7 @@ class AppConstants {
   AppConstants._();
 
   // App Info
-  static const String appName = 'Rally Point';
+  static const String appName = 'Light Point';
   static const String appVersion = '1.0.0';
 
   // Storage Keys

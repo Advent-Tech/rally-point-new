@@ -2642,7 +2642,7 @@ class _ReceiptDialog extends StatelessWidget {
             // Receipt content
             const SizedBox(height: 8),
             Text(
-              'Rally Point',
+              'Light Point',
               style: TextStyle(
                 fontSize: 24,
                 fontWeight: FontWeight.bold,

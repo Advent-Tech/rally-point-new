@@ -1,4 +1,4 @@
-// Basic Flutter widget test for Rally Point app
+// Basic Flutter widget test for Light Point app
 
 import 'package:flutter_test/flutter_test.dart';
 

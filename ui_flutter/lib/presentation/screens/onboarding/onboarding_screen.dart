@@ -18,7 +18,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
 
   final List<OnboardingSlide> _slides = [
     OnboardingSlide(
-      title: 'Welcome to RallyPoint',
+      title: 'Welcome to LightPoint',
       description: 'Track territories, visits, and prayer — together.',
       accentColors: [AppColors.buttonPrimaryLight, AppColors.accent],
       heroBuilder: (context) =>

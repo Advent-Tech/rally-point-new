@@ -5,7 +5,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
-	<string>Rally Point</string>
+	<string>Light Point</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -13,7 +13,7 @@
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
 	<key>CFBundleName</key>
-	<string>rally_point</string>
+	<string>light_point</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
@@ -50,16 +50,16 @@
 		<string>remote-notification</string>
 	</array>
 	<key>NSMicrophoneUsageDescription</key>
-	<string>Rally Point needs microphone access to record and send voice messages.</string>
+	<string>Light Point needs microphone access to record and send voice messages.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>Rally Point uses your location to show your position on the map and support location-based features.</string>
+	<string>Light Point uses your location to show your position on the map and support location-based features.</string>
 	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
-	<string>Rally Point uses your location to show your position on the map and support location-based features.</string>
+	<string>Light Point uses your location to show your position on the map and support location-based features.</string>
 	<key>NSCameraUsageDescription</key>
-	<string>Rally Point needs camera access to let you take photos for reports and updates.</string>
+	<string>Light Point needs camera access to let you take photos for reports and updates.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
-	<string>Rally Point needs photo library access to let you upload images.</string>
+	<string>Light Point needs photo library access to let you upload images.</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>
-	<string>Rally Point needs permission to save images to your photo library when you export or download media.</string>
+	<string>Light Point needs permission to save images to your photo library when you export or download media.</string>
 </dict>
 </plist>
