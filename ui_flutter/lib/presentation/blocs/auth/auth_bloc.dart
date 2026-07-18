@@ -69,6 +69,13 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     _secureStorage = await SecureStorage.getInstance();
     _localStorage = await LocalStorage.getInstance();
     _isInitialized = true;
+
+    // Register global 401 handler — triggers logout from any failed API call
+    _apiClient!.onAuthFailed = () {
+      if (state is AuthAuthenticated) {
+        add(const AuthTokenExpired());
+      }
+    };
   }
 
   // Getters that assert initialization
@@ -108,9 +115,9 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
         if (data['refresh_token'] != null) {
           await _secure.saveRefreshToken(data['refresh_token']);
         }
-        if (data['expires_in'] != null) {
-          await _secure.saveTokenExpiry(data['expires_in']);
-        }
+        // Always save expiry — default to 900s if backend omits it
+        final expiresIn = data['expires_in'] ?? 900;
+        await _secure.saveTokenExpiry(expiresIn);
         return true;
       }
       return false;
@@ -136,18 +143,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
         return;
       }
 
-      // Fast boot path:
-      // If we have cached user data, let user in immediately and validate token in background.
-      final cachedUser = _local.getUserData();
-      if (cachedUser != null) {
-        final cached = UserModel.fromJson(cachedUser);
-        if (cached.teamId != null && cached.teamId!.isNotEmpty) {
-          await _secure.write('team_id', cached.teamId!);
-        }
-        emit(AuthAuthenticated(user: cached, isOffline: true));
-      }
-
-      // Check if token is expired and try to refresh
+      // Check if token is expired and try to refresh BEFORE fast boot
       final isExpired = await _secure
           .isTokenExpired()
           .timeout(const Duration(seconds: 4));
@@ -157,15 +153,14 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
           onTimeout: () => false,
         );
         if (!refreshed) {
-          // Do not force logout on a single refresh failure.
-          // Network hiccups or temporary backend issues should not drop session.
-          debugPrint(
-            'Auth: token refresh failed during check, proceeding to /me validation.',
-          );
+          // Token expired and refresh failed — clear everything and force re-login
+          await _secure.clearTokens();
+          emit(AuthUnauthenticated());
+          return;
         }
       }
 
-      // Try to get current user
+      // Try to get current user from server (authoritative validation)
       final response = await _api
           .get(ApiConstants.userMe)
           .timeout(const Duration(seconds: 12));
@@ -184,7 +179,15 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
       }
     } catch (e) {
       debugPrint('Auth check failed, falling back safely: $e');
-      // Check for cached user data
+
+      // If the error is a 401, force logout — token is invalid
+      if (e is DioException && e.response?.statusCode == 401) {
+        await _secure.clearTokens();
+        emit(AuthUnauthenticated());
+        return;
+      }
+
+      // On other errors (network, timeout), allow fast boot with cached data
       final cachedUser = _local.getUserData();
       if (cachedUser != null) {
         final user = UserModel.fromJson(cachedUser);
@@ -218,10 +221,9 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
           await _secure.saveRefreshToken(authResponse.refreshToken!);
         }
 
-        // Save token expiry
-        if (authResponse.expiresIn != null) {
-          await _secure.saveTokenExpiry(authResponse.expiresIn!);
-        }
+        // Save token expiry (always — default to 900s if backend omits it)
+        final expiresIn = authResponse.expiresIn ?? 900;
+        await _secure.saveTokenExpiry(expiresIn);
 
         // Get user profile if not included in response
         UserModel user;

@@ -437,7 +437,7 @@ func (h *LocationHandler) WebSocketHandler(c *gin.Context) {
 func (h *LocationHandler) handleWebSocketConnection(conn *websocket.Conn, userID uuid.UUID, locationCh <-chan *domain.WorkerLocation) {
 	pingTicker := time.NewTicker(30 * time.Second)
 	defer pingTicker.Stop()
-	flushTicker := time.NewTicker(250 * time.Millisecond)
+	flushTicker := time.NewTicker(150 * time.Millisecond)
 	defer flushTicker.Stop()
 
 	pending := make(map[uuid.UUID]*domain.WorkerLocation)
@@ -535,7 +535,7 @@ func (h *LocationHandler) HealthCheck(c *gin.Context) {
 type LocationFilterConfig struct {
 	MaxSpeedKmh        float64 // 80 km/h - allows both foot and car modes
 	MaxDistanceKm      float64 // 50 km outlier threshold
-	MinAccuracyMeters  float64 // 50m accuracy threshold
+	MinAccuracyMeters  float64 // 100m accuracy threshold
 	MinIntervalSeconds int     // 3 seconds minimum between updates
 	MinSpeedKmh        float64 // 0.5 km/h minimum (not completely stuck)
 }
@@ -545,7 +545,7 @@ func DefaultFilterConfig() LocationFilterConfig {
 	return LocationFilterConfig{
 		MaxSpeedKmh:        80.0,
 		MaxDistanceKm:      50.0,
-		MinAccuracyMeters:  50.0,
+		MinAccuracyMeters:  100.0,
 		MinIntervalSeconds: 3,
 		MinSpeedKmh:        0.5,
 	}

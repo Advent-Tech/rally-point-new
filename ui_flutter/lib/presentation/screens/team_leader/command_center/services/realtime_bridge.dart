@@ -12,7 +12,7 @@ class RealtimeBridge {
   final WebSocketService _ws;
   final Map<String, _QueuedLocationUpdate> _pendingLocationUpdates = {};
   Timer? _locationFlushTimer;
-  static const Duration _locationFlushInterval = Duration(milliseconds: 300);
+  static const Duration _locationFlushInterval = Duration(milliseconds: 150);
 
   RealtimeBridge({required this.bloc, WebSocketService? ws})
     : _ws = ws ?? WebSocketService() {

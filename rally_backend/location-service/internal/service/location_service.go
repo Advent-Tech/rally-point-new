@@ -93,12 +93,12 @@ func (s *locationService) UpdateLocation(userID uuid.UUID, update *domain.Locati
 		}
 	}
 
-	// Create worker location for real-time updates
+	// Create worker location for real-time updates (use smoothed coords for broadcast)
 	workerLocation := &domain.WorkerLocation{
 		UserID:    userID,
 		UserName:  "", // Would be fetched from user service in real implementation
-		Latitude:  update.Latitude,
-		Longitude: update.Longitude,
+		Latitude:  smoothedLat,
+		Longitude: smoothedLng,
 		Accuracy:  update.Accuracy,
 		Speed:     update.Speed,
 		Heading:   update.Heading,

@@ -1,6 +1,8 @@
 import 'dart:async';
+import 'dart:io' show Platform;
 import 'dart:math' as math;
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:geolocator/geolocator.dart';
 import '../core/network/api_client.dart';
 import '../core/constants/api_constants.dart';
@@ -21,6 +23,7 @@ typedef OnTrackingError = void Function(String error);
 /// Service for automatic session tracking based on geofence entry/exit
 class SessionTrackingService {
   static SessionTrackingService? _instance;
+  static const MethodChannel _platform = MethodChannel('com.rallypoint/location');
 
   ApiClient? _apiClient;
   LocalStorage? _localStorage;
@@ -43,7 +46,7 @@ class SessionTrackingService {
   List<TerritoryAssignment> _assignedTerritories = [];
 
   // Settings
-  Duration _geofenceCheckInterval = const Duration(seconds: 60);
+  Duration _geofenceCheckInterval = const Duration(seconds: 30);
   bool _autoCheckIn = true;
   bool _autoCheckOut = true;
   Duration _minSendInterval = const Duration(seconds: 3);
@@ -154,6 +157,30 @@ class SessionTrackingService {
     }
   }
 
+  /// Start the Android foreground service to keep GPS alive in background
+  Future<void> _startForegroundService() async {
+    if (!kIsWeb && Platform.isAndroid) {
+      try {
+        await _platform.invokeMethod('startLocationService');
+        debugPrint('[SessionTracking] Android foreground service started');
+      } catch (e) {
+        debugPrint('[SessionTracking] Failed to start foreground service: $e');
+      }
+    }
+  }
+
+  /// Stop the Android foreground service
+  Future<void> _stopForegroundService() async {
+    if (!kIsWeb && Platform.isAndroid) {
+      try {
+        await _platform.invokeMethod('stopLocationService');
+        debugPrint('[SessionTracking] Android foreground service stopped');
+      } catch (e) {
+        debugPrint('[SessionTracking] Failed to stop foreground service: $e');
+      }
+    }
+  }
+
   /// Start automatic tracking
   Future<bool> startTracking() async {
     if (_isTracking) return true;
@@ -187,6 +214,9 @@ class SessionTrackingService {
         _ensurePositionStreamHealthy();
       });
 
+      // Start foreground service for background survival
+      await _startForegroundService();
+
       _isTracking = true;
       debugPrint('[SessionTracking] Started tracking successfully');
       return true;
@@ -209,8 +239,26 @@ class SessionTrackingService {
     _positionWatchdogTimer?.cancel();
     _positionWatchdogTimer = null;
 
+    // Stop foreground service
+    await _stopForegroundService();
+
     _isTracking = false;
     debugPrint('SessionTracking: Stopped tracking');
+  }
+
+  /// Called when app lifecycle changes — restart GPS on resume, start foreground on pause
+  void onAppLifecycleStateChanged(AppLifecycleState state) {
+    if (!_isTracking) return;
+
+    if (state == AppLifecycleState.resumed) {
+      debugPrint('[SessionTracking] App resumed — restarting GPS stream');
+      unawaited(_restartLocationStream());
+      unawaited(_ensurePositionStreamHealthy());
+    } else if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.inactive) {
+      debugPrint('[SessionTracking] App paused/inactive — ensuring foreground service');
+      unawaited(_startForegroundService());
+    }
   }
 
   /// Check location permission
@@ -324,42 +372,61 @@ class SessionTrackingService {
       );
 
       // 1. Send to location service (stores in location_tracks table)
-      final locationResponse = await _apiClient!.post(
-        ApiConstants.locationUpdate,
-        data: {
-          'latitude': position.latitude,
-          'longitude': position.longitude,
-          'accuracy': position.accuracy,
-          'altitude': position.altitude,
-          'speed': position.speed,
-          'heading': position.heading,
-          if (_currentSessionId != null) 'session_id': _currentSessionId,
-          if (_teamId != null) 'team_id': _teamId,
-        },
-      );
-      debugPrint(
-        '[SessionTracking] Location update response: ${locationResponse.statusCode}',
-      );
-
-      // 2. Send to geofence service (triggers territory entry/exit detection)
-      if (_userId != null) {
-        final geofenceResponse = await _apiClient!.post(
-          ApiConstants.geofenceLocationUpdate,
+      await _retrySend(() async {
+        final locationResponse = await _apiClient!.post(
+          ApiConstants.locationUpdate,
           data: {
-            'worker_id': _userId,
-            if (_teamId != null) 'team_id': _teamId,
             'latitude': position.latitude,
             'longitude': position.longitude,
+            'accuracy': position.accuracy,
+            'altitude': position.altitude,
+            'speed': position.speed,
+            'heading': position.heading,
+            if (_currentSessionId != null) 'session_id': _currentSessionId,
+            if (_teamId != null) 'team_id': _teamId,
           },
         );
         debugPrint(
-          '[SessionTracking] Geofence update response: ${geofenceResponse.statusCode}',
+          '[SessionTracking] Location update response: ${locationResponse.statusCode}',
         );
+      });
+
+      // 2. Send to geofence service (triggers territory entry/exit detection)
+      if (_userId != null) {
+        await _retrySend(() async {
+          final geofenceResponse = await _apiClient!.post(
+            ApiConstants.geofenceLocationUpdate,
+            data: {
+              'worker_id': _userId,
+              if (_teamId != null) 'team_id': _teamId,
+              'latitude': position.latitude,
+              'longitude': position.longitude,
+            },
+          );
+          debugPrint(
+            '[SessionTracking] Geofence update response: ${geofenceResponse.statusCode}',
+          );
+        });
       }
       _lastSentAt = now;
       _lastSentPosition = position;
     } catch (e) {
       debugPrint('[SessionTracking] Error sending location: $e');
+    }
+  }
+
+  Future<void> _retrySend(Future<void> Function() send, {int maxAttempts = 3}) async {
+    for (var attempt = 1; attempt <= maxAttempts; attempt++) {
+      try {
+        await send();
+        return;
+      } catch (e) {
+        if (attempt == maxAttempts) {
+          debugPrint('[SessionTracking] Send failed after $maxAttempts attempts: $e');
+          return;
+        }
+        await Future.delayed(Duration(seconds: attempt));
+      }
     }
   }
 

@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math' as math;
 import 'package:flutter/foundation.dart';
 import '../core/constants/api_constants.dart';
 import '../core/storage/secure_storage.dart';
@@ -171,7 +172,7 @@ class WebSocketService {
   Timer? _pingTimer;
   Timer? _reconnectTimer;
   int _reconnectAttempts = 0;
-  static const int _maxReconnectAttempts = 5;
+  static const int _maxReconnectAttempts = 50;
   static const Duration _pingInterval = Duration(seconds: 30);
   static const Duration _reconnectDelay = Duration(seconds: 5);
 
@@ -458,9 +459,13 @@ class WebSocketService {
     }
 
     _reconnectTimer?.cancel();
-    _reconnectTimer = Timer(_reconnectDelay * (_reconnectAttempts + 1), () {
+    final delaySeconds = math.min(
+      _reconnectDelay.inSeconds * (1 << _reconnectAttempts),
+      120,
+    );
+    _reconnectTimer = Timer(Duration(seconds: delaySeconds), () {
       _reconnectAttempts++;
-      debugPrint('WebSocket: Reconnect attempt $_reconnectAttempts');
+      debugPrint('WebSocket: Reconnect attempt $_reconnectAttempts (delay ${delaySeconds}s)');
       connect();
     });
   }

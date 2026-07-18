@@ -14,6 +14,7 @@ import '../../blocs/location/location_bloc.dart';
 import '../../../core/network/api_client.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/theme.dart';
+import '../../../services/session_tracking_service.dart';
 import '../../widgets/widgets.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -23,7 +24,7 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
+class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   late WorkSessionBloc _workSessionBloc;
   late WorkerScheduleBloc _scheduleBloc;
   late PrayerRequestBloc _prayerRequestBloc;
@@ -37,6 +38,7 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _workSessionBloc = context.read<WorkSessionBloc>();
     _workSessionBloc.add(const WorkSessionLoadCurrent());
 
@@ -199,7 +201,13 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    SessionTrackingService().onAppLifecycleStateChanged(state);
+  }
+
+  @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _scheduleBloc.close();
     _prayerRequestBloc.close();
     _locationBloc.close();

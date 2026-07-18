@@ -12,6 +12,12 @@ class ApiClient {
   SecureStorage? _storage;
   String? _authToken;
   Future<bool>? _refreshFuture;
+  int _retryCount = 0;
+  static const int _maxRetries = 1;
+
+  /// Called when a 401 cannot be recovered (refresh failed).
+  /// AuthBloc sets this to trigger logout + redirect to login.
+  VoidCallback? onAuthFailed;
 
   ApiClient._() {
     _dio = Dio(_baseOptions);
@@ -95,13 +101,27 @@ class ApiClient {
       },
       onError: (error, handler) async {
         if (error.response?.statusCode == 401) {
+          // Prevent retry loops
+          if (_retryCount >= _maxRetries) {
+            _retryCount = 0;
+            debugPrint('ApiClient: max retries reached, propagating 401');
+            return handler.next(error);
+          }
+
           // Try to refresh token
           final refreshed = await _refreshToken();
           if (refreshed) {
+            _retryCount++;
             // Retry the request
             final retryResponse = await _retryRequest(error.requestOptions);
+            _retryCount = 0;
             return handler.resolve(retryResponse);
           }
+
+          // Refresh failed — call onAuthFailed callback and propagate 401
+          debugPrint('ApiClient: refresh failed, propagating 401');
+          _retryCount = 0;
+          onAuthFailed?.call();
         }
         return handler.next(error);
       },

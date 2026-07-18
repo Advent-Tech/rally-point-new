@@ -20,6 +20,17 @@ class CommandCenterBloc extends Bloc<CommandCenterEvent, CommandCenterState> {
   final SecureStorage _storage;
   final RoadSnapService _roadSnapService;
 
+  // Client-side EMA smoothing for live worker dots (alpha=0.3: responsive but smooth)
+  final Map<String, Position> _emaPositions = {};
+  static const double _emaAlpha = 0.3;
+
+  // Road snapping state per worker
+  final Map<String, List<Position>> _positionRingBuffers = {};
+  final Map<String, DateTime> _lastSnapTimes = {};
+  final Map<String, Position> _snappedPositions = {};
+  static const int _ringBufferSize = 5;
+  static const Duration _snapRateLimit = Duration(seconds: 3);
+
   CommandCenterBloc({
     required ApiClient apiClient,
     required SecureStorage storage,
@@ -365,10 +376,10 @@ class CommandCenterBloc extends Bloc<CommandCenterEvent, CommandCenterState> {
     }
   }
 
-  void _onUpdateLiveLocation(
+  Future<void> _onUpdateLiveLocation(
     UpdateLiveLocationEvent event,
     Emitter<CommandCenterState> emit,
-  ) {
+  ) async {
     if (!_isValidLocation(event.latitude, event.longitude)) return;
     final existingTs = state.liveLocationUpdatedAt[event.workerId];
     if (existingTs != null && event.occurredAt.isBefore(existingTs)) {
@@ -377,22 +388,36 @@ class CommandCenterBloc extends Bloc<CommandCenterEvent, CommandCenterState> {
 
     final updatedLocations = Map<String, Position>.from(state.liveLocations);
     final previous = updatedLocations[event.workerId];
+
+    // Apply client-side EMA smoothing to reduce jitter
+    final rawPos = Position(
+      latitude: event.latitude,
+      longitude: event.longitude,
+    );
+    final smoothedPos = _smoothPosition(event.workerId, rawPos);
+
+    // Update ring buffer with raw position (for road snap context)
+    _updateRingBuffer(event.workerId, rawPos);
+
+    // Try road snapping (rate-limited)
+    final snappedPos = await _tryRoadSnap(event.workerId, smoothedPos);
+
+    // Use snapped if available, else EMA-smoothed
+    final displayPos = snappedPos ?? smoothedPos;
+
     if (previous != null) {
       final movementMeters = _haversineMeters(
         previous.latitude,
         previous.longitude,
-        event.latitude,
-        event.longitude,
+        displayPos.latitude,
+        displayPos.longitude,
       );
       if (movementMeters < 1.5) {
         return;
       }
     }
 
-    updatedLocations[event.workerId] = Position(
-      latitude: event.latitude,
-      longitude: event.longitude,
-    );
+    updatedLocations[event.workerId] = displayPos;
 
     final updatedTimestamps = Map<String, DateTime>.from(
       state.liveLocationUpdatedAt,
@@ -414,6 +439,11 @@ class CommandCenterBloc extends Bloc<CommandCenterEvent, CommandCenterState> {
       updatedSpeed[event.workerId] = event.speedMps!;
     }
 
+    final breachedWorkerIds = _computeBreachedWorkers(
+      updatedLocations,
+      state.territories,
+    );
+
     final shouldExtendPath =
         state.followTarget == event.workerId ||
         (state.workerPaths[event.workerId]?.isNotEmpty ?? false);
@@ -427,17 +457,15 @@ class CommandCenterBloc extends Bloc<CommandCenterEvent, CommandCenterState> {
           _haversineMeters(
                 currentPath.last.latitude,
                 currentPath.last.longitude,
-                event.latitude,
-                event.longitude,
+                displayPos.latitude,
+                displayPos.longitude,
               ) >=
               1.5;
       if (shouldAppendPoint) {
-        currentPath.add(
-          Position(latitude: event.latitude, longitude: event.longitude),
-        );
+        currentPath.add(displayPos);
       }
-      updatedPaths[event.workerId] = currentPath.length > 1200
-          ? currentPath.sublist(currentPath.length - 1200)
+      updatedPaths[event.workerId] = currentPath.length > 2400
+          ? currentPath.sublist(currentPath.length - 2400)
           : currentPath;
     }
 
@@ -449,8 +477,69 @@ class CommandCenterBloc extends Bloc<CommandCenterEvent, CommandCenterState> {
         liveLocationSpeedMps: updatedSpeed,
         gpsLiveWorkerIds: updatedGpsLive,
         workerPaths: updatedPaths,
+        breachedWorkerIds: breachedWorkerIds,
       ),
     );
+  }
+
+  Set<String> _computeBreachedWorkers(
+    Map<String, Position> locations,
+    List<GeoTerritory> territories,
+  ) {
+    final breached = <String>{};
+    for (final entry in locations.entries) {
+      final workerId = entry.key;
+      final pos = entry.value;
+      bool insideAny = false;
+      for (final territory in territories) {
+        final geom = territory.geometry;
+        if (geom == null) continue;
+        if (_isPointInGeometry(pos, geom)) {
+          insideAny = true;
+          break;
+        }
+      }
+      if (!insideAny) {
+        breached.add(workerId);
+      }
+    }
+    return breached;
+  }
+
+  bool _isPointInGeometry(Position point, Map<String, dynamic> geometry) {
+    final type = geometry['type'] as String?;
+    if (type == 'Polygon') {
+      return _isPointInPolygon(point, geometry['coordinates']);
+    } else if (type == 'MultiPolygon') {
+      final polygons = geometry['coordinates'] as List?;
+      if (polygons == null) return false;
+      for (final polygon in polygons) {
+        if (_isPointInPolygon(point, polygon)) return true;
+      }
+    }
+    return false;
+  }
+
+  bool _isPointInPolygon(Position point, dynamic coordinates) {
+    if (coordinates is! List || coordinates.isEmpty) return false;
+    final ring = coordinates[0] as List?;
+    if (ring == null || ring.length < 3) return false;
+
+    bool inside = false;
+    final n = ring.length;
+    for (int i = 0, j = n - 1; i < n; j = i++) {
+      final xi = (ring[i] as List)[0] as num;
+      final yi = (ring[i] as List)[1] as num;
+      final xj = (ring[j] as List)[0] as num;
+      final yj = (ring[j] as List)[1] as num;
+
+      if (((yi > point.latitude) != (yj > point.latitude)) &&
+          (point.longitude <
+              (xj - xi) * (point.latitude - yi) / (yj - yi) + xi)) {
+        inside = !inside;
+      }
+    }
+    return inside;
   }
 
   void _onAddDonation(
@@ -565,8 +654,8 @@ class CommandCenterBloc extends Bloc<CommandCenterEvent, CommandCenterState> {
               1.5) {
         current.add(livePoint);
       }
-      updatedPaths[event.workerId] = current.length > 1200
-          ? current.sublist(current.length - 1200)
+      updatedPaths[event.workerId] = current.length > 2400
+          ? current.sublist(current.length - 2400)
           : current;
     }
 
@@ -779,6 +868,59 @@ class CommandCenterBloc extends Bloc<CommandCenterEvent, CommandCenterState> {
       'created_at': json['created_at'],
       'updated_at': json['updated_at'],
     });
+  }
+
+  Position _smoothPosition(String workerId, Position raw) {
+    final prev = _emaPositions[workerId];
+    if (prev == null) {
+      _emaPositions[workerId] = raw;
+      return raw;
+    }
+    final smoothed = Position(
+      latitude: _emaAlpha * raw.latitude + (1 - _emaAlpha) * prev.latitude,
+      longitude: _emaAlpha * raw.longitude + (1 - _emaAlpha) * prev.longitude,
+    );
+    _emaPositions[workerId] = smoothed;
+    return smoothed;
+  }
+
+  void _updateRingBuffer(String workerId, Position raw) {
+    final buffer = _positionRingBuffers.putIfAbsent(workerId, () => []);
+    buffer.add(raw);
+    if (buffer.length > _ringBufferSize) {
+      buffer.removeAt(0);
+    }
+  }
+
+  Future<Position?> _tryRoadSnap(String workerId, Position smoothed) async {
+    final now = DateTime.now();
+    final lastSnap = _lastSnapTimes[workerId];
+    if (lastSnap != null && now.difference(lastSnap) < _snapRateLimit) {
+      // Rate limited — return last snapped position if available
+      return _snappedPositions[workerId];
+    }
+
+    _lastSnapTimes[workerId] = now;
+
+    try {
+      final buffer = _positionRingBuffers[workerId];
+      final context = buffer != null && buffer.length >= 2 ? buffer : null;
+
+      final result = await _roadSnapService.snapPoint(
+        smoothed,
+        context: context,
+      );
+
+      if (result != null) {
+        _snappedPositions[workerId] = result;
+        return result;
+      }
+    } catch (_) {
+      // Road snap failed silently — fall back to EMA
+    }
+
+    // Fallback: return last snapped or null (EMA will be used)
+    return _snappedPositions[workerId];
   }
 
   double _haversineMeters(double lat1, double lon1, double lat2, double lon2) {
