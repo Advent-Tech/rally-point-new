@@ -185,7 +185,7 @@ class AuthRepository {
 
       final response = await client.dio.post(
         ApiConstants.refreshToken,
-        data: {'refreshToken': refreshTokenValue},
+        data: {'refresh_token': refreshTokenValue}, // snake_case (Fix 5)
       );
 
       final authResponse = AuthResponse.fromJson(response.data);

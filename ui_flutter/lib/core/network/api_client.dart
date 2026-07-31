@@ -12,8 +12,13 @@ class ApiClient {
   SecureStorage? _storage;
   String? _authToken;
   Future<bool>? _refreshFuture;
-  int _retryCount = 0;
-  static const int _maxRetries = 1;
+
+  /// Tracks which request paths have already been retried after a refresh,
+  /// so concurrent 401s on the same endpoint don't double-retry.
+  final Set<String> _retriedPaths = {};
+
+  /// Global cancel token — cancelled on logout to abort all in-flight requests.
+  CancelToken? _globalCancelToken;
 
   /// Called when a 401 cannot be recovered (refresh failed).
   /// AuthBloc sets this to trigger logout + redirect to login.
@@ -101,26 +106,28 @@ class ApiClient {
       },
       onError: (error, handler) async {
         if (error.response?.statusCode == 401) {
-          // Prevent retry loops
-          if (_retryCount >= _maxRetries) {
-            _retryCount = 0;
-            debugPrint('ApiClient: max retries reached, propagating 401');
+          final path = error.requestOptions.path;
+
+          // Prevent retry loops: only retry each endpoint once per refresh cycle
+          if (_retriedPaths.contains(path)) {
+            _retriedPaths.clear();
+            debugPrint('ApiClient: already retried $path, propagating 401');
             return handler.next(error);
           }
 
-          // Try to refresh token
-          final refreshed = await _refreshToken();
+          // Try to refresh token (shared future — only one refresh at a time)
+          final refreshed = await refreshToken();
           if (refreshed) {
-            _retryCount++;
-            // Retry the request
+            _retriedPaths.add(path);
+            // Retry the request with the new token
             final retryResponse = await _retryRequest(error.requestOptions);
-            _retryCount = 0;
+            _retriedPaths.clear();
             return handler.resolve(retryResponse);
           }
 
           // Refresh failed — call onAuthFailed callback and propagate 401
           debugPrint('ApiClient: refresh failed, propagating 401');
-          _retryCount = 0;
+          _retriedPaths.clear();
           onAuthFailed?.call();
         }
         return handler.next(error);
@@ -141,7 +148,11 @@ class ApiClient {
     }
   }
 
-  Future<bool> _refreshToken() async {
+  /// Refresh the access token using the refresh token.
+  /// Uses a shared future to prevent concurrent refreshes (Fix 1).
+  /// This is the single source of truth for token refresh — both the
+  /// 401 interceptor and AuthBloc's timer call this method.
+  Future<bool> refreshToken() async {
     if (_refreshFuture != null) {
       return _refreshFuture!;
     }
@@ -152,6 +163,18 @@ class ApiClient {
     } finally {
       _refreshFuture = null;
     }
+  }
+
+  /// Cancel all in-flight requests (called on logout).
+  void cancelAllRequests() {
+    _globalCancelToken?.cancel('User logged out');
+    _globalCancelToken = CancelToken();
+  }
+
+  /// Get the current global cancel token, creating one if needed.
+  CancelToken get cancelToken {
+    _globalCancelToken ??= CancelToken();
+    return _globalCancelToken!;
   }
 
   Future<bool> _performRefresh() async {
@@ -175,15 +198,12 @@ class ApiClient {
         if (data['refresh_token'] != null) {
           await _storage?.saveRefreshToken(data['refresh_token']);
         }
-        final expiresInRaw = data['expires_in'];
-        if (expiresInRaw != null) {
-          final expiresIn = expiresInRaw is int
-              ? expiresInRaw
-              : int.tryParse(expiresInRaw.toString());
-          if (expiresIn != null) {
-            await _storage?.saveTokenExpiry(expiresIn);
-          }
-        }
+        // Always save expiry — default to 900s if backend omits it
+        final expiresInRaw = data['expires_in'] ?? 900;
+        final expiresIn = expiresInRaw is int
+            ? expiresInRaw
+            : int.tryParse(expiresInRaw.toString()) ?? 900;
+        await _storage?.saveTokenExpiry(expiresIn);
         return true;
       }
     } catch (e) {

@@ -70,11 +70,12 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     _localStorage = await LocalStorage.getInstance();
     _isInitialized = true;
 
-    // Register global 401 handler — triggers logout from any failed API call
+    // Register global 401 handler — triggers logout from any failed API call.
+    // No state guard: always fire AuthTokenExpired when refresh fails,
+    // even if AuthBloc is mid-loading. This prevents stale "logged in"
+    // state when a 401 arrives during another operation (Fix 2).
     _apiClient!.onAuthFailed = () {
-      if (state is AuthAuthenticated) {
-        add(const AuthTokenExpired());
-      }
+      add(const AuthTokenExpired());
     };
   }
 
@@ -101,26 +102,10 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
 
   Future<bool> _tryRefreshToken() async {
     try {
-      final refreshToken = await _secure.getRefreshToken();
-      if (refreshToken == null) return false;
-
-      final response = await _api.post(
-        ApiConstants.refreshToken,
-        data: {'refresh_token': refreshToken},
-      ).timeout(const Duration(seconds: 12));
-
-      if (response.statusCode == 200) {
-        final data = response.data;
-        await _secure.saveAccessToken(data['access_token']);
-        if (data['refresh_token'] != null) {
-          await _secure.saveRefreshToken(data['refresh_token']);
-        }
-        // Always save expiry — default to 900s if backend omits it
-        final expiresIn = data['expires_in'] ?? 900;
-        await _secure.saveTokenExpiry(expiresIn);
-        return true;
-      }
-      return false;
+      // Use ApiClient's shared refresh method (Fix 1).
+      // This prevents the timer and the 401 interceptor from both hitting
+      // /api/auth/refresh simultaneously and racing on refresh token rotation.
+      return await _api.refreshToken();
     } catch (e) {
       return false;
     }
@@ -394,10 +379,9 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
           await _secure.saveRefreshToken(authResponse.refreshToken!);
         }
 
-        // Save token expiry
-        if (authResponse.expiresIn != null) {
-          await _secure.saveTokenExpiry(authResponse.expiresIn!);
-        }
+        // Save token expiry — default to 900s if backend omits it (Fix 4)
+        final expiresIn = authResponse.expiresIn ?? 900;
+        await _secure.saveTokenExpiry(expiresIn);
 
         // Get user profile
         UserModel user;
@@ -430,6 +414,9 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
       await _initialize();
       _stopRefreshTimer();
 
+      // Cancel all in-flight API requests immediately (Fix 6)
+      _api.cancelAllRequests();
+
       // Call logout endpoint (optional, token invalidation)
       try {
         await _api.post(ApiConstants.userLogout);
@@ -444,6 +431,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
       emit(AuthUnauthenticated());
     } catch (e) {
       // Still logout locally even if API fails
+      _api.cancelAllRequests();
       await _secure.clearTokens();
       await _local.clearUserData();
       emit(AuthUnauthenticated());
@@ -492,6 +480,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
   ) async {
     _refreshFailureCount = 0;
     _stopRefreshTimer();
+    _api.cancelAllRequests(); // Fix 6: abort all in-flight requests
     await _secure.clearTokens();
     await _local.clearUserData();
     emit(AuthUnauthenticated());
