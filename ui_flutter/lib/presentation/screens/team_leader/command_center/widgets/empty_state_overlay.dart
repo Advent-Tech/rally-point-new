@@ -93,7 +93,7 @@ class EmptyStateOverlay extends StatelessWidget {
       case cc.MapMode.overview:
         return 'No Map Activity Yet';
       case cc.MapMode.workers:
-        return 'No Workers Active';
+        return 'No Light Squads Active';
       case cc.MapMode.territories:
         return 'No Territories Assigned';
     }
@@ -102,11 +102,11 @@ class EmptyStateOverlay extends StatelessWidget {
   String _getMessage() {
     switch (mode) {
       case cc.MapMode.overview:
-        return 'No territory or worker location data is available yet. Ask admin to assign territories, then refresh.';
+        return 'No territory or light squad location data is available yet. Ask admin to assign territories, then refresh.';
       case cc.MapMode.workers:
-        return 'No workers are currently sharing live location. They may be offline or not checked in yet.';
+        return 'No light squads are currently sharing live location. They may be offline or not checked in yet.';
       case cc.MapMode.territories:
-        return 'Your team has no territory allocations yet. Contact admin to assign territories to this leader/team.';
+        return 'Your team has no territory allocations yet. Contact admin to assign territories to this light house/team.';
     }
   }
 

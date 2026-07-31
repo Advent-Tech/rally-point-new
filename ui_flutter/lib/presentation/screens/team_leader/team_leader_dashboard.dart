@@ -102,11 +102,11 @@ class _TeamLeaderDashboardState extends State<TeamLeaderDashboard> {
         key: _showcaseCommandCenter,
         title: 'Command Center',
         description:
-            'Track workers live, view territories, and manage field activity on map.',
+            'Track light squads live, view territories, and manage field activity on map.',
         child: _ManagementTile(
           icon: Icons.map,
           title: 'Command Center',
-          subtitle: 'Map, worker tracking & territories',
+          subtitle: 'Map, light squad tracking & territories',
           color: AppColors.primary,
           isDark: isDark,
           onTap: () => context.push('/leader/command-center?mode=overview'),
@@ -122,12 +122,12 @@ class _TeamLeaderDashboardState extends State<TeamLeaderDashboard> {
       ),
       Showcase(
         key: _showcaseVerifyWorkers,
-        title: 'Verify Workers',
+        title: 'Verify Light Squads',
         description:
-            'Approve pending worker requests so they can join the team tools.',
+            'Approve pending light squad requests so they can join the team tools.',
         child: _ManagementTile(
           icon: Icons.verified_user,
-          title: 'Verify Workers',
+        title: 'Verify Light Squads',
           subtitle: 'Approve or reject join requests',
           color: AppColors.info,
           isDark: isDark,
@@ -138,7 +138,7 @@ class _TeamLeaderDashboardState extends State<TeamLeaderDashboard> {
         key: _showcaseReports,
         title: 'Reports & Analytics',
         description:
-            'Review donations, book sales, activity, and worker performance in one place.',
+            'Review donations, book sales, activity, and light squad performance in one place.',
         child: _ManagementTile(
           icon: Icons.analytics_outlined,
           title: 'Reports & Analytics',
@@ -167,7 +167,7 @@ class _TeamLeaderDashboardState extends State<TeamLeaderDashboard> {
       _ManagementTile(
         icon: Icons.flag_outlined,
         title: 'Targets',
-        subtitle: 'Set team & worker goals',
+          subtitle: 'Set team & light squad goals',
         color: AppColors.navyBlue,
         isDark: isDark,
         onTap: () => context.push('/leader/targets'),
@@ -268,8 +268,8 @@ class _TeamLeaderDashboardState extends State<TeamLeaderDashboard> {
                       child: BlocBuilder<AuthBloc, AuthState>(
                         builder: (context, state) {
                           final userName = state is AuthAuthenticated
-                              ? state.user.displayName ?? 'Team Leader'
-                              : 'Team Leader';
+                              ? state.user.displayName ?? 'Light House'
+                              : 'Light House';
                           final teamName = state is AuthAuthenticated
                               ? state.user.teamName ?? 'Your Team'
                               : 'Your Team';

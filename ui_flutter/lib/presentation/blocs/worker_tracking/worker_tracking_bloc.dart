@@ -44,7 +44,7 @@ class WorkerTrackingBloc
       );
 
       if (response.statusCode != 200) {
-        emit(const WorkerTrackingError(message: 'Failed to load workers'));
+        emit(const WorkerTrackingError(message: 'Failed to load light squads'));
         return;
       }
 

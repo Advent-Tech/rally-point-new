@@ -665,7 +665,7 @@ class _ScheduleFormSheetState extends State<_ScheduleFormSheet> {
 
               // Worker selection
               Text(
-                'Worker',
+                'Light Squad',
                 style: Theme.of(context).textTheme.titleSmall?.copyWith(
                   fontWeight: FontWeight.bold,
                 ),

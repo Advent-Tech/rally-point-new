@@ -42,12 +42,12 @@ class _WorkerVerificationScreenState extends State<WorkerVerificationScreen> {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Approve Worker'),
+        title: const Text('Approve Light Squad'),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Are you sure you want to approve ${request.displayName ?? 'this worker'}?'),
+            Text('Are you sure you want to approve ${request.displayName ?? 'this light squad'}?'),
             const SizedBox(height: 8),
             Text(
               'They will be added to your team and can start working immediately.',
@@ -132,7 +132,7 @@ class _WorkerVerificationScreenState extends State<WorkerVerificationScreen> {
             icon: const Icon(Icons.arrow_back),
             onPressed: () => context.pop(),
           ),
-          title: const Text('Worker Verification'),
+          title: const Text('Light Squad Verification'),
         ),
         body: const Center(
           child: Text('No team assigned'),
@@ -148,7 +148,7 @@ class _WorkerVerificationScreenState extends State<WorkerVerificationScreen> {
             icon: const Icon(Icons.arrow_back),
             onPressed: () => context.pop(),
           ),
-          title: const Text('Worker Verification'),
+          title: const Text('Light Squad Verification'),
           actions: [
             IconButton(
               icon: const Icon(Icons.refresh),
@@ -221,7 +221,7 @@ class _WorkerVerificationScreenState extends State<WorkerVerificationScreen> {
                       ),
                       const SizedBox(height: 8),
                       Text(
-                        'All worker join requests have been processed.',
+                        'All light squad join requests have been processed.',
                         textAlign: TextAlign.center,
                         style: TextStyle(
                           color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
@@ -317,7 +317,7 @@ class _JoinRequestCard extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        request.displayName ?? 'Unknown Worker',
+                        request.displayName ?? 'Unknown Light Squad',
                         style: Theme.of(context).textTheme.titleMedium?.copyWith(
                           fontWeight: FontWeight.bold,
                         ),

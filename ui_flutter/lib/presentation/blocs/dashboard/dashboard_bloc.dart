@@ -261,7 +261,7 @@ class DashboardBloc extends Bloc<DashboardEvent, DashboardState> {
           id: delivery['id']?.toString() ?? '',
           type: isBookSale ? 'book_sale' : 'delivery',
           workerId: delivery['worker_id']?.toString() ?? '',
-          workerName: delivery['worker_name']?.toString() ?? 'Worker',
+          workerName: delivery['worker_name']?.toString() ?? 'Light Squad',
           description: isBookSale
               ? 'Sold $bookTitle: \$${amount.toStringAsFixed(2)}'
               : 'Delivered to ${delivery['recipient_name'] ?? 'recipient'}',
@@ -293,8 +293,8 @@ class DashboardBloc extends Bloc<DashboardEvent, DashboardState> {
               '',
           workerName:
               donation['worker_name']?.toString() ??
-              donation['collected_by_name']?.toString() ??
-              'Worker',
+              donation['assignee_name']?.toString() ??
+              'Light Squad',
           description: 'Collected donation: \$${donation['amount'] ?? 0}',
           territoryName: donation['location']?.toString(),
           address: donation['location']?.toString(),
@@ -446,7 +446,7 @@ class DashboardBloc extends Bloc<DashboardEvent, DashboardState> {
       performanceList.add(
         WorkerPerformance(
           id: id,
-          name: fullName.isNotEmpty ? fullName : 'Unknown Worker',
+          name: fullName.isNotEmpty ? fullName : 'Unknown Light Squad',
           avatarUrl:
               member['avatar_url']?.toString() ??
               member['avatarUrl']?.toString(),

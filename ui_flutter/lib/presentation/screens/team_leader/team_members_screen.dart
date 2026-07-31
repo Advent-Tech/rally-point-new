@@ -555,7 +555,7 @@ class _TeamMembersScreenState extends State<TeamMembersScreen> {
                           Navigator.pop(context);
                           // Navigate to worker's territory assignments
                           context.push(
-                            '/leader/worker-assignments/${member.userId}?name=${Uri.encodeComponent(member.displayName ?? member.email ?? 'Worker')}',
+                            '/leader/worker-assignments/${member.userId}?name=${Uri.encodeComponent(member.displayName ?? member.email ?? 'Light Squad')}',
                           );
                         },
                       ),
@@ -570,7 +570,7 @@ class _TeamMembersScreenState extends State<TeamMembersScreen> {
                           Navigator.pop(context);
                           // Pass worker ID so territory assignment can pre-select this worker
                           context.push(
-                            '/leader/territory-assignment?workerId=${member.userId}&workerName=${Uri.encodeComponent(member.displayName ?? member.email ?? 'Worker')}',
+                            '/leader/territory-assignment?workerId=${member.userId}&workerName=${Uri.encodeComponent(member.displayName ?? member.email ?? 'Light Squad')}',
                           );
                         },
                       ),
@@ -604,9 +604,9 @@ class _TeamMembersScreenState extends State<TeamMembersScreen> {
       case 'admin':
         return 'Admin';
       case 'team_leader':
-        return 'Team Leader';
+        return 'Light House';
       case 'worker':
-        return 'Worker';
+        return 'Light Squad';
       default:
         return role;
     }
@@ -754,9 +754,9 @@ class _TeamMemberCard extends StatelessWidget {
       case 'admin':
         return 'Admin';
       case 'team_leader':
-        return 'Team Leader';
+        return 'Light House';
       case 'worker':
-        return 'Worker';
+        return 'Light Squad';
       default:
         return role;
     }

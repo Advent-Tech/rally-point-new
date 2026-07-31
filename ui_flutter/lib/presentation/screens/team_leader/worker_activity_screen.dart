@@ -173,7 +173,7 @@ class _WorkerActivityScreenState extends State<WorkerActivityScreen>
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Worker Activity'),
+        title: const Text('Light Squad Activity'),
         actions: [
           const RoleBadge(),
           TextButton.icon(

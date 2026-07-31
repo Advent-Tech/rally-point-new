@@ -841,7 +841,7 @@ class CommandCenterBloc extends Bloc<CommandCenterEvent, CommandCenterState> {
       'id': json['id'],
       'session_id': null,
       'worker_id': json['worker_id'],
-      'worker_name': json['worker_name'] ?? 'Worker',
+      'worker_name': json['worker_name'] ?? 'Light Squad',
       'team_id': json['team_id'],
       'donor_name': json['buyer_name'] ?? 'Buyer',
       'donor_phone': json['buyer_phone'],

@@ -37,12 +37,17 @@ class RoleBadge extends StatelessWidget {
         children: [
           Icon(roleConfig.icon, color: Colors.white, size: isSmall ? 12 : 16),
           const SizedBox(width: 4),
-          Text(
-            roleConfig.label,
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: isSmall ? 10 : 12,
-              fontWeight: FontWeight.w600,
+          Flexible(
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Text(
+                roleConfig.label,
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: isSmall ? 10 : 12,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
             ),
           ),
         ],
@@ -62,13 +67,13 @@ class RoleBadge extends StatelessWidget {
       case 'team_leader':
       case 'team-leader':
         return _RoleConfig(
-          label: 'Leader',
+          label: 'Light House',
           icon: Icons.supervisor_account,
           color: AppColors.warning,
         );
       case 'worker':
         return _RoleConfig(
-          label: 'Worker',
+          label: 'Light Squad',
           icon: Icons.person,
           color: AppColors.success,
         );

@@ -6,7 +6,8 @@ import '../../blocs/theme/theme_bloc.dart';
 import '../../blocs/profile/profile_bloc.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../widgets/custom_button.dart';
-import '../../widgets/help/help_mode_provider.dart';
+import 'privacy_policy_screen.dart';
+import 'about_screen.dart';
 
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
@@ -15,35 +16,25 @@ class ProfileScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    // Check if user is team leader to show back button
-    final authState = context.read<AuthBloc>().state;
-    final isTeamLeader =
-        authState is AuthAuthenticated && authState.user.isTeamLeader;
-
     return Scaffold(
       appBar: AppBar(
-        leading: isTeamLeader
-            ? IconButton(
-                icon: const Icon(Icons.arrow_back),
-                onPressed: () {
-                  // Check if we can pop, otherwise go to leader dashboard
-                  if (context.canPop()) {
-                    context.pop();
-                  } else {
-                    context.go('/leader/dashboard');
-                  }
-                },
-              )
-            : null,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () {
+            if (context.canPop()) {
+              context.pop();
+            } else {
+              final authState = context.read<AuthBloc>().state;
+              if (authState is AuthAuthenticated &&
+                  authState.user.isTeamLeader) {
+                context.go('/leader/dashboard');
+              } else {
+                context.go('/home');
+              }
+            }
+          },
+        ),
         title: const Text('Profile'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.settings_outlined),
-            onPressed: () {
-              // TODO: Settings
-            },
-          ),
-        ],
       ),
       body: BlocBuilder<AuthBloc, AuthState>(
         builder: (context, state) {
@@ -473,40 +464,28 @@ class _SettingsSection extends StatelessWidget {
           ),
           _buildDivider(isDark),
           _SettingsTile(
-            icon: Icons.notifications_outlined,
-            title: 'Notifications',
-            isDark: isDark,
-            onTap: () {
-              // TODO: Notification settings
-            },
-          ),
-          _buildDivider(isDark),
-          _SettingsTile(
-            icon: Icons.location_on_outlined,
-            title: 'Location Services',
-            isDark: isDark,
-            onTap: () {
-              // TODO: Location settings
-            },
-          ),
-          _buildDivider(isDark),
-          _SettingsTile(
             icon: Icons.security_outlined,
-            title: 'Privacy & Security',
+            title: 'Privacy Policy',
             isDark: isDark,
             onTap: () {
-              // TODO: Privacy settings
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => const PrivacyPolicyScreen(),
+                ),
+              );
             },
           ),
-          _buildDivider(isDark),
-          _HelpModeTile(isDark: isDark),
           _buildDivider(isDark),
           _SettingsTile(
             icon: Icons.info_outline,
             title: 'About',
             isDark: isDark,
             onTap: () {
-              // TODO: About
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const AboutScreen()),
+              );
             },
           ),
         ],
@@ -569,43 +548,4 @@ class _SettingsTile extends StatelessWidget {
   }
 }
 
-class _HelpModeTile extends StatelessWidget {
-  final bool isDark;
-  const _HelpModeTile({required this.isDark});
 
-  @override
-  Widget build(BuildContext context) {
-    final helpNotifier = HelpModeProvider.notifierOf(context);
-
-    if (helpNotifier == null) {
-      return _SettingsTile(
-        icon: Icons.help_outline,
-        title: 'Help Mode',
-        isDark: isDark,
-        trailing: Switch(
-          value: false,
-          onChanged: (value) {},
-          activeColor: AppColors.primary,
-        ),
-      );
-    }
-
-    return ValueListenableBuilder<bool>(
-      valueListenable: helpNotifier,
-      builder: (context, isEnabled, _) {
-        return _SettingsTile(
-          icon: Icons.help_outline,
-          title: 'Help Mode',
-          isDark: isDark,
-          trailing: Switch(
-            value: isEnabled,
-            onChanged: (value) {
-              helpNotifier.value = value;
-            },
-            activeColor: AppColors.primary,
-          ),
-        );
-      },
-    );
-  }
-}

@@ -79,7 +79,7 @@ class TeamBloc extends Bloc<TeamEvent, TeamState> {
       success: (_) {
         debugPrint('TeamBloc: Successfully approved join request ${event.requestId}');
         emit(TeamJoinRequestActionSuccess(
-          message: 'Worker approved successfully',
+          message: 'Light Squad approved successfully',
           teamId: event.teamId,
         ));
         // Reload join requests to refresh the list

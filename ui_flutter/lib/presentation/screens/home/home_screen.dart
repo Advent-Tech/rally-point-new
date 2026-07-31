@@ -495,9 +495,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                               child: OverviewStatCard(
                                 icon: Icons.people_outline,
                                 iconBackgroundColor: AppColors.primary,
-                                title: 'Total Workers',
+                                title: 'Total Light Squads',
                                 value: '0',
-                                unit: 'workers',
+                                unit: 'light squads',
                                 description: 'Team members',
                                 trendText: '0 online now',
                               ),
@@ -507,7 +507,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                               child: OverviewStatCard(
                                 icon: Icons.location_on_outlined,
                                 iconBackgroundColor: AppColors.secondary,
-                                title: 'Active Workers',
+                                title: 'Active Light Squads',
                                 value: '0',
                                 unit: 'tracking',
                                 description: 'Currently in field',
@@ -603,7 +603,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                       items: [
                         _ManagementItem(
                           icon: Icons.verified_user,
-                          label: 'Verify Workers',
+                          label: 'Verify Light Squads',
                           description: 'Approve or reject join requests',
                           color: AppColors.accent,
                           onTap: () =>
@@ -625,7 +625,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                         ),
                         _ManagementItem(
                           icon: Icons.calendar_month,
-                          label: 'Schedule Workers',
+                          label: 'Schedule Light Squads',
                           description: 'Assign shifts and territories',
                           color: AppColors.secondary,
                           onTap: () => context.go('/schedule'),

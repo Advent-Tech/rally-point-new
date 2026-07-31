@@ -15,10 +15,10 @@ class FollowModeBanner extends StatelessWidget {
           return const SizedBox.shrink();
         }
 
-        String displayName = 'Worker';
+        String displayName = 'Light Squad';
         for (final w in state.workers) {
           if (w.id == state.followTarget) {
-            displayName = w.displayName ?? 'Worker';
+            displayName = w.displayName ?? 'Light Squad';
             break;
           }
         }

@@ -184,7 +184,7 @@ class _WorkerDetailScreenState extends State<WorkerDetailScreen>
       setState(() {
         _isLoading = false;
         if (_donations.isEmpty && _prayers.isEmpty && errors.isNotEmpty) {
-          _error = 'Unable to load worker analytics (${errors.join(', ')})';
+          _error = 'Unable to load light squad analytics (${errors.join(', ')})';
         }
       });
     } catch (e) {
@@ -198,7 +198,7 @@ class _WorkerDetailScreenState extends State<WorkerDetailScreen>
 
   @override
   Widget build(BuildContext context) {
-    final workerName = widget.workerName ?? 'worker';
+    final workerName = widget.workerName ?? 'light squad';
 
     return Scaffold(
       appBar: AppBar(
@@ -356,7 +356,7 @@ class _WorkerDetailScreenState extends State<WorkerDetailScreen>
             child: ElevatedButton.icon(
               onPressed: () {
                 context.push(
-                  '/leader/command-center?mode=territories&preSelectedWorkerId=${widget.workerId}&preSelectedWorkerName=${Uri.encodeComponent(widget.workerName ?? 'Worker')}',
+                  '/leader/command-center?mode=territories&preSelectedWorkerId=${widget.workerId}&preSelectedWorkerName=${Uri.encodeComponent(widget.workerName ?? 'Light Squad')}',
                 );
               },
               icon: const Icon(Icons.map),

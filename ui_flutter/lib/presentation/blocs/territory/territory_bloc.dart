@@ -299,7 +299,7 @@ class TerritoryBloc extends Bloc<TerritoryEvent, TerritoryState> {
             errorMessage.contains('already assigned') ||
             errorMessage.contains('unique constraint')) {
           emit(const TerritoryError(
-            message: 'This territory is already assigned to your team. To reassign it to a different worker, please update the existing assignment.',
+            message: 'This territory is already assigned to your team. To reassign it to a different light squad, please update the existing assignment.',
           ));
         } else {
           emit(TerritoryError(message: errorMessage));
@@ -318,7 +318,7 @@ class TerritoryBloc extends Bloc<TerritoryEvent, TerritoryState> {
           if (apiError.contains('duplicate key') ||
               apiError.contains('already assigned') ||
               apiError.contains('unique constraint')) {
-            errorMessage = 'This territory is already assigned to your team. To reassign it to a different worker, please update the existing assignment.';
+            errorMessage = 'This territory is already assigned to your team. To reassign it to a different light squad, please update the existing assignment.';
           } else {
             errorMessage = apiError;
           }

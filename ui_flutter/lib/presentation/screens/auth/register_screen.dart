@@ -733,7 +733,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       Expanded(
                         child: _RoleCard(
                           icon: Icons.person,
-                          title: 'Worker',
+                          title: 'Light Squad',
                           subtitle: 'Field work & deliveries',
                           isSelected: _selectedRole == 'worker',
                           onTap: () => setState(() => _selectedRole = 'worker'),
@@ -744,7 +744,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       Expanded(
                         child: _RoleCard(
                           icon: Icons.shield,
-                          title: 'Team Leader',
+                          title: 'Light House',
                           subtitle: 'Manage a team',
                           isSelected: _selectedRole == 'team_leader',
                           onTap: () =>

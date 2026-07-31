@@ -265,7 +265,7 @@ class _CreateSurveyScreenState extends State<CreateSurveyScreen> {
                                     style: TextStyle(fontWeight: FontWeight.w600),
                                   ),
                                   Text(
-                                    'Workers must be at the location to submit',
+                                    'Light squads must be at the location to submit',
                                     style: TextStyle(
                                       fontSize: 12,
                                       color: isDark

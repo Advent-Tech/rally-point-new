@@ -125,7 +125,7 @@ class _LeaderTargetsScreenState extends State<LeaderTargetsScreen>
         isDark,
         icon: Icons.analytics_outlined,
         title: 'No Assigned Targets',
-        subtitle: 'Assign targets to a team or worker',
+        subtitle: 'Assign targets to a team or light squad',
       );
     }
 
@@ -533,7 +533,7 @@ class _LeaderTargetsScreenState extends State<LeaderTargetsScreen>
                             teamId: resolvedTeamId,
                           )
                   : (selectedWorker == null)
-                  ? const ApiResult<void>.failure('Select a worker')
+                  ? const ApiResult<void>.failure('Select a light squad')
                   : await _targetsRepository.assignTargetToWorker(
                       targetId: target.id,
                       workerId: selectedWorker!.id,
@@ -560,7 +560,7 @@ class _LeaderTargetsScreenState extends State<LeaderTargetsScreen>
                   SegmentedButton<String>(
                     segments: const [
                       ButtonSegment(value: 'team', label: Text('Team')),
-                      ButtonSegment(value: 'worker', label: Text('Worker')),
+                      ButtonSegment(value: 'worker', label: Text('Light Squad')),
                     ],
                     selected: {mode},
                     onSelectionChanged: isSaving
@@ -581,7 +581,7 @@ class _LeaderTargetsScreenState extends State<LeaderTargetsScreen>
                     DropdownButtonFormField<TeamMemberLite>(
                       value: selectedWorker,
                       decoration: const InputDecoration(
-                        labelText: 'Select worker',
+                        labelText: 'Select light squad',
                       ),
                       items: workers
                           .map(
@@ -596,7 +596,7 @@ class _LeaderTargetsScreenState extends State<LeaderTargetsScreen>
                   if (workersRes.isFailure) ...[
                     const SizedBox(height: 8),
                     Text(
-                      workersRes.errorMessage ?? 'Failed to load workers',
+                      workersRes.errorMessage ?? 'Failed to load light squads',
                       style: const TextStyle(color: Colors.red),
                     ),
                   ],

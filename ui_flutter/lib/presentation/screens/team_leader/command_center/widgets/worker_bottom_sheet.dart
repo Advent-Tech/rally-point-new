@@ -201,14 +201,14 @@ class _WorkerBottomSheetState extends State<WorkerBottomSheet> {
                                 tooltip: hasAnyLocation
                                     ? (isFollowing
                                           ? 'Stop following'
-                                          : 'Follow worker')
+                                           : 'Follow light squad')
                                     : 'No GPS location available',
                                 onPressed: () {
                                   if (!hasAnyLocation) {
                                     ScaffoldMessenger.of(context).showSnackBar(
                                       const SnackBar(
                                         content: Text(
-                                          'This worker has no GPS location yet.',
+                                          'This light squad has no GPS location yet.',
                                         ),
                                       ),
                                     );

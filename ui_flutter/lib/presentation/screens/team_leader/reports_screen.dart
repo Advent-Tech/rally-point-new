@@ -177,7 +177,7 @@ class _OverviewTab extends StatelessWidget {
                   children: [
                     Expanded(
                       child: _MetricCard(
-                        title: 'Active Workers',
+                        title: 'Active Light Squads',
                         value: '${stats.activeWorkers}',
                         subtitle: 'Right now',
                         icon: Icons.people,
@@ -452,7 +452,7 @@ class _TeamTabState extends State<_TeamTab> {
                 // Search Bar
                 TextField(
                   decoration: InputDecoration(
-                    hintText: 'Search workers...',
+                    hintText: 'Search light squads...',
                     prefixIcon: const Icon(Icons.search, size: 20),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
@@ -473,7 +473,7 @@ class _TeamTabState extends State<_TeamTab> {
 
                 // Worker Performance
                 Text(
-                  'Worker Performance',
+                  'Light Squad Performance',
                   style: Theme.of(context).textTheme.titleMedium?.copyWith(
                     fontWeight: FontWeight.bold,
                   ),
@@ -504,8 +504,8 @@ class _TeamTabState extends State<_TeamTab> {
                           const SizedBox(height: 8),
                           Text(
                             _searchQuery.isEmpty
-                                ? 'No worker data available'
-                                : 'No workers found',
+                                ? 'No light squad data available'
+                                : 'No light squads found',
                             style: Theme.of(context).textTheme.bodyMedium
                                 ?.copyWith(
                                   color: widget.isDark

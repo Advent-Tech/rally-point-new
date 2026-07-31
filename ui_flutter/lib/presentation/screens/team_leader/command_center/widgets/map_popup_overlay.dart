@@ -160,7 +160,7 @@ class _PopupCard extends StatelessWidget {
                   ),
                   if (popup.expanded) ...[
                     const SizedBox(height: 8),
-                    Text('Worker: ${d.workerName}'),
+                    Text('Light Squad: ${d.workerName}'),
                     if (d.donationType.isNotEmpty)
                       Text('Type: ${d.donationType}'),
                   ],
@@ -291,7 +291,7 @@ class _PopupCard extends StatelessWidget {
                       cc.MapPopupKind.activityBookSale => 'Book Sale',
                       cc.MapPopupKind.activityPrayer => 'Prayer Request',
                       cc.MapPopupKind.territory => 'Territory',
-                      cc.MapPopupKind.worker => 'Worker',
+                      cc.MapPopupKind.worker => 'Light Squad',
                     }, style: Theme.of(context).textTheme.titleMedium),
                   ),
                   IconButton(

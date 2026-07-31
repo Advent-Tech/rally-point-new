@@ -264,7 +264,7 @@ class _CommandCenterScreenState extends State<CommandCenterScreen> {
                     key: _showcaseModeTabs,
                     title: 'Map Tabs',
                     description:
-                        'Switch between Overview, Workers and Territories to manage operations.',
+                        'Switch between Overview, Light Squads and Territories to manage operations.',
                     tooltipBackgroundColor: tooltipBg,
                     titleTextStyle: tooltipTitleStyle,
                     descTextStyle: tooltipDescStyle,
@@ -327,7 +327,7 @@ class _CommandCenterScreenState extends State<CommandCenterScreen> {
                           key: _showcaseOverviewStats,
                           title: 'Overview Summary',
                           description:
-                              'This bar summarizes active workers, donations and prayer records.',
+                              'This bar summarizes active light squads, donations and prayer records.',
                           tooltipBackgroundColor: tooltipBg,
                           titleTextStyle: tooltipTitleStyle,
                           descTextStyle: tooltipDescStyle,
@@ -377,9 +377,9 @@ class _CommandCenterScreenState extends State<CommandCenterScreen> {
                     if (state.mapMode == cc.MapMode.workers)
                       Showcase(
                         key: _showcaseWorkerSheet,
-                        title: 'Workers Panel',
+                        title: 'Light Squads Panel',
                         description:
-                            'Tap a worker to view details, and follow to track live movement.',
+                            'Tap a light squad to view details, and follow to track live movement.',
                         tooltipBackgroundColor: tooltipBg,
                         titleTextStyle: tooltipTitleStyle,
                         descTextStyle: tooltipDescStyle,

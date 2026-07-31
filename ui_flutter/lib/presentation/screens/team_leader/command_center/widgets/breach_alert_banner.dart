@@ -37,8 +37,8 @@ class BreachAlertBanner extends StatelessWidget {
               Expanded(
                 child: Text(
                   breachedWorkers.length == 1
-                      ? '${breachedWorkers.first.displayName ?? 'Worker'} is outside assigned territory'
-                      : '${breachedWorkers.length} workers outside territories',
+                      ? '${breachedWorkers.first.displayName ?? 'Light Squad'} is outside assigned territory'
+                      : '${breachedWorkers.length} light squads outside territories',
                   style: TextStyle(
                     color: Colors.red.shade700,
                     fontWeight: FontWeight.w500,

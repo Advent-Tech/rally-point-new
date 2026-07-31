@@ -535,7 +535,7 @@ class _ResponsesTab extends StatelessWidget {
             ),
             const SizedBox(height: 8),
             Text(
-              'Responses will appear here once workers submit',
+              'Responses will appear here once light squads submit',
               style: TextStyle(
                 color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
               ),
