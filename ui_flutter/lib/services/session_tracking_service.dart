@@ -1,7 +1,9 @@
 import 'dart:async';
 import 'dart:io' show Platform;
 import 'dart:math' as math;
+import 'dart:ui';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/widgets.dart' show AppLifecycleState;
 import 'package:flutter/services.dart';
 import 'package:geolocator/geolocator.dart';
 import '../core/network/api_client.dart';
@@ -23,7 +25,9 @@ typedef OnTrackingError = void Function(String error);
 /// Service for automatic session tracking based on geofence entry/exit
 class SessionTrackingService {
   static SessionTrackingService? _instance;
-  static const MethodChannel _platform = MethodChannel('com.rallypoint/location');
+  static const MethodChannel _platform = MethodChannel(
+    'com.rallypoint/location',
+  );
 
   ApiClient? _apiClient;
   LocalStorage? _localStorage;
@@ -256,7 +260,9 @@ class SessionTrackingService {
       unawaited(_ensurePositionStreamHealthy());
     } else if (state == AppLifecycleState.paused ||
         state == AppLifecycleState.inactive) {
-      debugPrint('[SessionTracking] App paused/inactive — ensuring foreground service');
+      debugPrint(
+        '[SessionTracking] App paused/inactive — ensuring foreground service',
+      );
       unawaited(_startForegroundService());
     }
   }
@@ -415,14 +421,19 @@ class SessionTrackingService {
     }
   }
 
-  Future<void> _retrySend(Future<void> Function() send, {int maxAttempts = 3}) async {
+  Future<void> _retrySend(
+    Future<void> Function() send, {
+    int maxAttempts = 3,
+  }) async {
     for (var attempt = 1; attempt <= maxAttempts; attempt++) {
       try {
         await send();
         return;
       } catch (e) {
         if (attempt == maxAttempts) {
-          debugPrint('[SessionTracking] Send failed after $maxAttempts attempts: $e');
+          debugPrint(
+            '[SessionTracking] Send failed after $maxAttempts attempts: $e',
+          );
           return;
         }
         await Future.delayed(Duration(seconds: attempt));
