@@ -11,6 +11,7 @@ import '../screens/splash_screen.dart';
 import '../screens/auth/login_screen.dart';
 import '../screens/auth/register_screen.dart';
 import '../screens/auth/forgot_password_screen.dart';
+import '../screens/auth/reset_password_screen.dart';
 import '../screens/home/home_screen.dart';
 import '../screens/territory/territory_screen.dart';
 import '../screens/delivery/delivery_screen.dart';
@@ -42,6 +43,7 @@ import '../screens/prayer/prayer_request_form_screen.dart';
 import '../screens/notification/notification_center_screen.dart';
 import '../screens/notification/notification_settings_screen.dart';
 import '../screens/onboarding/onboarding_screen.dart';
+import '../screens/admin/admin_dashboard_screen.dart';
 import '../screens/worker/targets_screen.dart';
 import '../screens/worker/achievements_screen.dart';
 import '../widgets/bottom_nav_shell.dart';
@@ -75,7 +77,7 @@ class AppRouter {
 
         // If still checking auth status, stay on splash
         if (authState is AuthInitial || authState is AuthLoading) {
-          return isSplash ? null : '/splash';
+          return (isSplash || isAuthPage) ? null : '/splash';
         }
 
         // Handle intermediate auth states - don't redirect, let the page handle it
@@ -173,6 +175,16 @@ class AppRouter {
             return AppPageTransitions.fade(
               key: state.pageKey,
               child: ForgotPasswordScreen(initialEmail: email),
+            );
+          },
+        ),
+        GoRoute(
+          path: '/reset-password/:token',
+          pageBuilder: (context, state) {
+            final token = state.pathParameters['token']!;
+            return AppPageTransitions.fade(
+              key: state.pageKey,
+              child: ResetPasswordScreen(token: token),
             );
           },
         ),
@@ -559,11 +571,10 @@ class AppRouter {
           ),
         ),
 
-        // Admin Routes (placeholder for future implementation)
+        // Admin Routes - WebView loading admin.lightsquads.com
         GoRoute(
           path: '/admin/dashboard',
-          builder: (context, state) =>
-              const _PlaceholderScreen(title: 'Admin Dashboard'),
+          builder: (context, state) => const AdminDashboardScreen(),
         ),
       ],
     );
@@ -580,7 +591,6 @@ class GoRouterRefreshStream extends ChangeNotifier {
       // AuthRegistrationSuccess, AuthPendingVerification, etc.
       // Those states are handled by listeners on the pages themselves
       if (state is AuthInitial ||
-          state is AuthLoading ||
           state is AuthAuthenticated ||
           state is AuthUnauthenticated) {
         debugPrint('🔄 GoRouter refresh for state: ${state.runtimeType}');
@@ -594,37 +604,3 @@ class GoRouterRefreshStream extends ChangeNotifier {
   }
 }
 
-// Placeholder screen for routes not yet implemented
-class _PlaceholderScreen extends StatelessWidget {
-  final String title;
-
-  const _PlaceholderScreen({required this.title});
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: Text(title)),
-      body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              Icons.construction,
-              size: 64,
-              color: Theme.of(context).colorScheme.secondary,
-            ),
-            const SizedBox(height: 16),
-            Text(title, style: Theme.of(context).textTheme.headlineSmall),
-            const SizedBox(height: 8),
-            Text(
-              'Coming soon...',
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}

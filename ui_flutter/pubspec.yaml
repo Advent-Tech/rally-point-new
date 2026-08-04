@@ -1,7 +1,7 @@
 name: light_point
 description: "Light Point - Field Ministry Management App"
 publish_to: 'none'
-version: 1.0.1+3
+version: 1.0.2+4
 
 environment:
   sdk: ^3.8.1
@@ -79,6 +79,9 @@ dependencies:
 
   # Supabase (for direct storage uploads)
   supabase_flutter: ^2.3.0
+
+  # WebView for admin dashboard
+  webview_flutter: ^4.10.0
 
   # Responsive Design
   responsive_framework: ^1.1.1
