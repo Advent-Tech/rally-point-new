@@ -1367,7 +1367,6 @@ class _DonationDetailsSheet extends StatelessWidget {
           const Divider(),
           const SizedBox(height: 16),
           _DetailRow(label: 'Type', value: donation.donationType),
-          _DetailRow(label: 'Payment', value: donation.paymentMethod),
           _DetailRow(label: 'Status', value: donation.status.toUpperCase()),
           if (donation.workerName != null)
             _DetailRow(label: 'Worker', value: donation.workerName!),

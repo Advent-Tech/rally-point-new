@@ -128,8 +128,8 @@ Map<String, dynamic> _$ReceiptModelToJson(ReceiptModel instance) =>
 ReceiptStats _$ReceiptStatsFromJson(Map<String, dynamic> json) => ReceiptStats(
   totalReceipts: (json['total_receipts'] as num?)?.toInt() ?? 0,
   totalAmount: (json['total_amount'] as num?)?.toDouble() ?? 0,
-  bookSalesCount: (json['book_sales_count'] as num?)?.toInt() ?? 0,
-  bookSalesAmount: (json['book_sales_amount'] as num?)?.toDouble() ?? 0,
+  bookDistributionsCount: (json['book_sales_count'] as num?)?.toInt() ?? 0,
+  bookDistributionsAmount: (json['book_sales_amount'] as num?)?.toDouble() ?? 0,
   literatureCount: (json['literature_count'] as num?)?.toInt() ?? 0,
   literatureAmount: (json['literature_amount'] as num?)?.toDouble() ?? 0,
   donationCount: (json['donation_count'] as num?)?.toInt() ?? 0,
@@ -141,8 +141,8 @@ Map<String, dynamic> _$ReceiptStatsToJson(ReceiptStats instance) =>
     <String, dynamic>{
       'total_receipts': instance.totalReceipts,
       'total_amount': instance.totalAmount,
-      'book_sales_count': instance.bookSalesCount,
-      'book_sales_amount': instance.bookSalesAmount,
+      'book_sales_count': instance.bookDistributionsCount,
+      'book_sales_amount': instance.bookDistributionsAmount,
       'literature_count': instance.literatureCount,
       'literature_amount': instance.literatureAmount,
       'donation_count': instance.donationCount,

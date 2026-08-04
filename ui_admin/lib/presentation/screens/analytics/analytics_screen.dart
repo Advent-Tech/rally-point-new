@@ -402,27 +402,26 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
       return const Center(child: Text('No donation data available'));
     }
 
-    // Group donations by payment method
-    final Map<String, double> byMethod = {};
+    // Group donations by type
+    final Map<String, double> byType = {};
     for (final d in _recentDonations) {
-      final method = d.paymentMethod.isNotEmpty ? d.paymentMethod : 'unknown';
-      byMethod[method] = (byMethod[method] ?? 0) + d.amount;
+      final type = d.donationType.isNotEmpty ? d.donationType : 'other';
+      byType[type] = (byType[type] ?? 0) + d.amount;
     }
 
-    if (byMethod.isEmpty) {
+    if (byType.isEmpty) {
       return const Center(child: Text('No donation data available'));
     }
 
-    final methodColors = {
-      'cash': AppColors.success,
-      'online': AppColors.primary,
-      'card': AppColors.info,
-      'check': AppColors.warning,
+    final typeColors = {
+      'one_time': AppColors.success,
+      'recurring': AppColors.primary,
+      'pledge': AppColors.info,
+      'book_distribution': AppColors.warning,
       'other': AppColors.secondary,
-      'unknown': AppColors.textSecondary,
     };
 
-    final entries = byMethod.entries.toList();
+    final entries = byType.entries.toList();
 
     return Row(
       children: [
@@ -434,7 +433,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
               centerSpaceRadius: 40,
               sections: entries.map((entry) {
                 return PieChartSectionData(
-                  color: methodColors[entry.key.toLowerCase()] ?? AppColors.primary,
+                  color: typeColors[entry.key.toLowerCase()] ?? AppColors.primary,
                   value: entry.value,
                   title: _currencyFormat.format(entry.value),
                   titleStyle: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
@@ -450,7 +449,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
             mainAxisAlignment: MainAxisAlignment.center,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: entries.map((entry) {
-              final color = methodColors[entry.key.toLowerCase()] ?? AppColors.primary;
+              final color = typeColors[entry.key.toLowerCase()] ?? AppColors.primary;
               return Padding(
                 padding: const EdgeInsets.symmetric(vertical: 6),
                 child: Row(
@@ -620,7 +619,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
                             overflow: TextOverflow.ellipsis,
                           ),
                           subtitle: Text(
-                            '${donation.paymentMethod} • ${donation.donationType}',
+                            '${donation.donationType}',
                             overflow: TextOverflow.ellipsis,
                           ),
                           trailing: Text(

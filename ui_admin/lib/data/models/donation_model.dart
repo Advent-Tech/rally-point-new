@@ -163,9 +163,9 @@ class ReceiptStats {
   @JsonKey(name: 'total_amount')
   final double totalAmount;
   @JsonKey(name: 'book_sales_count')
-  final int bookSalesCount;
+  final int bookDistributionsCount;
   @JsonKey(name: 'book_sales_amount')
-  final double bookSalesAmount;
+  final double bookDistributionsAmount;
   @JsonKey(name: 'literature_count')
   final int literatureCount;
   @JsonKey(name: 'literature_amount')
@@ -180,8 +180,8 @@ class ReceiptStats {
   const ReceiptStats({
     this.totalReceipts = 0,
     this.totalAmount = 0,
-    this.bookSalesCount = 0,
-    this.bookSalesAmount = 0,
+    this.bookDistributionsCount = 0,
+    this.bookDistributionsAmount = 0,
     this.literatureCount = 0,
     this.literatureAmount = 0,
     this.donationCount = 0,

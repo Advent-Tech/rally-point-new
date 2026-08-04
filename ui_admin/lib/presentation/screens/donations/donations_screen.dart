@@ -113,7 +113,7 @@ class _DonationsScreenState extends State<DonationsScreen> with SingleTickerProv
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Donations & Receipts'),
+        title: const Text('Donations & Distributions'),
         actions: [
           if (_teams.isNotEmpty)
             Padding(
@@ -143,7 +143,7 @@ class _DonationsScreenState extends State<DonationsScreen> with SingleTickerProv
           tabs: const [
             Tab(text: 'Overview'),
             Tab(text: 'Donations'),
-            Tab(text: 'Receipts'),
+            Tab(text: 'Distributions'),
           ],
         ),
       ),
@@ -305,7 +305,7 @@ class _DonationsScreenState extends State<DonationsScreen> with SingleTickerProv
               subtitle: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('${donation.donationType} • ${donation.paymentMethod}'),
+                  Text('${donation.donationType}'),
                   if (donation.createdAt != null)
                     Text(
                       DateFormat('MMM d, yyyy h:mm a').format(donation.createdAt!),
@@ -357,7 +357,7 @@ class _DonationsScreenState extends State<DonationsScreen> with SingleTickerProv
             Icon(Icons.receipt_long_outlined, size: 64, color: AppColors.textSecondary),
             const SizedBox(height: 16),
             Text(
-              'No Receipts',
+              'No Distributions',
               style: Theme.of(context).textTheme.titleLarge,
             ),
             const SizedBox(height: 8),
