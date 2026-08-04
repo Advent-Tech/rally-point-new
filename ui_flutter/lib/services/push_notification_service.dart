@@ -183,8 +183,8 @@ class PushNotificationService {
       AndroidNotificationChannel('delivery_channel', 'Deliveries',
           description: 'Delivery assignment and status notifications',
           importance: Importance.high),
-      AndroidNotificationChannel('book_sale_channel', 'Book Sales',
-          description: 'Book sales and targets notifications',
+      AndroidNotificationChannel('book_distribution_channel', 'Books Distributed',
+          description: 'Book distribution and targets notifications',
           importance: Importance.high),
       AndroidNotificationChannel('team_channel', 'Team',
           description: 'Team join requests and approvals',
@@ -417,7 +417,7 @@ class PushNotificationService {
   String _channelIdForType(String type) {
     switch (type) {
       case 'book_sale':
-        return 'book_sale_channel';
+        return 'book_distribution_channel';
       default:
         return '${type}_channel';
     }

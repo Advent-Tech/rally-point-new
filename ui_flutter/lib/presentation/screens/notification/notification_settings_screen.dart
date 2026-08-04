@@ -25,7 +25,7 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
     ]),
     _NotifTypeInfo('Deliveries', [
       _NotifItem('delivery', 'Deliveries', 'Assignment and status updates'),
-      _NotifItem('book_sale', 'Book Sales', 'Book sale records and milestones'),
+      _NotifItem('book_sale', 'Books Distributed', 'Book distribution records and milestones'),
     ]),
     _NotifTypeInfo('Team', [
       _NotifItem('team', 'Team Updates', 'Join requests and approvals'),

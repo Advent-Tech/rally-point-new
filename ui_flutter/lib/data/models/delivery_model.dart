@@ -173,7 +173,7 @@ class DeliveryModel {
       case 'donation':
         return 'Donation';
       case 'book_sale':
-        return 'Book Sale';
+        return 'Book Distribution';
       default:
         return deliveryType;
     }

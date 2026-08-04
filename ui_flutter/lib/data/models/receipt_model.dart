@@ -84,7 +84,7 @@ class ReceiptModel {
   String get receiptTypeDisplay {
     switch (receiptType) {
       case 'book_sale':
-        return 'Book Sale';
+        return 'Book Distribution';
       case 'literature':
         return 'Literature';
       case 'donation':

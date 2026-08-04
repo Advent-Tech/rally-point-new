@@ -380,7 +380,7 @@ class _AchievementsScreenState extends State<AchievementsScreen>
           ),
           _LevelStatRow(
             icon: Icons.menu_book_rounded,
-            label: 'Book Sale Badges',
+            label: 'Book Distribution Badges',
             value: level['book_sale_badges'] ?? level['book_badges'] ?? 0,
             color: AppColors.warning,
             isDark: isDark,
@@ -645,7 +645,7 @@ class _AchievementCategoryCard extends StatelessWidget {
       case 'donation':
         return 'Donations';
       case 'book_sale':
-        return 'Book Sales';
+        return 'Books Distributed';
       case 'prayer':
         return 'Prayer';
       case 'visit':

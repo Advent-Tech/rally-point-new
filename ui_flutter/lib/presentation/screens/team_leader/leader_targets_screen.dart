@@ -359,7 +359,7 @@ class _LeaderTargetsScreenState extends State<LeaderTargetsScreen>
                           ),
                           DropdownMenuItem(
                             value: 'book_sale',
-                            child: Text('Book Sale'),
+                            child: Text('Book Distribution'),
                           ),
                           DropdownMenuItem(
                             value: 'prayer',
@@ -385,7 +385,7 @@ class _LeaderTargetsScreenState extends State<LeaderTargetsScreen>
                           child: Align(
                             alignment: Alignment.centerLeft,
                             child: Text(
-                              'Book Sale targets are saved under donations on the backend.',
+                              'Book Distribution targets are saved under donations on the backend.',
                               style: TextStyle(
                                 fontSize: 12,
                                 color: Colors.orange,
@@ -918,7 +918,7 @@ class _AssignedTargetCard extends StatelessWidget {
       case 'donation':
         return 'Donations';
       case 'book_sale':
-        return 'Book Sales';
+        return 'Books Distributed';
       case 'prayer':
         return 'Prayer Requests';
       case 'visit':

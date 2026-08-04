@@ -155,7 +155,7 @@ class _PopupCard extends StatelessWidget {
                   const SizedBox(height: 4),
                   Text(
                     popup.kind == cc.MapPopupKind.activityBookSale
-                        ? 'Status: ${d.statusDisplay} • Book Sale'
+                        ? 'Status: ${d.statusDisplay} • Book Distribution'
                         : 'Status: ${d.statusDisplay}',
                   ),
                   if (popup.expanded) ...[
@@ -288,7 +288,7 @@ class _PopupCard extends StatelessWidget {
                   Expanded(
                     child: Text(switch (popup.kind) {
                       cc.MapPopupKind.activityDonation => 'Donation',
-                      cc.MapPopupKind.activityBookSale => 'Book Sale',
+                      cc.MapPopupKind.activityBookSale => 'Book Distribution',
                       cc.MapPopupKind.activityPrayer => 'Prayer Request',
                       cc.MapPopupKind.territory => 'Territory',
                       cc.MapPopupKind.worker => 'Light Squad',

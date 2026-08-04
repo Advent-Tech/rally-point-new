@@ -151,9 +151,9 @@ class _OverviewTab extends StatelessWidget {
                   children: [
                     Expanded(
                       child: _MetricCard(
-                        title: 'Book Sales',
+                        title: 'Books Distributed',
                         value: '${stats.totalBookSales}',
-                        subtitle: 'Sold',
+                        subtitle: 'Distributed',
                         icon: Icons.menu_book_rounded,
                         color: const Color(0xFFF59E0B),
                         isDark: isDark,

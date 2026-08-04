@@ -138,7 +138,7 @@ class _TeamLeaderDashboardState extends State<TeamLeaderDashboard> {
         key: _showcaseReports,
         title: 'Reports & Analytics',
         description:
-            'Review donations, book sales, activity, and light squad performance in one place.',
+            'Review donations, book distribution, activity, and light squad performance in one place.',
         child: _ManagementTile(
           icon: Icons.analytics_outlined,
           title: 'Reports & Analytics',
@@ -413,7 +413,7 @@ class _TeamLeaderDashboardState extends State<TeamLeaderDashboard> {
                       ),
                     ),
 
-                    // Impact Snapshot (Donations / Book Sales / Prayers)
+                    // Impact Snapshot (Donations / Book Distribution / Prayers)
                     SliverToBoxAdapter(
                       child: Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -1081,7 +1081,7 @@ class _ActivityCard extends StatelessWidget {
       case 'donation':
         return 'Collected donation';
       case 'book_sale':
-        return 'Recorded a book sale';
+        return 'Recorded a book distribution';
       case 'assignment':
         return 'New territory assigned';
       default:

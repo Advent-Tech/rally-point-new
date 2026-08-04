@@ -130,7 +130,7 @@ class _WorkerActivityScreenState extends State<WorkerActivityScreen>
         debugPrint('Failed to load donations: $e');
       }
 
-      // Add book sales from worker deliveries into donation-like activity feed
+      // Add book distribution from worker deliveries into donation-like activity feed
       final bookSaleActivities = _deliveries
           .where((d) => d.deliveryType == 'book_sale')
           .map(

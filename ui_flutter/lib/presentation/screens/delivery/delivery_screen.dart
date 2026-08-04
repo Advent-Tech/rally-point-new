@@ -1,6 +1,4 @@
-import 'dart:async';
 import 'dart:math';
-import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
@@ -8,9 +6,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:intl/intl.dart';
 import 'package:showcaseview/showcaseview.dart';
 import '../../../core/theme/app_colors.dart';
-import '../../../core/constants/api_constants.dart';
 import '../../../core/storage/local_storage.dart';
-import '../../../core/network/api_client.dart';
 import '../../../core/network/api_result.dart';
 import '../../../data/models/delivery_model.dart';
 import '../../../data/repositories/territory_repository.dart';
@@ -30,14 +26,12 @@ class _BookOption {
   final String code;
   final String title;
   final String language;
-  final double unitPrice;
   final String assetPath;
 
   const _BookOption({
     required this.code,
     required this.title,
     required this.language,
-    required this.unitPrice,
     required this.assetPath,
   });
 }
@@ -47,28 +41,24 @@ const List<_BookOption> _bookCatalog = [
     code: 'GC_EN',
     title: 'The Great Controversy Book, Thrive Magazine, & Doorknob Bag',
     language: 'english',
-    unitPrice: 2.50,
     assetPath: 'assets/books/great_contoversy.png',
   ),
   _BookOption(
     code: 'GC_ES',
     title: 'The Great Controversy Book, Thrive Magazine, & Doorknob Bag (Spanish)',
     language: 'spanish',
-    unitPrice: 2.50,
     assetPath: 'assets/books/great_contoversy_spanish.png',
   ),
   _BookOption(
     code: 'WLD_EN',
     title: 'When Light and Darkness Collide, Thrive Magazine, & Doorknob Bag',
     language: 'english',
-    unitPrice: 2.50,
     assetPath: 'assets/books/whenLDcollide.png',
   ),
   _BookOption(
     code: 'WLD_ES',
     title: 'When Light and Darkness Collide, Thrive Magazine, & Doorknob Bag (Spanish)',
     language: 'spanish',
-    unitPrice: 2.50,
     assetPath: 'assets/books/whenLDcollide_spanish.png',
   ),
 ];
@@ -258,12 +248,8 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
 
               // Calculate today's totals for summary
               final donations = todayDeliveries.where((d) => d.isDonation).toList();
-              final bookSales = todayDeliveries.where((d) => d.isBookSale).toList();
+              final bookDistributions = todayDeliveries.where((d) => d.isBookSale).toList();
               final totalDonationAmount = donations.fold<double>(
-                0,
-                (sum, d) => sum + (d.donationAmount ?? 0),
-              );
-              final totalBookSalesAmount = bookSales.fold<double>(
                 0,
                 (sum, d) => sum + (d.donationAmount ?? 0),
               );
@@ -283,19 +269,18 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
                         key: _showcaseSummary,
                         title: "Today's Summary",
                         description:
-                            'See today\'s totals for both donations and book sales. This updates as you record each activity.',
+                            'See today\'s totals for both donations and books distributed.',
                         titleTextStyle: _tooltipTitleStyle,
                         descTextStyle: _tooltipDescStyle,
                         tooltipBorderRadius: _tooltipRadius,
                         tooltipPadding: _tooltipPadding,
                         targetBorderRadius: BorderRadius.circular(20),
-                        child: _TodaySummaryCard(
-                          donationsCount: donations.length,
-                          donationsAmount: totalDonationAmount,
-                          bookSalesCount: bookSales.length,
-                          bookSalesAmount: totalBookSalesAmount,
-                          isDark: isDark,
-                        ),
+                          child: _TodaySummaryCard(
+                            donationsCount: donations.length,
+                            donationsAmount: totalDonationAmount,
+                            bookDistributionsCount: bookDistributions.length,
+                            isDark: isDark,
+                          ),
                       ),
                       const SizedBox(height: 24),
 
@@ -306,7 +291,7 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
                               key: _showcaseRecord,
                               title: 'Record Activity',
                               description:
-                                  'Use these buttons to record a donation or a book sale. Your GPS location is captured automatically.',
+                                  'Use these buttons to record a donation or distribute a book.',
                               titleTextStyle: _tooltipTitleStyle,
                               descTextStyle: _tooltipDescStyle,
                               tooltipBorderRadius: _tooltipRadius,
@@ -324,7 +309,7 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
                           Expanded(
                             child: _ActionButton(
                               icon: Icons.menu_book_rounded,
-                              label: 'Record Book Sale',
+                              label: 'Give Book',
                               color: AppColors.primary,
                               onTap: () => _showBookSaleSheet(context),
                             ),
@@ -416,7 +401,7 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
                           icon: Icons.receipt_long_outlined,
                           title: 'No records yet',
                           description:
-                              'Tap above to record a donation or book sale.',
+                              'Tap above to record a donation or book distribution.',
                           compact: true,
                         )
                       else
@@ -482,7 +467,7 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
       backgroundColor: Colors.transparent,
       builder: (sheetContext) => BlocProvider.value(
         value: context.read<DeliveryBloc>(),
-        child: const _RecordBookSaleSheet(),
+        child: const _RecordBookDistributionSheet(),
       ),
     );
   }
@@ -565,7 +550,7 @@ class _DeliveryDetailSheet extends StatelessWidget {
                         ),
                       ),
                       Text(
-                        delivery.isBookSale ? 'Book Sale' : 'Donation',
+                        delivery.isBookSale ? 'Book Distribution' : 'Donation',
                         style: TextStyle(
                           color: isDark
                               ? AppColors.textSecondaryDark
@@ -644,15 +629,13 @@ class _DeliveryDetailSheet extends StatelessWidget {
 class _TodaySummaryCard extends StatelessWidget {
   final int donationsCount;
   final double donationsAmount;
-  final int bookSalesCount;
-  final double bookSalesAmount;
+  final int bookDistributionsCount;
   final bool isDark;
 
   const _TodaySummaryCard({
     required this.donationsCount,
     required this.donationsAmount,
-    required this.bookSalesCount,
-    required this.bookSalesAmount,
+    required this.bookDistributionsCount,
     required this.isDark,
   });
 
@@ -706,7 +689,7 @@ class _TodaySummaryCard extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           Text(
-            '\$${bookSalesAmount.toStringAsFixed(2)} from $bookSalesCount book sales',
+            '$bookDistributionsCount books distributed',
             style: const TextStyle(color: Colors.white70, fontSize: 13),
           ),
         ],
@@ -1089,39 +1072,9 @@ class _RecordDonationSheetState extends State<_RecordDonationSheet> {
 
   Future<bool> _processPayment(double amount) async {
     // Cash payment - immediate completion
-    if (_paymentMethod == 'cash') {
-      setState(() => _isProcessingPayment = true);
-      await Future.delayed(const Duration(milliseconds: 300));
-      setState(() => _isProcessingPayment = false);
-      return true;
-    }
-
-    // Online payment - send payment link via SMS
-    if (_paymentMethod == 'online') {
-      final phone = _phoneController.text.trim();
-      if (phone.isEmpty) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Phone number is required for online payment'),
-            backgroundColor: AppColors.error,
-          ),
-        );
-        return false;
-      }
-
-      // Show waiting dialog and send payment link
-      final result = await showDialog<bool>(
-        context: context,
-        barrierDismissible: false,
-        builder: (context) => _PaymentLinkDialog(
-          amount: amount,
-          phoneNumber: phone,
-          recipientName: _nameController.text.trim(),
-        ),
-      );
-      return result ?? false;
-    }
-
+    setState(() => _isProcessingPayment = true);
+    await Future.delayed(const Duration(milliseconds: 300));
+    setState(() => _isProcessingPayment = false);
     return true;
   }
 
@@ -1572,59 +1525,6 @@ class _RecordDonationSheetState extends State<_RecordDonationSheet> {
               },
             ),
             const SizedBox(height: 16),
-            Text(
-              'Payment Method',
-              style: Theme.of(
-                context,
-              ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w500),
-            ),
-            const SizedBox(height: 8),
-            Row(
-              children: [
-                _PaymentChip(
-                  label: 'Cash',
-                  icon: Icons.money,
-                  isSelected: _paymentMethod == 'cash',
-                  onTap: () => setState(() => _paymentMethod = 'cash'),
-                ),
-                const SizedBox(width: 12),
-                _PaymentChip(
-                  label: 'Send Payment Link',
-                  icon: Icons.send,
-                  isSelected: _paymentMethod == 'online',
-                  onTap: () => setState(() => _paymentMethod = 'online'),
-                ),
-              ],
-            ),
-            if (_paymentMethod == 'online') ...[
-              const SizedBox(height: 16),
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: AppColors.info.withAlpha(20),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: AppColors.info.withAlpha(50)),
-                ),
-                child: Row(
-                  children: [
-                    Icon(Icons.info_outline, color: AppColors.info, size: 20),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Text(
-                        'A payment link will be sent to the phone number. The donor will complete payment on their own device.',
-                        style: TextStyle(
-                          fontSize: 13,
-                          color: isDark
-                              ? AppColors.textSecondaryDark
-                              : AppColors.textSecondaryLight,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-            const SizedBox(height: 16),
             CustomTextField(
               controller: _notesController,
               label: 'Notes (optional)',
@@ -1686,7 +1586,7 @@ class _RecordDonationSheetState extends State<_RecordDonationSheet> {
             const Divider(height: 24),
             _ReviewRow(
               label: 'Payment',
-              value: _paymentMethod == 'cash' ? 'Cash' : 'Payment Link',
+              value: 'Cash',
               color: secondaryColor,
             ),
             if (_addressController.text.trim().isNotEmpty) ...[
@@ -1768,64 +1668,14 @@ class _ReviewRow extends StatelessWidget {
   }
 }
 
-class _PaymentChip extends StatelessWidget {
-  final String label;
-  final IconData icon;
-  final bool isSelected;
-  final VoidCallback onTap;
-
-  const _PaymentChip({
-    required this.label,
-    required this.icon,
-    required this.isSelected,
-    required this.onTap,
-  });
+class _RecordBookDistributionSheet extends StatefulWidget {
+  const _RecordBookDistributionSheet();
 
   @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-        decoration: BoxDecoration(
-          color: isSelected ? AppColors.primary : Colors.transparent,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(
-            color: isSelected ? AppColors.primary : AppColors.borderLight,
-          ),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              icon,
-              size: 16,
-              color: isSelected ? Colors.white : AppColors.textSecondaryLight,
-            ),
-            const SizedBox(width: 6),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w500,
-                color: isSelected ? Colors.white : AppColors.textSecondaryLight,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
+  State<_RecordBookDistributionSheet> createState() => _RecordBookDistributionSheetState();
 }
 
-class _RecordBookSaleSheet extends StatefulWidget {
-  const _RecordBookSaleSheet();
-
-  @override
-  State<_RecordBookSaleSheet> createState() => _RecordBookSaleSheetState();
-}
-
-class _RecordBookSaleSheetState extends State<_RecordBookSaleSheet> {
+class _RecordBookDistributionSheetState extends State<_RecordBookDistributionSheet> {
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
   final _addressController = TextEditingController();
@@ -1834,7 +1684,6 @@ class _RecordBookSaleSheetState extends State<_RecordBookSaleSheet> {
   final _quantityController = TextEditingController(text: '1');
 
   int _selectedBookIndex = 0;
-  String _paymentMethod = 'cash';
   bool _isSubmitting = false;
   bool _isGettingLocation = false;
   double? _latitude;
@@ -1994,7 +1843,6 @@ class _RecordBookSaleSheetState extends State<_RecordBookSaleSheet> {
 
     setState(() => _isSubmitting = true);
     final quantity = int.tryParse(_quantityController.text.trim()) ?? 1;
-    final totalAmount = _selectedBook.unitPrice * quantity;
     final languageLabel = _selectedBook.language == 'spanish'
         ? 'Spanish'
         : 'English';
@@ -2011,13 +1859,13 @@ class _RecordBookSaleSheetState extends State<_RecordBookSaleSheet> {
       latitude: _latitude,
       longitude: _longitude,
       deliveryType: 'book_sale',
-      donationAmount: totalAmount,
-      paymentMethod: _paymentMethod,
+      donationAmount: 0,
+      paymentMethod: 'cash',
       bookCode: _selectedBook.code,
       bookTitle: _selectedBook.title,
       bookLanguage: _selectedBook.language,
       bookQuantity: quantity,
-      bookUnitPrice: _selectedBook.unitPrice,
+      bookUnitPrice: 0,
       notes: _notesController.text.trim().isNotEmpty
           ? _notesController.text.trim()
           : null,
@@ -2042,7 +1890,6 @@ class _RecordBookSaleSheetState extends State<_RecordBookSaleSheet> {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final quantity = int.tryParse(_quantityController.text.trim()) ?? 1;
-    final totalAmount = _selectedBook.unitPrice * quantity;
 
     return Container(
       decoration: BoxDecoration(
@@ -2068,7 +1915,7 @@ class _RecordBookSaleSheetState extends State<_RecordBookSaleSheet> {
           ),
           const SizedBox(height: 14),
           const Text(
-            'Record Book Sale',
+            'Give Book',
             style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
           ),
           const SizedBox(height: 10),
@@ -2134,13 +1981,6 @@ class _RecordBookSaleSheetState extends State<_RecordBookSaleSheet> {
                                     fontWeight: FontWeight.w600,
                                   ),
                                 ),
-                                Text(
-                                  '\$${book.unitPrice.toStringAsFixed(2)}',
-                                  style: const TextStyle(
-                                    color: AppColors.primary,
-                                    fontWeight: FontWeight.w700,
-                                  ),
-                                ),
                               ],
                             ),
                           ),
@@ -2151,11 +1991,11 @@ class _RecordBookSaleSheetState extends State<_RecordBookSaleSheet> {
                   const SizedBox(height: 16),
                   CustomTextField(
                     controller: _nameController,
-                    label: 'Buyer Name *',
-                    hint: 'Enter buyer name',
+                    label: 'Recipient Name *',
+                    hint: 'Enter recipient name',
                     validator: (value) {
                       if (value == null || value.trim().isEmpty) {
-                        return 'Buyer name is required';
+                        return 'Recipient name is required';
                       }
                       return null;
                     },
@@ -2187,33 +2027,6 @@ class _RecordBookSaleSheetState extends State<_RecordBookSaleSheet> {
                     onChanged: (_) => setState(() {}),
                   ),
                   const SizedBox(height: 12),
-                  Text(
-                    'Payment Method',
-                    style: TextStyle(
-                      color: isDark
-                          ? AppColors.textSecondaryDark
-                          : AppColors.textSecondaryLight,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      _PaymentChip(
-                        label: 'Cash',
-                        icon: Icons.payments,
-                        isSelected: _paymentMethod == 'cash',
-                        onTap: () => setState(() => _paymentMethod = 'cash'),
-                      ),
-                      const SizedBox(width: 8),
-                      _PaymentChip(
-                        label: 'Online',
-                        icon: Icons.link,
-                        isSelected: _paymentMethod == 'online',
-                        onTap: () => setState(() => _paymentMethod = 'online'),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
                   CustomTextField(
                     controller: _notesController,
                     label: 'Notes',
@@ -2233,7 +2046,7 @@ class _RecordBookSaleSheetState extends State<_RecordBookSaleSheet> {
                         Text('Selected: ${_selectedBook.title}'),
                         const SizedBox(height: 4),
                         Text(
-                          'Total: \$${totalAmount.toStringAsFixed(2)} (${_selectedBook.unitPrice.toStringAsFixed(2)} x $quantity)',
+                          'Quantity: $quantity',
                           style: const TextStyle(fontWeight: FontWeight.w700),
                         ),
                         if (_isGettingLocation)
@@ -2267,340 +2080,11 @@ class _RecordBookSaleSheetState extends State<_RecordBookSaleSheet> {
                       )
                     : const Icon(Icons.check_circle_outline),
                 label: Text(
-                  _isSubmitting
-                      ? 'Saving...'
-                      : 'Record Sale (\$${totalAmount.toStringAsFixed(2)})',
+                  _isSubmitting ? 'Saving...' : 'Give Book',
                 ),
               ),
             ),
           ),
-        ],
-      ),
-    );
-  }
-}
-
-/// Payment Link Dialog - Sends SMS and waits for payment
-class _PaymentLinkDialog extends StatefulWidget {
-  final double amount;
-  final String phoneNumber;
-  final String recipientName;
-
-  const _PaymentLinkDialog({
-    required this.amount,
-    required this.phoneNumber,
-    required this.recipientName,
-  });
-
-  @override
-  State<_PaymentLinkDialog> createState() => _PaymentLinkDialogState();
-}
-
-class _PaymentLinkDialogState extends State<_PaymentLinkDialog> {
-  String _status = 'sending'; // sending, waiting, completed, failed
-  String? _errorMessage;
-  String? _paymentSessionId;
-  Timer? _pollTimer;
-  int _pollCount = 0;
-  static const int maxPolls = 60; // 5 minutes (5 second intervals)
-
-  @override
-  void initState() {
-    super.initState();
-    _sendPaymentLink();
-  }
-
-  @override
-  void dispose() {
-    _pollTimer?.cancel();
-    super.dispose();
-  }
-
-  Future<void> _sendPaymentLink() async {
-    try {
-      final apiClient = ApiClient();
-
-      // Call backend to create payment link and send SMS
-      final response = await apiClient.dio.post(
-        ApiConstants.sendPaymentLink,
-        data: {
-          'recipient_phone': widget.phoneNumber,
-          'recipient_name': widget.recipientName,
-          'amount': (widget.amount * 100).toInt(), // Convert to cents
-          'currency': 'usd',
-          'description': 'Donation',
-        },
-      );
-
-      if (!mounted) return;
-
-      final data = response.data;
-      _paymentSessionId = data['session_id'];
-
-      final smsSent = data['sms_sent'] ?? false;
-      if (!smsSent && data['sms_error'] != null) {
-        debugPrint('SMS Error: ${data['sms_error']}');
-      }
-
-      setState(() => _status = 'waiting');
-
-      // Start polling for payment status
-      _startPolling();
-    } on DioException catch (e) {
-      if (mounted) {
-        String message = 'Failed to send payment link';
-        final data = e.response?.data;
-        if (data is Map && data['error'] != null) {
-          message = data['error'].toString();
-        } else if (data is String && data.isNotEmpty) {
-          message = data;
-        }
-        setState(() {
-          _status = 'failed';
-          _errorMessage = message;
-        });
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() {
-          _status = 'failed';
-          _errorMessage = e.toString();
-        });
-      }
-    }
-  }
-
-  void _startPolling() {
-    _pollTimer = Timer.periodic(const Duration(seconds: 5), (timer) async {
-      if (_pollCount >= maxPolls || _status != 'waiting' || !mounted) {
-        timer.cancel();
-        if (_status == 'waiting' && mounted) {
-          setState(() {
-            _status = 'failed';
-            _errorMessage = 'Payment timeout. Please try again.';
-          });
-        }
-        return;
-      }
-
-      _pollCount++;
-      await _checkPaymentStatus();
-    });
-  }
-
-  Future<void> _checkPaymentStatus() async {
-    if (_paymentSessionId == null) return;
-
-    try {
-      final apiClient = ApiClient();
-
-      final response = await apiClient.dio.get(
-        '${ApiConstants.paymentStatus}/$_paymentSessionId',
-      );
-
-      if (!mounted) return;
-
-      final data = response.data;
-      final status = data['status'] as String?;
-
-      if (status == 'completed') {
-        _pollTimer?.cancel();
-        setState(() => _status = 'completed');
-        await Future.delayed(const Duration(milliseconds: 500));
-        if (mounted) Navigator.pop(context, true);
-      } else if (status == 'failed' || status == 'expired') {
-        _pollTimer?.cancel();
-        setState(() {
-          _status = 'failed';
-          _errorMessage = status == 'expired'
-              ? 'Payment link expired. Please try again.'
-              : 'Payment failed. Please try again.';
-        });
-      }
-      // If still pending, continue polling
-    } catch (e) {
-      debugPrint('Error checking payment status: $e');
-      // Continue polling on error
-    }
-  }
-
-  String _formatPhone(String phone) {
-    if (phone.length >= 4) {
-      return '***-***-${phone.substring(phone.length - 4)}';
-    }
-    return phone;
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return AlertDialog(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          // Icon based on status
-          if (_status == 'sending' || _status == 'waiting')
-            Container(
-              width: 64,
-              height: 64,
-              decoration: BoxDecoration(
-                color: AppColors.primary.withAlpha(20),
-                shape: BoxShape.circle,
-              ),
-              child: _status == 'sending'
-                  ? const Center(
-                      child: CircularProgressIndicator(strokeWidth: 3),
-                    )
-                  : const Icon(
-                      Icons.hourglass_top,
-                      color: AppColors.primary,
-                      size: 32,
-                    ),
-            )
-          else if (_status == 'completed')
-            Container(
-              width: 64,
-              height: 64,
-              decoration: BoxDecoration(
-                color: AppColors.success.withAlpha(20),
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(
-                Icons.check,
-                color: AppColors.success,
-                size: 32,
-              ),
-            )
-          else
-            Container(
-              width: 64,
-              height: 64,
-              decoration: BoxDecoration(
-                color: AppColors.error.withAlpha(20),
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(
-                Icons.error_outline,
-                color: AppColors.error,
-                size: 32,
-              ),
-            ),
-
-          const SizedBox(height: 20),
-
-          // Title
-          Text(
-            _status == 'sending'
-                ? 'Sending Payment Link...'
-                : _status == 'waiting'
-                ? 'Waiting for Payment'
-                : _status == 'completed'
-                ? 'Payment Received!'
-                : 'Payment Failed',
-            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-            textAlign: TextAlign.center,
-          ),
-
-          const SizedBox(height: 12),
-
-          // Amount
-          Text(
-            '\$${widget.amount.toStringAsFixed(2)}',
-            style: TextStyle(
-              fontSize: 28,
-              fontWeight: FontWeight.bold,
-              color: _status == 'completed'
-                  ? AppColors.success
-                  : AppColors.primary,
-            ),
-          ),
-
-          const SizedBox(height: 8),
-
-          // Phone number
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const Icon(
-                Icons.phone,
-                size: 16,
-                color: AppColors.textSecondaryLight,
-              ),
-              const SizedBox(width: 6),
-              Text(
-                _formatPhone(widget.phoneNumber),
-                style: const TextStyle(color: AppColors.textSecondaryLight),
-              ),
-            ],
-          ),
-
-          const SizedBox(height: 20),
-
-          // Status message
-          if (_status == 'sending')
-            const Text(
-              'Sending payment link via SMS...',
-              style: TextStyle(color: AppColors.textSecondaryLight),
-              textAlign: TextAlign.center,
-            )
-          else if (_status == 'waiting')
-            Column(
-              children: [
-                Text(
-                  'Payment link sent to ${widget.recipientName}',
-                  style: const TextStyle(fontWeight: FontWeight.w500),
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 8),
-                const Text(
-                  'Waiting for them to complete payment...',
-                  style: TextStyle(color: AppColors.textSecondaryLight),
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 16),
-                LinearProgressIndicator(
-                  value: _pollCount / maxPolls,
-                  backgroundColor: AppColors.borderLight,
-                  valueColor: AlwaysStoppedAnimation(AppColors.primary),
-                ),
-              ],
-            )
-          else if (_status == 'failed')
-            Text(
-              _errorMessage ?? 'Payment could not be processed',
-              style: const TextStyle(color: AppColors.error),
-              textAlign: TextAlign.center,
-            ),
-
-          const SizedBox(height: 20),
-
-          // Action buttons
-          if (_status == 'waiting')
-            TextButton(
-              onPressed: () => Navigator.pop(context, false),
-              child: const Text('Cancel'),
-            )
-          else if (_status == 'failed')
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-              children: [
-                TextButton(
-                  onPressed: () => Navigator.pop(context, false),
-                  child: const Text('Cancel'),
-                ),
-                ElevatedButton(
-                  onPressed: () {
-                    setState(() {
-                      _status = 'sending';
-                      _pollCount = 0;
-                      _errorMessage = null;
-                    });
-                    _sendPaymentLink();
-                  },
-                  child: const Text('Retry'),
-                ),
-              ],
-            ),
         ],
       ),
     );
@@ -2651,7 +2135,7 @@ class _ReceiptDialog extends StatelessWidget {
             ),
             const SizedBox(height: 4),
             Text(
-              delivery.isBookSale ? 'Book Sale Receipt' : 'Donation Receipt',
+              delivery.isBookSale ? 'Distribution Receipt' : 'Donation Receipt',
               style: const TextStyle(color: AppColors.textSecondaryLight),
             ),
             const SizedBox(height: 16),
@@ -2682,7 +2166,7 @@ class _ReceiptDialog extends StatelessWidget {
               ).format(delivery.createdAt ?? DateTime.now()),
             ),
             _ReceiptRow(
-              label: delivery.isBookSale ? 'Buyer' : 'Donor',
+              label: delivery.isBookSale ? 'Recipient' : 'Donor',
               value: delivery.recipientName,
             ),
             if (delivery.isBookSale && delivery.bookTitle != null)

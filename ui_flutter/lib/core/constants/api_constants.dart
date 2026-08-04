@@ -133,11 +133,7 @@ class ApiConstants {
       '/api/workers'; // + /{workerId}/deliveries
   static const String routes = '/api/routes';
 
-  // Payment Endpoints
-  static const String createPaymentIntent = '/api/payments/create-intent';
-  static const String verifyPayment = '/api/payments/verify';
-  static const String sendPaymentLink = '/api/payments/send-link';
-  static const String paymentStatus = '/api/payments/status'; // + /{sessionId}
+  // Receipts
   static const String receipts = '/api/receipts';
 
   // Walkie Endpoints

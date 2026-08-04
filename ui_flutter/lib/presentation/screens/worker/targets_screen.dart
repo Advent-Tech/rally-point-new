@@ -250,7 +250,7 @@ class _TargetsScreenState extends State<TargetsScreen> {
         return 'Donations';
       case 'book_sale':
       case 'book':
-        return 'Book Sales';
+        return 'Books Distributed';
       case 'prayer':
         return 'Prayer Requests';
       case 'visit':
