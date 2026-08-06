@@ -317,20 +317,23 @@ func (t *EmailTemplates) GeneratePasswordResetEmail(data PasswordResetEmailData)
 </body>
 </html>`
 
-	textTmpl := `light point - Reset Your Password
+	textTmpl := `Light Point - Reset Your Password
 
 Hello {{.UserName}},
 
 We received a request to reset your password. Click the link below to create a new password:
 
+>>> Reset Password <<<
 {{.ResetURL}}
 
-SECURITY NOTICE: This link will expire in {{.ExpiryMinutes}} minutes for your security.
+(If the above link doesn't work, copy and paste the URL into your browser.)
+
+This link will expire in {{.ExpiryMinutes}} minutes for your security.
 
 Didn't request this? If you did not request a password reset, please ignore this email. Your password will remain unchanged and your account is secure.
 
 ---
-light point
+Light Point
 This is an automated message, please do not reply.`
 
 	var htmlBuf, textBuf bytes.Buffer
