@@ -91,7 +91,7 @@ func main() {
 	teamService := service.NewTeamService(teamRepo, db.DB, nc)
 	userService := service.NewUserService(userRepo, sessionRepo, joinRequestRepo, jwtManager, db.DB)
 	adminService := service.NewAdminService(userRepo, teamRepo, db.DB)
-	superAdminService := service.NewSuperAdminService(userRepo, db.DB)
+	superAdminService := service.NewSuperAdminService(userRepo, verificationTokenRepo, db.DB)
 	joinRequestService := service.NewJoinRequestService(joinRequestRepo, userRepo, teamRepo, nc)
 	blogService := service.NewBlogService(blogRepo, storagePath, baseURL)
 	verificationService := service.NewVerificationService(userRepo, verificationTokenRepo, sessionRepo)
@@ -299,6 +299,7 @@ func setupRouter(
 		superadmin := protected.Group("/api/superadmin")
 		superadmin.Use(handler.SuperAdminMiddleware())
 		{
+			superadmin.POST("/admins/invite", superAdminHandler.InviteAdmin)
 			superadmin.POST("/admins", superAdminHandler.CreateAdmin)
 			superadmin.GET("/admins", superAdminHandler.ListAdmins)
 			superadmin.GET("/admins/:id", superAdminHandler.GetAdmin)

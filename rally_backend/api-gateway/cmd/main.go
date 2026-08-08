@@ -662,6 +662,7 @@ func setupRouter(cfg *config.Config, jwtManager *auth.JWTManager, rateLimiter mi
 	superadmin.Use(middleware.ServiceAuthMiddleware())
 	{
 		// Admin account management
+		superadmin.POST("/admins/invite", serviceProxy.ProxyRequest("user"))
 		superadmin.POST("/admins", serviceProxy.ProxyRequest("user"))
 		superadmin.GET("/admins", serviceProxy.ProxyRequest("user"))
 		superadmin.GET("/admins/:id", serviceProxy.ProxyRequest("user"))

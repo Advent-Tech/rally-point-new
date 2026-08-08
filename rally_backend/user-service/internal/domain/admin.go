@@ -14,6 +14,14 @@ type CreateAdminRequest struct {
 	Phone       string `json:"phone,omitempty"`
 }
 
+// InviteAdminRequest represents the request to invite an admin/superadmin
+type InviteAdminRequest struct {
+	Email       string `json:"email" binding:"required,email"`
+	DisplayName string `json:"display_name,omitempty"`
+	Role        string `json:"role,omitempty"` // "admin" (default) or "superadmin"
+	Phone       string `json:"phone,omitempty"`
+}
+
 // VerifyTeamLeaderRequest represents the request to verify a team leader
 type VerifyTeamLeaderRequest struct {
 	Verified bool   `json:"verified"`
@@ -106,6 +114,7 @@ type AdminService interface {
 type SuperAdminService interface {
 	// Admin Management
 	CreateAdmin(req *CreateAdminRequest) (*User, error)
+	InviteAdmin(req *InviteAdminRequest) error
 	GetAllAdmins() (*AdminListResponse, error)
 	GetAdminByID(id uuid.UUID) (*AdminInfo, error)
 	DeleteAdmin(adminID uuid.UUID) error

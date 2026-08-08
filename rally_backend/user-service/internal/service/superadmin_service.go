@@ -3,24 +3,34 @@ package service
 import (
 	"database/sql"
 	"fmt"
+	"log"
+	"os"
 	"time"
 
 	"rally-point/user-service/internal/domain"
+	"rally-point/user-service/internal/email"
 
 	"github.com/google/uuid"
+	"github.com/rally-point/shared/utils"
 	"golang.org/x/crypto/bcrypt"
 )
 
 type superAdminService struct {
-	userRepo domain.UserRepository
-	db       *sql.DB
+	userRepo  domain.UserRepository
+	tokenRepo domain.VerificationTokenRepository
+	db        *sql.DB
+	emailClient *email.EmailClient
+	templates   *email.EmailTemplates
 }
 
 // NewSuperAdminService creates a new superadmin service
-func NewSuperAdminService(userRepo domain.UserRepository, db *sql.DB) domain.SuperAdminService {
+func NewSuperAdminService(userRepo domain.UserRepository, tokenRepo domain.VerificationTokenRepository, db *sql.DB) domain.SuperAdminService {
 	return &superAdminService{
-		userRepo: userRepo,
-		db:       db,
+		userRepo:    userRepo,
+		tokenRepo:   tokenRepo,
+		db:          db,
+		emailClient: email.NewEmailClient(),
+		templates:   email.NewEmailTemplates(),
 	}
 }
 
@@ -67,6 +77,110 @@ func (s *superAdminService) CreateAdmin(req *domain.CreateAdminRequest) (*domain
 	user.PasswordHash = ""
 
 	return user, nil
+}
+
+// InviteAdmin invites an admin/superadmin by email, creating their account and sending an invitation email
+func (s *superAdminService) InviteAdmin(req *domain.InviteAdminRequest) error {
+	// Check if email already exists
+	existingUser, _ := s.userRepo.GetByEmail(req.Email)
+	if existingUser != nil {
+		return fmt.Errorf("user with email %s already exists", req.Email)
+	}
+
+	// Determine role (default to admin)
+	role := domain.RoleAdmin
+	if req.Role == "superadmin" {
+		role = domain.RoleSuperAdmin
+	}
+
+	// Generate a random placeholder password (user will set their own via invitation link)
+	placeholderPassword, err := utils.GenerateSecureToken(32)
+	if err != nil {
+		return fmt.Errorf("failed to generate placeholder password: %w", err)
+	}
+
+	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(placeholderPassword), bcrypt.DefaultCost)
+	if err != nil {
+		return fmt.Errorf("failed to hash placeholder password: %w", err)
+	}
+
+	// Create user with placeholder password
+	user := &domain.User{
+		ID:                 uuid.New(),
+		Email:              req.Email,
+		PasswordHash:       string(hashedPassword),
+		DisplayName:        req.DisplayName,
+		Role:               role,
+		VerificationStatus: domain.VerificationVerified,
+		IsOnline:           false,
+		LastActiveAt:       time.Now(),
+		CreatedAt:          time.Now(),
+		UpdatedAt:          time.Now(),
+	}
+
+	if req.Phone != "" {
+		user.Phone = &req.Phone
+	}
+
+	err = s.userRepo.Create(user)
+	if err != nil {
+		return fmt.Errorf("failed to create admin: %w", err)
+	}
+
+	// Generate password reset token for the invitation
+	plainToken, err := utils.GenerateSecureToken(32)
+	if err != nil {
+		return fmt.Errorf("failed to generate token: %w", err)
+	}
+
+	tokenHash := utils.HashSHA256(plainToken)
+
+	token := &domain.VerificationToken{
+		ID:        uuid.New(),
+		UserID:    user.ID,
+		TokenHash: tokenHash,
+		TokenType: domain.TokenTypePasswordReset,
+		ExpiresAt: time.Now().Add(7 * 24 * time.Hour), // 7 days for invitation
+		CreatedAt: time.Now(),
+	}
+
+	if err = s.tokenRepo.Create(token); err != nil {
+		return fmt.Errorf("failed to create invitation token: %w", err)
+	}
+
+	// Generate invitation email
+	invitationURL := s.templates.GetAdminInvitationURL(plainToken)
+	roleLabel := "Admin"
+	if role == domain.RoleSuperAdmin {
+		roleLabel = "Superadmin"
+	}
+
+	htmlContent, textContent, err := s.templates.GenerateAdminInvitationEmail(email.AdminInvitationEmailData{
+		InviterName:   "Light Point Admin",
+		InviteeEmail:  req.Email,
+		Role:          roleLabel,
+		InvitationURL: invitationURL,
+		ExpiryDays:    7,
+	})
+	if err != nil {
+		return fmt.Errorf("failed to generate invitation email: %w", err)
+	}
+
+	// Send email
+	if !s.emailClient.IsConfigured() {
+		if os.Getenv("GO_ENV") == "development" || os.Getenv("GO_ENV") == "" {
+			log.Printf("📧 [DEV] Admin invitation email for %s:\n   URL: %s\n", req.Email, invitationURL)
+			return nil
+		}
+		return fmt.Errorf("email service not configured")
+	}
+
+	if err = s.emailClient.SendEmail(req.Email, "You're Invited to Join Light Point Admin", htmlContent, textContent); err != nil {
+		return fmt.Errorf("failed to send invitation email: %w", err)
+	}
+
+	fmt.Printf("📧 Admin invitation sent to %s (role: %s)\n", req.Email, roleLabel)
+	return nil
 }
 
 // GetAllAdmins returns all admin users

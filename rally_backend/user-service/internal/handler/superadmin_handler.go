@@ -41,6 +41,26 @@ func (h *SuperAdminHandler) CreateAdmin(c *gin.Context) {
 	})
 }
 
+// InviteAdmin handles inviting an admin/superadmin by email
+// POST /api/superadmin/admins/invite
+func (h *SuperAdminHandler) InviteAdmin(c *gin.Context) {
+	var req domain.InviteAdminRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	err := h.superAdminService.InviteAdmin(&req)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"message": "Invitation sent successfully",
+	})
+}
+
 // ListAdmins handles listing all admin accounts
 // GET /api/superadmin/admins
 func (h *SuperAdminHandler) ListAdmins(c *gin.Context) {

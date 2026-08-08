@@ -377,6 +377,212 @@ func (t *EmailTemplates) GetTeamInvitationURL(token string) string {
 	return t.backendURL + "/api/invitations/join/" + token
 }
 
+// AdminInvitationEmailData holds data for admin invitation email
+type AdminInvitationEmailData struct {
+	InviterName    string
+	InviteeEmail   string
+	Role           string
+	InvitationURL  string
+	ExpiryDays     int
+}
+
+// GetAdminInvitationURL constructs the full admin invitation URL (points to password reset screen)
+func (t *EmailTemplates) GetAdminInvitationURL(token string) string {
+	return t.frontendURL + "/reset-password/" + token
+}
+
+// GenerateAdminInvitationEmail generates HTML and text versions of admin invitation email
+func (t *EmailTemplates) GenerateAdminInvitationEmail(data AdminInvitationEmailData) (html, text string, err error) {
+	roleLabel := "Admin"
+	if data.Role == "superadmin" {
+		roleLabel = "Superadmin"
+	}
+
+	htmlTmpl := `<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            margin: 0;
+            padding: 0;
+            background-color: #f5f5f5;
+        }
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px 20px;
+            text-align: center;
+            border-radius: 8px 8px 0 0;
+        }
+        .header h1 {
+            margin: 0;
+            font-size: 28px;
+            font-weight: 600;
+        }
+        .content {
+            padding: 30px;
+            background-color: #ffffff;
+            border-radius: 0 0 8px 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .content h2 {
+            color: #333;
+            margin-top: 0;
+        }
+        .role-badge {
+            display: inline-block;
+            background: linear-gradient(135deg, #667eea15 0%, #764ba215 100%);
+            border: 1px solid #667eea30;
+            border-radius: 20px;
+            padding: 8px 20px;
+            margin: 15px 0;
+            font-weight: 600;
+            color: #667eea;
+            font-size: 16px;
+        }
+        .button {
+            display: inline-block;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white !important;
+            padding: 14px 32px;
+            text-decoration: none;
+            border-radius: 8px;
+            margin: 20px 0;
+            font-weight: 600;
+            font-size: 16px;
+        }
+        .button:hover {
+            opacity: 0.9;
+        }
+        .link-text {
+            word-break: break-all;
+            color: #666;
+            font-size: 14px;
+            background-color: #f9f9f9;
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+        .footer {
+            padding: 20px;
+            text-align: center;
+            color: #666;
+            font-size: 12px;
+        }
+        .info-box {
+            background-color: #E8F4FD;
+            border: 1px solid #B3D9F7;
+            padding: 12px;
+            border-radius: 6px;
+            margin-top: 20px;
+            font-size: 14px;
+        }
+        .steps {
+            text-align: left;
+            margin: 20px 0;
+            padding: 0 20px;
+        }
+        .steps li {
+            margin: 8px 0;
+            color: #555;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>light point</h1>
+        </div>
+        <div class="content">
+            <h2>You've Been Invited to Join!</h2>
+            <p>Hello,</p>
+            <p><strong>{{.InviterName}}</strong> has invited you to join light point as a <strong>{{.Role}}</strong>.</p>
+
+            <div class="role-badge">{{.Role}}</div>
+
+            <p>Your email address: <strong>{{.InviteeEmail}}</strong></p>
+
+            <p>Click the button below to set your password and activate your account:</p>
+            <p style="text-align: center;">
+                <a href="{{.InvitationURL}}" class="button">Set Your Password</a>
+            </p>
+
+            <p>Or copy and paste this link into your browser:</p>
+            <p class="link-text">{{.InvitationURL}}</p>
+
+            <div class="info-box">
+                <strong>What happens next?</strong>
+                <ul class="steps">
+                    <li>Click the button above to set your password</li>
+                    <li>Once your password is set, you can log in with your email and new password</li>
+                </ul>
+                <p style="margin-bottom: 0;"><strong>Note:</strong> This invitation expires in {{.ExpiryDays}} days.</p>
+            </div>
+        </div>
+        <div class="footer">
+            <p>&copy; light point. All rights reserved.</p>
+            <p>This is an automated message, please do not reply.</p>
+            <p style="color: #999; font-size: 11px;">If you did not expect this invitation, you can safely ignore this email.</p>
+        </div>
+    </div>
+</body>
+</html>`
+
+	textTmpl := `light point - Admin Invitation
+
+Hello,
+
+{{.InviterName}} has invited you to join light point as a {{.Role}}.
+
+Your email address: {{.InviteeEmail}}
+
+To set your password and activate your account, click the link below:
+
+{{.InvitationURL}}
+
+What happens next?
+1. Click the link above to set your password
+2. Once your password is set, you can log in with your email and new password
+
+This invitation expires in {{.ExpiryDays}} days.
+
+---
+light point
+This is an automated message, please do not reply.
+
+If you did not expect this invitation, you can safely ignore this email.`
+
+	var htmlBuf, textBuf bytes.Buffer
+
+	htmlTemplate, err := template.New("html").Parse(htmlTmpl)
+	if err != nil {
+		return "", "", err
+	}
+	if err = htmlTemplate.Execute(&htmlBuf, data); err != nil {
+		return "", "", err
+	}
+
+	textTemplate, err := template.New("text").Parse(textTmpl)
+	if err != nil {
+		return "", "", err
+	}
+	if err = textTemplate.Execute(&textBuf, data); err != nil {
+		return "", "", err
+	}
+
+	return htmlBuf.String(), textBuf.String(), nil
+}
+
 // GenerateTeamInvitationEmail generates HTML and text versions of team invitation email
 func (t *EmailTemplates) GenerateTeamInvitationEmail(data TeamInvitationEmailData) (html, text string, err error) {
 	htmlTmpl := `<!DOCTYPE html>
