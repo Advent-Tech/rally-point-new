@@ -102,6 +102,15 @@ func (h *SuperAdminHandler) DeleteAdmin(c *gin.Context) {
 		return
 	}
 
+	currentUserID := c.GetString("user_id")
+	if currentUserID != "" {
+		currentID, err := uuid.Parse(currentUserID)
+		if err == nil && currentID == id {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "you cannot delete your own account"})
+			return
+		}
+	}
+
 	err = h.superAdminService.DeleteAdmin(id)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})

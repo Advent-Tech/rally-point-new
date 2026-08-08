@@ -243,13 +243,13 @@ func (s *superAdminService) GetAdminByID(id uuid.UUID) (*domain.AdminInfo, error
 
 // DeleteAdmin deletes an admin account
 func (s *superAdminService) DeleteAdmin(adminID uuid.UUID) error {
-	// Verify the user is an admin
+	// Verify the user exists and is admin or superadmin
 	user, err := s.userRepo.GetByID(adminID)
 	if err != nil {
 		return fmt.Errorf("admin not found: %w", err)
 	}
 
-	if user.Role != domain.RoleAdmin {
+	if !domain.IsAdminRole(user.Role) {
 		return fmt.Errorf("user is not an admin")
 	}
 
@@ -259,7 +259,7 @@ func (s *superAdminService) DeleteAdmin(adminID uuid.UUID) error {
 		return fmt.Errorf("failed to delete admin: %w", err)
 	}
 
-	fmt.Printf("🗑️ Admin account deleted: %s (%s)\n", user.DisplayName, user.Email)
+	fmt.Printf("🗑️ Admin account deleted: %s (%s) [%s]\n", user.DisplayName, user.Email, user.Role)
 
 	return nil
 }
