@@ -81,20 +81,20 @@ func (c *EmailClient) buildMessage(to, subject, htmlBody, textBody string) strin
 	sb.WriteString(fmt.Sprintf("Content-Type: multipart/alternative; boundary=\"%s\"\r\n", boundary))
 	sb.WriteString("\r\n")
 
-	// Plain text part
-	sb.WriteString(fmt.Sprintf("--%s\r\n", boundary))
-	sb.WriteString("Content-Type: text/plain; charset=\"UTF-8\"\r\n")
-	sb.WriteString("Content-Transfer-Encoding: quoted-printable\r\n")
-	sb.WriteString("\r\n")
-	sb.WriteString(textBody)
-	sb.WriteString("\r\n")
-
-	// HTML part
+	// HTML part (first — email clients prefer this)
 	sb.WriteString(fmt.Sprintf("--%s\r\n", boundary))
 	sb.WriteString("Content-Type: text/html; charset=\"UTF-8\"\r\n")
 	sb.WriteString("Content-Transfer-Encoding: quoted-printable\r\n")
 	sb.WriteString("\r\n")
 	sb.WriteString(htmlBody)
+	sb.WriteString("\r\n")
+
+	// Plain text part (fallback)
+	sb.WriteString(fmt.Sprintf("--%s\r\n", boundary))
+	sb.WriteString("Content-Type: text/plain; charset=\"UTF-8\"\r\n")
+	sb.WriteString("Content-Transfer-Encoding: quoted-printable\r\n")
+	sb.WriteString("\r\n")
+	sb.WriteString(textBody)
 	sb.WriteString("\r\n")
 
 	// End boundary
