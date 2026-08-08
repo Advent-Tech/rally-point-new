@@ -12,6 +12,7 @@ class ApiConstants {
 
   // Superadmin endpoints
   static const String superadminAdmins = '/api/superadmin/admins';
+  static const String superadminAdminsInvite = '/api/superadmin/admins/invite';
 
   // Admin endpoints
   static const String adminStats = '/api/admin/stats';

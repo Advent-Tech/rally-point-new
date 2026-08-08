@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/network/api_client.dart';
 import '../../../core/constants/api_constants.dart';
 import '../../../data/models/user_model.dart';
+import '../../blocs/auth/auth_bloc.dart';
 
 class AdminsScreen extends StatefulWidget {
   const AdminsScreen({super.key});
@@ -45,31 +47,24 @@ class _AdminsScreenState extends State<AdminsScreen> {
     }
   }
 
-  void _showCreateAdminDialog() {
+  void _showInviteAdminDialog() {
     final emailController = TextEditingController();
-    final passwordController = TextEditingController();
     final displayNameController = TextEditingController();
-    bool obscurePassword = true;
+    String selectedRole = 'admin';
+
+    final authState = context.read<AuthBloc>().state;
+    final isSuperAdmin = authState is AuthAuthenticated && authState.isSuperAdmin;
 
     showDialog(
       context: context,
       builder: (context) => StatefulBuilder(
         builder: (context, setDialogState) => AlertDialog(
-          title: const Text('Create Admin Account'),
+          title: const Text('Invite Admin'),
           content: SizedBox(
             width: 400,
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                TextField(
-                  controller: displayNameController,
-                  decoration: const InputDecoration(
-                    labelText: 'Display Name *',
-                    hintText: 'Enter admin name',
-                    prefixIcon: Icon(Icons.person_outline),
-                  ),
-                ),
-                const SizedBox(height: 16),
                 TextField(
                   controller: emailController,
                   decoration: const InputDecoration(
@@ -81,28 +76,48 @@ class _AdminsScreenState extends State<AdminsScreen> {
                 ),
                 const SizedBox(height: 16),
                 TextField(
-                  controller: passwordController,
-                  obscureText: obscurePassword,
-                  decoration: InputDecoration(
-                    labelText: 'Password *',
-                    hintText: 'Enter password',
-                    prefixIcon: const Icon(Icons.lock_outline),
-                    suffixIcon: IconButton(
-                      icon: Icon(
-                        obscurePassword ? Icons.visibility : Icons.visibility_off,
-                      ),
-                      onPressed: () {
-                        setDialogState(() => obscurePassword = !obscurePassword);
-                      },
-                    ),
+                  controller: displayNameController,
+                  decoration: const InputDecoration(
+                    labelText: 'Display Name (optional)',
+                    hintText: 'Enter admin name',
+                    prefixIcon: Icon(Icons.person_outline),
                   ),
                 ),
-                const SizedBox(height: 8),
-                Text(
-                  'Password must be at least 8 characters',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: AppColors.textSecondary,
+                if (isSuperAdmin) ...[
+                  const SizedBox(height: 16),
+                  DropdownButtonFormField<String>(
+                    value: selectedRole,
+                    decoration: const InputDecoration(
+                      labelText: 'Role *',
+                      prefixIcon: Icon(Icons.admin_panel_settings_outlined),
+                    ),
+                    items: const [
+                      DropdownMenuItem(value: 'admin', child: Text('Admin')),
+                      DropdownMenuItem(value: 'superadmin', child: Text('Superadmin')),
+                    ],
+                    onChanged: (value) {
+                      setDialogState(() => selectedRole = value ?? 'admin');
+                    },
+                  ),
+                ],
+                const SizedBox(height: 12),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.blue.withAlpha(20),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Row(
+                    children: [
+                      Icon(Icons.info_outline, color: Colors.blue, size: 20),
+                      SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'An invitation email will be sent with a link to set their password.',
+                          style: TextStyle(color: Colors.blue, fontSize: 12),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ],
@@ -115,28 +130,20 @@ class _AdminsScreenState extends State<AdminsScreen> {
             ),
             ElevatedButton(
               onPressed: () {
-                if (displayNameController.text.isEmpty ||
-                    emailController.text.isEmpty ||
-                    passwordController.text.isEmpty) {
+                if (emailController.text.isEmpty) {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Please fill all required fields')),
-                  );
-                  return;
-                }
-                if (passwordController.text.length < 8) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Password must be at least 8 characters')),
+                    const SnackBar(content: Text('Please enter an email address')),
                   );
                   return;
                 }
                 Navigator.pop(context);
-                _createAdmin(
+                _inviteAdmin(
                   email: emailController.text,
-                  password: passwordController.text,
                   displayName: displayNameController.text,
+                  role: selectedRole,
                 );
               },
-              child: const Text('Create'),
+              child: const Text('Send Invite'),
             ),
           ],
         ),
@@ -144,26 +151,26 @@ class _AdminsScreenState extends State<AdminsScreen> {
     );
   }
 
-  Future<void> _createAdmin({
+  Future<void> _inviteAdmin({
     required String email,
-    required String password,
     required String displayName,
+    required String role,
   }) async {
     try {
       final api = await ApiClient.getInstance();
       await api.post(
-        ApiConstants.superadminAdmins,
+        ApiConstants.superadminAdminsInvite,
         data: {
           'email': email,
-          'password': password,
           'display_name': displayName,
+          'role': role,
         },
       );
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Admin account created successfully'),
+            content: Text('Invitation sent successfully'),
             backgroundColor: AppColors.success,
           ),
         );
@@ -172,7 +179,7 @@ class _AdminsScreenState extends State<AdminsScreen> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to create admin: $e')),
+          SnackBar(content: Text('Failed to send invitation: $e')),
         );
       }
     }
@@ -325,9 +332,9 @@ class _AdminsScreenState extends State<AdminsScreen> {
           Padding(
             padding: const EdgeInsets.only(right: 16),
             child: ElevatedButton.icon(
-              onPressed: _showCreateAdminDialog,
-              icon: const Icon(Icons.add),
-              label: const Text('Create Admin'),
+              onPressed: _showInviteAdminDialog,
+              icon: const Icon(Icons.person_add_outlined),
+              label: const Text('Invite Admin'),
             ),
           ),
         ],
@@ -362,9 +369,9 @@ class _AdminsScreenState extends State<AdminsScreen> {
           ),
           const SizedBox(height: 24),
           ElevatedButton.icon(
-            onPressed: _showCreateAdminDialog,
-            icon: const Icon(Icons.add),
-            label: const Text('Create Admin'),
+            onPressed: _showInviteAdminDialog,
+            icon: const Icon(Icons.person_add_outlined),
+            label: const Text('Invite Admin'),
           ),
         ],
       ),
@@ -455,13 +462,15 @@ class _AdminsScreenState extends State<AdminsScreen> {
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                     decoration: BoxDecoration(
-                      color: AppColors.info.withAlpha(30),
+                      color: admin.isSuperAdmin
+                          ? AppColors.error.withAlpha(30)
+                          : AppColors.info.withAlpha(30),
                       borderRadius: BorderRadius.circular(16),
                     ),
-                    child: const Text(
-                      'Admin',
+                    child: Text(
+                      admin.isSuperAdmin ? 'Superadmin' : 'Admin',
                       style: TextStyle(
-                        color: AppColors.info,
+                        color: admin.isSuperAdmin ? AppColors.error : AppColors.info,
                         fontWeight: FontWeight.w600,
                         fontSize: 12,
                       ),
