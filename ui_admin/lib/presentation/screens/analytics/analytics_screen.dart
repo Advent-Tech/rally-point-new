@@ -8,6 +8,7 @@ import '../../../data/models/activity_stats_model.dart';
 import '../../../data/models/donation_model.dart';
 import '../../../data/models/prayer_request_model.dart';
 import '../../../data/models/user_model.dart';
+import '../../widgets/searchable_dropdown.dart';
 
 class AnalyticsScreen extends StatefulWidget {
   const AnalyticsScreen({super.key});
@@ -220,23 +221,26 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
           if (_teams.isNotEmpty)
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: DropdownButton<String>(
-                value: _selectedTeamId,
-                underline: const SizedBox(),
-                items: [
-                  const DropdownMenuItem(
-                    value: 'all',
-                    child: Text('All Teams'),
-                  ),
-                  ..._teams.map((t) => DropdownMenuItem(
-                        value: t.id,
-                        child: Text(t.name),
-                      )),
-                ],
-                onChanged: (value) {
-                  setState(() => _selectedTeamId = value);
-                  _loadAllData();
-                },
+              child: SizedBox(
+                width: 200,
+                child: SearchableDropdown<String>(
+                  value: _selectedTeamId,
+                  hintText: 'All Teams',
+                  items: [
+                    const SearchableDropdownItem(
+                      value: 'all',
+                      label: 'All Teams',
+                    ),
+                    ..._teams.map((t) => SearchableDropdownItem(
+                          value: t.id,
+                          label: t.name,
+                        )),
+                  ],
+                  onChanged: (value) {
+                    setState(() => _selectedTeamId = value);
+                    _loadAllData();
+                  },
+                ),
               ),
             ),
           IconButton(

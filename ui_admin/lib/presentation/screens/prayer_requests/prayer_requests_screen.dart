@@ -5,6 +5,7 @@ import '../../../core/network/api_client.dart';
 import '../../../core/constants/api_constants.dart';
 import '../../../data/models/prayer_request_model.dart';
 import '../../../data/models/user_model.dart';
+import '../../widgets/searchable_dropdown.dart';
 
 class PrayerRequestsScreen extends StatefulWidget {
   const PrayerRequestsScreen({super.key});
@@ -118,24 +119,26 @@ class _PrayerRequestsScreenState extends State<PrayerRequestsScreen>
           if (_teams.isNotEmpty)
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 8),
-              child: DropdownButton<String>(
-                value: _selectedTeamId,
-                hint: const Text('All Teams'),
-                underline: const SizedBox(),
-                items: [
-                  const DropdownMenuItem(
-                    value: '',
-                    child: Text('All Teams'),
-                  ),
-                  ..._teams.map((t) => DropdownMenuItem(
-                        value: t.id,
-                        child: Text(t.name),
-                      )),
-                ],
-                onChanged: (value) {
-                  setState(() => _selectedTeamId = value);
-                  _loadData();
-                },
+              child: SizedBox(
+                width: 200,
+                child: SearchableDropdown<String>(
+                  value: _selectedTeamId,
+                  hintText: 'All Teams',
+                  items: [
+                    const SearchableDropdownItem(
+                      value: '',
+                      label: 'All Teams',
+                    ),
+                    ..._teams.map((t) => SearchableDropdownItem(
+                          value: t.id,
+                          label: t.name,
+                        )),
+                  ],
+                  onChanged: (value) {
+                    setState(() => _selectedTeamId = value);
+                    _loadData();
+                  },
+                ),
               ),
             ),
           // Status filter
