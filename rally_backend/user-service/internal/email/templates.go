@@ -393,11 +393,6 @@ func (t *EmailTemplates) GetAdminInvitationURL(token string) string {
 
 // GenerateAdminInvitationEmail generates HTML and text versions of admin invitation email
 func (t *EmailTemplates) GenerateAdminInvitationEmail(data AdminInvitationEmailData) (html, text string, err error) {
-	roleLabel := "Admin"
-	if data.Role == "superadmin" {
-		roleLabel = "Superadmin"
-	}
-
 	htmlTmpl := `<!DOCTYPE html>
 <html>
 <head>
