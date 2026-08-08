@@ -320,9 +320,13 @@ class _AdminsScreenState extends State<AdminsScreen> {
       }
       _loadAdmins();
     } catch (e) {
+      String errorMessage = 'Failed to delete admin';
+      if (e is DioException && e.response?.data is Map) {
+        errorMessage = e.response?.data['error'] ?? errorMessage;
+      }
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to delete admin: $e')),
+          SnackBar(content: Text(errorMessage)),
         );
       }
     }
