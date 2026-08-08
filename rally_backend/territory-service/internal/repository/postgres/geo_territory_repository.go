@@ -275,7 +275,7 @@ func (r *geoTerritoryRepository) Search(query domain.TerritorySearchQuery) ([]*d
 
 	sqlQuery := fmt.Sprintf(`
 		SELECT id, solid, entity_name, entity_id, city, state,
-			union_name, conference, population
+			union_name, conference, population, housing_units
 		FROM territories
 		%s
 		ORDER BY entity_name, territory_order
@@ -350,7 +350,7 @@ func (r *geoTerritoryRepository) List(filters domain.TerritoryFilters) ([]*domai
 	args = append(args, limit, offset)
 	sqlQuery := fmt.Sprintf(`
 		SELECT id, solid, entity_name, entity_id, city, state,
-			union_name, conference, population
+			union_name, conference, population, housing_units
 		FROM territories
 		%s
 		ORDER BY union_name, conference, entity_name, territory_order
@@ -1209,11 +1209,11 @@ func (r *geoTerritoryRepository) scanSimpleTerritories(rows *sql.Rows) ([]*domai
 	for rows.Next() {
 		t := &domain.GeoTerritorySimple{}
 		var city, state, unionName, conference sql.NullString
-		var population sql.NullInt64
+		var population, housingUnits sql.NullInt64
 
 		err := rows.Scan(
 			&t.ID, &t.SOLID, &t.EntityName, &t.EntityID,
-			&city, &state, &unionName, &conference, &population,
+			&city, &state, &unionName, &conference, &population, &housingUnits,
 		)
 		if err != nil {
 			continue
@@ -1234,6 +1234,10 @@ func (r *geoTerritoryRepository) scanSimpleTerritories(rows *sql.Rows) ([]*domai
 		if population.Valid {
 			pop := int(population.Int64)
 			t.Population = &pop
+		}
+		if housingUnits.Valid {
+			hu := int(housingUnits.Int64)
+			t.HousingUnits = &hu
 		}
 
 		territories = append(territories, t)

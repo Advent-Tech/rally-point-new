@@ -54,15 +54,16 @@ type GeoTerritory struct {
 
 // GeoTerritorySimple is a lightweight version for list views
 type GeoTerritorySimple struct {
-	ID         uuid.UUID `json:"id"`
-	SOLID      string    `json:"solid"`
-	EntityName string    `json:"entity_name"`
-	EntityID   string    `json:"entity_id"`
-	City       *string   `json:"city,omitempty"`
-	State      *string   `json:"state,omitempty"`
-	UnionName  *string   `json:"union_name,omitempty"`
-	Conference *string   `json:"conference,omitempty"`
-	Population *int      `json:"population,omitempty"`
+	ID           uuid.UUID `json:"id"`
+	SOLID        string    `json:"solid"`
+	EntityName   string    `json:"entity_name"`
+	EntityID     string    `json:"entity_id"`
+	City         *string   `json:"city,omitempty"`
+	State        *string   `json:"state,omitempty"`
+	UnionName    *string   `json:"union_name,omitempty"`
+	Conference   *string   `json:"conference,omitempty"`
+	Population   *int      `json:"population,omitempty"`
+	HousingUnits *int      `json:"housing_units,omitempty"`
 }
 
 // ChurchLocation represents a church point location (centroid of territories)
