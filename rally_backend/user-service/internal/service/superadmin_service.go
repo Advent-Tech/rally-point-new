@@ -84,7 +84,7 @@ func (s *superAdminService) InviteAdmin(req *domain.InviteAdminRequest) error {
 	// Check if email already exists
 	existingUser, _ := s.userRepo.GetByEmail(req.Email)
 	if existingUser != nil {
-		return fmt.Errorf("user with email %s already exists", req.Email)
+		return fmt.Errorf("a user with email %s already exists", req.Email)
 	}
 
 	// Determine role (default to admin)
@@ -183,24 +183,32 @@ func (s *superAdminService) InviteAdmin(req *domain.InviteAdminRequest) error {
 	return nil
 }
 
-// GetAllAdmins returns all admin users
+// GetAllAdmins returns all admin and superadmin users
 func (s *superAdminService) GetAllAdmins() (*domain.AdminListResponse, error) {
 	admins, err := s.userRepo.GetByRole(domain.RoleAdmin)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get admins: %w", err)
 	}
 
-	adminInfos := make([]*domain.AdminInfo, 0, len(admins))
-	for _, admin := range admins {
+	superadmins, err := s.userRepo.GetByRole(domain.RoleSuperAdmin)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get superadmins: %w", err)
+	}
+
+	allUsers := append(admins, superadmins...)
+
+	adminInfos := make([]*domain.AdminInfo, 0, len(allUsers))
+	for _, user := range allUsers {
 		adminInfos = append(adminInfos, &domain.AdminInfo{
-			ID:              admin.ID,
-			Email:           admin.Email,
-			DisplayName:     admin.DisplayName,
-			Phone:           admin.Phone,
-			ProfilePhotoURL: admin.ProfilePhotoURL,
-			CreatedAt:       admin.CreatedAt,
-			LastActiveAt:    admin.LastActiveAt,
-			IsOnline:        admin.IsOnline,
+			ID:              user.ID,
+			Email:           user.Email,
+			DisplayName:     user.DisplayName,
+			Role:            user.Role,
+			Phone:           user.Phone,
+			ProfilePhotoURL: user.ProfilePhotoURL,
+			CreatedAt:       user.CreatedAt,
+			LastActiveAt:    user.LastActiveAt,
+			IsOnline:        user.IsOnline,
 		})
 	}
 

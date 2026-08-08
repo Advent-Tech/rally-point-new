@@ -83,6 +83,7 @@ type AdminInfo struct {
 	ID              uuid.UUID `json:"id"`
 	Email           string    `json:"email"`
 	DisplayName     string    `json:"display_name"`
+	Role            string    `json:"role"`
 	Phone           *string   `json:"phone,omitempty"`
 	ProfilePhotoURL *string   `json:"profile_photo_url,omitempty"`
 	CreatedAt       time.Time `json:"created_at"`
