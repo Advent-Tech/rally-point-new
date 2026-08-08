@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:dio/dio.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/network/api_client.dart';
 import '../../../core/constants/api_constants.dart';
@@ -177,9 +178,13 @@ class _AdminsScreenState extends State<AdminsScreen> {
       }
       _loadAdmins();
     } catch (e) {
+      String errorMessage = 'Failed to send invitation';
+      if (e is DioException && e.response?.data is Map) {
+        errorMessage = e.response?.data['error'] ?? errorMessage;
+      }
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to send invitation: $e')),
+          SnackBar(content: Text(errorMessage)),
         );
       }
     }
