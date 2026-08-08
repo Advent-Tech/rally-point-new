@@ -297,11 +297,13 @@ func (t *EmailTemplates) GeneratePasswordResetEmail(data PasswordResetEmailData)
             <h2>Reset Your Password</h2>
             <p>Hello {{.UserName}},</p>
             <p>We received a request to reset your password. Click the button below to create a new password:</p>
-            <p style="text-align: center;">
-                <a href="{{.ResetURL}}" class="button">Reset Password</a>
-            </p>
-            <p>Or copy and paste this link into your browser:</p>
-            <p class="link-text">{{.ResetURL}}</p>
+            <table role="presentation" cellspacing="0" cellpadding="0" border="0" style="margin:20px auto;">
+                <tr>
+                    <td align="center" bgcolor="#E74C3C" style="border-radius:6px;">
+                        <a href="{{.ResetURL}}" style="display:inline-block;padding:14px 28px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;font-size:16px;font-weight:600;color:#ffffff;text-decoration:none;border-radius:6px;">Reset Password</a>
+                    </td>
+                </tr>
+            </table>
             <div class="warning">
                 <strong>Security Notice:</strong> This link will expire in {{.ExpiryMinutes}} minutes for your security.
             </div>
@@ -508,12 +510,13 @@ func (t *EmailTemplates) GenerateAdminInvitationEmail(data AdminInvitationEmailD
             <p>Your email address: <strong>{{.InviteeEmail}}</strong></p>
 
             <p>Click the button below to set your password and activate your account:</p>
-            <p style="text-align: center;">
-                <a href="{{.InvitationURL}}" class="button">Set Your Password</a>
-            </p>
-
-            <p>Or copy and paste this link into your browser:</p>
-            <p class="link-text">{{.InvitationURL}}</p>
+            <table role="presentation" cellspacing="0" cellpadding="0" border="0" style="margin:20px auto;">
+                <tr>
+                    <td align="center" bgcolor="#667eea" style="border-radius:8px;">
+                        <a href="{{.InvitationURL}}" style="display:inline-block;padding:14px 32px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;font-size:16px;font-weight:600;color:#ffffff;text-decoration:none;border-radius:8px;">Set Your Password</a>
+                    </td>
+                </tr>
+            </table>
 
             <div class="info-box">
                 <strong>What happens next?</strong>
@@ -703,12 +706,13 @@ func (t *EmailTemplates) GenerateTeamInvitationEmail(data TeamInvitationEmailDat
             </div>
 
             <p>To accept this invitation and join the team, click the button below:</p>
-            <p style="text-align: center;">
-                <a href="{{.InvitationURL}}" class="button">Accept Invitation</a>
-            </p>
-
-            <p>Or copy and paste this link into your browser:</p>
-            <p class="link-text">{{.InvitationURL}}</p>
+            <table role="presentation" cellspacing="0" cellpadding="0" border="0" style="margin:20px auto;">
+                <tr>
+                    <td align="center" bgcolor="#667eea" style="border-radius:8px;">
+                        <a href="{{.InvitationURL}}" style="display:inline-block;padding:14px 32px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;font-size:16px;font-weight:600;color:#ffffff;text-decoration:none;border-radius:8px;">Accept Invitation</a>
+                    </td>
+                </tr>
+            </table>
 
             <div class="info-box">
                 <strong>What happens next?</strong>
