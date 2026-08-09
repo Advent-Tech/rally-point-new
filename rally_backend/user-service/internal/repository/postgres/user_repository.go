@@ -167,23 +167,34 @@ func (r *userRepository) Update(user *domain.User) error {
 
 // Delete deletes a user
 func (r *userRepository) Delete(id uuid.UUID) error {
-	query := `DELETE FROM users WHERE id = $1`
-	
-	result, err := r.db.Exec(query, id)
+	tx, err := r.db.Begin()
+	if err != nil {
+		return fmt.Errorf("failed to begin transaction: %w", err)
+	}
+	defer tx.Rollback()
+
+	_, err = tx.Exec(`UPDATE leader_territory_allocations SET allocated_by = (
+		SELECT id FROM users WHERE role = 'superadmin' AND id != $1 AND is_active = true ORDER BY created_at LIMIT 1
+	) WHERE allocated_by = $1`, id)
+	if err != nil {
+		return fmt.Errorf("failed to reassign territory allocations: %w", err)
+	}
+
+	result, err := tx.Exec(`DELETE FROM users WHERE id = $1`, id)
 	if err != nil {
 		return fmt.Errorf("failed to delete user: %w", err)
 	}
-	
+
 	rowsAffected, err := result.RowsAffected()
 	if err != nil {
 		return fmt.Errorf("failed to get rows affected: %w", err)
 	}
-	
+
 	if rowsAffected == 0 {
 		return fmt.Errorf("user not found")
 	}
-	
-	return nil
+
+	return tx.Commit()
 }
 
 // GetByTeamID retrieves users by team ID
