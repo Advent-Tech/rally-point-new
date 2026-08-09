@@ -119,13 +119,15 @@ func (t *EmailTemplates) GenerateVerificationEmail(data VerificationEmailData) (
             <h2>Verify Your Email Address</h2>
             <p>Hello {{.UserName}},</p>
             <p>Thank you for registering with light point. To complete your registration, please activate your account by clicking the button below:</p>
-            <table cellspacing="0" cellpadding="0" border="0" align="center">
-                <tr>
-                    <td align="center" bgcolor="#4A90D9" style="padding:14px 28px;border-radius:6px;font-family:sans-serif;font-size:16px;font-weight:600;">
-                        <a href="{{.VerificationURL}}" target="_blank" style="color:#ffffff;text-decoration:none;">Activate Account</a>
-                    </td>
-                </tr>
-            </table>
+            <!--[if mso]>
+            <v:roundrect xmlns:v="urn:schemas-microsoft-com:vml" xmlns:w="urn:schemas-microsoft-com:office:word" href="{{.VerificationURL}}" style="height:48px;v-text-anchor:middle;width:220px;" arcsize="10%" fillcolor="#4A90D9" strokecolor="#4A90D9">
+            <w:anchorlock/>
+            <center style="color:#ffffff;font-family:Arial,sans-serif;font-size:16px;font-weight:bold;">Activate Account</center>
+            </v:roundrect>
+            <![endif]-->
+            <!--[if !mso]><!-->
+            <a href="{{.VerificationURL}}" target="_blank" style="background-color:#4A90D9;border-radius:6px;color:#ffffff;display:inline-block;font-family:Arial,sans-serif;font-size:16px;font-weight:bold;line-height:48px;text-align:center;text-decoration:none;padding:0 28px;">Activate Account</a>
+            <!--<![endif]-->
             <div class="warning">
                 <strong>Note:</strong> This link will expire in {{.ExpiryHours}} hours. If you did not create an account with light point, please ignore this email.
             </div>
@@ -251,13 +253,15 @@ func (t *EmailTemplates) GeneratePasswordResetEmail(data PasswordResetEmailData)
             <h2>Reset Your Password</h2>
             <p>Hello {{.UserName}},</p>
             <p>We received a request to reset your password. Click the button below to create a new password:</p>
-            <table cellspacing="0" cellpadding="0" border="0" align="center">
-                <tr>
-                    <td align="center" bgcolor="#E74C3C" style="padding:14px 28px;border-radius:6px;font-family:sans-serif;font-size:16px;font-weight:600;">
-                        <a href="{{.ResetURL}}" target="_blank" style="color:#ffffff;text-decoration:none;">Reset Password</a>
-                    </td>
-                </tr>
-            </table>
+            <!--[if mso]>
+            <v:roundrect xmlns:v="urn:schemas-microsoft-com:vml" xmlns:w="urn:schemas-microsoft-com:office:word" href="{{.ResetURL}}" style="height:48px;v-text-anchor:middle;width:220px;" arcsize="10%" fillcolor="#E74C3C" strokecolor="#E74C3C">
+            <w:anchorlock/>
+            <center style="color:#ffffff;font-family:Arial,sans-serif;font-size:16px;font-weight:bold;">Reset Password</center>
+            </v:roundrect>
+            <![endif]-->
+            <!--[if !mso]><!-->
+            <a href="{{.ResetURL}}" target="_blank" style="background-color:#E74C3C;border-radius:6px;color:#ffffff;display:inline-block;font-family:Arial,sans-serif;font-size:16px;font-weight:bold;line-height:48px;text-align:center;text-decoration:none;padding:0 28px;">Reset Password</a>
+            <!--<![endif]-->
             <div class="warning">
                 <strong>Security Notice:</strong> This link will expire in {{.ExpiryMinutes}} minutes for your security.
             </div>
@@ -441,13 +445,15 @@ func (t *EmailTemplates) GenerateAdminInvitationEmail(data AdminInvitationEmailD
             <p>Your email address: <strong>{{.InviteeEmail}}</strong></p>
 
             <p>Click the button below to set your password and activate your account:</p>
-            <table cellspacing="0" cellpadding="0" border="0" align="center">
-                <tr>
-                    <td align="center" bgcolor="#667eea" style="padding:14px 32px;border-radius:8px;font-family:sans-serif;font-size:16px;font-weight:600;">
-                        <a href="{{.InvitationURL}}" target="_blank" style="color:#ffffff;text-decoration:none;">Set Your Password</a>
-                    </td>
-                </tr>
-            </table>
+            <!--[if mso]>
+            <v:roundrect xmlns:v="urn:schemas-microsoft-com:vml" xmlns:w="urn:schemas-microsoft-com:office:word" href="{{.InvitationURL}}" style="height:48px;v-text-anchor:middle;width:240px;" arcsize="10%" fillcolor="#667eea" strokecolor="#667eea">
+            <w:anchorlock/>
+            <center style="color:#ffffff;font-family:Arial,sans-serif;font-size:16px;font-weight:bold;">Set Your Password</center>
+            </v:roundrect>
+            <![endif]-->
+            <!--[if !mso]><!-->
+            <a href="{{.InvitationURL}}" target="_blank" style="background-color:#667eea;border-radius:8px;color:#ffffff;display:inline-block;font-family:Arial,sans-serif;font-size:16px;font-weight:bold;line-height:48px;text-align:center;text-decoration:none;padding:0 32px;">Set Your Password</a>
+            <!--<![endif]-->
 
             <div class="info-box">
                 <strong>What happens next?</strong>
@@ -614,13 +620,15 @@ func (t *EmailTemplates) GenerateTeamInvitationEmail(data TeamInvitationEmailDat
             </div>
 
             <p>To accept this invitation and join the team, click the button below:</p>
-            <table cellspacing="0" cellpadding="0" border="0" align="center">
-                <tr>
-                    <td align="center" bgcolor="#667eea" style="padding:14px 32px;border-radius:8px;font-family:sans-serif;font-size:16px;font-weight:600;">
-                        <a href="{{.InvitationURL}}" target="_blank" style="color:#ffffff;text-decoration:none;">Accept Invitation</a>
-                    </td>
-                </tr>
-            </table>
+            <!--[if mso]>
+            <v:roundrect xmlns:v="urn:schemas-microsoft-com:vml" xmlns:w="urn:schemas-microsoft-com:office:word" href="{{.InvitationURL}}" style="height:48px;v-text-anchor:middle;width:240px;" arcsize="10%" fillcolor="#667eea" strokecolor="#667eea">
+            <w:anchorlock/>
+            <center style="color:#ffffff;font-family:Arial,sans-serif;font-size:16px;font-weight:bold;">Accept Invitation</center>
+            </v:roundrect>
+            <![endif]-->
+            <!--[if !mso]><!-->
+            <a href="{{.InvitationURL}}" target="_blank" style="background-color:#667eea;border-radius:8px;color:#ffffff;display:inline-block;font-family:Arial,sans-serif;font-size:16px;font-weight:bold;line-height:48px;text-align:center;text-decoration:none;padding:0 32px;">Accept Invitation</a>
+            <!--<![endif]-->
 
             <div class="info-box">
                 <strong>What happens next?</strong>
