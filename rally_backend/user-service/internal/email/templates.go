@@ -94,29 +94,6 @@ func (t *EmailTemplates) GenerateVerificationEmail(data VerificationEmailData) (
             color: #333;
             margin-top: 0;
         }
-        .button {
-            display: inline-block;
-            background-color: #4A90D9;
-            color: white !important;
-            padding: 14px 28px;
-            text-decoration: none;
-            border-radius: 6px;
-            margin: 20px 0;
-            font-weight: 600;
-            font-size: 16px;
-        }
-        .button:hover {
-            background-color: #357ABD;
-        }
-        .link-text {
-            word-break: break-all;
-            color: #666;
-            font-size: 14px;
-            background-color: #f9f9f9;
-            padding: 10px;
-            border-radius: 4px;
-            margin: 10px 0;
-        }
         .footer {
             padding: 20px;
             text-align: center;
@@ -142,10 +119,10 @@ func (t *EmailTemplates) GenerateVerificationEmail(data VerificationEmailData) (
             <h2>Verify Your Email Address</h2>
             <p>Hello {{.UserName}},</p>
             <p>Thank you for registering with light point. To complete your registration, please activate your account by clicking the button below:</p>
-            <table role="presentation" cellspacing="0" cellpadding="0" border="0" style="margin:20px auto;">
+            <table cellspacing="0" cellpadding="0" border="0" align="center">
                 <tr>
-                    <td align="center" bgcolor="#4A90D9" style="border-radius:6px;">
-                        <a href="{{.VerificationURL}}" style="display:inline-block;padding:14px 28px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;font-size:16px;font-weight:600;color:#ffffff;text-decoration:none;border-radius:6px;">Activate Account</a>
+                    <td align="center" bgcolor="#4A90D9" style="padding:14px 28px;border-radius:6px;font-family:sans-serif;font-size:16px;font-weight:600;">
+                        <a href="{{.VerificationURL}}" target="_blank" style="color:#ffffff;text-decoration:none;">Activate Account</a>
                     </td>
                 </tr>
             </table>
@@ -241,29 +218,6 @@ func (t *EmailTemplates) GeneratePasswordResetEmail(data PasswordResetEmailData)
             color: #333;
             margin-top: 0;
         }
-        .button {
-            display: inline-block;
-            background-color: #E74C3C;
-            color: white !important;
-            padding: 14px 28px;
-            text-decoration: none;
-            border-radius: 6px;
-            margin: 20px 0;
-            font-weight: 600;
-            font-size: 16px;
-        }
-        .button:hover {
-            background-color: #C0392B;
-        }
-        .link-text {
-            word-break: break-all;
-            color: #666;
-            font-size: 14px;
-            background-color: #f9f9f9;
-            padding: 10px;
-            border-radius: 4px;
-            margin: 10px 0;
-        }
         .footer {
             padding: 20px;
             text-align: center;
@@ -297,10 +251,10 @@ func (t *EmailTemplates) GeneratePasswordResetEmail(data PasswordResetEmailData)
             <h2>Reset Your Password</h2>
             <p>Hello {{.UserName}},</p>
             <p>We received a request to reset your password. Click the button below to create a new password:</p>
-            <table role="presentation" cellspacing="0" cellpadding="0" border="0" style="margin:20px auto;">
+            <table cellspacing="0" cellpadding="0" border="0" align="center">
                 <tr>
-                    <td align="center" bgcolor="#E74C3C" style="border-radius:6px;">
-                        <a href="{{.ResetURL}}" style="display:inline-block;padding:14px 28px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;font-size:16px;font-weight:600;color:#ffffff;text-decoration:none;border-radius:6px;">Reset Password</a>
+                    <td align="center" bgcolor="#E74C3C" style="padding:14px 28px;border-radius:6px;font-family:sans-serif;font-size:16px;font-weight:600;">
+                        <a href="{{.ResetURL}}" target="_blank" style="color:#ffffff;text-decoration:none;">Reset Password</a>
                     </td>
                 </tr>
             </table>
@@ -447,29 +401,6 @@ func (t *EmailTemplates) GenerateAdminInvitationEmail(data AdminInvitationEmailD
             color: #667eea;
             font-size: 16px;
         }
-        .button {
-            display: inline-block;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white !important;
-            padding: 14px 32px;
-            text-decoration: none;
-            border-radius: 8px;
-            margin: 20px 0;
-            font-weight: 600;
-            font-size: 16px;
-        }
-        .button:hover {
-            opacity: 0.9;
-        }
-        .link-text {
-            word-break: break-all;
-            color: #666;
-            font-size: 14px;
-            background-color: #f9f9f9;
-            padding: 10px;
-            border-radius: 4px;
-            margin: 10px 0;
-        }
         .footer {
             padding: 20px;
             text-align: center;
@@ -510,10 +441,10 @@ func (t *EmailTemplates) GenerateAdminInvitationEmail(data AdminInvitationEmailD
             <p>Your email address: <strong>{{.InviteeEmail}}</strong></p>
 
             <p>Click the button below to set your password and activate your account:</p>
-            <table role="presentation" cellspacing="0" cellpadding="0" border="0" style="margin:20px auto;">
+            <table cellspacing="0" cellpadding="0" border="0" align="center">
                 <tr>
-                    <td align="center" bgcolor="#667eea" style="border-radius:8px;">
-                        <a href="{{.InvitationURL}}" style="display:inline-block;padding:14px 32px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;font-size:16px;font-weight:600;color:#ffffff;text-decoration:none;border-radius:8px;">Set Your Password</a>
+                    <td align="center" bgcolor="#667eea" style="padding:14px 32px;border-radius:8px;font-family:sans-serif;font-size:16px;font-weight:600;">
+                        <a href="{{.InvitationURL}}" target="_blank" style="color:#ffffff;text-decoration:none;">Set Your Password</a>
                     </td>
                 </tr>
             </table>
@@ -642,29 +573,6 @@ func (t *EmailTemplates) GenerateTeamInvitationEmail(data TeamInvitationEmailDat
             color: #666;
             font-size: 14px;
         }
-        .button {
-            display: inline-block;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white !important;
-            padding: 14px 32px;
-            text-decoration: none;
-            border-radius: 8px;
-            margin: 20px 0;
-            font-weight: 600;
-            font-size: 16px;
-        }
-        .button:hover {
-            opacity: 0.9;
-        }
-        .link-text {
-            word-break: break-all;
-            color: #666;
-            font-size: 14px;
-            background-color: #f9f9f9;
-            padding: 10px;
-            border-radius: 4px;
-            margin: 10px 0;
-        }
         .footer {
             padding: 20px;
             text-align: center;
@@ -706,10 +614,10 @@ func (t *EmailTemplates) GenerateTeamInvitationEmail(data TeamInvitationEmailDat
             </div>
 
             <p>To accept this invitation and join the team, click the button below:</p>
-            <table role="presentation" cellspacing="0" cellpadding="0" border="0" style="margin:20px auto;">
+            <table cellspacing="0" cellpadding="0" border="0" align="center">
                 <tr>
-                    <td align="center" bgcolor="#667eea" style="border-radius:8px;">
-                        <a href="{{.InvitationURL}}" style="display:inline-block;padding:14px 32px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;font-size:16px;font-weight:600;color:#ffffff;text-decoration:none;border-radius:8px;">Accept Invitation</a>
+                    <td align="center" bgcolor="#667eea" style="padding:14px 32px;border-radius:8px;font-family:sans-serif;font-size:16px;font-weight:600;">
+                        <a href="{{.InvitationURL}}" target="_blank" style="color:#ffffff;text-decoration:none;">Accept Invitation</a>
                     </td>
                 </tr>
             </table>
