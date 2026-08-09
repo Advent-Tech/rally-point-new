@@ -174,7 +174,7 @@ func (r *userRepository) Delete(id uuid.UUID) error {
 	defer tx.Rollback()
 
 	_, err = tx.Exec(`UPDATE leader_territory_allocations SET allocated_by = (
-		SELECT id FROM users WHERE role = 'superadmin' AND id != $1 AND is_active = true ORDER BY created_at LIMIT 1
+		SELECT id FROM users WHERE role = 'superadmin' AND id != $1 ORDER BY created_at LIMIT 1
 	) WHERE allocated_by = $1`, id)
 	if err != nil {
 		return fmt.Errorf("failed to reassign territory allocations: %w", err)
