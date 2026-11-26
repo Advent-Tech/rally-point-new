@@ -1,6 +1,7 @@
 package postgres
 
 import (
+	"math"
 	"database/sql"
 	"encoding/json"
 	"fmt"
@@ -702,14 +703,21 @@ func (r *geoTerritoryRepository) GetTotalCount() (int, error) {
 }
 
 func (r *geoTerritoryRepository) GetVectorTile(z, x, y int) ([]byte, error) {
-	query := `
+	// Low zoom tiles use pre-simplified geometry (much smaller, faster to encode)
+	geomColumn := "t.geom"
+	if z < domain.ZoomThresholdSimplified {
+		geomColumn = "COALESCE(t.geom_simplified, t.geom)"
+	}
+
+	query := fmt.Sprintf(`
 		WITH bounds AS (
-			SELECT ST_TileEnvelope($1, $2, $3) AS geom
+			SELECT ST_TileEnvelope($1, $2, $3) AS geom,
+				ST_Transform(ST_TileEnvelope($1, $2, $3), 4326) AS geom4326
 		),
 		mvt AS (
 			SELECT
 				ST_AsMVTGeom(
-					t.geom,
+					ST_Transform(%s, 3857),
 					bounds.geom,
 					4096, 64, true
 				) AS geom,
@@ -723,14 +731,22 @@ func (r *geoTerritoryRepository) GetVectorTile(z, x, y int) ([]byte, error) {
 				t.conference,
 				t.population
 			FROM territories t, bounds
-			WHERE ST_Intersects(t.geom, bounds.geom)
+			WHERE t.geom && bounds.geom4326 AND ST_Intersects(t.geom, bounds.geom4326)
+				AND (t.area_deg2 IS NULL OR t.area_deg2 >= $4)
 		)
-		SELECT ST_AsMVT(mvt.*, 'territories', 4096, 'geom')
+		SELECT COALESCE(ST_AsMVT(mvt.*, 'territories', 4096, 'geom'), ''::bytea)
 		FROM mvt
-	`
+	`, geomColumn)
+
+	// Below zoom 10, skip territories smaller than ~3x3 screen pixels (invisible anyway).
+	minArea := 0.0
+	if z < domain.ZoomThresholdSimplified {
+		px := 360.0 / (256.0 * math.Pow(2, float64(z)))
+		minArea = (3 * px) * (3 * px)
+	}
 
 	var tile []byte
-	err := r.db.QueryRow(query, z, x, y).Scan(&tile)
+	err := r.db.QueryRow(query, z, x, y, minArea).Scan(&tile)
 	if err != nil {
 		return nil, err
 	}
@@ -1015,11 +1031,19 @@ func (r *geoTerritoryRepository) CreateBatch(territories []*domain.GeoTerritory)
 
 func (r *geoTerritoryRepository) UpdateSimplifiedGeometry(tolerance float64) error {
 	query := `
-		UPDATE territories
-		SET geom_simplified = ST_Simplify(geom, $1)
-		WHERE geom_simplified IS NULL
+		UPDATE territories t
+		SET geom_simplified = s.g
+		FROM (
+			SELECT id, ST_Multi(ST_CollectionExtract(ST_MakeValid(ST_Simplify(geom, $1)), 3)) AS g
+			FROM territories
+			WHERE geom_simplified IS NULL
+		) s
+		WHERE t.id = s.id AND s.g IS NOT NULL AND NOT ST_IsEmpty(s.g)
 	`
-	_, err := r.db.Exec(query, tolerance)
+	if _, err := r.db.Exec(query, tolerance); err != nil {
+		return err
+	}
+	_, err := r.db.Exec(`UPDATE territories SET area_deg2 = ST_Area(geom) WHERE area_deg2 IS NULL`)
 	return err
 }
 

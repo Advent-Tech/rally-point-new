@@ -170,6 +170,13 @@ migrate-up: ## Run database migrations
 	@docker-compose --env-file .env exec postgres psql -U $(DB_USER) -d $(DB_NAME) -f /docker-entrypoint-initdb.d/021_survey_multi_team.sql || true
 	@docker-compose --env-file .env exec postgres psql -U $(DB_USER) -d $(DB_NAME) -f /docker-entrypoint-initdb.d/022_email_verification_password_reset.sql || true
 	@docker-compose --env-file .env exec postgres psql -U $(DB_USER) -d $(DB_NAME) -f /docker-entrypoint-initdb.d/023_team_invitations.sql || true
+	@docker-compose --env-file .env exec postgres psql -U $(DB_USER) -d $(DB_NAME) -f /docker-entrypoint-initdb.d/024_performance_indexes.sql || true
+	@docker-compose --env-file .env exec postgres psql -U $(DB_USER) -d $(DB_NAME) -f /docker-entrypoint-initdb.d/025_notifications.sql || true
+	@docker-compose --env-file .env exec postgres psql -U $(DB_USER) -d $(DB_NAME) -f /docker-entrypoint-initdb.d/026_gps_smoothing.sql || true
+	@docker-compose --env-file .env exec postgres psql -U $(DB_USER) -d $(DB_NAME) -f /docker-entrypoint-initdb.d/027_targets_achievements.sql || true
+	@docker-compose --env-file .env exec postgres psql -U $(DB_USER) -d $(DB_NAME) -f /docker-entrypoint-initdb.d/028_territory_query_indexes.sql || true
+	@docker-compose --env-file .env exec postgres psql -U $(DB_USER) -d $(DB_NAME) -f /docker-entrypoint-initdb.d/029_territory_area.sql || true
+	@docker-compose --env-file .env exec postgres psql -U $(DB_USER) -d $(DB_NAME) -f /docker-entrypoint-initdb.d/030_union_stats_mv.sql || true
 	@echo "✅ Migrations completed"
 
 migrate-assignments: ## Run territory assignments migration only

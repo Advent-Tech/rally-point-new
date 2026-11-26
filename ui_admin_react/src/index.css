@@ -1,0 +1,16 @@
+*{box-sizing:border-box}body{margin:0;font:14px system-ui,sans-serif;background:#f5f5f5;color:#1c1c1e}
+.login{width:340px;margin:12vh auto;display:flex;flex-direction:column;gap:12px;text-align:center}
+.login input{padding:14px;border:1px solid #ddd;border-radius:8px;background:#eee}
+.login button{padding:12px;border:0;border-radius:8px;background:#1976d2;color:#fff;font-weight:600;cursor:pointer}
+.err{color:#d32f2f}.note{background:#e3f0fa;color:#1976d2;padding:12px;border-radius:8px;font-size:12px}
+.shell{height:100vh;display:flex;flex-direction:column}
+header{display:flex;justify-content:space-between;padding:14px 20px;background:#fff;border-bottom:1px solid #e5e5e5}
+header a{color:#1976d2;cursor:pointer}
+.body{flex:1;display:flex;min-height:0}.map{flex:1}
+aside{width:320px;background:#fff;padding:16px;overflow:auto;border-left:1px solid #e5e5e5;display:flex;flex-direction:column;gap:10px}
+aside h2{margin:0}.tiles{display:flex;gap:8px}.tiles div{flex:1;background:#e8f1fb;border-radius:8px;padding:10px;text-align:center;font-size:12px;color:#1976d2}
+.tiles b{display:block;font-size:18px}
+select,.search{padding:10px;border:1px solid #ccc;border-radius:6px}
+ul{list-style:none;margin:0;padding:0}li{display:flex;justify-content:space-between;padding:10px 6px;border-bottom:1px solid #eee;cursor:pointer}
+li small{display:block;color:#777}li em{color:#777;font-style:normal}
+.mapwrap{flex:1;position:relative;display:flex}.busy{position:absolute;top:12px;left:56px;background:#fff;padding:6px 12px;border-radius:8px;box-shadow:0 1px 4px #0003}.info{position:absolute;left:12px;bottom:28px;background:#fff;padding:8px 12px;border-radius:10px;box-shadow:0 1px 6px #0003}.info small{display:block;color:#777;font-size:11px}

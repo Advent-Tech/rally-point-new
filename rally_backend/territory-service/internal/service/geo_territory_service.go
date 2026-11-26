@@ -3,6 +3,7 @@ package service
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 	"time"
 
 	"github.com/google/uuid"
@@ -13,6 +14,7 @@ import (
 type geoTerritoryService struct {
 	repo     domain.GeoTerritoryRepository
 	importer *importer.GeoPackageImporter
+	tiles    *tileCache
 }
 
 // NewGeoTerritoryService creates a new geo territory service
@@ -20,6 +22,7 @@ func NewGeoTerritoryService(repo domain.GeoTerritoryRepository, imp *importer.Ge
 	return &geoTerritoryService{
 		repo:     repo,
 		importer: imp,
+		tiles:    newTileCache(256<<20, time.Hour), // 256MB, 1h TTL
 	}
 }
 
@@ -165,11 +168,15 @@ func (s *geoTerritoryService) GetVectorTile(z, x, y int) ([]byte, error) {
 		return nil, fmt.Errorf("invalid tile coordinates for zoom level %d", z)
 	}
 
-	return s.repo.GetVectorTile(z, x, y)
+	key := fmt.Sprintf("%d/%d/%d", z, x, y)
+	return s.tiles.get(key, func() ([]byte, error) {
+		return s.repo.GetVectorTile(z, x, y)
+	})
 }
 
 // CreateTerritory creates a new territory
 func (s *geoTerritoryService) CreateTerritory(req *domain.CreateGeoTerritoryRequest) (*domain.GeoTerritory, error) {
+	defer s.tiles.clear() // invalidate cached vector tiles
 	// Validate geometry
 	validation, err := s.repo.ValidateGeometry(req.Geometry)
 	if err != nil {
@@ -242,6 +249,7 @@ func (s *geoTerritoryService) CreateTerritory(req *domain.CreateGeoTerritoryRequ
 
 // UpdateTerritory updates an existing territory
 func (s *geoTerritoryService) UpdateTerritory(id uuid.UUID, req *domain.UpdateGeoTerritoryRequest) (*domain.GeoTerritory, error) {
+	defer s.tiles.clear() // invalidate cached vector tiles
 	// Verify exists
 	_, err := s.repo.GetByID(id)
 	if err != nil {
@@ -268,6 +276,7 @@ func (s *geoTerritoryService) UpdateTerritory(id uuid.UUID, req *domain.UpdateGe
 
 // DeleteTerritory deletes a territory
 func (s *geoTerritoryService) DeleteTerritory(id uuid.UUID) error {
+	defer s.tiles.clear() // invalidate cached vector tiles
 	return s.repo.Delete(id)
 }
 
@@ -290,10 +299,19 @@ func (s *geoTerritoryService) ValidateGeometry(geojson json.RawMessage) (*domain
 
 // ImportGeoPackage imports a GeoPackage file
 func (s *geoTerritoryService) ImportGeoPackage(filePath string) (*domain.ImportProgress, error) {
+	defer s.tiles.clear() // invalidate cached vector tiles
 	if s.importer == nil {
 		return nil, fmt.Errorf("importer not configured")
 	}
-	return s.importer.ImportFile(filePath)
+	progress, err := s.importer.ImportFile(filePath)
+	if err != nil {
+		return progress, err
+	}
+	// Fill geom_simplified for new rows so low-zoom tiles/bounds stay small
+	if serr := s.repo.UpdateSimplifiedGeometry(domain.SimplificationTolerance); serr != nil {
+		log.Printf("warning: failed to build simplified geometry: %v", serr)
+	}
+	return progress, nil
 }
 
 // GetImportProgress retrieves the progress of an import

@@ -1,6 +1,8 @@
 package handler
 
 import (
+	"crypto/sha1"
+	"encoding/hex"
 	"encoding/json"
 	"net/http"
 	"strconv"
@@ -370,10 +372,22 @@ func (h *GeoTerritoryHandler) GetVectorTile(c *gin.Context) {
 		return
 	}
 
-	// Set cache headers (tiles can be cached for a long time)
-	c.Header("Content-Type", "application/vnd.mapbox-vector-tile")
-	c.Header("Cache-Control", "public, max-age=86400") // 24 hours
+	// Tiles sit behind auth, so only private (browser) caches may store them.
+	// ETag lets clients revalidate cheaply with a 304.
+	sum := sha1.Sum(tile)
+	etag := `"` + hex.EncodeToString(sum[:8]) + `"`
+	c.Header("ETag", etag)
+	c.Header("Cache-Control", "private, max-age=3600, stale-while-revalidate=86400")
 	c.Header("Access-Control-Allow-Origin", "*")
+	if c.GetHeader("If-None-Match") == etag {
+		c.Status(http.StatusNotModified)
+		return
+	}
+	if len(tile) == 0 {
+		c.Status(http.StatusNoContent) // empty tile
+		return
+	}
+	c.Header("Content-Type", "application/vnd.mapbox-vector-tile")
 
 	c.Data(http.StatusOK, "application/vnd.mapbox-vector-tile", tile)
 }
